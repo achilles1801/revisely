@@ -42,7 +42,9 @@ jest.mock('firebase/firestore', () => {
   };
 });
 jest.mock('../../lib/firebase', () => ({ db: {}, auth: { currentUser: { uid: 'u1' } } }));
-jest.mock('../../lib/logger', () => ({ logger: { warn: jest.fn(), error: jest.fn(), info: jest.fn(), log: jest.fn() } }));
+jest.mock('../../lib/logger', () => ({
+  logger: { warn: jest.fn(), error: jest.fn(), info: jest.fn(), log: jest.fn() },
+}));
 
 import { getDocsFromServer } from 'firebase/firestore';
 import { createMissingPages, initializeAllPages, isInitializingPages } from '../firestoreService';

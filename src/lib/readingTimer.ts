@@ -1,4 +1,6 @@
 import { ReadingSession, ReadingTimerMode } from '../types';
+import { westernDigits } from '../i18n/digits';
+import { t } from '../i18n';
 
 /** What a timer was started for. Kept on the persisted timer for
  *  compatibility; since there is one floating timer, both behave the same
@@ -197,12 +199,13 @@ export function formatClock(ms: number): string {
 
 /** Human duration: "45s", "12m", "1h 5m". */
 export function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${Math.max(0, Math.round(seconds))}s`;
+  // In the app's language: "18m", «١٨ د» in Arabic.
+  if (seconds < 60) return t('lib.duration.seconds', { n: Math.max(0, Math.round(seconds)) });
   const totalMin = Math.round(seconds / 60);
-  if (totalMin < 60) return `${totalMin}m`;
+  if (totalMin < 60) return t('lib.duration.minutes', { n: totalMin });
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
-  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+  return m === 0 ? t('lib.duration.hours', { h }) : t('lib.duration.hoursMinutes', { h, m });
 }
 
 // ---------------------------------------------------------------------------
@@ -215,8 +218,8 @@ export function formatDuration(seconds: number): string {
  * outside 1–604.
  */
 export function parsePageRanges(text: string): number[] | null {
-  const parts = text
-    .split(/[,\s]+/)
+  const parts = westernDigits(text)
+    .split(/[,،\s]+/)
     .map((p) => p.trim())
     .filter(Boolean);
   const pages = new Set<number>();

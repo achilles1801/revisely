@@ -1,0 +1,187 @@
+{
+ "version": 1,
+ "about": "Revisely Dev's on-device bench (Settings -> Testing -> On-device model, ONDEV-1). Models are workstream M's watermarked v7 files (~/revisely-mistake-lab/runs/mobile/models: v7m-live-r16 runs as fp32, the shipping weights; v7m-live-f16pack is the fp16 pack, run here as a true fp16 graph until the engine widens it; v7m-any-r16 the any-length graph). Expected outputs on M's hop-16 features are ORT 1.31.1 CPU's. The clip is public EveryAyah audio (Husary, page 7, 90 s, 16 kHz int16). Paths are under models/recite/; only accounts with the onDeviceBench claim read them. The first run is the long run's.",
+ "files": {
+  "r16": {
+   "path": "v7/v7m-live-r16.onnx",
+   "bytes": 79915849,
+   "sha256": "5b4daf7d373abc0f84ee880f8d2cdf56a1d488fb8b2c1233affc05ec766971dc"
+  },
+  "f16pack": {
+   "path": "v7/v7m-live-f16pack.onnx",
+   "bytes": 39998066,
+   "sha256": "9116844c46e6d2c04bde1035963e79180ead0fd321aec9b252408d007f5c8815"
+  },
+  "anyR16": {
+   "path": "v7/v7m-any-r16.onnx",
+   "bytes": 82519804,
+   "sha256": "6836c4d9d51afff4e34e145e96fb8e16df229756461aa5068e93d7a99b964eac"
+  },
+  "clip": {
+   "path": "bench/husary-p7-90s.pcm16",
+   "bytes": 2880000,
+   "sha256": "91b8680d7ef01446e41ac0e25dabea8daa8734914a4a0ff4f04f0768e0454d01"
+  },
+  "take": {
+   "path": "vectors/take.pcm16",
+   "bytes": 394246,
+   "sha256": "9b0e17d26a7a8cb33f19c649001e96bfdebfa8485b12d1a10a316e6decb7a114"
+  },
+  "mel16": {
+   "path": "vectors/hop16.mel.f32",
+   "bytes": 153600,
+   "sha256": "8e2dcd2b05ae610724214859f1ffeccc5ab17f281af0ba80f233de71d22b5e3e"
+  },
+  "outR16": {
+   "path": "vectors/hop16.logprobs.v7m-live-r16.f32",
+   "bytes": 41280,
+   "sha256": "d1e917e945a5799c9dac452fd862a815801094604ea9e91dbf8eacb3574f7453"
+  },
+  "outF16pack": {
+   "path": "vectors/hop16.logprobs.v7m-live-f16pack.f32",
+   "bytes": 41280,
+   "sha256": "c02916c5fc507ca326a7f07264b292f6e6d5bc1058c263ab6be41ed12543c323"
+  },
+  "melFilters": {
+   "path": "vectors/mel_filters.f32",
+   "bytes": 64320,
+   "sha256": "88df35e6c6d720d89b2d59b410cf386081a6ad04ccc6daaa732ca9b481575137"
+  },
+  "hann": {
+   "path": "vectors/hann400.f32",
+   "bytes": 1600,
+   "sha256": "2b66ad855bb20e73e657a4df6d8f4a4c840a18431c35cf323f29143f04796c7e"
+  }
+ },
+ "models": [
+  {
+   "id": "v7m-live-r16",
+   "file": "r16",
+   "checkOut": "outR16"
+  },
+  {
+   "id": "v7m-live-f16pack",
+   "file": "f16pack",
+   "checkOut": "outF16pack"
+  },
+  {
+   "id": "v7m-any-r16",
+   "file": "anyR16",
+   "checkOut": "outR16"
+  }
+ ],
+ "audio": "clip",
+ "melFilters": "melFilters",
+ "hann": "hann",
+ "check": {
+  "pcm": "take",
+  "mel": "mel16",
+  "s0": 64000,
+  "end": 128000
+ },
+ "plans": {
+  "ios": [
+   {
+    "model": "v7m-live-r16",
+    "provider": "cpu",
+    "threads": 2
+   },
+   {
+    "model": "v7m-live-r16",
+    "provider": "cpu",
+    "threads": 1
+   },
+   {
+    "model": "v7m-live-f16pack",
+    "provider": "cpu",
+    "threads": 1
+   },
+   {
+    "model": "v7m-live-f16pack",
+    "provider": "cpu",
+    "threads": 2
+   },
+   {
+    "model": "v7m-live-r16",
+    "provider": "cpu",
+    "threads": 2,
+    "fromMemory": true,
+    "alsoModel": "v7m-any-r16"
+   },
+   {
+    "model": "v7m-live-r16",
+    "provider": "coreml",
+    "threads": 0,
+    "options": {
+     "ModelFormat": "MLProgram",
+     "MLComputeUnits": "ALL",
+     "RequireStaticInputShapes": "1"
+    }
+   },
+   {
+    "model": "v7m-live-f16pack",
+    "provider": "coreml",
+    "threads": 0,
+    "options": {
+     "ModelFormat": "MLProgram",
+     "MLComputeUnits": "ALL",
+     "RequireStaticInputShapes": "1"
+    }
+   }
+  ],
+  "android": [
+   {
+    "model": "v7m-live-r16",
+    "provider": "cpu",
+    "threads": 2
+   },
+   {
+    "model": "v7m-live-r16",
+    "provider": "cpu",
+    "threads": 1
+   },
+   {
+    "model": "v7m-live-f16pack",
+    "provider": "cpu",
+    "threads": 1
+   },
+   {
+    "model": "v7m-live-f16pack",
+    "provider": "cpu",
+    "threads": 2
+   },
+   {
+    "model": "v7m-live-r16",
+    "provider": "cpu",
+    "threads": 2,
+    "fromMemory": true,
+    "alsoModel": "v7m-any-r16"
+   },
+   {
+    "model": "v7m-live-r16",
+    "provider": "cpu",
+    "threads": 4
+   },
+   {
+    "model": "v7m-live-r16",
+    "provider": "nnapi",
+    "threads": 0
+   },
+   {
+    "model": "v7m-live-r16",
+    "provider": "xnnpack",
+    "threads": 1,
+    "options": {
+     "intra_op_num_threads": "2"
+    }
+   }
+  ]
+ },
+ "windowSamples": 64000,
+ "hopSamples": 8000,
+ "tolerance": {
+  "mel": 0.0002,
+  "out": 0.001,
+  "own": 0.02
+ }
+}

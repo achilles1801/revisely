@@ -38,14 +38,12 @@ import {
   FIRST_JUZ,
   JUZ_SHADE,
   MOMENT_CHOICE_P,
-  MOMENT_HAPTICS,
   MOMENT_ORBIT,
   MOMENT_QUESTIONS,
   MOMENT_WEEK,
   MOMENT_WEEK_MAX,
   MOMENT_WORDS,
   QUESTION_TIMES_P,
-  WEEK_LETTERS,
   back,
   eio,
   eo,
@@ -67,6 +65,8 @@ import { Tap } from '../v2/Tap';
 import { Stepper } from '../Stepper';
 import { R_TRACE } from './rTrace';
 import { MOMENT_CAPTURE } from '../../lib/whatsNew/capture';
+import { t, weekdayLetters } from '../../i18n';
+import { chevron } from '../../i18n/direction';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -392,7 +392,7 @@ function Pictures({ p, L }: { p: P; L: MomentLayout }) {
       {JUZ_SHADE.map((_, i) => (
         <Cell key={i} p={p} i={i} L={L} color={palette.primary} />
       ))}
-      {WEEK_LETTERS.map((l, i) => (
+      {weekdayLetters().map((l, i) => (
         <Animated.Text
           key={i}
           style={[styles.weekLetter, { top: 572 + L.oy, left: L.cx - 140 + i * 40, color: palette.secondary }, letters]}
@@ -449,7 +449,8 @@ function Crumbs({ p, L }: { p: P; L: MomentLayout }) {
       </Text>
     </View>
   );
-  const sep = <Text style={[styles.sep, { color: palette.secondary }]}>›</Text>;
+  // Breadcrumbs: the › points the way the language reads.
+  const sep = <Text style={[styles.sep, { color: palette.secondary }]}>{chevron()}</Text>;
   return (
     <View style={[styles.row, styles.centerRow, styles.abs, { top: 410 + L.oy, width: L.width, gap: 8 }]}>
       <Pop p={p} at={8.3}>
@@ -516,9 +517,8 @@ function HomeSketch({ p, firstName, topInset, tabBar }: { p: P; firstName: strin
           السلام عليكم
         </Text>
         <View style={styles.sketchIcons}>
-          {(['compass-outline', 'pulse-outline', 'settings-outline'] as const).map((n) => (
-            <Ionicons key={n} name={n} size={24} color={palette.text} />
-          ))}
+          {/* Home's top bar: the gear alone (HOME-1). */}
+          <Ionicons name="settings-outline" size={24} color={palette.text} />
         </View>
       </View>
       <View style={[styles.sketchPost, { top: topInset + 64 }]}>
@@ -529,7 +529,7 @@ function HomeSketch({ p, firstName, topInset, tabBar }: { p: P; firstName: strin
         </View>
         <View style={[styles.flex, { gap: 10 }]}>
           <Text style={[styles.cardTitle, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={1}>
-            {firstName || 'Today'}
+            {firstName || t('common.today')}
           </Text>
           {bar('70%', 16)}
           {bar('55%')}
@@ -550,6 +550,10 @@ function HomeSketch({ p, firstName, topInset, tabBar }: { p: P; firstName: strin
         <View style={styles.sketchTab}>
           <Ionicons name="home" size={26} color={palette.text} />
           <View style={[styles.tabDot, { backgroundColor: palette.accentText }]} />
+        </View>
+        {/* Home, Activity, Read (TAB-2). */}
+        <View style={styles.sketchTab}>
+          <Ionicons name="pulse-outline" size={26} color={palette.secondary} />
         </View>
         <View style={styles.sketchTab}>
           <Ionicons name="book-outline" size={26} color={palette.secondary} />
@@ -781,7 +785,7 @@ export function RevoMoment({
                 <Text
                   style={[styles.endTitle, { color: palette.text }]}
                   accessibilityRole="header"
-                  accessibilityLabel={mode === 'whatsNew' ? `Step ${step} of ${total}. ${title}` : title}
+                  accessibilityLabel={mode === 'whatsNew' ? t('whatsNew.step', { step, total, title }) : title}
                   maxFontSizeMultiplier={TEXT_MAX}
                   testID="whats-new-title"
                 >
@@ -865,7 +869,7 @@ export function RevoMoment({
         </Tap>
       )}
       {closable && !MOMENT_CAPTURE ? (
-        <Tap onPress={() => onClose?.()} accessibilityRole="button" accessibilityLabel="Close" hitSlop={12} style={[styles.close, { top: top + 6 }]} testID="whats-new-close">
+        <Tap onPress={() => onClose?.()} accessibilityRole="button" accessibilityLabel={t('common.close')} hitSlop={12} style={[styles.close, { top: top + 6 }]} testID="whats-new-close">
           <Ionicons name="close" size={26} color={palette.text} />
         </Tap>
       ) : null}

@@ -1,6 +1,11 @@
+const mockQueue = jest.fn(async (..._a: unknown[]) => undefined);
+jest.mock('../offline/queue', () => ({ queueChange: (...a: unknown[]) => mockQueue(...a) }));
+const mockUndoRecording = jest.fn(async (..._a: unknown[]) => 'deleted');
+jest.mock('../recordings', () => ({ undoRecording: (...a: unknown[]) => mockUndoRecording(...a) }));
+
 import { HELD_MS, notePageOnScreen, pagesHeld, pageTimesAt, pauseTimer, readingSessionFromTimer, resumeTimer, startTimer } from '../readingTimer';
 import { plainText } from '../passages';
-import { sittingDayWord, sittingSavedText, sittingToReviseText } from '../sitting';
+import { sittingDayWord, sittingSavedText, sittingToReviseText, undoSitting } from '../sitting';
 
 const MIN = 60_000;
 
@@ -51,5 +56,35 @@ describe('a sitting’s Add to revised line (REC-3)', () => {
     expect(plainText(sittingToReviseText([556, 557], [556, 557], 'today'))).toBe('At-Taghabun is the 2 pages left of today’s revision.');
     expect(plainText(sittingToReviseText([556, 557], [554, 555, 556, 557], 'today'))).toBe('At-Taghabun is 2 of the 4 pages left of today’s revision.');
     expect(plainText(sittingToReviseText([562], [562], 'yesterday'))).toBe('Al-Mulk, ayahs 1–12 is the page left of yesterday’s revision.');
+  });
+});
+
+describe('"Saved to today · Undo" (REC-1): the sitting and its recording, taken back together', () => {
+  beforeEach(() => {
+    mockQueue.mockClear();
+    mockUndoRecording.mockClear().mockResolvedValue('deleted');
+  });
+
+  it('[REC-1] deletes the session through the outbox, then the recording that ended with it (this go only)', async () => {
+    const undo = { created: true, segments: ['r1-0.m4a'], fromMs: 0 };
+    expect(await undoSitting({ sessionId: 's1', recording: { recordingId: 'r1', undo } })).toBe('done');
+    expect(mockQueue).toHaveBeenCalledWith({ kind: 'reading.delete', id: 's1' });
+    expect(mockUndoRecording).toHaveBeenCalledWith('r1', undo);
+  });
+
+  it('[REC-1] a sitting with no recording: the session alone; one too short to keep: only its recording', async () => {
+    await undoSitting({ sessionId: 's2', recording: null });
+    expect(mockQueue).toHaveBeenCalledWith({ kind: 'reading.delete', id: 's2' });
+    expect(mockUndoRecording).not.toHaveBeenCalled();
+    mockQueue.mockClear();
+    await undoSitting({ sessionId: null, recording: { recordingId: 'r3' } });
+    expect(mockQueue).not.toHaveBeenCalled();
+    expect(mockUndoRecording).toHaveBeenCalledWith('r3', undefined);
+  });
+
+  it('[REC-1] part of the recording already backed up: the session still goes, the recording stays, and it says so', async () => {
+    mockUndoRecording.mockResolvedValue('backedUp');
+    expect(await undoSitting({ sessionId: 's1', recording: { recordingId: 'r1' } })).toBe('recordingBackedUp');
+    expect(mockQueue).toHaveBeenCalledWith({ kind: 'reading.delete', id: 's1' });
   });
 });

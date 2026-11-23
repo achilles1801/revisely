@@ -6,7 +6,7 @@ import { hiddenPageLayout, WordFollow } from '../../lib/recite/hiddenPage';
 const GUIDE_AT = 0.74;
 
 /**
- * A hidden page (the recite mode), over the page image in its own frame: every
+ * A hidden page (Recite's hidden view), over the page image in its own frame: every
  * line covered in the page colour with a faint guide line across it, the verse
  * markers left open, revealed verses open in place, and, given a band colour, a blue band
  * (followInk) across the line where the next hidden verse starts. The live recitation's hidden

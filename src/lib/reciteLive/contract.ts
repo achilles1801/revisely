@@ -1,11 +1,11 @@
 // The live recitation check's messages (Revisely Dev only): what the checker on revisely-dev sends while someone
 // recites, and what a mark is. The contract between the model, the server and the app is recite-contract.md
-// (draft 2) in the orchestrator's notes; the server is scripts/recite-check. Anything this file doesn't know is
+// (draft 2) in the orchestrator's notes; the server is revisely-internal's checker/. Anything this file doesn't know is
 // dropped, never guessed, as in lib/reciteCheck/result.ts.
 
 import type { TajweedRule } from '../reciteCheck/result';
 
-/** What a mark is about. Mistakes: word, skipped, added; slips: harakat, letter, tajweed (`severityOf`). Colours: `markGroup`. */
+/** What a mark is about. Its tier (mistake, Not clear, tajweed): `markTier`. Its colour and memory group: `markGroup`. */
 export type MarkKind = 'word' | 'skipped' | 'added' | 'harakat' | 'letter' | 'tajweed';
 
 /** Finer than the kind, for the card's wording. */
@@ -85,6 +85,11 @@ export interface FinalResult {
    * never found it. Absent from a take that started at a known place.
    */
   start?: number | null;
+  /**
+   * The phone's own, never the checker's: no final answer came (late, or the connection was lost), so this is what the
+   * take found before it (lib/reciteLive/state `settleUnfinished`). A final answer that comes after replaces it.
+   */
+  unfinished?: boolean;
 }
 
 /** Why a take ended without its answer. `offline` is the phone's own: the checker couldn't be reached again. */
@@ -102,23 +107,67 @@ export type LiveFailure =
    */
   | 'check_locked'
   | 'premium_required'
+  /** A service that doesn't take this level (recite-check-pair): the socket starts the take on recite-check instead. */
+  | 'level_elsewhere'
+  /** Production's checker (recite-server-prod-plan.md): its kill switch (`PAUSED`), and App Check refused once it's on. */
+  | 'paused'
+  | 'app_check'
+  /**
+   * The phone's own, as `offline`: every instance was busy (Cloud Run's 429/503, or the socket never opened), or no
+   * `ready` within READY_WAIT_MS of the take's start (at capacity Cloud Run holds a new take about 35 s, then refuses it).
+   */
+  | 'busy'
   | 'offline';
 
 export type LiveEvent =
-  | { type: 'ready'; take: string | null; engine?: string; session?: string; from?: number; protocol?: number }
+  | {
+      type: 'ready';
+      take: string | null;
+      engine?: string;
+      session?: string;
+      from?: number;
+      protocol?: number;
+      /** "voice": `said` also comes as the reciter's voice stops (recite-check-00115 and later; absent on rollbacks). */
+      said?: 'voice';
+      /** The checker beats every this many seconds (contract draft 9): its silence then means a dead socket. */
+      beat?: number;
+      /** "adpcm": the checker decodes the IMA-ADPCM blocks the start frame asked to send (contract "ADPCM uplink"). */
+      audio?: 'adpcm';
+      /** The checker holds a parked take after a `pause` frame and its socket's close (contract draft 12). */
+      pause?: true;
+    }
   /**
    * A take started anywhere on the page: the checker has found where the reciter is (once per search). Its `nolock`
    * (still searching after about 8 s of speech) isn't read: a search that never finds the start fails silently
    * (Majd, Nov 14 2026), so the phone shows nothing for it.
    */
-  | { type: 'locked'; w: number; s: number; a: number; t?: number }
+  | { type: 'locked'; w: number; s: number; a: number; t?: number; where?: 'page' | 'quran' }
   | { type: 'at'; w: number; t?: number }
+  /**
+   * Protocol 9 (contract draft 11): before `locked`, the checker's best guess at where the reciter is on the page shown,
+   * at most once a hop and only when it changes. Shown as the cursor, never a start, mark or `said`; none after `locked`.
+   */
+  | { type: 'guess'; w: number; t?: number }
+  /** Something other than word `w` (the next to say) is being said in its slot: the hidden view's red cover (draft 7). */
+  | { type: 'off'; w: number; t?: number }
   | { type: 'said'; upTo: number }
   | { type: 'mark'; mark: Mark }
   | { type: 'unmark'; id: string; why: 'corrected' | 'retracted' }
   | { type: 'ayah'; s: number; a: number }
   | { type: 'score'; score: LiveScore }
   | { type: 'done'; result: FinalResult }
+  /**
+   * Where the slips went, after `done` (contract draft 8): only on a take started with `namesAfter`, whose `done` comes
+   * without `into` so the summary needn't wait for it. `names` is empty when nothing was named.
+   */
+  | { type: 'into'; names: { id: string; into: MarkInto }[] }
+  /**
+   * The checker's heartbeat (contract draft 9, long takes, Nov 20 2026): every `ready.beat` seconds while the take is
+   * open on the socket, with the seconds of the take's audio it has checked (`t`) and received (`rx`). The phone treats
+   * its silence as a dead socket and resumes (lib/reciteLive/socket), paces a resume's held audio by `rx`, and reads
+   * the checker's lag as the audio sent minus `t`.
+   */
+  | { type: 'beat'; t: number; rx?: number }
   | { type: 'error'; reason: LiveFailure };
 
 const KINDS: MarkKind[] = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'];
@@ -137,6 +186,9 @@ const FAILURES: LiveFailure[] = [
   'server',
   'check_locked',
   'premium_required',
+  'level_elsewhere',
+  'paused',
+  'app_check',
 ];
 
 /** The server refused marking mistakes for want of Premium (either name). */
@@ -254,13 +306,29 @@ export function parseEvent(raw: unknown): LiveEvent | null {
         ...(typeof x.session === 'string' ? { session: x.session } : {}),
         ...(isNum(x.from) ? { from: x.from } : {}),
         ...(isNum(x.protocol) ? { protocol: x.protocol } : {}),
+        ...(x.said === 'voice' ? { said: 'voice' as const } : {}),
+        ...(isNum(x.beat) && x.beat > 0 ? { beat: x.beat } : {}),
+        ...(x.audio === 'adpcm' ? { audio: 'adpcm' as const } : {}),
+        ...(x.pause === true ? { pause: true as const } : {}),
       };
     case 'locked':
       return isWord(x.w) && isNum(x.s) && isNum(x.a)
-        ? { type: 'locked', w: x.w, s: x.s, a: x.a, ...(isNum(x.t) ? { t: x.t } : {}) }
+        ? {
+            type: 'locked',
+            w: x.w,
+            s: x.s,
+            a: x.a,
+            ...(isNum(x.t) ? { t: x.t } : {}),
+            // Protocol 7: found on the open page, or elsewhere in the Qur'an.
+            ...(x.where === 'page' || x.where === 'quran' ? { where: x.where } : {}),
+          }
         : null;
     case 'at':
       return isWord(x.w) ? { type: 'at', w: x.w, ...(isNum(x.t) ? { t: x.t } : {}) } : null;
+    case 'guess':
+      return isWord(x.w) ? { type: 'guess', w: x.w, ...(isNum(x.t) ? { t: x.t } : {}) } : null;
+    case 'off':
+      return isWord(x.w) ? { type: 'off', w: x.w, ...(isNum(x.t) ? { t: x.t } : {}) } : null;
     case 'said':
       return isWord(x.upTo) ? { type: 'said', upTo: x.upTo } : null;
     case 'mark': {
@@ -282,6 +350,19 @@ export function parseEvent(raw: unknown): LiveEvent | null {
       const result = parseFinal(x.result);
       return result ? { type: 'done', result } : null;
     }
+    case 'into': {
+      // A malformed entry is dropped, never the rest (as a malformed `into` on a mark is).
+      if (!Array.isArray(x.names)) return null;
+      const names: { id: string; into: MarkInto }[] = [];
+      for (const n of x.names as unknown[]) {
+        const r = n && typeof n === 'object' ? (n as Record<string, unknown>) : null;
+        const into = r ? parseInto(r.into) : null;
+        if (r && typeof r.id === 'string' && r.id && into) names.push({ id: r.id, into });
+      }
+      return { type: 'into', names };
+    }
+    case 'beat':
+      return isNum(x.t) ? { type: 'beat', t: x.t, ...(isNum(x.rx) ? { rx: x.rx } : {}) } : null;
     case 'error': {
       const reason = (x.reason ?? x.error) as LiveFailure;
       return { type: 'error', reason: FAILURES.includes(reason) ? reason : 'server' };
@@ -291,7 +372,7 @@ export function parseEvent(raw: unknown): LiveEvent | null {
   }
 }
 
-/** Red for words; amber for harakat, letters and tajweed. */
+/** What a mark is about, for its colour group: a whole word (wrong, skipped, extra), or a part of one (a haraka, a letter, tajweed). */
 export type Severity = 'mistake' | 'slip';
 
 export function severityOf(mark: Pick<Mark, 'kind'>): Severity {
@@ -299,16 +380,46 @@ export function severityOf(mark: Pick<Mark, 'kind'>): Severity {
 }
 
 /**
- * A mark's colour on the page, in the bar, the card and the summary: three groups at most (Majd, Nov 15 2026). Words
- * (wrong, skipped, extra) red, slips (a haraka, a letter, "Not clear") amber, tajweed notes violet. The card and the
- * summary always name the kind in words.
+ * The two tiers (Majd, Nov 22 2026: "saying a wrong haraka or letter IS a word mistake. the only two "tiers" is word
+ * (including haraqah and letters) mistakes and then second tier is tajweed level mistake which we can market as
+ * "beta""). `mistake`: a wrong, skipped or extra word, a wrong haraka or a wrong letter, counted in the score and named
+ * a mistake. `tajweed`: a tajweed note (Strict), never counted, labelled Beta wherever it shows. `unclear` isn't a tier:
+ * a haraka or letter not heard clearly enough to judge, shown and never counted (RECITE-3). RECITE-2.
+ */
+export type MarkTier = 'mistake' | 'unclear' | 'tajweed';
+export function markTier(mark: Pick<Mark, 'kind' | 'sure'>): MarkTier {
+  if (mark.kind === 'tajweed') return 'tajweed';
+  return isUnclear(mark) ? 'unclear' : 'mistake';
+}
+
+/**
+ * A mark's colour group on the page, in the bar, the card and the summary: three colours at most (Majd, Nov 15 2026).
+ * Words (wrong, skipped, extra) red, a haraka or a letter (and "Not clear") amber, tajweed notes violet. Recite's memory
+ * keys a word's mistakes by it (lib/reciteMemory), so it stays what a mark is about whatever the colours follow
+ * (`colourGroup` in components/reciteLive/markColours). The card and the summary always name the kind in words.
  */
 export type MarkGroup = 'word' | 'slip' | 'tajweed';
 export function markGroup(mark: Pick<Mark, 'kind'>): MarkGroup {
   return mark.kind === 'tajweed' ? 'tajweed' : severityOf(mark) === 'mistake' ? 'word' : 'slip';
 }
-/** Which of a word's marks shows when it has several: a word mistake over a slip over a tajweed note. */
+/** Which of a word's marks shows when it has several: a word mistake over a haraka or letter over a tajweed note. */
 export const GROUP_RANK: Record<MarkGroup, number> = { tajweed: 0, slip: 1, word: 2 };
+
+/** How strong a mark is beside another on its word: its group, then a mistake over a Not clear in the same group. */
+const strength = (m: Mark) => GROUP_RANK[markGroup(m)] * 2 + (isUnclear(m) ? 0 : 1);
+
+/**
+ * One highlight per word: its strongest mark, a word mistake over a haraka or letter over a tajweed note, and a mistake
+ * over a Not clear (RECITE-2).
+ */
+export function strongestByWord(marks: readonly Mark[]): Map<number, Mark> {
+  const byWord = new Map<number, Mark>();
+  for (const m of marks) {
+    const had = byWord.get(m.w);
+    if (!had || strength(m) > strength(had)) byWord.set(m.w, m);
+  }
+  return byWord;
+}
 
 /** Marks the checker's `mistakes` has counted (everything but tajweed notes; "not clear" ones too, until `unclear`). */
 export const countsAsMistake = (mark: Pick<Mark, 'kind'>) => mark.kind !== 'tajweed';

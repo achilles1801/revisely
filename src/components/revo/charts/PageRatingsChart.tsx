@@ -16,6 +16,7 @@ import { spokenText } from '../../../lib/passages';
 import { passageShort } from '../../../lib/revo/words';
 import { CHART_TEXT_MAX, ChartFrame, ChartPlot } from './ChartFrame';
 import { ChartButtons, DetailLine, DetailTitle, Legend, useBandColor } from './ChartParts';
+import { t } from '../../../i18n';
 
 /** How near (pt) a tap must land to a dot to pick it, rather than only its row. */
 const DOT_REACH = 18;
@@ -76,12 +77,16 @@ export function PageRatingsChart({
   };
 
   const spokenRow = (r: (typeof data.rows)[number]) =>
-    `${spokenText(passageShort([r.page]))}: ${r.dots.length ? r.dots.map((d) => `${d.band} on ${shortDate(d.day)}`).join(', ') : 'no ratings'}`;
+    `${spokenText(passageShort([r.page]))}: ${
+      r.dots.length
+        ? r.dots.map((d) => t('revo.chart.bandOn', { band: t(`revo.bands.${d.band}`), date: shortDate(d.day) })).join(', ')
+        : t('revo.chart.noRatings')
+    }`;
 
   return (
     <ChartFrame
       title={title}
-      hint="Tap a row to see it"
+      hint={t('revo.chart.rowHint')}
       readout={readout}
       onClear={() => setPicked(null)}
       testID={testID}
@@ -103,7 +108,7 @@ export function PageRatingsChart({
       <ChartPlot
         testID={`${testID}-plot`}
         label={`${title}. ${data.rows.map(spokenRow).join('. ')}`}
-        value={readout ? spokenText(`${readout.title}, ${readout.line}`) : 'Swipe up or down to pick a row'}
+        value={readout ? spokenText(`${readout.title}, ${readout.line}`) : t('revo.chart.pickRow')}
         onStep={(by) => {
           const r = stepIndex(picked?.row ?? null, by, data.rows.length);
           setPicked(r == null ? null : { row: r, dot: null });

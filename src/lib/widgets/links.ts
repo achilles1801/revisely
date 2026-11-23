@@ -7,11 +7,7 @@
 // Revisely Dev's widgets open the same links on its own scheme, revisely-dev:// (plugins/withDevVariant).
 
 export type WidgetLink =
-  | { kind: 'today' }
-  | { kind: 'home' }
-  | { kind: 'qibla' }
-  | { kind: 'prayer' }
-  | { kind: 'read'; page: number };
+  { kind: 'today' } | { kind: 'home' } | { kind: 'qibla' } | { kind: 'prayer' } | { kind: 'read'; page: number };
 
 export function parseWidgetLink(url: string | null | undefined): WidgetLink | null {
   if (!url) return null;

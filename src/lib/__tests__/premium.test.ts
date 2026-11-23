@@ -64,6 +64,17 @@ describe('the account’s grant, live', () => {
     expect(mockSnap.stopped).toBe(1);
   });
 
+  it('[PREM-1] says whether the account has the early-access grant, whichever grant Premium names', () => {
+    const { result } = renderHook(() => usePremium('u1', true));
+    const early = { source: 'early', grantedAt: 1, until: null };
+    act(() => mockSnap.next!(snap({ premium: { source: 'dev', grantedAt: 1, until: null }, grants: { dev: {}, early } })));
+    expect(result.current).toMatchObject({ has: true, early: true, grant: { source: 'dev' } });
+    act(() => mockSnap.next!(snap({ premium: early, grants: { early } })));
+    expect(result.current).toMatchObject({ has: true, early: true, grant: { source: 'early', until: null } });
+    act(() => mockSnap.next!(snap({ premium: null, grants: {} })));
+    expect(result.current).toMatchObject({ has: false, early: false });
+  });
+
   it('no document from the server is no Premium; an empty answer from memory is not the server’s', () => {
     const { result } = renderHook(() => usePremium('u1', true));
     act(() => mockSnap.next!(snap(null, true)));
@@ -75,7 +86,7 @@ describe('the account’s grant, live', () => {
   it('the store app (or a non-tester) reads nothing', () => {
     const { result } = renderHook(() => usePremium('u1', false));
     expect(mockSnap.path).toBeUndefined();
-    expect(result.current).toEqual({ has: false, known: false, grant: null });
+    expect(result.current).toEqual({ has: false, known: false, grant: null, early: false });
   });
 });
 

@@ -30,6 +30,7 @@ import {
 } from './algorithm';
 import { dateToLocalISODay } from './schedulePlans';
 import type { RevisionLog, User, UserPage } from '../types';
+import { t } from '../i18n';
 
 export type JumpTarget = { kind: 'juz'; juz: number } | { kind: 'surah'; surah: number } | { kind: 'page'; page: number };
 
@@ -206,7 +207,9 @@ export function undoJump(current: User, before: User): User {
  */
 export function describeStart(target: JumpTarget, startPage: number): string {
   if (target.kind === 'juz') {
-    return startPage === getPagesForJuz(target.juz)[0] ? `Juz ${target.juz}` : `Juz ${target.juz} · ${placeOfPage(startPage)}`;
+    return startPage === getPagesForJuz(target.juz)[0]
+      ? t('lib.plan.jumpJuz', { n: target.juz })
+      : t('lib.plan.jumpJuzAt', { n: target.juz, place: placeOfPage(startPage) });
   }
   if (target.kind === 'surah' && startPage === getPagesForSurah(target.surah)[0]) return surahName(target.surah);
   return placeOfPage(startPage);

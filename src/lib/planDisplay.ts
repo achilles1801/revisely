@@ -8,8 +8,9 @@ import {
   getJuzName,
   getSurahsForPage,
 } from './quranData';
-import { describePassage, placeOfPage } from './passages';
+import { describePassage, placeOfPage, surahNameIn } from './passages';
 import { pageRuns } from './pageRanges';
+import { formatNumber, t } from '../i18n';
 
 export interface MemorizedSurahGroup {
   number: number;
@@ -80,25 +81,25 @@ export function pageRangeLabel(pages: number[], maxRuns = 2): string {
   }
   const shown = runs
     .slice(0, maxRuns)
-    .map(([a, b]) => (a === b ? `${a}` : `${a}–${b}`))
-    .join(', ');
+    .map(([a, b]) => (a === b ? formatNumber(a) : `${formatNumber(a)}–${formatNumber(b)}`))
+    .join(t('lib.passages.listSeparator'));
   const more = runs.length - maxRuns;
-  return `p. ${shown}${more > 0 ? ` +${more} more` : ''}`;
+  return more > 0 ? t('lib.plan.pagesShortMore', { list: shown, count: more }) : t('lib.plan.pagesShort', { list: shown });
 }
 
 function juzTitle(juzList: number[]): string {
-  if (juzList.length === 1) return `Juz ${juzList[0]}`;
+  if (juzList.length === 1) return t('lib.plan.juz', { n: juzList[0] });
   const contiguous = juzList.every((j, i) => i === 0 || j === juzList[i - 1] + 1);
-  if (contiguous) return `Juz ${juzList[0]}–${juzList[juzList.length - 1]}`;
-  if (juzList.length <= 3) return `Juz ${juzList.join(', ')}`;
-  return `Juz ${juzList[0]}–${juzList[juzList.length - 1]}`;
+  if (contiguous) return t('lib.plan.juzRange', { from: juzList[0], to: juzList[juzList.length - 1] });
+  if (juzList.length <= 3) return t('lib.plan.juzList', { list: juzList.map((j) => formatNumber(j)).join(t('lib.passages.listSeparator')) });
+  return t('lib.plan.juzRange', { from: juzList[0], to: juzList[juzList.length - 1] });
 }
 
 export function pageCountLabel(n: number): string {
-  return `${n} page${n === 1 ? '' : 's'}`;
+  return t('lib.plan.pages', { count: n });
 }
 
-/** Surah names on these pages in order, deduped: "Al-Baqarah, Al-Imran +2". */
+/** Surah names on these pages in order, deduped, in the app's language: "Al-Baqarah, Al-Imran +2". */
 export function surahNamesLabel(pages: number[], max = 2): string {
   const names: string[] = [];
   const seen = new Set<number>();
@@ -106,12 +107,13 @@ export function surahNamesLabel(pages: number[], max = 2): string {
     for (const s of getSurahsForPage(p)) {
       if (!seen.has(s.number)) {
         seen.add(s.number);
-        names.push(s.name);
+        names.push(surahNameIn(s.number));
       }
     }
   }
-  if (names.length <= max) return names.join(', ');
-  return `${names.slice(0, max).join(', ')} +${names.length - max}`;
+  const separator = t('lib.passages.listSeparator');
+  if (names.length <= max) return names.join(separator);
+  return `${names.slice(0, max).join(separator)} +${formatNumber(names.length - max)}`;
 }
 
 export interface DaySummary {
@@ -128,7 +130,7 @@ export interface DaySummary {
  */
 export function summarizeDay(pages: number[]): DaySummary {
   if (pages.length === 0) {
-    return { title: 'Rest Day', subtitle: 'Nothing scheduled', isRest: true };
+    return { title: t('lib.plan.restDay'), subtitle: t('lib.plan.nothingScheduled'), isRest: true };
   }
   const juzList = Array.from(new Set(pages.map(getJuzForPage))).sort((a, b) => a - b);
   const surahs =
@@ -144,9 +146,9 @@ export function summarizeDay(pages: number[]): DaySummary {
 
 /** "Al-Baqarah, ayah 142" / "Juz 2 · p. 22" for a start-point row: where the page begins, the page a quiet detail. */
 export function describeStartPage(page: number | null): { title: string; subtitle: string } {
-  if (page == null) return { title: 'Beginning', subtitle: '' };
+  if (page == null) return { title: t('lib.plan.beginning'), subtitle: '' };
   return {
     title: placeOfPage(page),
-    subtitle: `Juz ${getJuzForPage(page)} · p. ${page}`,
+    subtitle: t('lib.plan.startDetail', { juz: getJuzForPage(page), page }),
   };
 }

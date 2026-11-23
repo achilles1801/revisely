@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useApp } from '../../context/AppContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
+import { t } from '../../i18n';
 
 /**
  * One quiet line while the server can't be reached: what's shown is the copy
@@ -20,14 +21,14 @@ export function OfflineNote() {
       accessible
       accessibilityLabel={
         waiting
-          ? "Offline. Your changes are saved on this phone and sync when you're back online."
-          : "Offline. Showing what's saved on this phone."
+          ? t('offline.note.waitingLabel')
+          : t('offline.note.label')
       }
       testID="offline-note"
     >
       <Ionicons name="cloud-offline-outline" size={14} color={palette.secondary} allowFontScaling />
       <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} numberOfLines={1}>
-        {waiting ? 'Offline · changes saved on this phone' : 'Offline'}
+        {waiting ? t('offline.note.waiting') : t('offline.note.short')}
       </Text>
     </View>
   );

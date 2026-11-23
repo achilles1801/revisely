@@ -20,6 +20,7 @@ import type { FactSources } from './facts';
 import type { RevoDayFacts, RevoPassageFacts, RevoTableColumn, RevoVisual } from './types';
 import { passageShort } from './words';
 import { coverageSince, daysSince, lastRevisedWords, recencyLine as recencyWords, timesWord } from '../recency';
+import { currentLanguage, dayMonth as dayMonthOf, formatDate, formatNumber, monthName as monthNameOf, t, weekdayName } from '../../i18n';
 
 export { timesWord };
 
@@ -60,7 +61,8 @@ export function knownChart(c: RevoVisual | null | undefined): c is RevoVisual {
 // Words
 // ---------------------------------------------------------------------------------------------
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+/** A rating band's word: "weak", "moderate", "strong". */
+const bandWord = (band: RatingBand) => t(`revo.bands.${band}`);
 const DAY_MS = 86_400_000;
 const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / DAY_MS);
 const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
@@ -73,18 +75,17 @@ const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from
  */
 export function agoWords(day: string, today: string): string {
   const n = daysSince(day, today);
-  return n <= 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`;
+  return n <= 0 ? t('revo.readout.agoToday') : n === 1 ? t('revo.readout.agoYesterday') : t('revo.readout.agoDays', { count: n });
 }
 
 /** "30 October". */
 export function dayMonth(day: string): string {
-  const date = new Date(`${day}T00:00:00`);
-  return `${date.getDate()} ${date.toLocaleDateString('en-US', { month: 'long' })}`;
+  return dayMonthOf(new Date(`${day}T00:00:00`));
 }
 
 /** "1 Oct". */
 export function shortDate(day: string): string {
-  return new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return formatDate(new Date(`${day}T12:00:00`), { day: 'numeric', month: 'short' }, 'device');
 }
 
 /** The surah a run of pages starts in, and the one it ends in: a strip's two end labels. */
@@ -150,14 +151,14 @@ export function dayDetail(bar: DayBar, today: string, logs: readonly RevisionLog
   const parts: string[] = [];
   const plan = facts?.plan ?? null;
   if (plan) {
-    if (plan.done) parts.push('Done');
-    parts.push(`${plan.pages - plan.notDone} of ${plural(plan.pages, 'page')}`);
-    if (plan.late > 0) parts.push(`${plan.late} caught up later`);
+    if (plan.done) parts.push(t('revo.readout.done'));
+    parts.push(t('revo.readout.ofPages', { done: plan.pages - plan.notDone, count: plan.pages }));
+    if (plan.late > 0) parts.push(t('revo.readout.caughtUpLater', { n: plan.late }));
   } else {
-    parts.push(bar.pages > 0 ? `${plural(bar.pages, 'page')} revised` : 'Nothing revised');
+    parts.push(bar.pages > 0 ? t('revo.readout.pagesRevised', { count: bar.pages }) : t('revo.readout.nothingRevised'));
   }
-  if (facts && facts.revised.forEarlier > 0) parts.push(`${facts.revised.forEarlier} from earlier days`);
-  if (facts && facts.revised.forLater > 0) parts.push(`${facts.revised.forLater} ahead`);
+  if (facts && facts.revised.forEarlier > 0) parts.push(t('revo.readout.fromEarlier', { n: facts.revised.forEarlier }));
+  if (facts && facts.revised.forLater > 0) parts.push(t('revo.readout.ahead', { n: facts.revised.forLater }));
   if (facts?.minutes) parts.push(formatMinutesLong(facts.minutes));
 
   const revised = [...reviewedOn(logs, bar.day)].sort((a, b) => a - b);
@@ -172,7 +173,7 @@ export function dayDetail(bar: DayBar, today: string, logs: readonly RevisionLog
   const named = revised.length > 0 ? revised : planned ? planPages : [];
   const ends = stripEnds(revised);
   return {
-    title: bar.day === today ? 'Today' : formatDayLong(bar.day),
+    title: bar.day === today ? t('revo.readout.today') : formatDayLong(bar.day),
     line: parts.join(' · '),
     passage: named.length > 0 ? describePassage(named, { juz: true }) : null,
     planned,
@@ -231,8 +232,8 @@ export function revisedBefore(logs: readonly RevisionLog[], page: number, day: s
 export function ratingsRowReadout(page: number, dots: readonly RatingDot[], userPage: UserPage | undefined): { title: string; line: string } {
   const now = userPage && userPage.lastRevisedDate ? bandOf(userPage.weaknessRating) : null;
   return {
-    title: `${passageShort([page])}${now ? ` · ${now} now` : ''}`,
-    line: dots.length > 0 ? `${plural(dots.length, 'rating')} in ${RATING_DAYS} days` : `No ratings in ${RATING_DAYS} days`,
+    title: now ? t('revo.readout.withNote', { text: passageShort([page]), note: t(`revo.readout.nowLower.${now}`) }) : passageShort([page]),
+    line: dots.length > 0 ? t('revo.readout.ratings', { count: dots.length, days: RATING_DAYS }) : t('revo.readout.noRatings', { days: RATING_DAYS }),
   };
 }
 
@@ -240,8 +241,8 @@ export function ratingsRowReadout(page: number, dots: readonly RatingDot[], user
 export function ratingsDotReadout(page: number, dot: RatingDot, before: string | null): { title: string; line: string } {
   const gap = before ? daysBetween(before, dot.day) : null;
   return {
-    title: `${passageShort([page])} · ${dot.band}`,
-    line: `${dayMonth(dot.day)}${gap != null && gap > 0 ? `, ${plural(gap, 'day')} after the time before` : ''}`,
+    title: t('revo.readout.withNote', { text: passageShort([page]), note: bandWord(dot.band) }),
+    line: gap != null && gap > 0 ? t('revo.readout.dateAfterGap', { date: dayMonth(dot.day), count: gap }) : dayMonth(dot.day),
   };
 }
 
@@ -250,11 +251,11 @@ export function pageDetail(page: number, userPage: UserPage | undefined, dots: r
   const parts: string[] = [];
   if (userPage?.lastRevisedDate) {
     const now = bandOf(userPage.weaknessRating);
-    parts.push(`${now[0].toUpperCase()}${now.slice(1)} now`);
+    parts.push(t(`revo.readout.now.${now}`));
   }
   const weak = dots.filter((d) => d.band === 'weak').length;
-  if (weak > 0) parts.push(`rated weak ${timesWord(weak)} in ${RATING_DAYS} days`);
-  parts.push(userPage?.lastRevisedDate ? `revised ${agoWords(userPage.lastRevisedDate, today)}` : 'not revised yet');
+  if (weak > 0) parts.push(t('revo.readout.ratedWeak', { times: timesWord(weak), days: RATING_DAYS }));
+  parts.push(userPage?.lastRevisedDate ? t('revo.readout.revisedWhen', { when: agoWords(userPage.lastRevisedDate, today) }) : t('revo.readout.notRevisedYet'));
   return { title: describePassage([page], { juz: true }), note: pagesNote([page]), meta: parts.join(' · ') };
 }
 
@@ -268,12 +269,12 @@ export function pageDetail(page: number, userPage: UserPage | undefined, dots: r
  * revisions of every memorized page (in full), as Revo's attachments do.
  */
 export function recencyLine(f: RevoPassageFacts): string {
-  if (f.memorized === 0) return 'Not memorized';
-  const t = f.revised.last30;
-  const times = f.memorized === 1 ? t.maxEach : t.minEach;
+  if (f.memorized === 0) return t('revo.readout.notMemorized');
+  const last30 = f.revised.last30;
+  const times = f.memorized === 1 ? last30.maxEach : last30.minEach;
   // Revised in part only (some pages, never all of them): the shared wording can't say "in full".
-  const line = times === 0 && t.days > 0 ? `${lastRevisedWords(f.lastRevisedDaysAgo)} · partly in the last 30 days` : recencyWords(f.lastRevisedDaysAgo, times, 30);
-  return f.memorized < f.pages ? `${line} · ${f.memorized} of ${f.pages} pages memorized` : line;
+  const line = times === 0 && last30.days > 0 ? t('revo.readout.partly', { last: lastRevisedWords(f.lastRevisedDaysAgo) }) : recencyWords(f.lastRevisedDaysAgo, times, 30);
+  return f.memorized < f.pages ? t('revo.readout.memorizedOf', { line, n: f.memorized, pages: f.pages }) : line;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -299,20 +300,20 @@ export function juzReadout(tile: JuzTile): { title: string; line: string } {
   const when =
     tile.state === 'none'
       ? tile.learning
-        ? 'being learned'
-        : 'not memorized'
+        ? t('revo.readout.beingLearned')
+        : t('revo.readout.notMemorizedLower')
       : tile.state === 'new'
         ? tile.counts.week + tile.counts.month === 0
-          ? 'not revised yet'
-          : 'not all revised yet'
+          ? t('revo.readout.notRevisedYet')
+          : t('revo.readout.notAllRevised')
         : tile.daysSince == null
-          ? 'not all revised yet'
+          ? t('revo.readout.notAllRevised')
         : tile.daysSince === 0
-          ? 'revised today'
+          ? t('revo.readout.revisedToday')
           : tile.daysSince === 1
-            ? 'last revised yesterday'
-            : `last revised ${tile.daysSince} days ago`;
-  return { title: `Juz ${tile.juz} · ${when}`, line: describePageRange(start, end, { wholeJuz: false }) };
+            ? t('revo.readout.lastYesterday')
+            : t('revo.readout.lastDaysAgo', { count: tile.daysSince });
+  return { title: t('revo.readout.juzTitle', { juz: tile.juz, when }), line: describePageRange(start, end, { wholeJuz: false }) };
 }
 
 /** Pages for a strip: each memorized page that has been revised in its rating's band; the rest unrated. */
@@ -331,21 +332,21 @@ export function juzStrip(juz: number, pages: readonly UserPage[]): { page: numbe
   return pagesStrip(Array.from({ length: end - start + 1 }, (_, i) => start + i), pages);
 }
 
-const juzList = (js: number[]) => (js.length === 0 ? null : js.map((j) => `Juz ${j}`).join(', '));
+const juzList = (js: number[]) => (js.length === 0 ? null : js.map((j) => t('revo.readout.juz', { n: j })).join(t('revo.readout.listSep')));
 
 /** For VoiceOver: the tiles by state ("Revised this week: Juz 24, Juz 25. …"). */
 export function juzSummary(tiles: readonly JuzTile[]): string {
   const of = (state: JuzTile['state']) => juzList(tiles.filter((t) => t.state === state).map((t) => t.juz));
   return [
-    ['Revised this week', of('week')],
-    ['This month', of('month')],
-    ['Not revised yet', of('new')],
-    ['Over 30 days ago', of('stale')],
-    ['Being learned', juzList(tiles.filter((t) => t.state === 'none' && t.learning).map((t) => t.juz))],
+    [t('revo.readout.summary.week'), of('week')],
+    [t('revo.readout.summary.month'), of('month')],
+    [t('revo.readout.summary.new'), of('new')],
+    [t('revo.readout.summary.stale'), of('stale')],
+    [t('revo.readout.summary.learning'), juzList(tiles.filter((tile) => tile.state === 'none' && tile.learning).map((tile) => tile.juz))],
   ]
     .filter(([, v]) => v)
-    .map(([k, v]) => `${k}: ${v}`)
-    .join('. ');
+    .map(([k, v]) => t('revo.readout.summary.row', { label: k ?? '', juz: v ?? '' }))
+    .join(t('revo.readout.summary.join'));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -401,16 +402,16 @@ export function timelineData(logs: readonly RevisionLog[], passage: readonly num
 
 /** "5 revisions · tap one to see it", or "Not revised in 30 days". */
 export function timelineHint(marks: readonly TimelineMark[], days: number): string {
-  if (marks.length > 0) return `${plural(marks.length, 'revision')} · tap one to see it`;
-  return days >= 365 ? 'Not revised in the last year' : `Not revised in ${days} days`;
+  if (marks.length > 0) return t('revo.readout.revisions', { count: marks.length });
+  return days >= 365 ? t('revo.readout.notInYear') : t('revo.readout.notInDays', { days });
 }
 
 /** A picked revision: "Friday 16 October · weak", "14 days after the time before". */
 export function timelineReadout(mark: TimelineMark, smart = true): { title: string; line: string } {
   return {
     // Smart Tracking off (REVO-36): the day alone, no rating.
-    title: smart ? `${formatDayLong(mark.day)} · ${mark.band ?? 'not rated'}` : formatDayLong(mark.day),
-    line: mark.gap != null ? `${plural(mark.gap, 'day')} after the time before` : 'The first time in this view',
+    title: smart ? t('revo.readout.withNote', { text: formatDayLong(mark.day), note: mark.band ? bandWord(mark.band) : t('revo.readout.notRated') }) : formatDayLong(mark.day),
+    line: mark.gap != null ? t('revo.readout.afterGap', { count: mark.gap }) : t('revo.readout.firstTime'),
   };
 }
 
@@ -425,12 +426,12 @@ export function timelineDetail(mark: TimelineMark, logs: readonly RevisionLog[],
     const r = ratings.get(p);
     if (r != null) byBand[bandOf(r)].push(p);
   }
-  const parts = (['weak', 'moderate', 'strong'] as const).filter((b) => byBand[b].length > 0).map((b) => `${describePassage(byBand[b], { form: 'short' })} ${b}`);
+  const parts = (['weak', 'moderate', 'strong'] as const).filter((b) => byBand[b].length > 0).map((b) => t('revo.readout.passageBand', { passage: describePassage(byBand[b], { form: 'short' }), band: bandWord(b) }));
   const total = reviewedOn(logs, mark.day).size;
   const minutes = logs.filter((l) => l.date === mark.day).reduce((n, l) => n + (l.durationMinutes ?? 0), 0);
   return {
     ratings: smart && parts.length > 0 ? parts.join(' · ') : null,
-    line: `${plural(total, 'page')} revised that day${minutes > 0 ? ` in ${formatMinutesLong(minutes)}` : ''}`,
+    line: minutes > 0 ? t('revo.readout.thatDayIn', { count: total, time: formatMinutesLong(minutes) }) : t('revo.readout.thatDay', { count: total }),
   };
 }
 
@@ -497,7 +498,7 @@ const counted = (c: WeekCell) => c === 'done' || c === 'part' || c === 'missed';
 export function weeksHint(rows: readonly { cell: WeekCell }[][]): string {
   const cells = rows.flat().filter((c) => counted(c.cell));
   const revised = cells.filter((c) => c.cell !== 'missed').length;
-  return cells.length > 0 ? `${revised} of ${plural(cells.length, 'day')} revised · tap a day or a weekday` : 'Tap a day to see it';
+  return cells.length > 0 ? t('revo.readout.weeksRevised', { revised, count: cells.length }) : t('revo.readout.tapDay');
 }
 
 /** "26 Sep, 10, 17 and 24 Oct": days grouped by month, in order. */
@@ -505,10 +506,14 @@ export function daysList(days: readonly string[]): string {
   const groups: { month: string; dates: number[] }[] = [];
   for (const day of [...days].sort()) {
     const date = new Date(`${day}T00:00:00`);
-    const month = date.toLocaleDateString('en-US', { month: 'short' });
+    const month = monthNameOf(date, 'short');
     const last = groups[groups.length - 1];
     if (last && last.month === month) last.dates.push(date.getDate());
     else groups.push({ month, dates: [date.getDate()] });
+  }
+  // Arabic repeats «و» before each date after the first: «٢٦ سبتمبر و١٠ و١٧ و٢٤ أكتوبر».
+  if (currentLanguage() === 'ar') {
+    return groups.map((g, gi) => `${g.dates.map((d, i) => `${gi + i > 0 ? 'و' : ''}${formatNumber(d)}`).join(' ')} ${g.month}`).join(' ');
   }
   const total = groups.reduce((n, g) => n + g.dates.length, 0);
   let seen = 0;
@@ -516,6 +521,7 @@ export function daysList(days: readonly string[]): string {
     .map((g) => {
       const parts = g.dates.map((d) => {
         seen++;
+        // i18n-ignore (English list grammar: Arabic has its own branch above)
         return seen === total && total > 1 ? `and ${d}` : String(d);
       });
       // "10, 17 and 24": the "and" joins with a space, the rest with commas.
@@ -528,15 +534,15 @@ export function daysList(days: readonly string[]): string {
 /** A picked weekday: "Saturdays · 4 missed of 8", "Missed 26 Sep, 10, 17 and 24 Oct · part of 31 Oct". */
 export function weekdayReadout(rows: readonly { day: string; cell: WeekCell }[][], column: number): { title: string; line: string } {
   const cells = rows.map((r) => r[column]).filter((c) => counted(c.cell));
-  const name = `${new Date(`${rows[0][column].day}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' })}s`;
+  const name = t('revo.readout.weekdays', { day: weekdayName(new Date(`${rows[0][column].day}T12:00:00`)) });
   const missed = cells.filter((c) => c.cell === 'missed').map((c) => c.day);
   const part = cells.filter((c) => c.cell === 'part').map((c) => c.day);
   const done = cells.filter((c) => c.cell === 'done').length;
-  const title = missed.length > 0 ? `${name} · ${missed.length} missed of ${cells.length}` : `${name} · ${done} of ${cells.length} done`;
+  const title = missed.length > 0 ? t('revo.readout.missedOf', { name, missed: missed.length, total: cells.length }) : t('revo.readout.doneOf', { name, done, total: cells.length });
   const parts: string[] = [];
-  if (missed.length > 0) parts.push(`Missed ${daysList(missed)}`);
-  if (part.length > 0) parts.push(`${missed.length > 0 ? 'part' : 'Part'} of ${daysList(part)}`);
-  if (parts.length === 0) parts.push(cells.length > 0 ? 'None missed' : 'No plan on these days');
+  if (missed.length > 0) parts.push(t('revo.readout.missedDays', { days: daysList(missed) }));
+  if (part.length > 0) parts.push(missed.length > 0 ? t('revo.readout.partOfLower', { days: daysList(part) }) : t('revo.readout.partOf', { days: daysList(part) }));
+  if (parts.length === 0) parts.push(cells.length > 0 ? t('revo.readout.noneMissed') : t('revo.readout.noPlan'));
   return { title, line: parts.join(' · ') };
 }
 
@@ -544,12 +550,23 @@ export function weekdayReadout(rows: readonly { day: string; cell: WeekCell }[][
 // Table
 // ---------------------------------------------------------------------------------------------
 
+/** The table's headings, in the app's language (read where the table is drawn). */
 export const TABLE_HEADS: Record<RevoTableColumn, string> = {
-  lastRevised: 'Last revised',
-  times30: '30 days',
-  weak: 'Weak',
-  strength: 'Strength',
-  memorized: 'Memorized',
+  get lastRevised() {
+    return t('revo.readout.heads.lastRevised');
+  },
+  get times30() {
+    return t('revo.readout.heads.times30');
+  },
+  get weak() {
+    return t('revo.readout.heads.weak');
+  },
+  get strength() {
+    return t('revo.readout.heads.strength');
+  },
+  get memorized() {
+    return t('revo.readout.heads.memorized');
+  },
 };
 
 /** Which way puts what needs care first, per column: the oldest, the fewest, the most weak, the weakest. */
@@ -583,12 +600,12 @@ export function tableRows(c: { juz?: number[]; surahs?: number[] }, factsOf: (pa
  * which always sorts last). `alert`: weak pages, in red.
  */
 export function tableCell(col: RevoTableColumn, f: RevoPassageFacts): { text: string; key: number | null; alert?: boolean } {
-  if (col === 'memorized') return { text: `${f.memorized} of ${f.pages}`, key: f.pages > 0 ? f.memorized / f.pages : 0 };
+  if (col === 'memorized') return { text: t('revo.readout.nOf', { n: f.memorized, total: f.pages }), key: f.pages > 0 ? f.memorized / f.pages : 0 };
   if (f.memorized === 0) return { text: '—', key: null };
   switch (col) {
     case 'lastRevised': {
       const d = f.lastRevisedDaysAgo;
-      return { text: d == null ? 'Never' : d === 0 ? 'Today' : d === 1 ? 'Yesterday' : `${d} days`, key: d ?? Number.MAX_SAFE_INTEGER };
+      return { text: d == null ? t('revo.readout.never') : d === 0 ? t('revo.readout.today') : d === 1 ? t('revo.readout.yesterday') : t('revo.readout.daysShort', { count: d }), key: d ?? Number.MAX_SAFE_INTEGER };
     }
     case 'times30': {
       // Revised in full (every memorized page) that many times, as Revo's attachments say it.
@@ -651,8 +668,8 @@ export function monthDays(items: readonly MemorizedDay[], month: string): { day:
 export function monthReadout(bar: { month: string; pages: number }, items: readonly MemorizedDay[]): { title: string; line: string } {
   const pages = [...new Set(items.filter((i) => i.day.slice(0, 7) === bar.month).flatMap((i) => i.pages))];
   return {
-    title: `${monthName(bar.month)} · ${plural(bar.pages, 'page')}`,
-    line: pages.length > 0 ? ayahWords(pages) : `Nothing memorized in ${monthName(bar.month)}`,
+    title: t('revo.readout.monthPages', { month: monthName(bar.month), count: bar.pages }),
+    line: pages.length > 0 ? ayahWords(pages) : t('revo.readout.nothingMemorizedIn', { month: monthName(bar.month) }),
   };
 }
 

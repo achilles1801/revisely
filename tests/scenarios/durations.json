@@ -92,5 +92,6 @@
   "scenarios/testerReset.scenario.tsx": 71,
   "scenarios/testScenarios.scenario.tsx": 296,
   "scenarios/translations.scenario.tsx": 12,
-  "scenarios/whatsNew.scenario.tsx": 105
+  "scenarios/whatsNew.scenario.tsx": 105,
+  "scenarios/reportProblem.scenario.tsx": 1
 }

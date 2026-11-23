@@ -10,21 +10,28 @@ import PlanEditScreen from '../screens/main/PlanEditScreen';
 import PlanDayEditScreen from '../screens/main/PlanDayEditScreen';
 import PrayerCalculationScreen from '../screens/prayer/PrayerCalculationScreen';
 import PrayerNotificationsScreen from '../screens/prayer/PrayerNotificationsScreen';
+import AthanVoiceScreen from '../screens/prayer/AthanVoiceScreen';
+import OnDeviceBenchScreen from '../screens/main/OnDeviceBenchScreen';
+import OnboardingPreviewScreen from '../screens/onboarding/OnboardingPreviewScreen';
 import ActiveRevisionScreen from '../screens/revision/ActiveRevisionScreen';
 import ReadIndexScreen from '../screens/read/ReadIndexScreen';
 import QuranReaderScreen from '../screens/read/QuranReaderScreen';
 import QuranSearchScreen from '../screens/read/QuranSearchScreen';
 import { RevoHost } from '../components/revo/RevoHost';
+import { ReportProblemHost } from '../components/report/ReportProblemHost';
 import ListenBackScreen from '../screens/activity/ListenBackScreen';
-import JournalEntryScreen from '../screens/journal/JournalEntryScreen';
 import ActivityScreen from '../screens/activity/ActivityScreen';
 import ActivityDayScreen from '../screens/activity/ActivityDayScreen';
 import ActivityAllScreen from '../screens/activity/ActivityAllScreen';
 import PagesByStrengthScreen from '../screens/activity/PagesByStrengthScreen';
+import LastRevisedScreen from '../screens/activity/LastRevisedScreen';
 import { activityBlocksEnabled } from '../components/activity/DayBlocks';
 import type { ActivityKind } from '../lib/activityItems';
 import { ReadingTimerProvider } from '../context/ReadingTimerContext';
 import { useAppUsageTracking } from '../lib/appUsage';
+import { useWarmCheckerOnFront } from '../components/reciteLive/useKeepCheckerWarm';
+import { reciteLiveForAccount } from '../lib/reciteLive/availability';
+import { reciteCheckOff } from '../lib/reciteLive/off';
 import { TabBar, useTabBarHeight } from './TabBar';
 import type { PagerTabBarProps } from './PagerTabs';
 import { MiniPlayer, MINI_PLAYER_GAP } from '../components/player/MiniPlayer';
@@ -34,12 +41,14 @@ import { createPagerTabNavigator } from './PagerTabs';
 import { insightsTab, mainTabRoutes, swipeableTabCount } from './tabPages';
 import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPreviewScreen';
 import { useApp } from '../context/AppContext';
-import type { JournalKind } from '../types';
 import type { RevoSettingsSection } from '../lib/revo/types';
+import type { SettingsPage } from '../lib/settingsPages';
 
 export type MainTabParamList = {
   // Non-screen code (the timer) opens a day of Activity on the Home stack.
   Home: NavigatorScreenParams<HomeStackParamList> | undefined;
+  // Activity's tab (TAB-2): Activity first, then what it opens.
+  ActivityTab: NavigatorScreenParams<HomeStackParamList> | undefined;
   // Home opens the reader directly for the Friday Al-Kahf card.
   Read: NavigatorScreenParams<ReadStackParamList> | undefined;
   // Only for accounts whose Insights aren't in Activity (navigation/tabPages).
@@ -52,7 +61,8 @@ export type HomeStackParamList = {
   // round: that day repeats today's pages (the cycle has come round, AHEAD-3): it opens alone, a new round.
   ActiveRevision: { aheadDay?: string; round?: boolean } | undefined;
   // section: scroll to that section (Revo's openScreen, REVO-31).
-  Settings: { section?: RevoSettingsSection } | undefined;
+  /** `page`: one of Settings' pages (SET-1); `section`: a Settings section (Revo's openScreen), opened as its page. */
+  Settings: { section?: RevoSettingsSection; page?: SettingsPage } | undefined;
   // edit: open with the pages ready to edit (Home's Memorized line). focusPages: open at those pages
   // (Activity's Memorized → Edit): their surah open and scrolled to, the pages ringed.
   Memorization: { edit?: boolean; focusPages?: number[] } | undefined;
@@ -67,33 +77,43 @@ export type HomeStackParamList = {
   // date is a revision day, YYYY-MM-DD.
   /** focusRecordingId: scroll to that recording and highlight it. focusBlock: scroll to that block
    *  (a row of Overview's picked day, ACT-18). */
-  ActivityDay: { date: string; focusRecordingId?: string; focusBlock?: 'revised' | 'memorized' | 'read' | 'notes' };
+  ActivityDay: { date: string; focusRecordingId?: string; focusBlock?: 'revised' | 'memorized' | 'read' | 'notes' | 'recited' };
   // The reader over Activity (a page of a day's strip, a weak spot): back returns to where it was
   // opened (ACT-20), unlike the Read tab's reader.
-  QuranReader: { pageNumber: number };
+  // `highlight`: ayahs highlighted until the page is turned (Insights' Recitation rows, RINS-2), as the Read tab's.
+  // `showTake`: a past recitation take (Recite's memory, Revisely Dev) shown on its page with its marks.
+  QuranReader: { pageNumber: number; highlight?: { sura: number; ayah: number; last?: { sura: number; ayah: number } }; showTake?: string };
   // A recording played over the pages it was recorded on, from fromMs (ms
   // into it; default the start).
   ListenBack: { recordingId: string; fromMs?: number };
   // Everything done, searchable (new design's "See all"); kind preselects a filter.
-  ActivityAll: { kind?: ActivityKind } | undefined;
+  ActivityAll: { kind?: ActivityKind | 'recitation' } | undefined;
   // Every revised page by strength (the Insights tab's Browse), from Activity's Weak spots.
   PagesByStrength: undefined;
-  // Daily-log editor. date is YYYY-MM-DD; omitted means "today" (fajr-aware
-  // revision day).
-  JournalEntry: { date?: string; kind?: JournalKind } | undefined;
+  // When each surah, juz, hizb or page was last revised (ACT-30), from Insights' Gaps.
+  LastRevised: { sort?: 'recent' | 'waiting' | 'mushaf' } | undefined;
   // Settings → Prayer (testers).
   PrayerCalculation: undefined;
   PrayerNotifications: undefined;
+  /** The athan voice for every prayer, or (prayer) for one. Revisely Dev, iPhone. */
+  AthanVoice: { prayer?: 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha' } | undefined;
+  /** Settings → Testing → On-device model: Recite's model timed on this phone (Revisely Dev, ONDEV-1). */
+  OnDeviceBench: undefined;
+  /** Revisely Dev: the onboarding screens, saving nothing (ONBOARD-5). */
+  OnboardingPreview: undefined;
 };
 
 export type ReadStackParamList = {
   ReadIndex: undefined;
   /** `highlight`: a verse found by search, highlighted on its page until the page is turned; with
-   *  `last`, the verses from it to `last` (a match that runs on into the next ayah). */
+   *  `last`, the verses from it to `last` (a match that runs on into the next ayah). `recite`: a voice
+   *  search's one result (Revisely Dev's live check): a take starts there as the reader opens. */
   QuranReader: {
     pageNumber: number;
     source?: 'index' | 'recent' | 'search';
     highlight?: { sura: number; ayah: number; last?: { sura: number; ayah: number } };
+    /** A past recitation take (Recite's memory, Revisely Dev) shown on its page with its marks. */
+    showTake?: string;
   };
   /** Search the Qur'an (testers); `listen`: start listening at once (the Read tab's mic). */
   QuranSearch: { listen?: boolean } | undefined;
@@ -118,24 +138,23 @@ const HIDE_TAB_BAR_ON = new Set([
   'PlanEdit',
   'PlanDayEdit',
   'ActiveRevision',
-  'Memorization',
+  'Memorization', // i18n-ignore (route names)
   'QuranReader',
   'QuranSearch',
-  'JournalEntry',
   'ListenBack',
+  'OnboardingPreview', // i18n-ignore (route names)
 ]);
 
-function HomeStackNavigator() {
+const STACK_OPTIONS = {
+  headerShown: false,
+  contentStyle: { backgroundColor: 'transparent' },
+  animation: 'slide_from_right',
+} as const;
+
+/** What Home and Activity open, in either tab's stack: each tab pushes them over its own first screen. */
+function sharedScreens() {
   return (
-    <HomeStack.Navigator
-      screenListeners={e2eScreenListeners}
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: 'transparent' },
-        animation: 'slide_from_right',
-      }}
-    >
-      <HomeStack.Screen name="Dashboard" component={DashboardScreen} />
+    <>
       <HomeStack.Screen name="ActiveRevision" component={ActiveRevisionScreen} />
       <HomeStack.Screen name="Settings" component={SettingsScreen} />
       <HomeStack.Screen name="Memorization" component={MemorizationScreen} />
@@ -143,13 +162,38 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="PlanDayEdit" component={PlanDayEditScreen} />
       <HomeStack.Screen name="PrayerCalculation" component={PrayerCalculationScreen} />
       <HomeStack.Screen name="PrayerNotifications" component={PrayerNotificationsScreen} />
-      <HomeStack.Screen name="Activity" component={ActivityScreen} />
+      <HomeStack.Screen name="AthanVoice" component={AthanVoiceScreen} />
+      <HomeStack.Screen name="OnDeviceBench" component={OnDeviceBenchScreen} />
+      <HomeStack.Screen name="OnboardingPreview" component={OnboardingPreviewScreen} options={{ animation: 'slide_from_bottom' }} />
       <HomeStack.Screen name="ActivityDay" component={ActivityDayScreen} />
       <HomeStack.Screen name="ListenBack" component={ListenBackScreen} />
       <HomeStack.Screen name="ActivityAll" component={ActivityAllScreen} />
       <HomeStack.Screen name="PagesByStrength" component={PagesByStrengthScreen} />
-      <HomeStack.Screen name="JournalEntry" component={JournalEntryScreen} />
+      <HomeStack.Screen name="LastRevised" component={LastRevisedScreen} />
       <HomeStack.Screen name="QuranReader" component={QuranReaderScreen} />
+    </>
+  );
+}
+
+function HomeStackNavigator() {
+  return (
+    <HomeStack.Navigator screenListeners={e2eScreenListeners} screenOptions={STACK_OPTIONS}>
+      <HomeStack.Screen name="Dashboard" component={DashboardScreen} />
+      {sharedScreens()}
+    </HomeStack.Navigator>
+  );
+}
+
+/**
+ * Activity's tab (TAB-2; Majd, Nov 23 2026: "let's make that official"): Activity at the bottom, and what it opens (a
+ * day, See all, the reader, the daily log, Settings) pushed in this tab, so Back comes back to it. Activity is a screen
+ * of this tab only: everything that opens it (Settings, Revo, a day's link) goes to the tab.
+ */
+function ActivityStackNavigator() {
+  return (
+    <HomeStack.Navigator screenListeners={e2eScreenListeners} screenOptions={STACK_OPTIONS}>
+      <HomeStack.Screen name="Activity" component={ActivityScreen} />
+      {sharedScreens()}
     </HomeStack.Navigator>
   );
 }
@@ -187,6 +231,8 @@ function MiniPlayerAboveTabs({ navigation }: { navigation: PagerTabBarProps['nav
 
 export function MainNavigator() {
   const { user } = useApp();
+  // The recitation checker, woken as the app comes to the front, so a take begun soon after doesn't meet a cold start.
+  useWarmCheckerOnFront(!reciteCheckOff() && reciteLiveForAccount(user));
   const smartTrackingEnabled = user?.smartTrackingEnabled ?? false;
   const hasSeenPreview = user?.hasSeenSmartTrackingPreview ?? false;
   // Accounts on the new Activity have Insights there: the tab bar is Home and Read (ACT-12).
@@ -233,6 +279,7 @@ export function MainNavigator() {
           onSwipePastEnd={glowInsightsTab ? openPreview : undefined}
         >
           <Tab.Screen name="Home" component={HomeStackNavigator} />
+          <Tab.Screen name="ActivityTab" component={ActivityStackNavigator} />
           <Tab.Screen name="Read" component={ReadStackNavigator} />
           {mainTabRoutes(insightsInActivity).includes('Insights') ? (
             <Tab.Screen name="Insights" component={AlgorithmScreen} />
@@ -245,6 +292,8 @@ export function MainNavigator() {
       />
       {/* Revo (previewTester accounts): its button over the main screens, and its sheet. */}
       <RevoHost />
+      {/* Settings → Report a problem: its form, and the bar that captures a screen for it. */}
+      <ReportProblemHost />
     </ReadingTimerProvider>
   );
 }

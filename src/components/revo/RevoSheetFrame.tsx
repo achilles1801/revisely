@@ -11,6 +11,7 @@ import { Backdrop } from '../Backdrop';
 import { DISMISS_FALLBACK_MS, shouldDismiss } from '../v2/Sheet';
 import { ModalNest, useModalTurn } from '../v2/modalTurn';
 import { REVO_KEYBOARD_PAD, REVO_TOP_GAP, keyboardCover, keyboardOverSheet, revoHeights, revoSheetFit } from '../../lib/revo/sheetFit';
+import { t } from '../../i18n';
 
 /** Revo opens at about half the screen; a conversation, or a drag up, takes it to full height. */
 export const REVO_MEDIUM = 0.55;
@@ -83,8 +84,8 @@ export function RevoSheetFrame({
       release();
       return;
     }
-    const t = setTimeout(release, DISMISS_FALLBACK_MS);
-    return () => clearTimeout(t);
+    const timer = setTimeout(release, DISMISS_FALLBACK_MS);
+    return () => clearTimeout(timer);
   }, [shown, turn, release]);
 
   // How far the sheet sits below its place: 0 shown, a sheet's height gone.
@@ -176,7 +177,7 @@ export function RevoSheetFrame({
     >
       <GestureHandlerRootView style={styles.fill}>
         <Reanimated.View style={[StyleSheet.absoluteFill, { backgroundColor: palette.overlay }, dim]}>
-          <Backdrop onPress={onClose} label="Close Revo" />
+          <Backdrop onPress={onClose} label={t('revo.sheet.closeRevo')} />
         </Reanimated.View>
         <View style={styles.bottom} pointerEvents="box-none" onLayout={(e) => setFrameHeight(e.nativeEvent.layout.height)} testID={`${testID}-frame`}>
           <Reanimated.View
@@ -203,8 +204,11 @@ export function RevoSheetFrame({
                 style={styles.grab}
                 accessible
                 accessibilityRole="button"
-                accessibilityLabel={full ? 'Close' : 'Close. Swipe up to expand'}
-                accessibilityActions={[{ name: 'activate', label: 'Close' }, { name: 'increment', label: 'Expand' }]}
+                accessibilityLabel={full ? t('common.close') : t('revo.sheet.closeExpand')}
+                accessibilityActions={[
+                  { name: 'activate', label: t('common.close') },
+                  { name: 'increment', label: t('revo.sheet.expand') },
+                ]}
                 onAccessibilityAction={(e) => {
                   if (e.nativeEvent.actionName === 'increment') onFullChange(true);
                   else onClose();

@@ -46,6 +46,19 @@ describe('the words heard in the bar', () => {
     expect(barWords(s, words, { check: false, startWord: A23 }).map((b) => b.tone)).toEqual(['said', 'current']);
   });
 
+  it('a wrong haraka or letter says which, for a screen reader (a mistake like a wrong word, RECITE-2)', () => {
+    let s = at(liveConnecting(), A23 + 8);
+    s = applyEvent(s, { type: 'mark', mark: mark({ id: 'h', w: A23 + 7, kind: 'harakat', sure: 'clear' }) });
+    s = applyEvent(s, { type: 'mark', mark: mark({ id: 'l', w: A23 + 8, kind: 'letter', sure: 'clear' }) });
+    expect(barWords(s, words, { check: true, startWord: A23 }).map((b) => [b.w - A23, b.tone, b.part])).toEqual([
+      [7, 'slip', 'harakat'],
+      [8, 'slip', 'letter'],
+    ]);
+    // A word with both a wrong haraka and a wrong letter is said as a wrong letter.
+    s = applyEvent(s, { type: 'mark', mark: mark({ id: 'l2', w: A23 + 7, kind: 'letter', sure: 'clear' }) });
+    expect(barWords(s, words, { check: true, startWord: A23 })[0].part).toBe('letter');
+  });
+
   it('a “not clear” haraka (past the normal bar only) isn’t shown as a slip: it wasn’t heard as wrong', () => {
     let s = at(liveConnecting(), A23 + 8);
     s = applyEvent(s, { type: 'mark', mark: mark({ id: 'h', w: A23 + 7, kind: 'harakat', sure: 'likely' }) });

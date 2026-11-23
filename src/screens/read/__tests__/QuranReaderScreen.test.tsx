@@ -65,6 +65,8 @@ const mockState: {
   phase: string;
   calls: string[];
   onFinished?: (info: { day: string; recordingId: string }) => void;
+  /** What the timer's finish answers (the session it saved). */
+  saved?: { sessionId: string | null };
 } = { user: null, timer: null, phase: 'idle', calls: [] };
 jest.mock('../../../context/ReadingTimerContext', () => ({
   useReadingTimer: () => ({
@@ -74,7 +76,7 @@ jest.mock('../../../context/ReadingTimerContext', () => ({
     resume: jest.fn(),
     finish: jest.fn(async () => {
       mockState.calls.push('timer saved');
-      return true;
+      return mockState.saved ?? { sessionId: null };
     }),
     discard: jest.fn(),
     notePage: jest.fn(),
@@ -117,6 +119,7 @@ beforeEach(async () => {
   mockState.timer = null;
   mockState.phase = 'idle';
   mockState.calls = [];
+  mockState.saved = undefined;
   mockParams = { pageNumber: 3 };
   await AsyncStorage.clear();
 });
@@ -271,6 +274,20 @@ describe('QuranReaderScreen: a sitting, the timer and a recording (REC-1)', () =
     fireEvent.press(screen.getByText('View'));
     expect(navigateToActivityDay).toHaveBeenCalledWith('2026-11-03');
     expect(screen.queryByText(/^Saved to /)).toBeNull();
+  });
+
+  it('[REC-1] the sitting’s note offers Undo, which takes back the sitting and the recording that ended with it', async () => {
+    const undoSitting = jest.spyOn(jest.requireActual('../../../lib/sitting'), 'undoSitting').mockResolvedValue('done' as never);
+    mockState.user = { previewTester: true };
+    mockState.phase = 'recording';
+    mockState.timer = runningOn(3);
+    mockState.saved = { sessionId: 's1' };
+    await endTheTimer();
+    fireEvent.press(screen.getByTestId('sitting-saved-undo'));
+    await act(async () => {});
+    expect(undoSitting).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 's1', recording: expect.objectContaining({ recordingId: 'r1' }) }));
+    expect(screen.queryByText(/^Saved to /)).toBeNull();
+    undoSitting.mockRestore();
   });
 
   it('a recording ended alone: "Recording saved · View" opens its day at the recording', async () => {

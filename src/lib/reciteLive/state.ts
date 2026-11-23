@@ -56,6 +56,15 @@ export interface LiveState {
   seekFrom: number | null;
   /** The checker's protocol (`ready`); null until it's ready. Below 6 it doesn't look: the take starts at s:a. */
   protocol: number | null;
+  /** The checker sends `said` as the reciter's voice stops (`ready.said: "voice"`). */
+  voiceSaid?: boolean;
+  /**
+   * Something else is being said where word `w` goes (the checker's `off`, contract draft 7): the hidden view's red cover
+   * on `w`. `from`: the cursor when it came, so going back clears it. Never a mark, never counted.
+   */
+  off: { w: number; from: number | null } | null;
+  /** The checker's guess at where the reciter is, while it looks (protocol 9, `guess`); never a start or a cursor time. */
+  guess?: number | null;
 }
 
 /** A mark taken off with "Not a mistake": the mark, and what it had counted in the score (taken off with it). */
@@ -81,6 +90,7 @@ export const LIVE_IDLE: LiveState = {
   seeking: false,
   seekFrom: null,
   protocol: null,
+  off: null,
 };
 
 /**
@@ -116,7 +126,20 @@ export function checkerLooks(state: LiveState): boolean {
  * take's start. The cursor goes until it's found; what was decided stays.
  */
 export function seekOnPage(state: LiveState, w: number): LiveState {
-  return { ...state, seeking: true, seekFrom: w, cursor: null };
+  return { ...state, seeking: true, seekFrom: w, cursor: null, off: null, guess: null };
+}
+
+/**
+ * What clears the red cover: the word reached (`at` on it or past it) or decided (`said`), the reciter going back (`at`
+ * before where it was when `off` came), or a mark on the word, or an extra word marked just before it (the same stray
+ * speech, decided).
+ */
+function offAfter(off: LiveState['off'], e: LiveEvent): LiveState['off'] {
+  if (!off) return off;
+  if (e.type === 'at') return e.w >= off.w || (off.from != null && e.w < off.from) ? null : off;
+  if (e.type === 'said') return e.upTo >= off.w ? null : off;
+  if (e.type === 'mark') return e.mark.w === off.w || (e.mark.kind === 'added' && e.mark.w === off.w - 1) ? null : off;
+  return off;
 }
 
 /** The checker's cursor came without `locked` (a checker that doesn't look): it began at the searched page's top. */
@@ -127,12 +150,50 @@ function startedUnlocked(state: LiveState): LiveState {
 /** A word mark the take's start leaves out: nothing before where the reciter started is skipped. */
 const beforeStart = (m: Mark, start: number | null) => start != null && m.kind === 'skipped' && m.w < start;
 
+/**
+ * A take that ends without the checker's final answer (long takes, Nov 20 2026; Majd's take of Nov 19 spun on Stop until
+ * he left, and was lost): Stop's answer is late, or the connection failed after the start was found. What the take
+ * found stands as its result, marked unfinished, so Stop always ends in a summary and the take is kept. A final answer
+ * that comes afterwards replaces it (`done`). A take whose start was never found has nothing to keep.
+ */
+export function settleUnfinished(state: LiveState, secs: number): LiveState {
+  if (state.status === 'done' || state.status === 'idle' || state.start == null) return state;
+  const last = Math.max(furthestWord(state) ?? state.start, state.start);
+  const final: FinalResult = {
+    v: 2,
+    take: state.take,
+    from: state.start,
+    to: last + 1,
+    secs: Math.round(secs),
+    marks: Object.values(state.marks),
+    score: state.score,
+    start: state.start,
+    unfinished: true,
+  };
+  return { ...state, status: 'done', final, failure: null, off: null, seeking: false };
+}
+
+/** The take's result is what it found before the end, not the checker's final answer (`settleUnfinished`). */
+export function isUnfinished(state: LiveState): boolean {
+  return state.status === 'done' && state.final?.unfinished === true;
+}
+
+/** The first protocol whose final answer keeps every mark shown live (contract draft 10): the app needn't merge them. */
+export const FINAL_KEEPS_LIVE = 8;
+
+/** Whether the take's checker keeps the live marks in its final answer itself (RECITE-14). */
+export function finalKeepsLive(state: LiveState): boolean {
+  return state.protocol != null && state.protocol >= FINAL_KEEPS_LIVE;
+}
+
 /** Stop was tapped: the live marks stay while the final answer comes. */
 export function liveStopping(state: LiveState): LiveState {
-  return state.status === 'listening' || state.status === 'connecting' ? { ...state, status: 'checking' } : state;
+  return state.status === 'listening' || state.status === 'connecting' ? { ...state, status: 'checking', off: null } : state;
 }
 
 export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
+  const off = offAfter(state.off, e);
+  if (off !== state.off) state = { ...state, off };
   switch (e.type) {
     case 'ready': {
       const protocol = e.protocol ?? 5;
@@ -142,10 +203,15 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
         take: e.take ?? state.take,
         failure: null,
         protocol,
+        voiceSaid: e.said === 'voice',
       };
       // A checker that doesn't look for the start begins at the page's first ayah, as before: no waiting.
       return ready.seeking && protocol < LOOKS_FOR_START ? startedUnlocked(ready) : ready;
     }
+    case 'guess':
+      // Shown as the cursor until the checker is sure (draft 11); ignored once it is, or from a checker before protocol 9.
+      if (!state.seeking || state.cursor != null || (state.protocol ?? 0) < GUESS_PROTOCOL) return state;
+      return state.guess === e.w ? state : { ...state, guess: e.w };
     case 'locked': {
       // Found where the reciter is: the cursor shows there (and the page turns to it). The first lock is the start.
       const start = state.start ?? e.w;
@@ -153,6 +219,8 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
         ...state,
         start,
         seeking: false,
+        off: null,
+        guess: null,
         cursor: e.w,
         marks: Object.fromEntries(Object.entries(state.marks).filter(([, m]) => !beforeStart(m, start))),
       };
@@ -173,6 +241,11 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
       delete marks[e.id];
       return { ...state, marks };
     }
+    case 'off':
+      // Only while reciting, once the reciter is found, and for a word not reached yet (a resume replays it).
+      if (state.status !== 'listening' || state.seeking || (state.cursor != null && state.cursor >= e.w)) return state;
+      if (state.saidUpTo != null && state.saidUpTo >= e.w) return state;
+      return state.off?.w === e.w ? state : { ...state, off: { w: e.w, from: state.cursor } };
     case 'ayah':
       return { ...state, lastAyah: [e.s, e.a] };
     case 'score':
@@ -181,10 +254,34 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
       const start = state.start ?? e.result.start ?? null;
       const marks: Record<string, Mark> = {};
       for (const m of e.result.marks) if (!state.dismissed.includes(m.id) && !beforeStart(m, start)) marks[m.id] = m;
+      // A mark shown during the take stays (Majd, Nov 20 2026: "As soon as a mistake is made, the color should be
+      // highlighted immediately and should stay that way"; RECITE-14). One the final answer dropped stays as it was
+      // shown, and counts as it did, unless the final answer judged that word itself (its mark there replaces it).
+      // A checker from protocol 8 (contract draft 10) keeps them in its final answer itself, and counts them: its marks are
+      // the take's.
+      const judged = new Set(Object.values(marks).map((m) => m.w));
+      const kept = { mistakes: 0, unclear: 0, tajweed: 0 };
+      for (const m of finalKeepsLive(state) ? [] : Object.values(state.marks)) {
+        if (marks[m.id] || judged.has(m.w) || state.dismissed.includes(m.id) || beforeStart(m, start)) continue;
+        marks[m.id] = m;
+        if (isUnclear(m)) kept.unclear++;
+        else if (countsAsMistake(m)) kept.mistakes++;
+        else if (m.kind === 'tajweed') kept.tajweed++;
+      }
       // A mark taken off keeps its final version (the final answer holds dismissed marks too), so Put back restores
       // that; one the checker dropped in the end has nothing to put back.
       // The checker's final score leaves out what was dismissed during the take, so putting one back counts it again.
-      const finalScore = e.result.score ?? state.score;
+      const answered = e.result.score ?? state.score;
+      const finalScore: LiveScore | null =
+        answered && (kept.mistakes || kept.unclear || kept.tajweed)
+          ? {
+              ...answered,
+              mistakes: answered.mistakes + kept.mistakes,
+              tajweed: answered.tajweed + kept.tajweed,
+              ...(answered.unclear != null ? { unclear: answered.unclear + kept.unclear } : {}),
+              accuracy: answered.reached > 0 ? Math.max(0, 1 - (answered.mistakes + kept.mistakes) / answered.reached) : 1,
+            }
+          : answered;
       const removed: Record<string, Removed> = {};
       for (const m of e.result.marks) {
         if (!state.removed[m.id]) continue;
@@ -202,6 +299,7 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
         removed,
         start,
         seeking: false,
+        off: null,
         status: 'done',
         take: e.result.take ?? state.take,
         marks,
@@ -209,9 +307,29 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
         final: e.result,
       };
     }
+    case 'into': {
+      // The names that came after the final answer (contract draft 8): each joins its mark by id, wherever it is (shown,
+      // taken off, or in the final answer), so Put back and the kept take have it too.
+      if (state.status !== 'done' || !e.names.length) return state;
+      const byId = new Map(e.names.map((n) => [n.id, n.into]));
+      const named = (m: Mark): Mark => (byId.has(m.id) ? { ...m, into: byId.get(m.id) } : m);
+      const marks: Record<string, Mark> = {};
+      for (const [id, m] of Object.entries(state.marks)) marks[id] = named(m);
+      const removed: Record<string, Removed> = {};
+      for (const [id, r] of Object.entries(state.removed)) removed[id] = { ...r, mark: named(r.mark) };
+      return {
+        ...state,
+        marks,
+        removed,
+        final: state.final ? { ...state.final, marks: state.final.marks.map(named) } : state.final,
+      };
+    }
+    case 'beat':
+      // The checker's heartbeat: for the connection (lib/reciteLive/socket) and the take's numbers, not the page.
+      return state;
     case 'error':
       // A take that has its final answer keeps it; otherwise what was shown stays, marked as failed.
-      return state.status === 'done' ? state : { ...state, status: 'failed', failure: e.reason };
+      return state.status === 'done' ? state : { ...state, status: 'failed', failure: e.reason, off: null };
   }
 }
 
@@ -293,6 +411,105 @@ export function mistakeCount(state: LiveState): number {
     return Math.max(0, state.score.mistakes - marks.filter(isUnclear).length);
   }
   return marks.filter((m) => countsAsMistake(m) && !isUnclear(m)).length;
+}
+
+/**
+ * The furthest word a hidden page may show (RECITE-6; Majd, Nov 21 2026: "we shouldn't be showing the full word until the
+ * user maybe either starts the next word or we get a full match"). While the take runs: what the checker has decided
+ * (`said`, its full match), or the word before the cursor once the next word has begun, never the word being said.
+ * Once it has stopped: the furthest word reached.
+ */
+export function revealedUpTo(state: LiveState): number | null {
+  if (state.status !== 'listening' && state.status !== 'connecting') return furthestWord(state);
+  const xs = [state.saidUpTo, state.cursor != null ? state.cursor - 1 : null].filter((x): x is number => x != null);
+  return xs.length ? Math.max(...xs) : null;
+}
+
+/**
+ * How long the word under the cursor waits before a hidden page shows it, while the take listens (ms): Majd, Nov 22
+ * 2026, "i recite a word and honestly it should be under one second max that it shows up". The cursor reaches a word
+ * while it is being said (p95 0.13 s before its end), so this shows it about as it ends, not as it begins.
+ */
+export const REVEAL_AFTER_MS = 700;
+/** The longest the word under the cursor waits (ms), whatever its length. */
+export const REVEAL_MAX_MS = 2500;
+
+/**
+ * A word's length for its timing: its letters, a madd sign (ٓ, or آ) counting two more (a held vowel is about three letters
+ * long). The checker's bench (Nov 22 2026): a held madd outlasts a flat 0.7 s, so a flat wait would show a word mid-madd.
+ */
+export function wordLetters(text: string): number {
+  let n = 0;
+  for (const ch of text) {
+    const c = ch.codePointAt(0)!;
+    if (c === 0x0622) n += 3; // آ: an alif with its madd
+    else if ((c >= 0x0621 && c <= 0x064a) || c === 0x0671) n += 1;
+    else if (c === 0x0653) n += 2;
+  }
+  return Math.max(1, n);
+}
+
+/**
+ * How long the word under the cursor waits before a hidden page shows it (ms): its length at the reciter's own pace
+ * (`msPerLetter`, the median of this take's word-to-word times per letter), with a little to spare, between
+ * REVEAL_AFTER_MS and REVEAL_MAX_MS. Before the take has a pace, about 0.7 s for five letters.
+ */
+export function revealDelay(letters: number, msPerLetter: number | null, backstop = false): number {
+  const perLetter = msPerLetter != null && msPerLetter > 0 ? msPerLetter : REVEAL_AFTER_MS / 5;
+  if (backstop) return Math.round(Math.min(BACKSTOP_MAX_MS, Math.max(BACKSTOP_MIN_MS, 2.5 * perLetter * letters)));
+  return Math.round(Math.min(REVEAL_MAX_MS, Math.max(REVEAL_AFTER_MS, 1.15 * perLetter * letters)));
+}
+
+/**
+ * A checker that sends `said` as the reciter's voice stops says so in `ready` (`said: "voice"`; recite-check-00115 and
+ * later, Nov 22 2026: 0.4–0.7 s after a word's end before a pause). The protocol alone can't tell: the checker's rollback
+ * revisions report protocol 9 without it. With it the wait above is only a late backstop (`backstop`): voicing never fires
+ * in babble, so a word before a pause in a noisy room would otherwise wait for the next word. 2.5 times the word's length
+ * at the reciter's pace, between 1.5 s and 4 s, late enough that waqf lengthening isn't shown early (the checker's bench:
+ * 127 early before a pause at ×2.5, against 578 at ×1.15).
+ */
+export const BACKSTOP_MIN_MS = 1500;
+export const BACKSTOP_MAX_MS = 4000;
+
+/** The checker this far behind what was recorded (s), and growing, shows "Slow connection"; it clears below SLOW_CLEAR_S. */
+export const SLOW_AT_S = 3;
+export const SLOW_CLEAR_S = 2;
+
+/**
+ * Whether the bar says the connection is slow, after a `beat` (Nov 22 2026, the checker's bad-network test: below about
+ * 256 kbit/s the take's audio falls further behind every second). `behind`: seconds recorded minus the checker's `rx`;
+ * `before`: the last beat's. On once 3 s behind and still falling behind; off again below 2 s.
+ *
+ * `catchingUp`: a resume's re-check, where the checker has the take again from its start and is behind by the whole take
+ * while the held audio goes out. That isn't a slow connection, so it's never on then; the phone starts measuring again
+ * once it has caught up (`before` null). Before, a resume onto another instance said "Slow connection" in the words'
+ * place for the whole catch-up (E2E flow 20, Nov 22 2026).
+ */
+export function slowAfterBeat(was: boolean, behind: number, before: number | null, catchingUp = false): boolean {
+  if (catchingUp) return false;
+  if (was) return behind >= SLOW_CLEAR_S;
+  return behind >= SLOW_AT_S && before != null && behind > before;
+}
+
+/**
+ * What a hidden page shows (RECITE-6): `revealedUpTo`, and the word under the cursor once it has been there
+ * REVEAL_AFTER_MS (`held`: that word, given by the screen's timer), while the take listens.
+ */
+export function shownUpTo(state: LiveState, held: number | null): number | null {
+  const upTo = revealedUpTo(state);
+  if (held == null || held !== state.cursor || state.status !== 'listening') return upTo;
+  return Math.max(upTo ?? -1, held);
+}
+
+/** The first protocol whose checker sends `guess` before `locked` (contract draft 11). */
+export const GUESS_PROTOCOL = 9;
+
+/**
+ * Where the page shown draws the cursor before the checker is sure (draft 11; Majd's A2 lock request): its guess, while it
+ * still looks and has no cursor. A hidden page shows nothing for it (it would give a word away).
+ */
+export function guessCursor(state: LiveState): number | null {
+  return state.status === 'listening' && state.seeking && state.cursor == null ? state.guess ?? null : null;
 }
 
 /** The furthest word reached (the cursor or what's decided). */

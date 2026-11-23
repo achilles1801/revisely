@@ -60,7 +60,7 @@ function open(smartTracking: boolean) {
         readings={[]}
         notes={[]}
         onEditReading={noop}
-        onOpenLog={noop}
+        onEditNote={noop} onDeleteNote={noop} onDeleteAllNotes={noop}
         revisedLog={null}
         onDeleteRevised={noop}
         onDeleteMemorized={noop}

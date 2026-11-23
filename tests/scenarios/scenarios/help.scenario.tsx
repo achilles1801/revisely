@@ -1,5 +1,5 @@
 // The help buttons (BEHAVIOUR.md HELP-1, HELP-2): a ? on Home's Today post opens "How Home works"; hiding
-// the buttons takes them away for good on this phone, with Undo, until Settings → Support brings them back.
+// the buttons takes them away for good on this phone, with Undo, until Settings → Help and support brings them back.
 // Every account's since the November 2026 release: these run as App Store accounts (previewTester unset),
 // except where a tester's Revo is what Ask Revo needs (Revo follows its own switch, config/app.revo).
 
@@ -47,7 +47,7 @@ function homeAndSettings(mods: Booted): ReactElement {
         h(Stack.Screen, { name: 'ActiveRevision', component: Session }),
         h(Stack.Screen, { name: 'Activity', component: Activity }),
         h(Stack.Screen, { name: 'ActivityDay', component: ActivityDay }),
-        ...['PlanEdit', 'PlanDayEdit', 'Memorization', 'ActivityAll', 'Insights', 'QuranReader', 'JournalEntry', 'PagesByStrength', 'ListenBack'].map(
+        ...['PlanEdit', 'PlanDayEdit', 'Memorization', 'ActivityAll', 'Insights', 'QuranReader', 'PagesByStrength', 'ListenBack'].map(
           (name) => h(Stack.Screen, { key: name, name, component: Elsewhere }),
         ),
       ),
@@ -164,7 +164,7 @@ describe('the help on Home', () => {
     await app2.close();
   });
 
-  it('[HELP-2] Hide help buttons takes every ? away, with Undo; hidden they stay hidden at the next launch, until Settings → Support → Help buttons', async () => {
+  it('[HELP-2] Hide help buttons takes every ? away, with Undo; hidden they stay hidden at the next launch, until Settings → Help and support → Help buttons', async () => {
     const phone = await account(false);
     let { app } = await openHome(phone, false);
     await app.until(() => helpButton(app) != null, 'the ? on the Today post');
@@ -173,7 +173,7 @@ describe('the help on Home', () => {
     await press(app, 'help-button-home');
     await press(app, 'help-hide');
     await app.until(() => helpButton(app) == null, 'the ? to go');
-    expect(flatText(app.screen.getByTestId('undo-toast-bar'))).toContain('Help buttons hidden. Settings → Support brings them back.');
+    expect(flatText(app.screen.getByTestId('undo-toast-bar'))).toContain('Help buttons hidden. Settings → Help and support brings them back.');
     await press(app, 'undo-toast-action');
     await app.until(() => helpButton(app) != null, 'Undo to bring the ? back');
 
@@ -186,8 +186,10 @@ describe('the help on Home', () => {
     await app.idle(300);
     expect(helpButton(app)).toBeNull();
 
-    // Settings → Support → Help buttons: off, and turned on it brings them back.
+    // Settings → Help and support → Help buttons: off, and turned on it brings them back.
     await press(app, 'open-settings');
+    await app.until(() => app.screen.queryByTestId('settings-page-help') != null, 'Settings');
+    await press(app, 'settings-page-help');
     await app.until(() => app.screen.queryByTestId('settings-help-buttons') != null, 'the Help buttons switch');
     const { fireEvent } = app.mods.rtl;
     expect(app.screen.getByTestId('settings-help-buttons').props.value).toBe(false);
@@ -196,6 +198,10 @@ describe('the help on Home', () => {
     });
     await app.until(() => app.screen.getByTestId('settings-help-buttons').props.value === true, 'the switch to turn on');
     const { navigation } = app.mods.require<{ navigation: { current: { goBack: () => void } } }>('./navRef');
+    // Back from Help and support, then from Settings' first level (SET-1).
+    await app.act(async () => {
+      navigation.current.goBack();
+    });
     await app.act(async () => {
       navigation.current.goBack();
     });
@@ -208,22 +214,18 @@ describe('the help on Home', () => {
 const topicIds = (app: OpenApp) =>
   app.screen.queryAllByTestId(/^help-topic-/).map((t) => String(t.props.testID).replace('help-topic-', ''));
 
-/** Today's session, then its ⋯ → How a session works. */
+/** Today's session, then Pages → Help (How a session works). */
 async function sessionHelp(app: OpenApp, home: Home): Promise<void> {
   const session = await home.startSession();
   // The controls hide while reading; a tap on the page brings them back.
-  if (!app.screen.queryByLabelText('Session menu')) await session.tapPage();
-  const { fireEvent } = app.mods.rtl;
-  await app.act(async () => {
-    fireEvent.press(app.screen.getByLabelText('Session menu'));
-  });
-  await app.until(() => app.screen.queryByTestId('sheet-action-help') != null, 'How a session works in ⋯');
-  await press(app, 'sheet-action-help');
+  await session.openPages();
+  await app.until(() => app.screen.queryByTestId('session-pages-help') != null, 'Help in the Pages sheet');
+  await press(app, 'session-pages-help');
   await app.until(() => app.screen.queryByTestId('help-sheet-session') != null, 'How a session works');
 }
 
 describe('the help follows Smart Tracking', () => {
-  it('[HELP-1] [HELP-3] [REVO-25] a session’s ⋯ → How a session works: with Smart Tracking off, nothing about rating; no Ask Revo (no Revo in a session)', async () => {
+  it('[HELP-1] [HELP-3] [REVO-25] a session’s Pages → Help: with Smart Tracking off, nothing about rating; no Ask Revo (no Revo in a session)', async () => {
     const phone = await account(true, false);
     const { app, home } = await openHome(phone, true);
     await app.until(() => helpButton(app) != null, 'the ? on the Today post');
@@ -254,11 +256,16 @@ describe('the help in Activity', () => {
     const phone = await account(false, false);
     const { app } = await openHome(phone, false);
     await app.until(() => helpButton(app) != null, 'the ? on the Today post');
-    await press(app, 'open-activity');
+    // Activity is a tab (TAB-2); here, the stack's Activity.
+    const { navigation } = app.mods.require<{ navigation: { current: { navigate: (name: string) => void } } }>('./navRef');
+    await app.act(async () => {
+      navigation.current.navigate('Activity');
+    });
     await app.until(() => app.screen.queryByTestId('help-button-activity') != null, 'Activity’s ?');
     await press(app, 'help-button-activity');
     await app.until(() => app.screen.queryByTestId('help-sheet-activity') != null, 'How Activity works');
-    expect(topicIds(app)).toEqual(['activity.calendar', 'activity.day', 'activity.adding']);
+    // Activity's sections are every account's from the mistake detection release (ACT-29): their topic shows too.
+    expect(topicIds(app)).toEqual(['activity.calendar', 'activity.day', 'activity.adding', 'activity.sections']);
     await press(app, 'help-done');
     await app.until(() => app.screen.queryByTestId('help-sheet-activity') == null, 'the sheet to close');
 

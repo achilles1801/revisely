@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Linking, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Any glass in the new design would show up here.
@@ -15,6 +15,9 @@ jest.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Light: 'l', Medium: 'm', Heavy: 'h' },
   NotificationFeedbackType: { Success: 's', Warning: 'w' },
 }));
+// Web links open through lib/openWebPage (the in-app browser first, LINK-1).
+const mockOpenWebPage = jest.fn(async (_url: string) => 'in-app');
+jest.mock('../../../lib/openWebPage', () => ({ openWebPage: (url: string) => mockOpenWebPage(url) }));
 jest.mock('firebase/auth', () => ({ getAuth: () => ({ currentUser: null }) }));
 jest.mock('../../../context/AppContext', () => ({ useApp: () => ({ user: null, saveUser: jest.fn() }) }));
 jest.mock('../../../lib/recordings', () => ({ isRecordingActive: () => false }));
@@ -66,6 +69,7 @@ jest.mock('../../../lib/translation', () => {
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DEFAULT_ACCENT, paletteV2 } from '../../../theme/v2';
+import { arabicLines, clippedArabic } from '../../../../jest/arabicLines';
 import { touchHandlingAncestor } from '../../../../jest/scrollable';
 import { VerseSheet } from '../VerseSheet';
 import { VerseMenu } from '../VerseMenu';
@@ -141,13 +145,17 @@ describe('VerseSheet in the new design', () => {
     const tanzil = screen.getByText('tanzil.net');
     expect(tanzil.props.accessibilityRole).toBe('link');
     expect(StyleSheet.flatten(tanzil.props.style).color).toBe(palette.link);
+    // The verse's every haraka, stacked marks too (arabicFullV2), and the surah's name whole (arabicV2).
+    expect(arabicLines(screen.UNSAFE_root as never).map((l) => l.text)).toEqual(expect.arrayContaining([mockArabic]));
+    expect(clippedArabic(screen.UNSAFE_root as never)).toEqual([]);
   });
 
   it('The Clear Quran: its text exactly as given, the credit and its link pinned under the verse', async () => {
     getVerseText.mockImplementationOnce(
       tcq('Indeed, those who persist in disbelief—it is the same whether you warn them or not—they will never believe.<footnote id="9" number="1"></footnote>'),
     );
-    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const open = mockOpenWebPage;
+    open.mockClear();
     render(v2(<VerseSheet {...props({ page: 3, sura: 2, ayah: 6 }, 'en.khattab')} />));
     await screen.findByTestId('verse-translation', {}, { timeout: 10_000 });
     expect(
@@ -165,7 +173,6 @@ describe('VerseSheet in the new design', () => {
     expect(StyleSheet.flatten(link.props.style).color).toBe(palette.link);
     fireEvent.press(link);
     expect(open).toHaveBeenCalledWith('https://theclearquran.org');
-    open.mockRestore();
   });
 
   it("an error: \"Couldn't load translation\" and a retry, never another translation", async () => {

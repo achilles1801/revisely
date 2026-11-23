@@ -50,7 +50,12 @@ export function injectAccountNav(html: string): string {
     const withAccount = /<a class="pill"/.test(inner)
       ? inner.replace(/<a class="pill"/, `${LANG_BUTTON}\n        ${ACCOUNT_BUTTON}\n        <a class="pill"`)
       : `${inner}  ${LANG_BUTTON}\n        ${ACCOUNT_BUTTON}\n      `;
-    return `<nav class="site-nav" aria-label="Main" data-acct-nav>${HEAD_LINKS}${withAccount.replace(/\s*$/, '')}\n        ${MENU_BUTTON}\n      </nav>${MENU}`;
+    // The Download pill in the page's language too: the home and Support carry its key, privacy, terms and donate don't.
+    const pill = withAccount.replace(
+      /<a class="pill"((?:(?!data-t=)[^>])*)>Download<\/a>/,
+      '<a class="pill"$1 data-t="nav.download">Download</a>',
+    );
+    return `<nav class="site-nav" aria-label="Main" data-acct-nav>${HEAD_LINKS}${pill.replace(/\s*$/, '')}\n        ${MENU_BUTTON}\n      </nav>${MENU}`;
   });
   out = out.replace('<nav aria-label="Footer">', `<nav aria-label="Footer" data-acct-nav>${FOOT_LINKS}`);
   if (out === html) return html; // no site navigation on this page
@@ -66,10 +71,10 @@ export function injectAccountNav(html: string): string {
   return out.replace('</body>', `${scripts}</body>`);
 }
 
-/** An HTML page from the assets, with the account navigation added; anything else as it was. */
-export async function withAccountNav(res: Response): Promise<Response> {
+/** An HTML page from the assets, changed by `change` (the account navigation, the Recite section); anything else as it was. */
+export async function withPageChange(res: Response, change: (html: string) => string): Promise<Response> {
   if (res.status !== 200 || !(res.headers.get('Content-Type') ?? '').includes('text/html')) return res;
-  const out = new Response(injectAccountNav(await res.text()), res);
+  const out = new Response(change(await res.text()), res);
   out.headers.delete('Content-Length');
   out.headers.delete('ETag');
   return out;

@@ -1,0 +1,30 @@
+# Closes Revo's sheet: a drag down on its handle halves a full sheet, and a second closes it.
+# On an iPhone SE (E2E_IPHONE=se) a full sheet's handle sits 8pt under the 20pt status bar (y 28–51). There
+# the drag from it opened Notification Center, then Spotlight, and the flow went on outside the app: 09-revo
+# and 09-revo-attach, every attempt, in the SE run 43873599186 (Nov 16 2026). So on an SE the sheet is
+# closed by a tap on the backdrop: the strip above a full sheet, between the status bar and the sheet
+# (y 20–28; 4% is 26.7), as a tap anywhere outside it closes it.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    when:
+      platform: iOS
+      # typeof: run without run.sh (maestro test by hand), the name is unset.
+      true: ${typeof E2E_IPHONE !== 'undefined' && E2E_IPHONE == 'se'}
+    commands:
+      - tapOn:
+          point: 50%,4%
+      - waitForAnimationToEnd:
+          timeout: 1500
+- repeat:
+    while:
+      visible:
+        id: revo-sheet-handle
+    times: 3
+    commands:
+      - swipe:
+          from:
+            id: revo-sheet-handle
+          direction: DOWN
+      - waitForAnimationToEnd:
+          timeout: 1500

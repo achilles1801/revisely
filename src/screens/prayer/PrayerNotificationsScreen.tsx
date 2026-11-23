@@ -6,30 +6,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useApp } from '../../context/AppContext';
 import { TopBar } from '../../components/v2/TopBar';
-import { Sheet } from '../../components/v2/Sheet';
 import { Tap } from '../../components/v2/Tap';
 import { GroupedSection } from '../../components/plan/Grouped';
 import { SettingSwitch } from '../../components/settings/SettingSwitch';
 import { layoutV2, typeV2 } from '../../theme/v2';
-import {
-  PrayerAlert,
-  PrayerName,
-  PRAYERS,
-  REMINDER_OPTIONS,
-  setPrayerAlert,
-  usePrayerPrefs,
-} from '../../lib/prayer/prefs';
+import { PrayerName, PRAYERS, setPrayerAlert, usePrayerPrefs } from '../../lib/prayer/prefs';
 import { formatTime, TIME_LABELS } from '../../lib/prayer/times';
 import { usePrayerTimes } from '../../components/prayer/usePrayerTimes';
 import { usePrayerNotifyPermission } from '../../components/prayer/usePrayerNotifyPermission';
 import { useScheduledPrayerDays } from '../../lib/prayer/status';
-import { previewPrayerSound } from '../../lib/prayer/soundPreview';
+import { alertSummary, PrayerAlertSheet } from '../../components/prayer/PrayerAlertSheet';
+import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
-/** "Standard tone · 10 min before", "Silent". */
-export function alertSummary(a: PrayerAlert): string {
-  const sound = a.sound === 'silent' ? 'Silent' : 'Standard tone';
-  return a.before > 0 ? `${sound} · ${a.before} min before` : sound;
-}
+export { alertSummary };
 
 /**
  * Settings → Prayer → Prayer notifications: each prayer on or off, with its
@@ -56,14 +46,14 @@ export default function PrayerNotificationsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: palette.bg }]} testID="prayer-notifications-screen">
       <View style={{ paddingTop: insets.top }}>
-        <TopBar title="Prayer notifications" onBack={() => navigation.goBack()} separator />
+        <TopBar title={t('prayer.notifications.title')} onBack={() => navigation.goBack()} separator />
       </View>
       <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
         <GroupedSection
-          header="Prayers"
+          header={t('prayer.notifications.prayers')}
           footer={
             anyOn && days > 0
-              ? `Scheduled on this phone for the next ${days} ${days === 1 ? 'day' : 'days'}. Opening Revisely keeps them going.`
+              ? t('prayer.notifications.scheduled', { count: days })
               : undefined
           }
         >
@@ -85,17 +75,17 @@ export default function PrayerNotificationsScreen() {
                       hitSlop={6}
                       style={styles.detail}
                       accessibilityRole="button"
-                      accessibilityLabel={`${TIME_LABELS[p].en}: ${alertSummary(a)}. Change`}
+                      accessibilityLabel={t('prayer.notifications.rowLabel', { name: TIME_LABELS[p].en, summary: alertSummary(a) })}
                       testID={`prayer-alert-${p}-detail`}
                     >
                       <Text style={[typeV2.meta, { color: palette.accentText }]} maxFontSizeMultiplier={1.4}>
                         {alertSummary(a)}
                       </Text>
-                      <Ionicons name="chevron-forward" size={12} color={palette.accentText} />
+                      <Ionicons name={forwardIcon()} size={12} color={palette.accentText} />
                     </Tap>
                   ) : (
                     <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-                      Off
+                      {t('prayer.notifications.off')}
                     </Text>
                   )}
                 </View>
@@ -106,90 +96,16 @@ export default function PrayerNotificationsScreen() {
         </GroupedSection>
       </ScrollView>
 
-      <AlertSheet prayer={editing} onClose={() => setEditing(null)} />
+      <PrayerAlertSheet
+        prayer={editing}
+        onClose={() => setEditing(null)}
+        onVoice={(p) => {
+          setEditing(null);
+          (navigation as { navigate: (name: string, params?: object) => void }).navigate('AthanVoice', { prayer: p });
+        }}
+      />
       {permission.sheets}
     </View>
-  );
-}
-
-/** One prayer's reminder and sound. */
-function AlertSheet({ prayer, onClose }: { prayer: PrayerName | null; onClose: () => void }) {
-  const { palette } = useTheme();
-  const prefs = usePrayerPrefs();
-  const [shown, setShown] = useState<PrayerName>('fajr');
-  if (prayer && prayer !== shown) setShown(prayer);
-  const a = prefs.alerts[shown];
-  return (
-    <Sheet
-      visible={prayer != null}
-      onClose={onClose}
-      title={TIME_LABELS[shown].en}
-      footer={{ label: 'Done', onPress: onClose, testID: 'prayer-alert-done' }}
-      testID="prayer-alert-sheet"
-    >
-      <View style={styles.sheet}>
-        <Text style={[typeV2.name, styles.sheetHeader, { color: palette.text }]} accessibilityRole="header">
-          Reminder before
-        </Text>
-        <View style={styles.chips}>
-          {REMINDER_OPTIONS.map((m) => {
-            const selected = a.before === m;
-            return (
-              <Tap
-                key={m}
-                onPress={() => setPrayerAlert(shown, { before: m })}
-                style={[
-                  styles.chip,
-                  selected
-                    ? { backgroundColor: palette.primary, borderColor: palette.primary }
-                    : { borderColor: palette.outline },
-                ]}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: selected }}
-                testID={`prayer-before-${m}`}
-              >
-                <Text style={[typeV2.button, { color: selected ? palette.onPrimary : palette.text }]} maxFontSizeMultiplier={1.3}>
-                  {m === 0 ? 'Off' : `${m} min`}
-                </Text>
-              </Tap>
-            );
-          })}
-        </View>
-        <Text style={[typeV2.name, styles.sheetHeader, { color: palette.text }]} accessibilityRole="header">
-          Sound
-        </Text>
-        {(
-          [
-            { id: 'standard', label: 'Standard tone', detail: undefined },
-            { id: 'silent', label: 'Silent', detail: 'A banner only' },
-          ] as const
-        ).map((o) => {
-          const selected = a.sound === o.id;
-          return (
-            <Tap
-              key={o.id}
-              // Picks it and plays it, as iOS's own sound settings do (again on
-              // each tap). Silent plays nothing.
-              onPress={() => {
-                setPrayerAlert(shown, { sound: o.id });
-                void previewPrayerSound(o.id);
-              }}
-              style={styles.option}
-              accessibilityRole="radio"
-              accessibilityState={{ checked: selected }}
-              accessibilityHint={o.id === 'silent' ? undefined : 'Plays the sound'}
-              testID={`prayer-sound-${o.id}`}
-            >
-              <View style={styles.rowText}>
-                <Text style={[typeV2.menu, { color: palette.text }]}>{o.label}</Text>
-                {o.detail ? <Text style={[typeV2.meta, { color: palette.secondary }]}>{o.detail}</Text> : null}
-              </View>
-              {selected ? <Ionicons name="checkmark" size={22} color={palette.accentText} /> : null}
-            </Tap>
-          );
-        })}
-      </View>
-    </Sheet>
   );
 }
 
@@ -207,9 +123,4 @@ const styles = StyleSheet.create({
   name: { fontWeight: '600', fontSize: 17, lineHeight: 22 },
   time: { fontWeight: '400', fontSize: 15 },
   detail: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2, alignSelf: 'flex-start' },
-  sheet: { paddingHorizontal: layoutV2.gutter, paddingBottom: 8 },
-  sheetHeader: { marginTop: 12, marginBottom: 8 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { minHeight: 36, paddingHorizontal: 16, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  option: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingVertical: 8 },
 });

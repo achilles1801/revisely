@@ -6,6 +6,7 @@ import { SPEEDS, speedLabel } from '../../lib/playbackPlan';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { Backdrop } from '../Backdrop';
 import { Tap } from '../v2/Tap';
+import { t } from '../../i18n';
 
 export interface Anchor {
   x: number;
@@ -43,7 +44,7 @@ export function SpeedMenu({
   const fits = anchor.y - 8 - listHeight > 40;
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Backdrop onPress={onClose} label="Close speed menu" />
+      <Backdrop onPress={onClose} label={t('reader.speedMenu.close')} />
       <View
         style={[
           styles.menu,
@@ -64,7 +65,7 @@ export function SpeedMenu({
               }}
               style={styles.row}
               accessibilityRole="button"
-              accessibilityLabel={`${speedLabel(s)} speed`}
+              accessibilityLabel={t('reader.speedMenu.option', { speed: speedLabel(s) })}
               accessibilityState={{ selected: chosen }}
               testID={`speed-${s}`}
             >

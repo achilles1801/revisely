@@ -8,6 +8,7 @@
 import type { User, UserPage } from '../types';
 import { liveCustomPlanDays } from './planBuilder';
 import { describePassage, plainText } from './passages';
+import { t } from '../i18n';
 
 type CarryOver = NonNullable<User['carryOver']>;
 
@@ -64,7 +65,7 @@ export function addToPlanParams(
     dayIndex: PLAN_IT_DAY_INDEX,
     initialPages: addToPlanDay(basePages, pages),
     basePages,
-    note: `Saving the plan adds ${plainText(describePassage(pages, { form: 'short' }))} to this day in every cycle.`,
+    note: t('lib.weakSpots.planNote', { what: plainText(describePassage(pages, { form: 'short' })) }),
   };
 }
 
@@ -87,8 +88,11 @@ export function allFirstTomorrow(pages: readonly number[], first: ReadonlySet<nu
  * cut to two lines loses names, never what happened (a long name cut off "first tomorrow" on a phone).
  */
 export function firstTomorrowText(name: string, pages: number): string {
-  if (!/,| and /.test(name)) return `${name} goes first tomorrow`;
-  return `${pages} ${pages === 1 ? 'page goes' : 'pages go'} first tomorrow: ${name}`;
+  // Several passages: the name holds a list (its separator, or its "and": lib/passages' words).
+  const several =
+    name.includes(t('lib.passages.listSeparator').trim()) || name.includes(t('lib.passages.listAnd', { list: '', last: '' }));
+  if (!several) return t('lib.weakSpots.firstTomorrow', { name });
+  return t('lib.weakSpots.pagesFirst', { count: pages, name });
 }
 
 /**

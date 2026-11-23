@@ -5,13 +5,13 @@
 # (d6–d8), the day's end, a light day (d2), and Insights (d4: top; a juz from its tile and the stale one
 # from the untouched row, i5 and i6; Coverage's Surah view (as it opens, Juz 1 open and hidden), Page and
 # Juz views, ACT-26; the range's menu, 3 months and All time, i1, i2 and i4; what wasn't
-# revised, i7; Weak spots; a month's bar, i10; the end; Pace's timed revisions, i11). Each is a
+# revised, i7; Gaps, ACT-28; Weak spots; a month's bar, i10; the end; Pace's timed revisions, i11). Each is a
 # screenshot named 09-<screen>-${THEME}.
 # Run by 09-activity-light.yaml and 09-activity-dark.yaml, after seed-activity.yaml.
 appId: com.revisionbuddy.app
 ---
 - tapOn:
-    id: open-activity
+    id: tab-ActivityTab
 - extendedWaitUntil:
     visible:
       id: activity-blocks-views
@@ -73,8 +73,12 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - tapOn:
     id: calendar-day-2026-11-03
+# Near its top: on an iPhone SE the row (y 585–621) runs under the tab bar (from 600), and the tap at its
+# middle opened Read (SE run 43873599186, 09-activity-light and -dark, both attempts). Not a scroll: the
+# overview's place would carry on to its later screenshots (Insights is the same list).
 - tapOn:
     id: preview-row-revised
+    point: 50%,10%
 - extendedWaitUntil:
     visible:
       id: activity-day-v2
@@ -465,6 +469,78 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     notVisible:
       id: insights-uncovered
+    timeout: 10000
+# Gaps (ACT-28, mocks insights-gaps): the days since the last revision, the line under it and the gaps listed.
+- scrollUntilVisible:
+    element:
+      id: insights-gaps-list
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-gaps-${THEME}
+# When did I last revise…? (ACT-30): Last revised in the unit that suits the account (Juz, with 305 pages), recent
+# first, its first row opened: its pages drawn as part of it.
+- scrollUntilVisible:
+    element:
+      id: insights-gaps-last-revised
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: insights-gaps-last-revised
+- extendedWaitUntil:
+    visible:
+      id: last-revised-controls
+    timeout: 10000
+- tapOn:
+    id: "last-revised-row-.*"
+    index: 0
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-last-revised-${THEME}
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: activity-insights
+    timeout: 10000
+# The range's one gap (9 – 10 October, 2 days without revising) on Overview's calendar (ACT-28).
+- scrollUntilVisible:
+    element:
+      id: insights-gap-2026-10-09
+    direction: UP
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: insights-gap-2026-10-09
+- extendedWaitUntil:
+    visible:
+      id: calendar-gap-cue
+    timeout: 10000
+# Overview starts at its top (it shares Insights' scroll): the tabs and October's title show with the band.
+- extendedWaitUntil:
+    visible:
+      id: calendar-month-title
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: pill-insights
+    timeout: 10000
+- waitForAnimationToEnd
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-gaps-calendar-${THEME}
+- tapOn:
+    id: pill-insights
+- extendedWaitUntil:
+    visible:
+      id: activity-insights
     timeout: 10000
 # Weak spots in the middle of the screen, with Revo's Ask beside its title (d4's middle).
 - scrollUntilVisible:

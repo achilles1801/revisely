@@ -8,8 +8,9 @@ import { getRecitation } from '../recitation';
 import { isActive } from '../nowPlaying';
 import { hasRecordingSession, onRecordingSessionChange } from '../recordings';
 
-/** The tabs' own screens: Home, Read's index, Insights. */
-export const MAIN_SCREENS: ReadonlySet<string> = new Set(['Dashboard', 'ReadIndex', 'Insights']);
+/** The tabs' own screens: Home, Activity (its own tab, TAB-2), Read's index, Insights. */
+// i18n-ignore (route names)
+export const MAIN_SCREENS: ReadonlySet<string> = new Set(['Dashboard', 'Activity', 'ReadIndex', 'Insights']);
 
 export type BusyReason = 'recording' | 'recitation' | 'timer' | 'screen';
 

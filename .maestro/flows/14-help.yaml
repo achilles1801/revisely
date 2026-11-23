@@ -1,7 +1,7 @@
 # The help buttons, for an account that isn't a tester (help is every account's since the November
 # 2026 release, HELP_FOR_EVERYONE): Home's ? on the Today post opens "How Home works"; the sheet
 # closes; "Hide help buttons" takes the ? away with a toast and Undo; hidden it stays hidden after a
-# relaunch, until Settings → Support → Help buttons brings it back. Screenshots of the button, the
+# relaunch, until Settings → Help and support → Help buttons brings it back. Screenshots of the button, the
 # sheet and the toast (h1–h3).
 # Rules (BEHAVIOUR.md): HELP-1, HELP-2
 appId: com.revisionbuddy.app
@@ -61,10 +61,10 @@ appId: com.revisionbuddy.app
     visible:
       id: help-hide
     timeout: 10000
-# The sheet slides up; a tap while it moves can miss (iOS).
-- waitForAnimationToEnd
-- tapOn:
-    id: help-hide
+- runFlow:
+    file: ../subflows/help-hide.yaml
+    env:
+      SCREEN: home
 # Undo at once: its toast lasts six seconds, and with the checks and the screenshot before it the
 # tap came after them on iOS (#328's run 42483723092). They are on the second hide, below.
 - tapOn:
@@ -80,9 +80,10 @@ appId: com.revisionbuddy.app
     visible:
       id: help-hide
     timeout: 10000
-- waitForAnimationToEnd
-- tapOn:
-    id: help-hide
+- runFlow:
+    file: ../subflows/help-hide.yaml
+    env:
+      SCREEN: home
 - extendedWaitUntil:
     visible: "Help buttons hidden.*"
     timeout: 10000
@@ -100,12 +101,13 @@ appId: com.revisionbuddy.app
 - assertNotVisible:
     id: help-button-home
 
-# Settings → Support → Help buttons: off; turned on, the ? is back on Home.
+# Settings → Help and support → Help buttons: off; turned on, the ? is back on Home.
 - tapOn:
     id: open-settings
 - runFlow:
     file: ../subflows/settings-row.yaml
     env:
+      PAGE: help
       ROW: settings-help-buttons
 - tapOn:
     id: settings-help-buttons

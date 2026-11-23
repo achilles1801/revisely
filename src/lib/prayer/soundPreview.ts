@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { logger } from '../logger';
 import { PRAYER_CHANNEL_ID } from '../notificationChannels';
 import type { PrayerSound } from './prefs';
+import { t } from '../../i18n';
 
 /**
  * Tapping a sound in a prayer's sheet plays it (#173). The standard tone is the
@@ -49,7 +50,7 @@ export async function previewPrayerSound(sound: PrayerSound): Promise<PreviewRes
     await Notifications.dismissNotificationAsync(SOUND_PREVIEW_ID).catch(() => undefined);
     await Notifications.scheduleNotificationAsync({
       identifier: SOUND_PREVIEW_ID,
-      content: { title: 'Standard tone', sound: true, data: { soundPreview: true } },
+      content: { title: t('prayer.standardTone'), sound: true, data: { soundPreview: true } },
       // Android: the sound is the channel's, as for the prayer notification.
       trigger: Platform.OS === 'android' ? { channelId: PRAYER_CHANNEL_ID } : null,
     });

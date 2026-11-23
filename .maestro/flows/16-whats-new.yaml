@@ -5,7 +5,9 @@
 # Settings → About → What's new replays the cards with a ✕; Settings → Testing → Show What's new at
 # launch runs it from the next launch as App Store users will see it. It resumes on the card it was
 # left on after a relaunch, Android's back goes to the card before, and after Done it doesn't come back.
-# Revo's card is a moment (RevoMoment): Skip takes it to its end, its screenshot is that end.
+# The current release is 1.0.5 (mistake detection), five cards: the Recite moment (ReciteMoment: a take plays by
+# itself; Skip takes it to its end, its screenshot is that end), the marks, Recite the mistakes again, Gaps in Insights,
+# and Also new. The Recite cards need a phone that can run Recite (the microphone stream: both E2E builds have it).
 # A card's title reads "Step 1 of 5. <title>" to VoiceOver, and iOS matches that label: titles are
 # matched by id, with .* before them.
 # Screenshots: the replay, each card of the run, Home after (w1–w7).
@@ -28,12 +30,13 @@ appId: com.revisionbuddy.app
       id: today-post
     timeout: 20000
 
-# NEW-3: Settings → About → What's new, with a ✕.
+# NEW-3: Settings → About → What's new, with a ✕ (on the moment too).
 - tapOn:
     id: open-settings
 - runFlow:
     file: ../subflows/settings-row.yaml
     env:
+      PAGE: about
       ROW: settings-whats-new
 - tapOn:
     id: settings-whats-new
@@ -42,10 +45,13 @@ appId: com.revisionbuddy.app
       id: whats-new-replay
     timeout: 10000
 - assertVisible:
-    id: whats-new-title
-    text: '.*Your days, in Activity'
-- assertVisible:
     id: whats-new-close
+- runFlow: ../subflows/recite-moment-skip.yaml
+- extendedWaitUntil:
+    visible:
+      id: whats-new-title
+      text: '.*Recite, and see your mistakes'
+    timeout: 20000
 - runFlow:
     file: ../subflows/shot.yaml
     env:
@@ -54,7 +60,7 @@ appId: com.revisionbuddy.app
     id: whats-new-next
 - assertVisible:
     id: whats-new-title
-    text: '.*Revised elsewhere\?'
+    text: '.*Every mistake, explained'
 - tapOn:
     id: whats-new-close
 - extendedWaitUntil:
@@ -62,10 +68,16 @@ appId: com.revisionbuddy.app
       id: whats-new-replay
     timeout: 10000
 
-# NEW-3: Testing → Show What's new at launch, from the next launch.
+# NEW-3: Testing → Show What's new at launch, from the next launch. Back from About to Settings' first level first.
+- runFlow:
+    file: ../subflows/tap-to-open.yaml
+    env:
+      ID: back
+      OPENS: settings-page-testing
 - runFlow:
     file: ../subflows/settings-row.yaml
     env:
+      PAGE: testing
       ROW: settings-whats-new-launch
 - tapOn:
     id: settings-whats-new-launch
@@ -74,26 +86,40 @@ appId: com.revisionbuddy.app
     visible:
       id: whats-new-forced
     timeout: 20000
-# NEW-2: required, so no ✕; one Next a card.
+# NEW-2: required, so no ✕; one Next a card. The moment first.
 - assertNotVisible:
     id: whats-new-close
-- assertVisible:
-    id: whats-new-title
-    text: '.*Your days, in Activity'
+- runFlow: ../subflows/recite-moment-skip.yaml
+- extendedWaitUntil:
+    visible:
+      id: whats-new-title
+      text: '.*Recite, and see your mistakes'
+    timeout: 20000
+- assertNotVisible:
+    id: whats-new-close
 - runFlow:
     file: ../subflows/shot.yaml
     env:
-      NAME: w2-activity
+      NAME: w2-recite
 - tapOn:
     id: whats-new-next
 - assertVisible:
     id: whats-new-title
-    text: '.*Revised elsewhere\?'
+    text: '.*Every mistake, explained'
 - runFlow:
     file: ../subflows/shot.yaml
     env:
-      NAME: w3-elsewhere
-# Android's back goes to the card before.
+      NAME: w3-marks
+- tapOn:
+    id: whats-new-next
+- assertVisible:
+    id: whats-new-title
+    text: '.*Until it sticks'
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: w4-again
+# Android's back goes to the card before (between two pictures: back onto the moment would play it again).
 - runFlow:
     when:
       platform: Android
@@ -101,21 +127,12 @@ appId: com.revisionbuddy.app
       - back
       - assertVisible:
           id: whats-new-title
-          text: '.*Your days, in Activity'
+          text: '.*Every mistake, explained'
       - tapOn:
           id: whats-new-next
       - assertVisible:
           id: whats-new-title
-          text: '.*Revised elsewhere\?'
-- tapOn:
-    id: whats-new-next
-- assertVisible:
-    id: whats-new-title
-    text: '.*Memorize by the ayah'
-- runFlow:
-    file: ../subflows/shot.yaml
-    env:
-      NAME: w4-ayah
+          text: '.*Until it sticks'
 
 # NEW-2: leaving part way reopens it on the card it was on.
 - runFlow: ../subflows/relaunch.yaml
@@ -125,32 +142,25 @@ appId: com.revisionbuddy.app
     timeout: 20000
 - assertVisible:
     id: whats-new-title
-    text: '.*Memorize by the ayah'
-# NEW-2: Revo's card plays by itself (about 19 s); Skip, in its top corner, takes it to its end, where
-# Later goes on (a touch anywhere else does nothing). While it plays the screen never settles: these
-# taps don't wait for it (.maestro/README.md). The title is matched by id: iOS reads it as "Step 4 of 5.
-# Meet Revo".
+    text: '.*Until it sticks'
 - tapOn:
     id: whats-new-next
-    waitToSettleTimeoutMs: 500
-    retryTapIfNoChange: false
-- runFlow: ../subflows/revo-moment-skip.yaml
-- extendedWaitUntil:
-    visible:
-      id: whats-new-title
-      text: '.*Meet Revo'
-    timeout: 40000
+- assertVisible:
+    id: whats-new-title
+    text: '.*Gaps, in Insights'
 - runFlow:
     file: ../subflows/shot.yaml
     env:
-      NAME: w5-revo
+      NAME: w5-gaps
 - tapOn:
     id: whats-new-next
 - assertVisible:
     id: whats-new-title
     text: '.*Also new'
 - assertVisible:
-    id: whats-new-row-offline
+    id: whats-new-row-test
+- assertVisible:
+    id: whats-new-row-search
 - runFlow:
     file: ../subflows/shot.yaml
     env:

@@ -3,7 +3,7 @@
 // focused and in front, and never while a take's connection already holds it.
 import { AppState, AppStateStatus } from 'react-native';
 import { act, renderHook } from '@testing-library/react-native';
-import { useKeepCheckerWarm, WARM_EVERY_MS } from '../useKeepCheckerWarm';
+import { useKeepCheckerWarm, useWarmCheckerOnFront, WARM_EVERY_MS } from '../useKeepCheckerWarm';
 
 let appStateListeners: ((s: AppStateStatus) => void)[] = [];
 let removed = 0;
@@ -85,4 +85,40 @@ it('never with live checking off', () => {
   const { warm } = setup(false);
   act(() => jest.advanceTimersByTime(3 * WARM_EVERY_MS));
   expect(warm).not.toHaveBeenCalled();
+});
+
+describe('the app coming to the front wakes it (Nov 22 2026: production scales to zero, about 10 s cold)', () => {
+  const front = (on = true) => {
+    const warm = jest.fn();
+    const hook = renderHook((p: { on: boolean }) => useWarmCheckerOnFront(p.on, warm), { initialProps: { on } });
+    return { warm, ...hook };
+  };
+
+  it('[RECITE-1] on opening and on coming back, at most once every 10 minutes, with no timer of its own', () => {
+    const { warm } = front();
+    expect(warm).toHaveBeenCalledTimes(1);
+    act(() => jest.advanceTimersByTime(3 * WARM_EVERY_MS));
+    expect(warm).toHaveBeenCalledTimes(1);
+    app('background');
+    app('active');
+    expect(warm).toHaveBeenCalledTimes(2);
+    // Back again within 10 minutes: no second wake.
+    app('background');
+    act(() => jest.advanceTimersByTime(WARM_EVERY_MS - 1));
+    app('active');
+    expect(warm).toHaveBeenCalledTimes(2);
+  });
+
+  it('nothing while the app is in the background', () => {
+    Object.defineProperty(AppState, 'currentState', { value: 'background', configurable: true });
+    const { warm } = front(true);
+    expect(warm).not.toHaveBeenCalled();
+  });
+
+  it('not for an account that can’t recite', () => {
+    const { warm } = front(false);
+    app('active');
+    expect(warm).not.toHaveBeenCalled();
+    expect(appStateListeners).toHaveLength(0);
+  });
 });

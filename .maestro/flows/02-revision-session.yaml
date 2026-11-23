@@ -64,7 +64,7 @@ appId: com.revisionbuddy.app
     env:
       NAME: 02-home-continue
 
-# SESS-1: the check marks and unmarks the page on screen.
+# SESS-1: the Pages sheet marks and unmarks the page on screen.
 - runFlow:
     file: ../subflows/open-session.yaml
     env:
@@ -72,15 +72,33 @@ appId: com.revisionbuddy.app
 - runFlow: ../subflows/show-controls.yaml
 - assertVisible:
     id: session-page
-    text: "An.Nazi'at.16–46 · Juz 30 · .*"
-- tapOn: "Mark current page as revised"
+    text: "An.Nazi'at · Juz 30 · .*"
+- tapOn:
+    id: session-pages
+- extendedWaitUntil:
+    visible:
+      id: session-pages-toggle-here
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: 02-pages-sheet
+- tapOn:
+    id: session-pages-toggle-here
 - assertVisible:
-    id: session-title
-    text: ".*4/10"
-- tapOn: "Unmark current page"
+    id: session-pages-count
+    text: "4 of 10 revised"
+- tapOn:
+    id: session-pages-toggle-here
 - assertVisible:
-    id: session-title
-    text: ".*3/10"
+    id: session-pages-count
+    text: "3 of 10 revised"
+- runFlow: ../subflows/close-sheet.yaml
+- extendedWaitUntil:
+    visible:
+      id: session-title
+      text: ".*3/10"
+    timeout: 10000
 
 # The rest (584–590), the last by swiping onto the end card.
 - runFlow:

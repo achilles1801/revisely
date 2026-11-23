@@ -1,0 +1,10 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Debug builds only: lets adb hand the widgets a snapshot (see DebugSnapshotReceiver). -->
+  <application>
+    <receiver android:name="app.revisely.widgets.DebugSnapshotReceiver" android:exported="true">
+      <intent-filter>
+        <action android:name="app.revisely.widgets.DEBUG_SNAPSHOT" />
+      </intent-filter>
+    </receiver>
+  </application>
+</manifest>

@@ -63,7 +63,6 @@ export const MOMENT_ORBIT = [
 /** An example week, Sunday to Saturday (marked "Example" on screen: no account's own numbers). */
 export const MOMENT_WEEK = [8, 6, 9, 0, 14, 7, 8] as const;
 export const MOMENT_WEEK_MAX = 14;
-export const WEEK_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
 /** The example's 30 juz, each a share of the accent; Juz 29 is the one to start with. */
 export const JUZ_SHADE = [0.35, 0.55, 0.3, 0.7, 0.45, 0.6, 0.25, 0.5, 0.8, 0.4, 0.65, 0.3, 0.55, 0.75, 0.45, 0.6, 0.35, 0.7, 0.5, 0.85, 0.4, 0.6, 0.9, 0.55, 0.7, 0.8, 0.95, 0.6, 1, 0.9] as const;
 export const FIRST_JUZ = 29;

@@ -59,6 +59,8 @@ export interface StopTrace {
   stall: number;
   /** The last heartbeat saved, in ms after Stop. */
   beat: number;
+  /** The take's own numbers (lib/reciteLive/takeStats), when it was let go before its summary (`abandon`). */
+  stats?: Record<string, unknown>;
 }
 
 export interface StopTracerDeps {
@@ -79,6 +81,12 @@ export interface StopTracer {
   step(s: string, socket?: string): void;
   /** The take reached somewhere the screen shows (the summary, a failure) or went: the trace is removed. */
   end(): void;
+  /**
+   * The screen let the take go between Stop and its summary (the reader left while it was checking; long takes, Nov 20
+   * 2026): the trace goes to Sentry now, with the take's numbers, instead of being removed unseen. Without a Stop being
+   * traced, nothing.
+   */
+  abandon(stats?: Record<string, unknown>): void;
   /** At launch: a trace still there is from a run that ended between Stop and the summary. */
   reportLeftover(): Promise<void>;
 }
@@ -168,6 +176,16 @@ export function createStopTracer(deps: StopTracerDeps): StopTracer {
       if (!trace) return;
       trace = null;
       deps.storage.removeItem(STOP_TRACE_KEY).catch(() => undefined);
+    },
+    abandon(stats) {
+      stopBeat();
+      recent = [];
+      if (!trace) return;
+      add('left');
+      const left: StopTrace = { ...trace, ...(stats ? { stats } : {}) };
+      trace = null;
+      deps.storage.removeItem(STOP_TRACE_KEY).catch(() => undefined);
+      deps.report(left);
     },
     async reportLeftover() {
       if (!deps.enabled()) return;

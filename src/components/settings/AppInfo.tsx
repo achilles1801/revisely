@@ -10,20 +10,23 @@ import { spacing } from '../../theme/spacing';
 import { currentRelease, diagnosticLines, ReleaseInfo } from '../../lib/releaseInfo';
 import { sendTestError, triggerTestNativeCrash } from '../../lib/sentry';
 import { applyUpdate, checkForUpdateNow, useUpdateOffer } from '../../lib/updates/ota';
+import { t } from '../../i18n';
 
 export { checkForUpdateNow };
 
 /** The alert after "Check for updates" found one: it has downloaded, so the only step left is the restart. */
 export function offerRestart(): void {
-  Alert.alert('Update ready', 'Restart Revisely to use it.', [
-    { text: 'Later', style: 'cancel' },
-    { text: 'Restart to update', style: 'default', onPress: () => void applyUpdate() },
+  Alert.alert(t('settings.appInfo.updateReady'), t('settings.appInfo.restartToUse'), [
+    { text: t('settings.appInfo.later'), style: 'cancel' },
+    { text: t('settings.appInfo.restartToUpdate'), style: 'default', onPress: () => void applyUpdate() },
   ]);
 }
 
 /** One line summary for the row: "1.0.2 (19) · preview · update 84b0091f". */
 export function appInfoSummary(r: ReleaseInfo): string {
-  const js = r.isEmbeddedLaunch ? 'built-in' : `update ${r.updateShort ?? (r.updateId ?? '').slice(0, 8)}`;
+  const js = r.isEmbeddedLaunch
+    ? t('settings.appInfo.builtIn')
+    : t('settings.appInfo.update', { id: r.updateShort ?? (r.updateId ?? '').slice(0, 8) });
   return [r.versionLabel, r.channel ?? undefined, js].filter(Boolean).join(' · ');
 }
 
@@ -46,9 +49,9 @@ export function AppInfo({ release = currentRelease(), tools = false }: { release
 function VersionRow({ release }: { release: ReleaseInfo }) {
   const { palette } = useTheme();
   return (
-    <View style={v2.row} accessible accessibilityLabel={`Version ${release.versionLabel}`} testID="app-version">
+    <View style={v2.row} accessible accessibilityLabel={t('settings.appInfo.versionLabel', { version: release.versionLabel })} testID="app-version">
       <Ionicons name="information-circle-outline" size={24} color={palette.text} />
-      <Text style={[typeV2.body, styles.text, { color: palette.text }]}>Version</Text>
+      <Text style={[typeV2.body, styles.text, { color: palette.text }]}>{t('settings.appInfo.version')}</Text>
       <Text style={[typeV2.meta, typeV2.numeral, { color: palette.secondary }]}>{release.versionLabel}</Text>
     </View>
   );
@@ -70,23 +73,23 @@ function AppInfoTools({ release }: { release: ReleaseInfo }) {
     if (result === 'ready') {
       offerRestart();
     } else if (result === 'up-to-date') {
-      Alert.alert('Up to date', 'This is the latest version for this build.');
+      Alert.alert(t('settings.appInfo.upToDate'), t('settings.appInfo.latest'));
     } else if (result === 'unavailable') {
-      Alert.alert('Not available', 'Updates are off in this build.');
+      Alert.alert(t('settings.appInfo.notAvailable'), t('settings.appInfo.updatesOff'));
     } else {
-      Alert.alert('Couldn’t check for updates', error ?? 'Please try again.');
+      Alert.alert(t('settings.appInfo.checkFailed'), error ?? t('common.pleaseTryAgain'));
     }
   };
 
   const testActions = showsTestActions(release) ? (
     <>
-      <Action label="Send test error" onPress={() => { sendTestError(); Alert.alert('Sent', 'A test error went to Sentry.'); }} />
+      <Action label={t('settings.appInfo.sendTestError')} onPress={() => { sendTestError(); Alert.alert(t('settings.appInfo.sent'), t('settings.appInfo.sentBody')); }} />
       <Action
-        label="Test native crash"
+        label={t('settings.appInfo.testCrash')}
         onPress={() =>
-          Alert.alert('Crash the app?', 'Revisely closes at once; reopen it to send the crash report.', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Crash', style: 'destructive', onPress: triggerTestNativeCrash },
+          Alert.alert(t('settings.appInfo.crashTitle'), t('settings.appInfo.crashBody'), [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('settings.appInfo.crash'), style: 'destructive', onPress: triggerTestNativeCrash },
           ])
         }
       />
@@ -104,13 +107,13 @@ function AppInfoTools({ release }: { release: ReleaseInfo }) {
         delayLongPress={450}
         style={v2.row}
         accessibilityRole="button"
-        accessibilityLabel={`App info: ${appInfoSummary(release)}`}
-        accessibilityHint="Double tap for details. Long press to check for an update."
+        accessibilityLabel={t('settings.appInfo.label', { summary: appInfoSummary(release) })}
+        accessibilityHint={t('settings.appInfo.hint')}
         accessibilityState={{ expanded: open }}
       >
         <Ionicons name="information-circle-outline" size={24} color={palette.text} />
         <View style={styles.text}>
-          <Text style={[typeV2.body, { color: palette.text }]}>App info</Text>
+          <Text style={[typeV2.body, { color: palette.text }]}>{t('settings.appInfo.title')}</Text>
           <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1}>
             {appInfoSummary(release)}
           </Text>
@@ -123,7 +126,7 @@ function AppInfoTools({ release }: { release: ReleaseInfo }) {
       </Tap>
       {release.isEmergencyLaunch && (
         <Text style={[typeV2.meta, v2.indented, v2.warning, { color: palette.red }]}>
-          The last update couldn’t start, so the built-in version is running.
+          {t('settings.appInfo.emergency')}
         </Text>
       )}
       {open && (
@@ -135,11 +138,11 @@ function AppInfoTools({ release }: { release: ReleaseInfo }) {
           ))}
           <View style={styles.actions}>
             {waiting ? (
-              <PillButton title="Restart to update" onPress={() => void applyUpdate()} size="sm" testID="app-info-restart" />
+              <PillButton title={t('settings.appInfo.restartToUpdate')} onPress={() => void applyUpdate()} size="sm" testID="app-info-restart" />
             ) : (
-              <Action label="Check for updates" onPress={check} />
+              <Action label={t('settings.appInfo.checkForUpdates')} onPress={check} />
             )}
-            <Action label="Share" onPress={share} />
+            <Action label={t('settings.appInfo.share')} onPress={share} />
           </View>
           {testActions && <View style={styles.actions}>{testActions}</View>}
         </View>

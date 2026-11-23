@@ -53,7 +53,11 @@ interface Deps {
 }
 
 /** The token's account, if it may come in; null otherwise (a bad or expired token included). */
-async function allowed(token: string, env: GateEnv, deps: Deps): Promise<{ ok: boolean; email: string | null; exp: number }> {
+async function allowed(
+  token: string,
+  env: GateEnv,
+  deps: Deps,
+): Promise<{ ok: boolean; email: string | null; exp: number }> {
   const { claims } = await verifyIdTokenClaims(token, env.FIREBASE_PROJECT_ID, deps.now, deps.fetch);
   return {
     ok: claims[GATE_CLAIM] === true,
@@ -63,7 +67,10 @@ async function allowed(token: string, env: GateEnv, deps: Deps): Promise<{ ok: b
 }
 
 function json(status: number, body: unknown, headers: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...headers } });
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...headers },
+  });
 }
 
 /** Only the site's own pages may post to the gate. */
@@ -95,7 +102,10 @@ async function session(request: Request, env: GateEnv, deps: Deps): Promise<Resp
   const maxAge = Math.max(0, Math.min(3600, who.exp - now));
   return new Response(null, {
     status: 204,
-    headers: { 'Set-Cookie': `${GATE_COOKIE}=${token}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`, 'Cache-Control': 'no-store' },
+    headers: {
+      'Set-Cookie': `${GATE_COOKIE}=${token}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`,
+      'Cache-Control': 'no-store',
+    },
   });
 }
 
@@ -103,7 +113,10 @@ function signout(request: Request): Response {
   if (request.method !== 'POST' || !sameOrigin(request)) return json(403, { error: 'origin' });
   return new Response(null, {
     status: 204,
-    headers: { 'Set-Cookie': `${GATE_COOKIE}=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0`, 'Cache-Control': 'no-store' },
+    headers: {
+      'Set-Cookie': `${GATE_COOKIE}=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0`,
+      'Cache-Control': 'no-store',
+    },
   });
 }
 

@@ -1,0 +1,5 @@
+{
+  "_comment": "The store app's fingerprints with no environment (scripts/check-store-fingerprints.js). Changed only by a PR meant to move the store app's runtime.",
+  "ios": "77aeb665a5f62b3517709cc9d894a458fcadb96d",
+  "android": "3bddf5237462fdd897844c3c40c5b5005312d610"
+}

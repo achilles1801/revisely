@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useTheme } from '../../../context/ThemeContext';
 import { Tap } from '../../v2/Tap';
+import { t } from '../../../i18n';
 
 /** What the chart's two header lines say while a mark is picked. */
 export interface Readout {
@@ -54,7 +55,7 @@ export function ChartFrame({
           </Text>
         </View>
         {readout ? (
-          <Tap onPress={onClear} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8} testID={`${testID}-close`}>
+          <Tap onPress={onClear} accessibilityRole="button" accessibilityLabel={t('common.close')} hitSlop={8} testID={`${testID}-close`}>
             <View style={[styles.close, { backgroundColor: palette.bubble }]}>
               <Ionicons name="close" size={17} color={palette.text} />
             </View>

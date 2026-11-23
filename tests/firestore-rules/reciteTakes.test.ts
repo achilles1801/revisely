@@ -77,6 +77,54 @@ describe("Recite's memory: users/<uid>/reciteTakes", () => {
     await assertSucceeds(deleteDoc(doc(alice, path(ALICE, 'c1'))));
   });
 
+  it('a take kept without its final answer says so (unfinished: true), and only as true', async () => {
+    const alice = env.authenticatedContext(ALICE).firestore();
+    await assertSucceeds(setDoc(doc(alice, path(ALICE, 't3')), take({ unfinished: true })));
+    // Its final answer came after all: written again without it.
+    await assertSucceeds(setDoc(doc(alice, path(ALICE, 't3')), take({ rev: 1_763_200_300_000 })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 't4')), take({ unfinished: false })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 't4')), take({ unfinished: 'yes' })));
+  });
+
+  it('a take says where it ran and why, from the closed lists (ONDEV-4)', async () => {
+    const alice = env.authenticatedContext(ALICE).firestore();
+    await assertSucceeds(setDoc(doc(alice, path(ALICE, 'p1')), take({ ranOn: 'phone' })));
+    await assertSucceeds(setDoc(doc(alice, path(ALICE, 'p2')), take({ ranOn: 'server', ranWhy: 'no-pack' })));
+    for (const why of ['forced', 'pin', 'config', 'self-check', 'lacks', 'slow', 'no-speed', 'refused', 'replay']) {
+      await assertSucceeds(setDoc(doc(alice, path(ALICE, `w-${why}`)), take({ ranOn: 'server', ranWhy: why })));
+    }
+    await assertFails(setDoc(doc(alice, path(ALICE, 'p3')), take({ ranOn: 'mars' })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 'p3')), take({ ranOn: true })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 'p3')), take({ ranOn: 'server', ranWhy: 'because' })));
+  });
+
+  it('a recitation longer than the checker’s cap keeps its takes (links: 2 to 20), and nothing else in their place', async () => {
+    const alice = env.authenticatedContext(ALICE).firestore();
+    const links = [
+      { take: 'take-a', from: 48707 },
+      { take: 'take-b', from: 49310 },
+      { take: null, from: 49902 },
+    ];
+    await assertSucceeds(setDoc(doc(alice, path(ALICE, 't5')), take({ links })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 't6')), take({ links: [links[0]] })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 't6')), take({ links: Array.from({ length: 21 }, (_, i) => ({ take: `t${i}`, from: 48707 + i })) })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 't6')), take({ links: 'take-a,take-b' })));
+  });
+
+  it('a take keeps the words peeked (1 to 300) and the marks called Not a mistake (1 to 100), for its summary later', async () => {
+    const alice = env.authenticatedContext(ALICE).firestore();
+    const removed = [{ ...mark, id: '31450:harakat:fatha', w: 31450, kind: 'harakat' }];
+    await assertSucceeds(setDoc(doc(alice, path(ALICE, 't7')), take({ peeked: [31420, 31421], removed })));
+    // Neither is needed: a take kept before them, or with nothing peeked or removed, is as it was.
+    await assertSucceeds(setDoc(doc(alice, path(ALICE, 't8')), take()));
+    await assertFails(setDoc(doc(alice, path(ALICE, 't9')), take({ peeked: [] })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 't9')), take({ peeked: Array.from({ length: 301 }, (_, i) => 31000 + i) })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 't9')), take({ peeked: '31420' })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 't9')), take({ removed: [] })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 't9')), take({ removed: Array.from({ length: 101 }, (_, i) => ({ ...mark, id: `m${i}` })) })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 't9')), take({ removed: mark })));
+  });
+
   it('nobody else reads or writes them, signed in or not', async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), path(ALICE, 't1')), { ...take(), updatedAt: new Date() });

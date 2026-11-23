@@ -9,6 +9,8 @@ export const READER_HEADER_HEIGHT = 48;
 interface ReaderFrameProps {
   /** The controls are showing (otherwise: reading, nothing but the page). */
   chromeVisible: boolean;
+  /** The status bar stays while the controls are put away (an immersive page during a take: the time and battery). */
+  keepStatusBar?: boolean;
   /** The screen is the focused one. Only then does it set the status bar,
    *  which is app-wide: hidden here must not stay hidden on the next screen. */
   active?: boolean;
@@ -21,6 +23,10 @@ interface ReaderFrameProps {
   header: ReactNode;
   /** While reading: a quiet line above the page (the juz, the surah). */
   quietHeader: ReactNode;
+  /** Above the header, in both states (a session's page strip). Its height is `stripHeight`. */
+  strip?: ReactNode;
+  /** The room `strip` takes, so the page never moves and nothing covers it. */
+  stripHeight?: number;
   /** With the controls: what goes under the page. */
   footer: ReactNode;
   /** The room under the page for `footer`. Kept in both states, so the page
@@ -60,12 +66,15 @@ function useStableInset(value: number): number {
  */
 export function ReaderFrame({
   chromeVisible,
+  keepStatusBar = false,
   active = true,
   onBackgroundPress,
   background,
   isDark,
   header,
   quietHeader,
+  strip,
+  stripHeight = 0,
   footer,
   footerHeight,
   pageLabel,
@@ -74,7 +83,8 @@ export function ReaderFrame({
   children,
 }: ReaderFrameProps) {
   const insets = useSafeAreaInsets();
-  const top = useStableInset(insets.top);
+  const stripTop = useStableInset(insets.top);
+  const top = stripTop + (strip ? stripHeight : 0);
   const shown = useRef(new Animated.Value(chromeVisible ? 1 : 0)).current;
   useEffect(() => {
     Animated.timing(shown, {
@@ -97,7 +107,7 @@ export function ReaderFrame({
     <View style={[styles.root, { backgroundColor: background }]}>
       {active && (
         <StatusBar
-          hidden={!chromeVisible}
+          hidden={!chromeVisible && !keepStatusBar}
           animated
           showHideTransition="fade"
           barStyle={isDark ? 'light-content' : 'dark-content'}
@@ -114,6 +124,12 @@ export function ReaderFrame({
       <View style={[styles.pages, { top: top + READER_HEADER_HEIGHT, bottom: insets.bottom + footerHeight }]}>
         {children}
       </View>
+
+      {strip ? (
+        <View pointerEvents="none" style={[styles.strip, { top: stripTop, height: stripHeight }]}>
+          {strip}
+        </View>
+      ) : null}
 
       {/* Reading */}
       <Animated.View
@@ -178,6 +194,7 @@ const styles = StyleSheet.create({
     height: READER_HEADER_HEIGHT,
     justifyContent: 'center',
   },
+  strip: { position: 'absolute', left: 0, right: 0 },
   bottom: { position: 'absolute', left: 0, right: 0 },
   quietRow: {
     flexDirection: 'row',

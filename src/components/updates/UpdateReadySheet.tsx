@@ -7,6 +7,7 @@ import { PillButton } from '../v2/PillButton';
 import { applyUpdate, postponeUpdateOffer, useUpdateOffer } from '../../lib/updates/ota';
 import { useBusyReasons } from '../../lib/updates/busy';
 import { modalShowing, useModalShowing } from '../v2/modalTurn';
+import { t } from '../../i18n';
 
 /** The screen settles first (the splash going, a session's end). */
 export const UPDATE_OFFER_DELAY_MS = 1200;
@@ -31,10 +32,10 @@ export function UpdateReadySheet() {
 
   useEffect(() => {
     if (!visible || busy || shown || sheetOpen) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       if (!modalShowing()) setShown(true);
     }, UPDATE_OFFER_DELAY_MS);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [visible, busy, shown, sheetOpen]);
 
   const later = () => {
@@ -45,19 +46,19 @@ export function UpdateReadySheet() {
     <Sheet
       visible={shown && visible}
       onClose={later}
-      title="A new update is ready"
-      footer={{ label: 'Later', onPress: later, testID: 'update-ready-later' }}
+      title={t('updates.ready.title')}
+      footer={{ label: t('updates.ready.later'), onPress: later, testID: 'update-ready-later' }}
       testID="update-ready-sheet"
     >
       <View style={styles.body}>
         <Text style={[typeV2.body, styles.centred, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-          Revisely restarts to finish updating. It takes a moment.
+          {t('updates.ready.body')}
         </Text>
         <Text style={[typeV2.meta, styles.centred, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-          Your plan, progress and recordings stay as they are.
+          {t('updates.staysAsIs')}
         </Text>
         <PillButton
-          title="Update now"
+          title={t('updates.ready.now')}
           size="lg"
           onPress={() => void applyUpdate()}
           style={styles.button}

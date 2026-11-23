@@ -22,6 +22,11 @@ import { PillButton } from '../v2/PillButton';
 import { PillTabs } from '../v2/PillTabs';
 import { Hairline, InsightRow, QuietLine, ShowMore } from './InsightsV2';
 import { revisablePages } from '../../lib/memorizedAyahs';
+import { t } from '../../i18n';
+import { lastRevisedDay } from '../../lib/recency';
+
+// Moved to lib/recency (Insights' Gaps reads it too); kept here for this file's callers.
+export { lastRevisedDay };
 
 type BrowseMode = 'pages' | 'surahs' | 'juz';
 
@@ -61,18 +66,7 @@ interface JuzRow {
  * Arabic first would make the whole line right to left ("page · average 1.0 1 · الم").
  */
 export function juzMeta(juz: number, pageCount: number, avgStrength: number): string {
-  return `${pageCount} page${pageCount === 1 ? '' : 's'} · average ${avgStrength.toFixed(1)} · ⁨${getJuzName(juz)}⁩`;
-}
-
-/**
- * The revision day a page was last revised on. A page holds either the moment of its last
- * revision (a session sets it) or the revision day itself, stored as that day's midnight UTC (the
- * self-heal from the logs, AppContext's syncPagesFromLogs). Read as a moment, the second fell on
- * the evening before in the Americas.
- */
-export function lastRevisedDay(user: Parameters<typeof getRevisionDayForUser>[0], iso: string): string {
-  if (/T00:00:00(\.000)?Z$/.test(iso)) return iso.slice(0, 10);
-  return getRevisionDayForUser(user, new Date(iso));
+  return t('insights.juzMeta', { count: pageCount, average: avgStrength.toFixed(1), name: getJuzName(juz) });
 }
 
 /**
@@ -88,7 +82,7 @@ export function pageRowText(pageNumber: number, detail: (page: string) => string
 
 /** "today", "1d ago", "12d ago": how long since a page's last revision day. */
 export function revisedAgo(days: number): string {
-  return days === 0 ? 'today' : `${days}d ago`;
+  return days === 0 ? t('insights.today') : t('insights.daysAgo', { days });
 }
 
 /**
@@ -131,13 +125,13 @@ export function usePageStrengthRows(): {
 
         let reason: string;
         if (missed > 0) {
-          reason = missed === 1 ? 'Missed once on the schedule' : `Missed ${missed} scheduled revisions`;
+          reason = missed === 1 ? t('insights.reason.missedOnce') : t('insights.reason.missed', { count: missed });
         } else if (page.weaknessRating <= 2) {
-          reason = page.weaknessRating === 1 ? 'You marked this as very weak' : 'You marked this as weak';
+          reason = page.weaknessRating === 1 ? t('insights.reason.veryWeak') : t('insights.reason.weak');
         } else if (daysSinceMemorized !== null && daysSinceMemorized < 30) {
-          reason = 'Recently memorized — keep it fresh';
+          reason = t('insights.reason.recent');
         } else {
-          reason = `Last revised ${revisedAgo(daysSinceRevision)}`;
+          reason = t('insights.reason.lastRevised', { ago: revisedAgo(daysSinceRevision) });
         }
 
         return {
@@ -269,22 +263,27 @@ export function BrowseByStrength({
     setBrowseMode('pages');
   };
 
-  const filterLabel = juzFilter === null ? 'All juz' : `Juz ${juzFilter}`;
-  const strengthFilterLabel = strengthFilter === null ? 'All strengths' : getRatingLabel(strengthFilter);
+  const filterLabel = juzFilter === null ? t('insights.allJuz') : t('common.juzN', { n: juzFilter });
+  const strengthFilterLabel = strengthFilter === null ? t('insights.allStrengths') : getRatingLabel(strengthFilter);
   const listRows =
     browseMode === 'pages' ? sortedPages.length : browseMode === 'surahs' ? sortedSurahs.length : sortedJuz.length;
   const expanded = !collapsed || expandedLists[browseMode];
   const limit = expanded ? Infinity : LIST_LIMIT;
-  const emptyBrowse = browseMode === 'juz' ? 'Nothing memorized yet' : `No ${browseMode} match these filters`;
+  const emptyBrowse =
+    browseMode === 'juz'
+      ? t('insights.nothingMemorized')
+      : browseMode === 'pages'
+        ? t('insights.noMatchPages')
+        : t('insights.noMatchSurahs');
 
   return (
     <>
       <View style={styles.controls}>
         <PillTabs<BrowseMode>
           options={[
-            { value: 'pages', label: 'Pages' },
-            { value: 'surahs', label: 'Surahs' },
-            { value: 'juz', label: 'Juz' },
+            { value: 'pages', label: t('insights.pages') },
+            { value: 'surahs', label: t('insights.surahs') },
+            { value: 'juz', label: t('common.juz') },
           ]}
           value={browseMode}
           onChange={setBrowseMode}
@@ -300,7 +299,7 @@ export function BrowseByStrength({
               size="sm"
               variant={juzFilter !== null ? 'solid' : 'outline'}
               onPress={() => setJuzPickerOpen(true)}
-              accessibilityLabel={`Juz: ${filterLabel}`}
+              accessibilityLabel={t('insights.juzFilterLabel', { filter: filterLabel })}
               testID="filter-juz"
             />
           )}
@@ -310,7 +309,7 @@ export function BrowseByStrength({
             size="sm"
             variant={strengthFilter !== null ? 'solid' : 'outline'}
             onPress={() => setStrengthPickerOpen(true)}
-            accessibilityLabel={`Strength: ${strengthFilterLabel}`}
+            accessibilityLabel={t('insights.strengthLabel', { value: strengthFilterLabel })}
             testID="filter-strength"
           />
         </View>
@@ -324,19 +323,23 @@ export function BrowseByStrength({
         <View testID={`browse-${browseMode}`} collapsable={false}>
           {browseMode === 'pages' &&
             sortedPages.slice(0, limit).map((row) => {
-              const t = pageRowText(
-                row.pageNumber,
-                (page) => `${getRatingLabel(row.strength)} · Juz ${row.juzNumber} · ${page} · revised ${revisedAgo(row.daysSinceRevision)}`,
+              const rowText = pageRowText(row.pageNumber, (page) =>
+                t('insights.pageRow', {
+                  rating: getRatingLabel(row.strength),
+                  juz: row.juzNumber,
+                  page,
+                  ago: revisedAgo(row.daysSinceRevision),
+                }),
               );
               return (
                 <InsightRow
                   key={`page-${row.pageNumber}`}
                   number={row.surahNumber}
-                  name={t.name}
+                  name={rowText.name}
                   rating={row.strength}
-                  text={t.text}
+                  text={rowText.text}
                   onPress={() => onOpenPage(row.pageNumber)}
-                  accessibilityLabel={t.spoken}
+                  accessibilityLabel={rowText.spoken}
                   testID={`browse-page-${row.pageNumber}`}
                 />
               );
@@ -348,9 +351,9 @@ export function BrowseByStrength({
                 number={row.surahNumber}
                 name={row.surahName}
                 rating={Math.round(row.avgStrength)}
-                text={`${row.pageCount} page${row.pageCount === 1 ? '' : 's'} memorized · average ${row.avgStrength.toFixed(1)}`}
+                text={t('insights.surahRow', { count: row.pageCount, average: row.avgStrength.toFixed(1) })}
                 onPress={() => onOpenPage(row.weakestPage)}
-                accessibilityLabel={`${row.surahName}, ${row.pageCount} pages memorized, average strength ${row.avgStrength.toFixed(1)}. Opens its weakest page`}
+                accessibilityLabel={t('insights.surahLabel', { name: row.surahName, count: row.pageCount, average: row.avgStrength.toFixed(1) })}
                 testID={`browse-surah-${row.surahNumber}`}
               />
             ))}
@@ -363,7 +366,7 @@ export function BrowseByStrength({
                 rating={Math.round(row.avgStrength)}
                 text={juzMeta(row.juzNumber, row.pageCount, row.avgStrength)}
                 onPress={() => handleJuzRowTap(row.juzNumber)}
-                accessibilityLabel={`Juz ${row.juzNumber}, ${row.pageCount} pages, average strength ${row.avgStrength.toFixed(1)}. Shows its pages`}
+                accessibilityLabel={t('insights.juzLabel', { juz: row.juzNumber, count: row.pageCount, average: row.avgStrength.toFixed(1) })}
                 testID={`browse-juz-${row.juzNumber}`}
               />
             ))}
@@ -380,12 +383,12 @@ export function BrowseByStrength({
       <ActionSheet
         visible={juzPickerOpen}
         onClose={() => setJuzPickerOpen(false)}
-        title="Filter by juz"
+        title={t('insights.filterByJuz')}
         actions={[
-          { key: 'all', label: 'All juz', selected: juzFilter === null, onPress: () => setJuzFilter(null) },
+          { key: 'all', label: t('insights.allJuz'), selected: juzFilter === null, onPress: () => setJuzFilter(null) },
           ...availableJuz.map((juz) => ({
             key: `juz-${juz}`,
-            label: `Juz ${juz}`,
+            label: t('common.juzN', { n: juz }),
             subtitle: getJuzName(juz),
             selected: juzFilter === juz,
             onPress: () => setJuzFilter(juz),
@@ -396,9 +399,9 @@ export function BrowseByStrength({
       <ActionSheet
         visible={strengthPickerOpen}
         onClose={() => setStrengthPickerOpen(false)}
-        title="Filter by strength"
+        title={t('insights.filterByStrength')}
         actions={[
-          { key: 'all', label: 'All strengths', selected: strengthFilter === null, onPress: () => setStrengthFilter(null) },
+          { key: 'all', label: t('insights.allStrengths'), selected: strengthFilter === null, onPress: () => setStrengthFilter(null) },
           ...RATINGS.map((rating) => ({
             key: `strength-${rating.value}`,
             label: rating.label,

@@ -5,6 +5,8 @@
 if (__DEV__) {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   require('./offlineSwitch').installOfflineSwitch();
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require('./rtlSwitch').installRtlSwitch();
 }
 
 // E2E builds only (EXPO_PUBLIC_E2E=1, .maestro/README.md): the test clock and

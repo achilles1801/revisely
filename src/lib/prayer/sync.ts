@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from '../logger';
 import { PRAYER_CHANNEL_ID, PRAYER_SILENT_CHANNEL_ID } from '../notificationChannels';
 import type { PrayerSound } from './prefs';
+import { athanEnabled, athanSoundFile } from '../athan/store';
 import {
   interruptionFor,
   PlannedNotification,
@@ -22,9 +23,20 @@ import {
 
 const SIGNATURES_KEY = '@revisely_prayer_scheduled';
 
-/** Android takes the sound from the channel, so "silent" has its own. */
+/**
+ * What iOS plays: the athan's clip (the voice's, in Library/Sounds), the default tone, or nothing.
+ * An athan whose clip isn't on the phone, or where the athan isn't offered (lib/athan `athanEnabled`),
+ * plays the default tone.
+ */
+export function iosSound(sound: PrayerSound, voice?: string | null): string | boolean {
+  if (sound !== 'athan') return sound === 'standard';
+  return (athanEnabled() ? athanSoundFile(voice) : null) ?? true;
+}
+
+/** Android takes the sound from the channel, so "silent" has its own. An athan plays the standard
+ *  tone there until its sounds are built into the app. */
 export function androidChannel(sound: PrayerSound): string {
-  return sound === 'standard' ? PRAYER_CHANNEL_ID : PRAYER_SILENT_CHANNEL_ID;
+  return sound === 'silent' ? PRAYER_SILENT_CHANNEL_ID : PRAYER_CHANNEL_ID;
 }
 
 type PlanInput = Omit<Parameters<typeof planPrayerNotifications>[0], 'budget'>;
@@ -43,7 +55,7 @@ export function clearPrayerNotifications(): Promise<PlannedNotification[]> {
   return syncPrayerNotifications({ now: new Date(), days: [], alerts: NONE, place: null });
 }
 
-const OFF = { on: false, before: 0, sound: 'standard' } as const;
+const OFF = { on: false, before: 0, sound: 'standard', voice: null } as const;
 const NONE = { fajr: OFF, dhuhr: OFF, asr: OFF, maghrib: OFF, isha: OFF };
 
 async function syncNow(input: PlanInput): Promise<PlannedNotification[]> {
@@ -66,7 +78,11 @@ async function syncNow(input: PlanInput): Promise<PlannedNotification[]> {
   );
   const next: Record<string, string> = {};
   for (const n of plan) {
-    const sig = signature(n);
+    // With the file iOS will play: a voice downloaded (or deleted) since reschedules.
+    const sound = iosSound(n.sound, n.voice);
+    // The voice whose clip plays: a tap on the notification plays its whole athan (ATHAN-4).
+    const athan = typeof sound === 'string' ? (n.voice ?? null) : null;
+    const sig = `${signature(n)}|${String(sound)}${athan ? '|tap' : ''}`;
     next[n.id] = sig;
     if (ours.has(n.id) && saved[n.id] === sig) continue;
     try {
@@ -75,9 +91,9 @@ async function syncNow(input: PlanInput): Promise<PlannedNotification[]> {
         content: {
           title: n.title,
           body: n.body,
-          sound: n.sound === 'standard',
+          sound,
           interruptionLevel: interruptionFor(n.kind),
-          data: { kind: 'prayer', prayer: n.prayer ?? null },
+          data: { kind: 'prayer', prayer: n.prayer ?? null, athan },
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,

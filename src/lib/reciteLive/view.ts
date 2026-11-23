@@ -2,46 +2,59 @@
 
 import type { QuranWords } from '../recite/quranWords';
 import type { WordFollow } from '../recite/hiddenPage';
-import { isUnclear, severityOf, type Mark } from './contract';
-import { furthestWord, LiveState, mistakeCount } from './state';
+import { isUnclear, strongestByWord, type Mark } from './contract';
+import { furthestWord, LiveState, LiveStatus, mistakeCount } from './state';
 import { formatAccuracy, pageAccuracy, ScoreLevel, scoreLevel } from './score';
 
 /**
- * A word in the bar: the one being said (blue), one already said, one said wrong (as heard, on red), one with a slip (a
- * haraka or a letter, on amber) or a tajweed note (on violet): the page's highlights (Majd, Nov 15 2026). The colours
- * never follow the accent.
+ * A word in the bar: the one being said (blue), one already said, one said wrong (as heard, on red), one with a wrong
+ * haraka or letter (tone `slip`, on amber; `part` says which) or a tajweed note (on violet): the page's highlights (Majd,
+ * Nov 15 2026; components/reciteLive/markColours' `toneFill`). The colours never follow the accent.
  */
 export interface BarWord {
   w: number;
   text: string;
   tone: 'current' | 'said' | 'wrong' | 'slip' | 'tajweed';
+  /** A `slip` word's mistake: a wrong haraka or a wrong letter (a letter when it has both), for a screen reader. */
+  part?: 'harakat' | 'letter';
 }
 
-/** The words heard, for the bar: the last two up to the cursor (newest last). Check shows a wrong word as heard. */
-export function barWords(state: LiveState, words: QuranWords, opts: { check: boolean; startWord: number | null }): BarWord[] {
+/**
+ * The words heard, for the bar: the last two up to the cursor (newest last). Check shows a wrong word as heard. `upTo`
+ * (a hidden page): no further than the page shows, so the bar never gives away the word being said (RECITE-6).
+ */
+export function barWords(
+  state: LiveState,
+  words: QuranWords,
+  opts: { check: boolean; startWord: number | null; upTo?: number | null },
+): BarWord[] {
   if (state.cursor == null) return [];
+  const top = opts.upTo !== undefined ? Math.min(state.cursor, opts.upTo ?? -1) : state.cursor;
   const wrong = new Map<number, Mark>();
   const skipped = new Set<number>();
-  const slipped = new Set<number>();
+  const slipped = new Map<number, 'harakat' | 'letter'>();
   const tajweed = new Set<number>();
   if (opts.check) {
     for (const m of Object.values(state.marks)) {
       if (m.kind === 'word' && m.heard) wrong.set(m.w, m);
       if (m.kind === 'skipped') skipped.add(m.w);
       if (m.kind === 'tajweed') tajweed.add(m.w);
-      // A "not clear" haraka or letter isn't shown as a slip in the bar: it wasn't heard as wrong.
-      else if (severityOf(m) === 'slip' && !isUnclear(m)) slipped.add(m.w);
+      // A "not clear" haraka or letter isn't shown as a mistake in the bar: it wasn't heard as wrong.
+      else if ((m.kind === 'harakat' || m.kind === 'letter') && !isUnclear(m)) slipped.set(m.w, slipped.get(m.w) === 'letter' ? 'letter' : m.kind);
     }
   }
   const out: BarWord[] = [];
-  for (let w = state.cursor; w >= 0 && out.length < 2; w--) {
+  for (let w = top; w >= 0 && out.length < 2; w--) {
     if (opts.startWord != null && w < opts.startWord) break;
     if (skipped.has(w)) continue;
     const m = wrong.get(w);
+    const part = slipped.get(w);
     out.unshift(
       m
         ? { w, text: m.heard ?? words.uthmani(w), tone: 'wrong' }
-        : { w, text: words.uthmani(w), tone: slipped.has(w) ? 'slip' : tajweed.has(w) ? 'tajweed' : w === state.cursor ? 'current' : 'said' },
+        : part
+          ? { w, text: words.uthmani(w), tone: 'slip', part }
+          : { w, text: words.uthmani(w), tone: tajweed.has(w) ? 'tajweed' : w === state.cursor ? 'current' : 'said' },
     );
   }
   return out;
@@ -117,4 +130,38 @@ export function hiddenFollow(
   live: { saidUpTo: number | null; startWord: number | null; cursor: number | null },
 ): WordFollow {
   return { words, shown: (w) => wordShown(w, revealed, live), next: live.cursor };
+}
+
+/**
+ * The mistakes the hidden page keeps on its covers (RECITE-13; Majd, Nov 20 2026: "if I hide the page, that highlight
+ * should still be there. Obviously, the word won't be shown"): for each word on `page` still covered, the take's mark
+ * (its strongest), else the one Recite's memory holds there (`past`). A word that shows has its highlight behind its ink.
+ */
+/**
+ * What a tap on the bar's score opens (RECITE-17; Majd, Nov 21 2026: "the percentage score should be clickable throughout
+ * the whole process"): while the take runs or Stop waits, what it has found so far; once it's done, its summary.
+ */
+export function scoreTapOpens(status: LiveStatus): 'so-far' | 'summary' | null {
+  if (status === 'listening' || status === 'checking') return 'so-far';
+  if (status === 'done') return 'summary';
+  return null;
+}
+
+export function coverHighlights(
+  words: QuranWords,
+  page: number,
+  shown: (w: number) => boolean,
+  live: readonly Mark[],
+  past: readonly Mark[],
+): { mark: Mark; past: boolean }[] {
+  const [from, to] = words.pageRange(page);
+  const onPage = (m: Mark) => m.w >= from && m.w < to && !shown(m.w);
+  const out: { mark: Mark; past: boolean }[] = [];
+  const marked = new Set<number>();
+  for (const m of strongestByWord(live.filter(onPage)).values()) {
+    marked.add(m.w);
+    out.push({ mark: m, past: false });
+  }
+  for (const m of strongestByWord(past.filter(onPage)).values()) if (!marked.has(m.w)) out.push({ mark: m, past: true });
+  return out;
 }

@@ -6,6 +6,7 @@
 import { languageName } from './translationLanguages';
 import type { TranslationInfo } from './translation';
 import type { DownloadStatus } from './translationDownloads';
+import { t } from '../i18n';
 
 export interface PickerSection {
   /** "selected", "favorites", "downloaded", or the language's code. */
@@ -64,18 +65,18 @@ export function pickerSections(list: TranslationInfo[], query: string, opts: Pic
   const starred = favorites.map((id) => shown.find((t) => t.id === id)).filter((t): t is TranslationInfo => !!t);
   const sections: PickerSection[] = [];
   if (editing) {
-    if (starred.length > 0) sections.push({ key: 'favorites', title: 'Favorites', data: starred });
+    if (starred.length > 0) sections.push({ key: 'favorites', title: t('verse.sections.favorites'), data: starred });
     const onPhone = shown.filter((t) => downloaded(t) && removable(t)).sort(byName);
-    if (onPhone.length > 0) sections.push({ key: 'downloaded', title: 'Downloaded', data: onPhone });
+    if (onPhone.length > 0) sections.push({ key: 'downloaded', title: t('verse.sections.downloaded'), data: onPhone });
     return sections;
   }
   const chosen = shown.find((t) => t.id === chosenId);
-  if (chosen) sections.push({ key: 'selected', title: 'Selected', data: [chosen] });
+  if (chosen) sections.push({ key: 'selected', title: t('verse.sections.selected'), data: [chosen] });
   const favs = starred.filter((t) => t.id !== chosenId);
-  if (favs.length > 0) sections.push({ key: 'favorites', title: 'Favorites', data: favs });
+  if (favs.length > 0) sections.push({ key: 'favorites', title: t('verse.sections.favorites'), data: favs });
   const listed = new Set([chosenId, ...favs.map((t) => t.id)]);
   const onPhone = shown.filter((t) => !listed.has(t.id) && downloaded(t)).sort(byName);
-  if (onPhone.length > 0) sections.push({ key: 'downloaded', title: 'Downloaded', data: onPhone });
+  if (onPhone.length > 0) sections.push({ key: 'downloaded', title: t('verse.sections.downloaded'), data: onPhone });
   onPhone.forEach((t) => listed.add(t.id));
   const byLanguage = new Map<string, TranslationInfo[]>();
   for (const t of shown) {
@@ -100,22 +101,22 @@ export function pickerSections(list: TranslationInfo[], query: string, opts: Pic
 /** Megabytes as Settings writes them ("1.1 MB", "12 MB"; mushafOfflineUi's formatMegabytes). */
 export function megabytes(bytes: number): string {
   const mb = bytes / 1e6;
-  return `${mb >= 10 ? Math.round(mb) : Math.max(0.1, Math.round(mb * 10) / 10)}\u00A0MB`;
+  return t('common.megabytesTight', { n: mb >= 10 ? Math.round(mb) : Math.max(0.1, Math.round(mb * 10) / 10) });
 }
 
 /** The row's line about the phone: its size, what is on the phone, a download's progress. */
 export function downloadLine(s: DownloadStatus | null): string | null {
   if (!s) return null;
-  if (!s.manageable) return s.phase === 'complete' ? 'On this phone, with the offline mushaf' : 'Downloads with the offline mushaf';
+  if (!s.manageable) return s.phase === 'complete' ? t('verse.downloads.withMushaf') : t('verse.downloads.downloadsWithMushaf');
   switch (s.phase) {
     case 'downloading':
-      return `Downloading… ${Math.floor((100 * s.suras) / s.total)}%`;
+      return t('verse.downloads.downloading', { percent: Math.floor((100 * s.suras) / s.total) });
     case 'complete':
-      return `On this phone · ${megabytes(s.bytes)}`;
+      return t('verse.downloads.onPhone', { size: megabytes(s.bytes) });
     case 'failed':
-      return `Couldn’t download all of it · ${s.suras} of ${s.total} suras on this phone`;
+      return t('verse.downloads.failed', { suras: s.suras, total: s.total });
     case 'partial':
-      return `${s.suras} of ${s.total} suras on this phone · ${megabytes(s.bytes)}`;
+      return t('verse.downloads.partial', { suras: s.suras, total: s.total, size: megabytes(s.bytes) });
     default:
       return megabytes(s.bytes);
   }

@@ -44,7 +44,7 @@ function homeAndSettings(mods: Booted): ReactElement {
         { screenOptions: { headerShown: false, animation: 'none' } },
         h(Stack.Screen, { name: 'Dashboard', component: Dashboard }),
         h(Stack.Screen, { name: 'Settings', component: Settings }),
-        ...['ActiveRevision', 'PlanEdit', 'PlanDayEdit', 'Memorization', 'Activity', 'ActivityDay', 'ActivityAll', 'Insights', 'QuranReader', 'JournalEntry', 'PagesByStrength', 'ListenBack'].map(
+        ...['ActiveRevision', 'PlanEdit', 'PlanDayEdit', 'Memorization', 'Activity', 'ActivityDay', 'ActivityAll', 'Insights', 'QuranReader', 'PagesByStrength', 'ListenBack'].map(
           (name) => h(Stack.Screen, { key: name, name, component: Elsewhere }),
         ),
       ),
@@ -121,6 +121,7 @@ it('[REVO-39] Settings → Revo AI → What Revo can do plays it any time: Turn 
   const { app, uid } = await tester(phone);
 
   await tap(app, 'open-settings');
+  await tap(app, 'settings-page-revo');
   expect(await stored(app, SEEN(uid))).toBeNull();
   await tap(app, 'settings-revo-moment');
   await app.until(() => app.screen.queryByTestId('settings-revo-moment-screen') != null, 'the moment from Settings');

@@ -5,6 +5,9 @@
  * text never passes through here (adminRevo reads it on demand, for one account).
  */
 
+import type { ActivityRow } from './sources';
+import { lastFullDay, Retention, retention } from './retention';
+
 export type RangeKey = '1h' | '24h' | '7d' | '30d';
 export const RANGES: Record<RangeKey, { ms: number; step: number }> = {
   '1h': { ms: 3600e3, step: 300e3 },
@@ -91,6 +94,10 @@ export interface Input {
   revoLines?: RevoLine[] | null;
   monitoring?: Monitoring | null;
   totals?: Totals | null;
+  /** Every account's active days (sources.readActivity); testers, the owner and service accounts are left out. */
+  activity?: ActivityRow[] | null;
+  /** Staff accounts in this project's Auth (sources.staffUids): left out of retention like the owner. */
+  staffUids?: Set<string> | null;
   sources?: Record<string, string>;
 }
 
@@ -412,6 +419,7 @@ export interface Metrics {
   sources: Record<string, string>;
   alerts: Alert[];
   look: { level: string; text: string; uid?: string }[];
+  retention: (Retention & { left: { testers: number; owner: number; service: number } }) | null;
 }
 
 /** Everything the console shows. */
@@ -450,5 +458,22 @@ export function build(input: Input): Metrics {
     sources: input.sources ?? {},
     alerts,
     look,
+    retention: retentionOf(input, now),
   };
+}
+
+/** Counts only: the accounts left once testers, the owner and the service accounts are out. */
+function retentionOf(input: Input, now: number): Metrics['retention'] {
+  if (!input.activity) return null;
+  const owners = new Set([...(input.ownerUids ?? []), ...(input.staffUids ?? [])]);
+  const testers = input.testers ?? new Set<string>();
+  const left = { testers: 0, owner: 0, service: 0 };
+  const people = [];
+  for (const a of input.activity) {
+    if (owners.has(a.uid)) left.owner += 1;
+    else if (a.service) left.service += 1;
+    else if (a.tester || testers.has(a.uid)) left.testers += 1;
+    else people.push({ signedUp: a.signedUp ?? '', firstDay: a.firstDay, onboarded: a.onboarded, days: a.days });
+  }
+  return { ...retention(people, lastFullDay(now)), left };
 }

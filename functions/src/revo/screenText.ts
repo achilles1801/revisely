@@ -7,14 +7,16 @@
  */
 import { REVO_SETTINGS_SECTIONS, RevoAction, RevoScreen, RevoSettingsSection } from './types';
 
+// The pages the sections open since Settings became a first level with a page per group (SET-1, Nov 22 2026). The ids
+// stay as they were (an older app understands them); homeScreen and notifications both open Reminders.
 const SECTION_NAMES: Record<RevoSettingsSection, string> = {
-  activity: 'Activity',
-  homeScreen: 'Home screen',
+  activity: 'Downloads and storage',
+  homeScreen: 'Reminders',
   prayer: 'Prayer',
   revision: 'Revision',
   revo: 'Revo AI',
-  mushaf: 'Mushaf',
-  notifications: 'Notifications',
+  mushaf: 'Mushaf and Recite',
+  notifications: 'Reminders',
   appearance: 'Appearance',
   testing: 'Testing',
 };
@@ -34,7 +36,8 @@ const TITLES: Record<Exclude<RevoScreen, 'settings'>, string> = {
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const ARROW = '\\s*(?:→|->|>)\\s*';
-// "Settings → Prayer"; "Settings → Day boundary" is the same section without prayer times.
+// "Settings → Prayer", "Settings → Downloads and storage"; "Day boundary", the old section without prayer times, opens
+// Prayer (on the phone: Revision when it has no prayer times).
 const SETTINGS = new RegExp(`\\bSettings${ARROW}(${[...REVO_SETTINGS_SECTIONS.map((s) => escape(SECTION_NAMES[s])), 'Day boundary'].join('|')})\\b`);
 
 /** Each screen's names in an answer, as the guide and the app write them. */

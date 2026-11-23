@@ -16,6 +16,7 @@ appId: com.revisionbuddy.app
     file: ../subflows/onboard.yaml
     env:
       BOUNDARY: midnight
+      SHOTS: "yes"
 # SCHED-1: day one is the first 10 memorized pages in page order: 1, 582–590.
 - assertVisible:
     id: today-title

@@ -23,6 +23,7 @@ import { knownAction } from '../../lib/revo/screens';
 import { refreshRevoRelease } from '../../lib/revo/release';
 import { RevoComposer } from './RevoComposer';
 import { Chips, FeedbackRow, LimitCard, ReviewRow, RevoHeader, RevoText, Typing, UserBubble } from './RevoParts';
+import { t } from '../../i18n';
 
 /**
  * A conversation with Revo. A new one opens on a line written from today's data as it is now (no
@@ -282,7 +283,8 @@ export function RevoChat({
             {refusalText(refusal)}
             {refusal.retry ? (
               <Text style={{ color: palette.link }} onPress={() => void ask(refusal.retry!)} suppressHighlighting>
-                {'  '}Try again
+                {'  '}
+                {t('common.tryAgain')}
               </Text>
             ) : null}
           </Text>
@@ -290,21 +292,24 @@ export function RevoChat({
       </ScrollView>
       <View style={[styles.gutter, styles.foot]}>
         {capped ? (
-          <LimitCard title="Revo is resting" body="Revo has reached this month’s limit for everyone. It’s back next month. Your conversations stay in History." />
+          <LimitCard title={t('revo.chat.resting')} body={t('revo.chat.capped')} />
         ) : resting ? (
-          <LimitCard title="Revo is resting" body={`${refusal?.message ?? ''} Your conversations stay in History.`} />
+          <LimitCard title={t('revo.chat.resting')} body={t('revo.chat.restingBody', { message: refusal?.message ?? '' })} />
         ) : outOfQuestions ? (
-          <LimitCard title={`That’s today’s ${REVO_DAILY_QUESTIONS} questions`} body={`${back.long} Your conversations stay in History.`} />
+          <LimitCard
+            title={t('revo.chat.dailyTitle', { n: REVO_DAILY_QUESTIONS })}
+            body={t('revo.chat.dailyBody', { back: back.long })}
+          />
         ) : (
           <Chips chips={chips} onPick={(c) => void ask(c)} disabled={pending != null} />
         )}
         <RevoComposer
-          onSend={(t) => void ask(t)}
+          onSend={(question) => void ask(question)}
           onAdd={onAdd}
           attachments={attachments}
           onRemoveAttach={(i) => onAttachments(attachments.filter((_, j) => j !== i))}
           disabled={outOfQuestions || capped || resting}
-          disabledText={capped ? 'Back next month' : resting ? 'Back later' : back.short}
+          disabledText={capped ? t('revo.chat.backNextMonth') : resting ? t('revo.chat.backLater') : back.short}
           busy={pending != null}
           onFocus={onExpand}
         />

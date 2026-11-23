@@ -47,6 +47,15 @@ jobs:
           CLAUDE_KEY_EXPIRES: '2027-01-01'
         run: node scripts/sentry/claude-key.js
 
+      # A reminder from 30 days before the on-device engine's build token expires. The date only; never the token.
+      - name: Check the engine build token's date
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MENTION: '@${{ github.repository_owner }}'
+          RECITE_CORE_EXPIRES: ${{ vars.RECITE_CORE_EXPIRES }}
+        run: node scripts/sentry/engine-token-expiry.js
+
       - name: Post the report
         env:
           SENTRY_API_TOKEN: ${{ secrets.SENTRY_API_TOKEN }}

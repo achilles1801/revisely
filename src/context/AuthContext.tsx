@@ -22,6 +22,7 @@ import Constants from 'expo-constants';
 import { clearAccount } from '../lib/offline/accountCache';
 import { clearOutbox } from '../lib/offline/outbox';
 import { settleWithin } from '../lib/timeLimit';
+import { t } from '../i18n';
 
 /**
  * How long Firebase Auth may take to check its saved sign-in before the app
@@ -257,9 +258,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Apple only sends fullName on the FIRST sign-in. Use it to seed displayName.
         const displayName =
-          user.displayName ||
-          [fullName?.givenName, fullName?.familyName].filter(Boolean).join(' ') ||
-          null;
+          user.displayName || [fullName?.givenName, fullName?.familyName].filter(Boolean).join(' ') || null;
 
         try {
           const existingUser = await firestoreService.getUser(user.uid);
@@ -403,26 +402,26 @@ export function useAuth() {
 function getErrorMessage(code: string): string {
   switch (code) {
     case 'auth/email-already-in-use':
-      return 'This email is already registered';
+      return t('auth.errors.emailInUse');
     case 'auth/invalid-email':
-      return 'Invalid email address';
+      return t('auth.errors.invalidEmail');
     case 'auth/operation-not-allowed':
-      return 'Email/password accounts are not enabled';
+      return t('auth.errors.notAllowed');
     case 'auth/weak-password':
-      return 'Password is too weak';
+      return t('auth.errors.weakPassword');
     case 'auth/user-disabled':
-      return 'This account has been disabled';
+      return t('auth.errors.disabled');
     case 'auth/user-not-found':
-      return 'No account found with this email';
+      return t('auth.errors.noAccount');
     case 'auth/wrong-password':
-      return 'Incorrect password';
+      return t('auth.errors.wrongPassword');
     case 'auth/invalid-credential':
-      return 'Invalid email or password';
+      return t('auth.errors.invalidCredential');
     case 'auth/too-many-requests':
-      return 'Too many attempts. Please try again later';
+      return t('auth.errors.tooManyRequests');
     case 'auth/network-request-failed':
-      return 'Network error. Please check your connection';
+      return t('auth.errors.network');
     default:
-      return 'An error occurred. Please try again';
+      return t('auth.errors.other');
   }
 }

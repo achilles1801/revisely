@@ -4,17 +4,13 @@
 
 import { getAllSurahs, getSurahDisplay } from '../quranData';
 import { editDistance, normalizeWord } from '../recite/arabic';
+import { westernDigits } from '../../i18n/digits';
 
 export type SearchTarget =
   | { kind: 'verse'; sura: number; ayah: number }
   | { kind: 'surah'; sura: number }
   | { kind: 'page'; page: number }
   | { kind: 'juz'; juz: number };
-
-/** Arabic-Indic and Persian digits as 0-9. */
-function westernDigits(text: string): string {
-  return text.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)).replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
-}
 
 const ayahCount = (sura: number) => getSurahDisplay(sura)?.ayahCount ?? 0;
 
@@ -55,7 +51,11 @@ function keys(): SurahKeys[] {
         latin.add(latinKey(n));
         latin.add(withoutArticle(n));
       }
-      return { sura: s.number, latin: [...latin].filter(Boolean), arabic: s.nameArabic.split(/\s+/).map(normalizeWord).join('') };
+      return {
+        sura: s.number,
+        latin: [...latin].filter(Boolean),
+        arabic: s.nameArabic.split(/\s+/).map(normalizeWord).join(''),
+      };
     });
   }
   return surahKeys;

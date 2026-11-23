@@ -12,6 +12,7 @@
 #
 # Environment:
 #   E2E_DEVICE         simulator UDID / adb serial (default: the one booted device)
+#   E2E_IPHONE         which iPhone the simulator is, pro or se (default pro); flows read it as E2E_IPHONE
 #   E2E_AUTH_URL       the Auth emulator as this computer sees it (http://127.0.0.1:9099)
 #   E2E_FIRESTORE_URL  the Firestore emulator (http://127.0.0.1:8080)
 #   E2E_FUNCTIONS_URL  the functions emulator (http://127.0.0.1:5001)
@@ -57,6 +58,8 @@ MAESTRO=${MAESTRO:-$(command -v maestro || echo "$HOME/.maestro/bin/maestro")}
 mkdir -p "$OUT"
 
 DEVICE=${E2E_DEVICE:-}
+# Passed on Android too, as pro: a flow's condition on it is read on both platforms.
+IPHONE=${E2E_IPHONE:-pro}
 if [ -z "$DEVICE" ]; then
   if [ "$PLATFORM" = ios ]; then
     DEVICE=$(xcrun simctl list devices booted -j | node -e '
@@ -196,6 +199,7 @@ run_flow() {
     # shellcheck disable=SC2086
     with_limit "$FLOW_LIMIT" env SIMCTL_CHILD_TZ="$zone" "$MAESTRO" --device "$DEVICE" test $reuse \
       -e E2E_AUTH_URL="$AUTH_URL" -e E2E_FIRESTORE_URL="$FIRESTORE_URL" -e E2E_FUNCTIONS_URL="$FUNCTIONS_URL" \
+      -e E2E_IPHONE="$IPHONE" \
       --format junit --output "$out/report.xml" --debug-output "$out/debug" \
       --test-output-dir "$out/run" \
       "$flow" > "$out/maestro.log" 2>&1
@@ -203,6 +207,7 @@ run_flow() {
     set_android_zone "$zone" || return 1
     with_limit "$FLOW_LIMIT" "$MAESTRO" --device "$DEVICE" test \
       -e E2E_AUTH_URL="$AUTH_URL" -e E2E_FIRESTORE_URL="$FIRESTORE_URL" -e E2E_FUNCTIONS_URL="$FUNCTIONS_URL" \
+      -e E2E_IPHONE="$IPHONE" \
       --format junit --output "$out/report.xml" --debug-output "$out/debug" \
       --test-output-dir "$out/run" \
       "$flow" > "$out/maestro.log" 2>&1

@@ -74,7 +74,8 @@ export function uploadUrl(bucket: string, path: string): string {
   return `${STORAGE_HOST}/${bucket}/o?name=${encodeURIComponent(path)}`;
 }
 
-async function authHeaders(): Promise<Record<string, string>> {
+/** The user's Firebase ID token and, when there is one, an App Check token (also the on-device bench's downloads). */
+export async function authHeaders(): Promise<Record<string, string>> {
   const user = getAuth().currentUser;
   if (!user) throw new Error('Not signed in.');
   const headers: Record<string, string> = { Authorization: `Firebase ${await user.getIdToken()}` };
@@ -95,7 +96,7 @@ export class CloudError extends Error {
 /** A transfer stopped on purpose (cancelled, or the caller said stop). */
 export class TransferStopped extends Error {
   constructor() {
-    super('Transfer stopped');
+    super('Transfer stopped'); // i18n-ignore (an error's message, for the log)
     this.name = 'TransferStopped';
   }
 }
@@ -274,7 +275,7 @@ export async function uploadSegment(
     const last = offset + length >= sizeBytes;
     const headers = {
       ...(await authHeaders()),
-      'X-Goog-Upload-Command': last ? 'upload, finalize' : 'upload',
+      'X-Goog-Upload-Command': last ? 'upload, finalize' : 'upload', // i18n-ignore (the protocol's words)
       'X-Goog-Upload-Offset': String(offset),
     };
     check(); // a cancel while the tokens were fetched

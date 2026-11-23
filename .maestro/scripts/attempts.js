@@ -32,6 +32,29 @@ function reasonOf(folder) {
   return 'no report from Maestro (stopped at the time limit, or it crashed)';
 }
 
+/**
+ * How many taps tap-to-open.yaml found lost and tapped again in an attempt: its lost-tap-<n>-<id>
+ * screenshots, under the attempt's …/takeScreenshot/ folders.
+ */
+function lostTapsOf(folder) {
+  let n = 0;
+  const walk = (d) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const full = path.join(d, e.name);
+      if (e.isDirectory()) walk(full);
+      else if (path.basename(d) === 'takeScreenshot' && /^lost-tap-.*\.png$/.test(e.name)) n++;
+    }
+  };
+  walk(folder);
+  return n;
+}
+
 function build(dir, env = process.env) {
   const platform = path.basename(dir);
   const flows = new Map();
@@ -42,6 +65,8 @@ function build(dir, env = process.env) {
     if (!flows.has(flow)) flows.set(flow, { flow, zone, attempts: [] });
     const a = { attempt: Number(attempt), passed: outcome === 'passed', secs: Number(secs) };
     if (!a.passed) a.reason = reasonOf(path.join(dir, folder));
+    const lostTaps = folder ? lostTapsOf(path.join(dir, folder)) : 0;
+    if (lostTaps > 0) a.lostTaps = lostTaps;
     flows.get(flow).attempts.push(a);
   }
   const server = env.GITHUB_SERVER_URL || 'https://github.com';
@@ -76,4 +101,4 @@ if (require.main === module) {
   console.log(`attempts.json: ${out.flows.length} flows${flaky.length ? `, passed on a retry: ${flaky.join(', ')}` : ''}`);
 }
 
-module.exports = { build, reasonOf };
+module.exports = { build, reasonOf, lostTapsOf };
