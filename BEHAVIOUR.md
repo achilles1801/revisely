@@ -79,8 +79,14 @@ How the tests are made: `tests/scenarios/README.md`.
 
 ## A revision session
 
-- **SESS-1.** Swiping off a page marks it revised, the last page by swiping onto the end card. The
-  check marks or unmarks the page on screen.
+- **SESS-1.** Swiping off a page marks it revised, the last page by swiping onto the end card. A strip above the page,
+  always on show, has a bar for each of the day's pages, filled once revised, the page on screen's taller; beside the
+  page's number, "Revised" says the page on screen is done. One Pages button opens one Pages sheet: the day's pages by
+  page number, no ayah numbers, the page on screen highlighted in the accent ("You are here"). A tap on a row goes to
+  that page and marks nothing; its circle marks or unmarks it; the top line marks them all (or unmarks them, once all
+  are). The sheet also holds Rate page strength and Help. The session's title and the line under it name surahs, never
+  ayah numbers. (Majd, Nov 23 2026: "remove the ayah count from the title -- too many numbers and most users don't care
+  about ayah numbers".)
 - **SESS-2.** A day is done when all its pages are credited to it. Home then says Done, and the streak
   counts the day. The streak counts back from
   today if today is done, else from yesterday, so it stays alive until today's revision day ends. Home, the
@@ -145,7 +151,7 @@ How the tests are made: `tests/scenarios/README.md`.
   revised (DAY-9, AHEAD-6): the day's own pages stay done there, each later day it counted for is
   named ("Ahead for Monday 9 November: …"), and Coverage counts them. Home's line goes on the same
   way, "Next cycle starts at Al-Fatihah ›" for a day that begins the plan again, and a day a week or
-  more away is named with its date ("Mon 16 Nov"). Mark in bulk works on the day on screen. (Majd, Nov
+  more away is named with its date ("Mon 16 Nov"). Mark all revised works on the day on screen. (Majd, Nov
   9 2026: "it should restart the cycle if they finish it before their cycle ends so for example if my
   cycle is one week and i procrastinated all my revision for today and kept revising ahead until that
   one week is done, my next revise ahead would just be restarting the cycle." It used to stop at the
@@ -613,7 +619,7 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   continued.
 - **RECITE-9.** A revision session has the reader's mic, with the same takes, marks, hidden view, cards and summary;
   Test me stays in the reader. A take there stays in Recite: it never marks a page revised, since its own page turns
-  credit nothing, so only a swipe off a page or ✓ marks one (SESS-1). Its page turns stay on the session's pages, and
+  credit nothing, so only a swipe off a page or the Pages sheet marks one (SESS-1). Its page turns stay on the session's pages, and
   a place outside them (a similar ayah, a past take) opens in the reader over the session; Back comes back to it.
   (Majd, Nov 17 2026: "add the mistake detection and mic functionality same as mushaf to the revision sessions".)
 - **RECITE-10.** A long take keeps up: what the checker sends is shown as it comes, and a burst of it never holds the
@@ -1482,7 +1488,7 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 
 - **HELP-1.** Screens that need explaining have a ?. Home's sits at the right of the Today
   post's header; the schedule editor's before Save; the reader's is a round button at the right of its
-  header; a session's is the last row of its ⋯ menu, "How a session works" (its header is full);
+  header; a session's is the last row of its Pages sheet, "Help";
   Activity's is in its top bar before search, and explains the tab on show (Overview or Insights); a
   day's is before +. It opens
   that screen's help ("How Home works"): at most four short topics, then "Ask Revo ›" when the account has

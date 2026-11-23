@@ -214,22 +214,18 @@ describe('the help on Home', () => {
 const topicIds = (app: OpenApp) =>
   app.screen.queryAllByTestId(/^help-topic-/).map((t) => String(t.props.testID).replace('help-topic-', ''));
 
-/** Today's session, then its ⋯ → How a session works. */
+/** Today's session, then Pages → Help (How a session works). */
 async function sessionHelp(app: OpenApp, home: Home): Promise<void> {
   const session = await home.startSession();
   // The controls hide while reading; a tap on the page brings them back.
-  if (!app.screen.queryByLabelText('Session menu')) await session.tapPage();
-  const { fireEvent } = app.mods.rtl;
-  await app.act(async () => {
-    fireEvent.press(app.screen.getByLabelText('Session menu'));
-  });
-  await app.until(() => app.screen.queryByTestId('sheet-action-help') != null, 'How a session works in ⋯');
-  await press(app, 'sheet-action-help');
+  await session.openPages();
+  await app.until(() => app.screen.queryByTestId('session-pages-help') != null, 'Help in the Pages sheet');
+  await press(app, 'session-pages-help');
   await app.until(() => app.screen.queryByTestId('help-sheet-session') != null, 'How a session works');
 }
 
 describe('the help follows Smart Tracking', () => {
-  it('[HELP-1] [HELP-3] [REVO-25] a session’s ⋯ → How a session works: with Smart Tracking off, nothing about rating; no Ask Revo (no Revo in a session)', async () => {
+  it('[HELP-1] [HELP-3] [REVO-25] a session’s Pages → Help: with Smart Tracking off, nothing about rating; no Ask Revo (no Revo in a session)', async () => {
     const phone = await account(true, false);
     const { app, home } = await openHome(phone, true);
     await app.until(() => helpButton(app) != null, 'the ? on the Today post');
