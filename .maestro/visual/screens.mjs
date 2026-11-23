@@ -53,7 +53,9 @@ const merge = (...sets) => ({
 
 export const SCREEN_MASKS = {
   '01-home-day-one': merge(revoButton),
-  '02-home-continue': merge(revoButton, sessionMinutes(1194, 1012)),
+  // Two lines each: where the minutes are now, under the card's first words (NAME-1), and where they were, which the
+  // approved baselines still show masked. The older one can go the next time these baselines are approved.
+  '02-home-continue': merge(revoButton, sessionMinutes(1194, 1012), sessionMinutes(1308, 1112)),
   '02-home-done': merge(revoButton, sessionMinutes(1272, 1081)),
   '03-home-tomorrow': merge(revoButton, sessionMinutes(1272, 1081)),
   '04-home-done': merge(revoButton, sessionMinutes(1392, 1186), {
@@ -61,7 +63,7 @@ export const SCREEN_MASKS = {
     ios: [{ x: 880, y: 360, w: 242, h: 60, why: 'prayer countdown' }],
     android: [{ x: 800, y: 279, w: 205, h: 53, why: 'prayer countdown' }],
   }),
-  '06-home-offline': merge(revoButton, sessionMinutes(1272, 1186), {
+  '06-home-offline': merge(revoButton, sessionMinutes(1272, 1186), sessionMinutes(1386, 1286), {
     // The next prayer's countdown, under the offline note: on Android the flow sets Chicago, so Home
     // has the prayer line; on iOS it sets no position and has none.
     android: [{ x: 800, y: 348, w: 205, h: 53, why: 'prayer countdown' }],
