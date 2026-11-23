@@ -14,7 +14,8 @@ name: Claude fix
 #            commands it runs (CLAUDE_CODE_SUBPROCESS_ENV_SCRUB, isolated with bubblewrap). Claude can
 #            read, edit, run jest and tsc, and commit locally; its commits leave the job as a patch.
 #   pr       runs no repository code. It applies the patch to develop and refuses one that touches
-#            .github/, worker/ or wrangler*.jsonc, or holds anything that looks like a credential. Then it pushes claude/issue-<n>,
+#            .github/, worker/, wrangler*.jsonc or the on-device engine's fetch, or holds anything
+#            that looks like a credential. Then it pushes claude/issue-<n>,
 #            opens a PR into develop, starts CI on it (PRs opened with the workflow token start no
 #            workflows by themselves) and links the PR on the issue.
 # Claude never merges: the PR goes through CI, review, preview and TestFlight like any other change.
@@ -356,6 +357,11 @@ jobs:
           { git diff --no-ext-diff --no-textconv "$BASE" HEAD; git log --format=%B "$BASE..HEAD"; } > "$RUNNER_TEMP/added.txt"
           if grep -Eq '^\.github/' "$RUNNER_TEMP/paths.txt"; then
             comment "Refused: the patch changes .github/ (workflows can't be changed this way). Nothing was pushed ([run]($RUN_URL))."
+            exit 1
+          fi
+          # What handles the private engine's token in a Revisely Dev build (core/fetch.js and the files that run it).
+          if grep -Eq '^modules-dev/recite-engine/(core/|ios/ReciteEngine\.podspec$|android/(build\.gradle|CMakeLists\.txt)$)' "$RUNNER_TEMP/paths.txt"; then
+            comment "Refused: the patch changes how the on-device engine is fetched (modules-dev/recite-engine/core and its build files). Nothing was pushed ([run]($RUN_URL))."
             exit 1
           fi
           # The Cloudflare worker holds the API keys' code path and deploys from main: not this way either.

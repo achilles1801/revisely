@@ -350,6 +350,10 @@ export const settings = {
     missing: 'This Revisely Dev build doesn’t have the on-device model yet. Update it from TestFlight or Google Play.',
     /** "iPhone16,2 · 6 cores · 8 GB". */
     device: '{{model}} · {{cores}} cores · {{memory}} GB',
+    /** Which Recite engine this build carries (the private library, or the stub that leaves takes to the server). */
+    engine: 'Engine: {{version}}',
+    engineStub: 'Engine: stub (server path)',
+    engineFailed: 'Engine: {{version}}, self-test failed ({{why}})',
     reading: 'Reading the list of runs…',
     readFailed: 'Couldn’t read the list of runs: {{error}}',
     /** The account lacks the team's bench access (storage.rules, the onDeviceBench claim). */

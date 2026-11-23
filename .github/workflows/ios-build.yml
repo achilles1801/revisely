@@ -35,6 +35,9 @@ on:
         required: false
       SENTRY_AUTH_TOKEN:
         required: false
+      # Revisely Dev's private engine (modules-dev/recite-engine/core/fetch.js): without it, Dev builds the stub.
+      RECITE_CORE_TOKEN:
+        required: false
 
 jobs:
   build:
@@ -106,6 +109,9 @@ jobs:
           SENTRY_DISABLE_AUTO_UPLOAD: ${{ secrets.SENTRY_AUTH_TOKEN == '' && 'true' || 'false' }}
           # A failed upload costs readable stack traces, not the release.
           SENTRY_ALLOW_FAILURE: 'true'
+          # Read-only access to the engine's private release, for Revisely Dev's build alone (the store app doesn't link
+          # the module). Never in E2E or claude-fix; core/__tests__/tokenScope.test.js holds that.
+          RECITE_CORE_TOKEN: ${{ inputs.variant == 'dev' && secrets.RECITE_CORE_TOKEN || '' }}
         run: eas build --local --profile "$PROFILE" --platform ios --non-interactive --output "$RUNNER_TEMP/revisely.ipa"
 
       # The Xcode build phase uploads dSYMs too, but its output is hidden and a

@@ -31,6 +31,9 @@ public class ReciteEngineModule: Module {
       ]
     }
 
+    /// Which engine this build linked: recite-core or its stub (core/fetch.js), as JSON.
+    Function("coreInfo") { () -> String in RECCore.infoJSON() }
+
     /// A file's SHA-256 (hex), read in 1 MB pieces.
     AsyncFunction("sha256") { (path: String, promise: Promise) in
       DispatchQueue.global(qos: .utility).async {
