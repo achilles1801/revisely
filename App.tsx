@@ -11,6 +11,7 @@ import { RecordingBackupController } from './src/components/RecordingBackupContr
 import { MushafOfflineController } from './src/components/MushafOfflineController';
 import { WidgetSync } from './src/components/WidgetSync';
 import { PrayerSync } from './src/components/prayer/PrayerSync';
+import { AthanOnTap } from './src/components/prayer/AthanOnTap';
 import { RevisionRemindersSync } from './src/components/RevisionRemindersSync';
 import { DesignProvider } from './src/design/DesignContext';
 import { DesignGate } from './src/design/DesignGate';
@@ -136,6 +137,7 @@ function App() {
                   <MushafOfflineController />
                   <WidgetSync />
                   <PrayerSync />
+                  <AthanOnTap />
                   <RevisionRemindersSync />
                   {/* Last: over everything when this version is no longer supported. */}
                   <UpdateRequiredGate />

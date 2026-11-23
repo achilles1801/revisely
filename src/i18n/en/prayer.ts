@@ -143,6 +143,9 @@ export const prayer = {
     licence: 'Licence: {{licence}}',
     source: 'Where it’s from',
     stopDownloading: 'Stop downloading',
+    /** The sheet while the whole athan plays, after a tap on its notification. */
+    fullMessage: 'The whole athan',
+    fullStop: 'Stop',
     remove: 'Remove download',
     removeDetail: 'Prayers set to it play the standard tone until it downloads again',
     report: 'Report a rights issue',

@@ -237,6 +237,10 @@ current basic sounds". October 2026's version was removed for the voices it offe
 - **ATHAN-3.** A prayer's notification never goes quiet for the athan's sake. Until its voice has downloaded, after
   it is removed or withdrawn, with no voice chosen, and wherever the athan isn't offered (the store app, Android), a
   prayer set to the athan plays the standard tone.
+- **ATHAN-4.** A tap on a prayer's notification that played the athan, within 15 minutes of it, opens the app and
+  plays that voice's whole athan from its start, under a sheet with Stop. It stops at its end, on Stop or the sheet
+  closing, when other audio starts, and when the app goes to the background. A later tap, a notification that played
+  the standard tone, a reminder's, and a voice no longer offered play nothing: the app just opens.
 
 ## Al-Kahf on Friday
 

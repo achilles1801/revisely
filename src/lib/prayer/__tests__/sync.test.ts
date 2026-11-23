@@ -1,5 +1,5 @@
 // Scheduling with expo-notifications (kept in memory here, as iOS keeps them).
-const mockPending = new Map<string, { identifier: string; content: { title: string; body: string; sound: boolean | string; interruptionLevel?: string }; trigger: { date: Date; channelId?: string } }>();
+const mockPending = new Map<string, { identifier: string; content: { title: string; body: string; sound: boolean | string; interruptionLevel?: string; data?: { kind: string; prayer: string | null; athan: string | null } }; trigger: { date: Date; channelId?: string } }>();
 const mockCalls = { schedule: 0, cancel: 0 };
 jest.mock('expo-notifications', () => ({
   SchedulableTriggerInputTypes: { DATE: 'date', DAILY: 'daily' },
@@ -81,6 +81,10 @@ describe('syncPrayerNotifications', () => {
     const at = mockPending.get('prayer-2026-10-28-maghrib')!;
     expect(at.content.sound).toBe('athan-makkah-regular.caf');
     expect(at.content.interruptionLevel).toBe('timeSensitive');
+    // It says which voice it played, so a tap on it can play the whole athan (ATHAN-4).
+    expect(at.content.data).toEqual({ kind: 'prayer', prayer: 'maghrib', athan: 'makkah-regular' });
+    expect(mockPending.get('prayer-2026-10-28-maghrib-before')!.content.data!.athan).toBeNull();
+    expect(mockPending.get('prayer-2026-10-28-asr')!.content.data!.athan).toBeNull();
     // Android has no athan sounds yet: the standard channel.
     expect(at.trigger.channelId).toBe('prayer');
     const before = mockPending.get('prayer-2026-10-28-maghrib-before')!;

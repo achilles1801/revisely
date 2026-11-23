@@ -8,6 +8,7 @@ import type { AthanVoice } from '../../../src/lib/athan/catalog';
 import { DEFAULT_PRAYER_PREFS, PRAYERS, type PrayerAlert, type PrayerName } from '../../../src/lib/prayer/prefs';
 import { planPrayerNotifications } from '../../../src/lib/prayer/schedule';
 import { dayTimes } from '../../../src/lib/prayer/times';
+import { ATHAN_TAP_WINDOW_MS, tappedAthanVoiceId } from '../../../src/lib/athan/tapped';
 import { runs } from './fixtures';
 
 const voice = (id: string, style: string, opts: Partial<AthanVoice> = {}): AthanVoice => ({
@@ -112,5 +113,49 @@ describe('what a prayer set to the athan plans', () => {
     expect(asr).toHaveLength(3);
     // No voice: the scheduler (lib/prayer/sync `iosSound`) plays the standard tone for it.
     expect(asr.every((n) => n.sound === 'athan' && (n.voice ?? null) === null)).toBe(true);
+  });
+});
+
+describe('a tap on a prayer’s athan notification', () => {
+  const NOW = new Date('2026-11-22T12:30:00Z').getTime();
+
+  it('[ATHAN-4] plays the voice the notification played, for a tap within 15 minutes of it and never later', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom('makkah', 'madinah-sunbul-fajr', 'aqsa'),
+        fc.integer({ min: 0, max: 6 * 60 * 60 * 1000 }),
+        fc.boolean(),
+        (id, ago, seconds) => {
+          // iOS gives the notification's date in seconds, Android in milliseconds.
+          const arrived = seconds ? (NOW - ago) / 1000 : NOW - ago;
+          const got = tappedAthanVoiceId({ kind: 'prayer', prayer: 'asr', athan: id }, arrived, NOW);
+          expect(got).toBe(ago <= ATHAN_TAP_WINDOW_MS ? id : null);
+        },
+      ),
+      { numRuns: runs(200) },
+    );
+  });
+
+  it('[ATHAN-4] plays nothing for a notification that played the standard tone, a reminder’s, or anything that isn’t a prayer’s', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom<unknown>(
+          { kind: 'prayer', prayer: 'asr', athan: null },
+          { kind: 'prayer', prayer: 'asr' },
+          { kind: 'reminder', athan: 'makkah' },
+          { kind: 'prayer', athan: '../makkah' },
+          { kind: 'prayer', athan: 7 },
+          null,
+          'prayer',
+        ),
+        fc.integer({ min: 0, max: ATHAN_TAP_WINDOW_MS }),
+        (data, ago) => {
+          expect(tappedAthanVoiceId(data, NOW - ago, NOW)).toBeNull();
+        },
+      ),
+      { numRuns: runs(100) },
+    );
+    // No date to go by: nothing plays.
+    expect(tappedAthanVoiceId({ kind: 'prayer', athan: 'makkah' }, undefined, NOW)).toBeNull();
   });
 });

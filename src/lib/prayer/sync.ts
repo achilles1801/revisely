@@ -80,7 +80,9 @@ async function syncNow(input: PlanInput): Promise<PlannedNotification[]> {
   for (const n of plan) {
     // With the file iOS will play: a voice downloaded (or deleted) since reschedules.
     const sound = iosSound(n.sound, n.voice);
-    const sig = `${signature(n)}|${String(sound)}`;
+    // The voice whose clip plays: a tap on the notification plays its whole athan (ATHAN-4).
+    const athan = typeof sound === 'string' ? (n.voice ?? null) : null;
+    const sig = `${signature(n)}|${String(sound)}${athan ? '|tap' : ''}`;
     next[n.id] = sig;
     if (ours.has(n.id) && saved[n.id] === sig) continue;
     try {
@@ -91,7 +93,7 @@ async function syncNow(input: PlanInput): Promise<PlannedNotification[]> {
           body: n.body,
           sound,
           interruptionLevel: interruptionFor(n.kind),
-          data: { kind: 'prayer', prayer: n.prayer ?? null },
+          data: { kind: 'prayer', prayer: n.prayer ?? null, athan },
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
