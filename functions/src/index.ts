@@ -36,6 +36,8 @@ import { SUPPORT_ORIGINS, SUPPORT_PAGES, SupportError } from './support/logic';
 import { handleDevPremium, handleSupportApplication, handleSupportLink } from './support/handler';
 import { adminSupportStore, deleteSupportData } from './support/admin';
 import { earlyAccessOn, grantEarlyAccess } from './support/early';
+import { PackError, handleRecitePack } from './recitePack/handler';
+import { adminPackDeps } from './recitePack/admin';
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 3 });
 
@@ -565,4 +567,22 @@ export const claimEarlyAccess = onCall({ enforceAppCheck: true, maxInstances: 3,
   }
   await grantEarlyAccess(adminDb, uid);
   return { premium: true };
+});
+
+/**
+ * Recite's pack for the phone (Revisely Dev, BEHAVIOUR.md ONDEV-2): short-lived signed URLs for its sealed parts and
+ * its key wrapped to the caller's device key. Who may and how often: recitePack/handler.ts. App Check is required.
+ * Production has no pack (recitePacks/current), so it refuses there.
+ */
+export const recitePack = onCall({ enforceAppCheck: true, maxInstances: 5, timeoutSeconds: 30 }, async (request) => {
+  try {
+    return await handleRecitePack(
+      { auth: request.auth ?? null, app: request.app ? { appId: request.app.appId } : null, data: request.data },
+      adminPackDeps(adminDb, getStorage()),
+    );
+  } catch (err) {
+    if (err instanceof PackError) throw new HttpsError(err.code, err.message);
+    logger.error(failure('recitePack', err));
+    throw new HttpsError('internal', 'The pack couldn’t be prepared. Try again later.');
+  }
 });
