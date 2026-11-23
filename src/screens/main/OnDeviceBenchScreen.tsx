@@ -31,6 +31,10 @@ type WindowChoice = (typeof WINDOW_CHOICES)[number];
 // A long run (research's 20-minute protocol): one run at the live cadence, battery and heat each minute.
 const MINUTE_CHOICES = ['5', '20'] as const;
 type MinuteChoice = (typeof MINUTE_CHOICES)[number];
+// The engine's hop by phone (the lead, Nov 23): a window every half second, or every second on slower phones.
+const HOP_CHOICES = ['500', '1000'] as const;
+type HopChoice = (typeof HOP_CHOICES)[number];
+const hopSeconds = (ms: number) => (ms / 1000).toString();
 
 const PROVIDER_LABEL: Record<Provider, () => string> = {
   cpu: () => t('settings.bench.providerCpu'),
@@ -77,6 +81,9 @@ export default function OnDeviceBenchScreen() {
   const [off, setOff] = useState<Set<string>>(new Set());
   const [windows, setWindows] = useState<WindowChoice>('200');
   const [minutes, setMinutes] = useState<MinuteChoice>('20');
+  const [hop, setHop] = useState<HopChoice>('500');
+  // Which button the last run came from, so its status shows under that button.
+  const [longStarted, setLongStarted] = useState(false);
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [runs, setRuns] = useState<BenchRun[]>([]);
   const [record, setRecord] = useState<ReturnType<typeof benchRecord> | null>(null);
@@ -112,7 +119,8 @@ export default function OnDeviceBenchScreen() {
     const n = Number(windows);
     const toRun = long ? chosen.slice(0, 1) : chosen;
     const seconds = Number(minutes) * 60;
-    const length = long ? { durationSec: seconds } : { windows: n };
+    const length = long ? { durationSec: seconds, cadenceMs: Number(hop) } : { windows: n };
+    setLongStarted(long);
     setRuns([]);
     setRecord(null);
     const done: BenchRun[] = [];
@@ -171,6 +179,12 @@ export default function OnDeviceBenchScreen() {
               : status.kind === 'failed'
                 ? t('settings.bench.failed', { error: status.error })
                 : null;
+
+  const statusText = statusLine ? (
+    <Text style={[typeV2.meta, styles.status, { color: palette.secondary }]} testID="bench-status">
+      {statusLine}
+    </Text>
+  ) : null;
 
   return (
     <View style={[styles.container, { backgroundColor: palette.bg }]} testID="on-device-bench-screen">
@@ -241,18 +255,15 @@ export default function OnDeviceBenchScreen() {
                     title={t('settings.bench.run')}
                     size="lg"
                     onPress={() => start(false)}
-                    busy={busy}
-                    disabled={chosen.length === 0}
+                    busy={busy && !longStarted}
+                    disabled={chosen.length === 0 || busy}
                     testID="bench-run"
                   />
-                  {statusLine ? (
-                    <Text style={[typeV2.meta, styles.status, { color: palette.secondary }]} testID="bench-status">
-                      {statusLine}
-                    </Text>
-                  ) : null}
+                  {longStarted ? null : statusText}
                 </View>
                 <GroupedSection header={t('settings.bench.long')} footer={t('settings.bench.longFooter')}>
-                  <View style={styles.tabs}>
+                  <View style={styles.choice}>
+                    <Text style={[typeV2.meta, { color: palette.secondary }]}>{t('settings.bench.longLength')}</Text>
                     <PillTabs
                       options={MINUTE_CHOICES.map((m) => ({ value: m, label: t('settings.bench.minutes', { count: Number(m) }) }))}
                       value={minutes}
@@ -261,15 +272,36 @@ export default function OnDeviceBenchScreen() {
                       testID="bench-minutes"
                     />
                   </View>
+                  <View style={styles.choice}>
+                    <Text style={[typeV2.meta, { color: palette.secondary }]}>{t('settings.bench.longPace')}</Text>
+                    <PillTabs
+                      options={HOP_CHOICES.map((h) => ({ value: h, label: t('settings.bench.hopChoice', { seconds: hopSeconds(Number(h)) }) }))}
+                      value={hop}
+                      onChange={setHop}
+                      disabled={busy}
+                      testID="bench-hop"
+                    />
+                  </View>
                 </GroupedSection>
                 <View style={styles.actions}>
+                  <Text style={[typeV2.body, styles.warning, { color: palette.text }]} testID="bench-long-warning">
+                    {t('settings.bench.longStay')}
+                  </Text>
                   <PillButton
-                    title={t('settings.bench.longRun', { plan: chosen[0] ? planLabel(chosen[0]) : '' })}
+                    title={t('settings.bench.longRun', { minutes, hop: hopSeconds(Number(hop)) })}
+                    size="lg"
                     variant="outline"
                     onPress={() => start(true)}
+                    busy={busy && longStarted}
                     disabled={busy || chosen.length === 0}
                     testID="bench-long-run"
                   />
+                  {chosen[0] ? (
+                    <Text style={[typeV2.meta, styles.status, { color: palette.secondary }]}>
+                      {t('settings.bench.longPlan', { plan: planLabel(chosen[0]) })}
+                    </Text>
+                  ) : null}
+                  {longStarted ? statusText : null}
                 </View>
                 {runs.length > 0 ? (
                   <GroupedSection header={t('settings.bench.results')}>
@@ -296,6 +328,7 @@ function RunCard({ run, manifest }: { run: BenchRun; manifest: BenchManifest }) 
   const { palette } = useTheme();
   const { result, summary } = run;
   const lines: string[] = [];
+  const hit = run.interrupted;
   if (!result.ok || !summary) {
     lines.push(t('settings.bench.failed', { error: result.error ?? '' }));
   } else {
@@ -312,13 +345,17 @@ function RunCard({ run, manifest }: { run: BenchRun; manifest: BenchManifest }) 
     );
   }
   if (run.long && result.ok) {
-    const v = longVerdict(run.long.minutes, result.samples ?? []);
+    const v = longVerdict(run.long.minutes, result.samples ?? [], !!hit);
     lines.push(
       v.hot ? t('settings.bench.longHot', { heat: v.hottest ?? '' }) : t('settings.bench.longCool', { heat: v.hottest ?? '' }),
       v.steady ? t('settings.bench.longSteady', { percent: fixed(100 * v.drift, 0) }) : t('settings.bench.longDrift', { percent: fixed(100 * v.drift, 0) }),
-      v.charging
+      v.batteryNote === 'charging'
         ? t('settings.bench.longCharging')
-        : t('settings.bench.longBattery', { drop: fixed(v.batteryDrop, 1), perHour: fixed(v.batteryPerHour, 1) }),
+        : v.batteryNote === 'away'
+          ? t('settings.bench.longBatteryAway')
+          : v.batteryNote === 'coarse'
+            ? t('settings.bench.longBatteryCoarse', { drop: fixed(v.batteryDrop, 0) })
+            : t('settings.bench.longBattery', { drop: fixed(v.batteryDrop, 1), perHour: fixed(v.batteryPerHour, 1) }),
       t('settings.bench.longLate', { count: result.late }),
     );
     for (const m of run.long.minutes) {
@@ -349,8 +386,15 @@ function RunCard({ run, manifest }: { run: BenchRun; manifest: BenchManifest }) 
   }
   return (
     <View style={styles.card} testID={`bench-result-${run.plan.model}-${run.plan.provider}-${run.plan.threads}${run.long ? '-long' : ''}`}>
+      {hit ? (
+        <Text style={[typeV2.meta, styles.interrupted, { color: palette.text }]} testID="bench-interrupted">
+          {hit.times > 0
+            ? t('settings.bench.interrupted', { count: hit.times, seconds: Math.round(hit.awayMs / 1000), clean: fixed(hit.longestCleanMs / 60000, 1) })
+            : t('settings.bench.stalled', { seconds: Math.round(hit.stallMs / 1000), clean: fixed(hit.longestCleanMs / 60000, 1) })}
+        </Text>
+      ) : null}
       <Text style={[typeV2.body, styles.cardTitle, { color: palette.text }]}>
-        {run.long ? t('settings.bench.longTitle', { plan: planLabel(run.plan), minutes: Math.round(run.long.durationSec / 60) }) : planLabel(run.plan)}
+        {run.long ? t('settings.bench.longTitle', { plan: planLabel(run.plan), minutes: Math.round(run.long.durationSec / 60), hop: hopSeconds(run.long.cadenceMs) }) : planLabel(run.plan)}
       </Text>
       {lines.map((line, i) => (
         <Text key={i} style={[typeV2.meta, typeV2.numeral, { color: palette.secondary }]}>
@@ -366,10 +410,13 @@ const styles = StyleSheet.create({
   note: { paddingHorizontal: layoutV2.gutter, paddingTop: 16 },
   retry: { alignSelf: 'flex-start', marginTop: 12 },
   tabs: { paddingHorizontal: layoutV2.gutter, paddingVertical: 12 },
+  choice: { paddingHorizontal: layoutV2.gutter, paddingVertical: 10, gap: 8 },
+  warning: { fontWeight: '600' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, paddingHorizontal: layoutV2.gutter, paddingVertical: 10 },
   rowText: { flex: 1, minWidth: 0 },
   actions: { paddingHorizontal: layoutV2.gutter, paddingTop: 20, gap: 10 },
   status: { textAlign: 'center' },
   card: { paddingHorizontal: layoutV2.gutter, paddingVertical: 12, gap: 2 },
   cardTitle: { fontWeight: '600', marginBottom: 2 },
+  interrupted: { fontWeight: '600', marginBottom: 2 },
 });

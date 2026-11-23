@@ -790,7 +790,7 @@ service cloud.firestore {
                        incomingData().platform in ['ios', 'android'] &&
                        incomingData().device is map && incomingData().device.size() <= 20 &&
                        incomingData().app is map && incomingData().app.size() <= 10 &&
-                       incomingData().windows is int && incomingData().windows > 0 && incomingData().windows <= 1000 &&
+                       incomingData().windows is int && incomingData().windows > 0 && incomingData().windows <= 20000 &&
                        incomingData().runs is list && incomingData().runs.size() >= 1 && incomingData().runs.size() <= 40;
       allow read, update, delete: if false;
     }
