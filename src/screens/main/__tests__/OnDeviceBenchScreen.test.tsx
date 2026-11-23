@@ -152,7 +152,11 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
     await show();
     const runPlan = jest.requireMock('../../../lib/onDevice/benchRun').runPlan as jest.Mock;
     runPlan.mockClear();
-    expect(screen.getByText('Long run: v7m-live-r16 · CPU · 2 threads')).toBeTruthy();
+    expect(screen.getByText('Start: 20 min, every 0.5 s')).toBeTruthy();
+    expect(screen.getByText('Runs v7m-live-r16 · CPU · 2 threads')).toBeTruthy();
+    expect(screen.getByTestId('bench-long-warning').props.children).toBe(
+      'Unplug the phone and stay on this screen until it finishes. Leaving the app, even for a moment, spoils the run.',
+    );
     await act(async () => {
       fireEvent.press(screen.getByTestId('bench-long-run'));
     });
@@ -174,6 +178,7 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
     const runPlan = jest.requireMock('../../../lib/onDevice/benchRun').runPlan as jest.Mock;
     runPlan.mockClear();
     fireEvent.press(screen.getByText('Every 1 s'));
+    expect(screen.getByText('Start: 20 min, every 1 s')).toBeTruthy();
     await act(async () => {
       fireEvent.press(screen.getByTestId('bench-long-run'));
     });

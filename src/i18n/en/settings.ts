@@ -374,13 +374,20 @@ export const settings = {
     run: 'Run',
     downloading: 'Downloading {{file}} of {{files}} · {{percent}}%',
     long: 'Long run',
-    longFooter: 'The first chosen run at a live take’s pace, a window every 0.5 or 1 second, with the battery and the phone’s heat noted each minute. Unplug the phone, keep its brightness as it is, and leave it on this screen.',
+    longFooter: 'The first chosen run at a live take’s pace, with the battery and the phone’s heat noted each minute.',
+    longLength: 'Length',
+    longPace: 'How often the model runs',
+    /** Shown above the button: leaving the app suspends the run and spoils its battery and heat numbers. */
+    longStay: 'Unplug the phone and stay on this screen until it finishes. Leaving the app, even for a moment, spoils the run.',
+    /** Under the button: which run it takes. */
+    longPlan: 'Runs {{plan}}',
     /** "Every 0.5 s": how often a long run starts a window. */
     hopChoice: 'Every {{seconds}} s',
     minutes_one: '{{count}} minute',
     minutes_other: '{{count}} minutes',
     /** "Long run: v7-live-fp32 · CPU · 2 threads". */
-    longRun: 'Long run: {{plan}}',
+    /** "Start: 20 min, every 0.5 s". */
+    longRun: 'Start: {{minutes}} min, every {{hop}} s',
     /** "v7-live-fp32 · CPU · 2 threads: minute 3 of 20". */
     runningLong: '{{plan}}: minute {{done}} of {{total}}',
     longTitle: '{{plan}} · {{minutes}} minutes · every {{hop}} s',

@@ -82,6 +82,8 @@ export default function OnDeviceBenchScreen() {
   const [windows, setWindows] = useState<WindowChoice>('200');
   const [minutes, setMinutes] = useState<MinuteChoice>('20');
   const [hop, setHop] = useState<HopChoice>('500');
+  // Which button the last run came from, so its status shows under that button.
+  const [longStarted, setLongStarted] = useState(false);
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [runs, setRuns] = useState<BenchRun[]>([]);
   const [record, setRecord] = useState<ReturnType<typeof benchRecord> | null>(null);
@@ -118,6 +120,7 @@ export default function OnDeviceBenchScreen() {
     const toRun = long ? chosen.slice(0, 1) : chosen;
     const seconds = Number(minutes) * 60;
     const length = long ? { durationSec: seconds, cadenceMs: Number(hop) } : { windows: n };
+    setLongStarted(long);
     setRuns([]);
     setRecord(null);
     const done: BenchRun[] = [];
@@ -176,6 +179,12 @@ export default function OnDeviceBenchScreen() {
               : status.kind === 'failed'
                 ? t('settings.bench.failed', { error: status.error })
                 : null;
+
+  const statusText = statusLine ? (
+    <Text style={[typeV2.meta, styles.status, { color: palette.secondary }]} testID="bench-status">
+      {statusLine}
+    </Text>
+  ) : null;
 
   return (
     <View style={[styles.container, { backgroundColor: palette.bg }]} testID="on-device-bench-screen">
@@ -246,18 +255,15 @@ export default function OnDeviceBenchScreen() {
                     title={t('settings.bench.run')}
                     size="lg"
                     onPress={() => start(false)}
-                    busy={busy}
-                    disabled={chosen.length === 0}
+                    busy={busy && !longStarted}
+                    disabled={chosen.length === 0 || busy}
                     testID="bench-run"
                   />
-                  {statusLine ? (
-                    <Text style={[typeV2.meta, styles.status, { color: palette.secondary }]} testID="bench-status">
-                      {statusLine}
-                    </Text>
-                  ) : null}
+                  {longStarted ? null : statusText}
                 </View>
                 <GroupedSection header={t('settings.bench.long')} footer={t('settings.bench.longFooter')}>
-                  <View style={styles.tabs}>
+                  <View style={styles.choice}>
+                    <Text style={[typeV2.meta, { color: palette.secondary }]}>{t('settings.bench.longLength')}</Text>
                     <PillTabs
                       options={MINUTE_CHOICES.map((m) => ({ value: m, label: t('settings.bench.minutes', { count: Number(m) }) }))}
                       value={minutes}
@@ -266,7 +272,8 @@ export default function OnDeviceBenchScreen() {
                       testID="bench-minutes"
                     />
                   </View>
-                  <View style={styles.tabs}>
+                  <View style={styles.choice}>
+                    <Text style={[typeV2.meta, { color: palette.secondary }]}>{t('settings.bench.longPace')}</Text>
                     <PillTabs
                       options={HOP_CHOICES.map((h) => ({ value: h, label: t('settings.bench.hopChoice', { seconds: hopSeconds(Number(h)) }) }))}
                       value={hop}
@@ -277,13 +284,24 @@ export default function OnDeviceBenchScreen() {
                   </View>
                 </GroupedSection>
                 <View style={styles.actions}>
+                  <Text style={[typeV2.body, styles.warning, { color: palette.text }]} testID="bench-long-warning">
+                    {t('settings.bench.longStay')}
+                  </Text>
                   <PillButton
-                    title={t('settings.bench.longRun', { plan: chosen[0] ? planLabel(chosen[0]) : '' })}
+                    title={t('settings.bench.longRun', { minutes, hop: hopSeconds(Number(hop)) })}
+                    size="lg"
                     variant="outline"
                     onPress={() => start(true)}
+                    busy={busy && longStarted}
                     disabled={busy || chosen.length === 0}
                     testID="bench-long-run"
                   />
+                  {chosen[0] ? (
+                    <Text style={[typeV2.meta, styles.status, { color: palette.secondary }]}>
+                      {t('settings.bench.longPlan', { plan: planLabel(chosen[0]) })}
+                    </Text>
+                  ) : null}
+                  {longStarted ? statusText : null}
                 </View>
                 {runs.length > 0 ? (
                   <GroupedSection header={t('settings.bench.results')}>
@@ -392,6 +410,8 @@ const styles = StyleSheet.create({
   note: { paddingHorizontal: layoutV2.gutter, paddingTop: 16 },
   retry: { alignSelf: 'flex-start', marginTop: 12 },
   tabs: { paddingHorizontal: layoutV2.gutter, paddingVertical: 12 },
+  choice: { paddingHorizontal: layoutV2.gutter, paddingVertical: 10, gap: 8 },
+  warning: { fontWeight: '600' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, paddingHorizontal: layoutV2.gutter, paddingVertical: 10 },
   rowText: { flex: 1, minWidth: 0 },
   actions: { paddingHorizontal: layoutV2.gutter, paddingTop: 20, gap: 10 },
