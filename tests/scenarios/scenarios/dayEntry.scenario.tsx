@@ -2,7 +2,6 @@
 // modified should be the journal entries beneath it; also i dont think we need to put "journal" for each entry").
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import type { ReactTestInstance } from 'react-test-renderer';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { CalendarMonth } from '../../../src/components/activity/CalendarMonth';
 import type { Revised } from '../../../src/lib/activityInsights';
@@ -10,6 +9,8 @@ import type { Revised } from '../../../src/lib/activityInsights';
 const mockPalette = new Proxy({}, { get: () => '#000000' });
 jest.mock('../../../src/context/ThemeContext', () => ({ useTheme: () => ({ palette: mockPalette, theme: mockPalette, isDark: false }) }));
 jest.mock('../../../src/lib/variant', () => ({ ...jest.requireActual('../../../src/lib/variant'), isDevVariant: () => true }));
+
+type Node = ReturnType<typeof screen.getByTestId>;
 
 const DAY = '2026-11-22';
 const METRICS = { frame: { x: 0, y: 0, width: 393, height: 852 }, insets: { top: 59, left: 0, right: 0, bottom: 34 } };
@@ -46,8 +47,8 @@ describe('a day’s entry under the calendar', () => {
     expect(screen.queryByText(/journal/i)).toBeNull();
     const entry = screen.getByTestId('preview-open');
     const lines = entry
-      .findAll((n: ReactTestInstance) => typeof n.type === 'string' && /^preview-row-/.test(String(n.props.testID ?? '')))
-      .map((n: ReactTestInstance) => n.props.testID);
+      .findAll((n: Node) => typeof n.type === 'string' && /^preview-row-/.test(String(n.props.testID ?? '')))
+      .map((n: Node) => n.props.testID);
     expect(lines).toEqual(['preview-row-revised', 'preview-row-memorized', 'preview-row-notes']);
     expect(screen.getByTestId('preview-value-notes').props.children).toBe('Slow down at the second page');
     expect(screen.queryByTestId('preview-add-note')).toBeNull();
