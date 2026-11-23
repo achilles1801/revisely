@@ -4,11 +4,15 @@
 appId: com.revisionbuddy.app
 ---
 - tapOn:
-    id: open-activity
+    id: tab-ActivityTab
 - extendedWaitUntil:
     visible:
       id: activity-blocks-views
     timeout: 20000
+# Activity is a tab and keeps where it was (TAB-2): a press on its tab, now that it shows, takes it back to its top.
+- tapOn:
+    id: tab-ActivityTab
+- waitForAnimationToEnd
 - tapOn:
     id: pill-insights
 - extendedWaitUntil:

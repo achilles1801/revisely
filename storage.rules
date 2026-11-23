@@ -9,6 +9,9 @@ rules_version = '2';
  *   account, never overwritten (a name is one file, ever). Account deletion
  *   removes them on the server (functions deleteUserAccount).
  * - backups/: tester resets' backups (functions resetMyData), admin only.
+ * - models/recite/: Recite's model for the phone and the on-device bench's files (Revisely Dev): read only by
+ *   accounts with the onDeviceBench claim (functions/scripts/set-bench-access.js), written only by the admin SDK.
+ * - packs/recite/: Recite's sealed pack (Revisely Dev): closed; phones read it through recitePack's signed URLs.
  * - The mushaf page images and the speech model are public objects served from
  *   storage.googleapis.com, outside these rules.
  * - Everything else is closed.
@@ -38,6 +41,21 @@ service firebase.storage {
                        fileName.matches('[A-Za-z0-9._-]+') &&
                        request.resource.size < 200 * 1024 * 1024 &&
                        request.resource.contentType.matches('audio/.*');
+    }
+
+    // Recite's model on the phone (Revisely Dev's on-device bench, BEHAVIOUR.md ONDEV-1): the models (watermarked),
+    // the bench's clip and the checker's test vectors, put there by the team with the admin SDK. Revisely Dev is open
+    // to anyone with its link, so signing in isn't enough: only accounts given the `onDeviceBench` claim
+    // (functions/scripts/set-bench-access.js) read them. Nobody writes from a client. Nothing lives there on production.
+    match /models/recite/{allPaths=**} {
+      allow read: if request.auth != null && request.auth.token.onDeviceBench == true;
+      allow write: if false;
+    }
+
+    // Recite's sealed pack (functions recitePack, Revisely Dev): no client reads it through these rules. A phone gets
+    // a short-lived signed URL from the callable, after its checks. Written only by functions/scripts/recite-pack-make.js.
+    match /packs/recite/{allPaths=**} {
+      allow read, write: if false;
     }
 
     // Tester resets' backups (functions resetMyData): admin only, never a client.

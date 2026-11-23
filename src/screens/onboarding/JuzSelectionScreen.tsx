@@ -1,30 +1,27 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-} from 'react-native';
-import { ScreenSafeAreaView } from '../../components/SafeAreaView';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
-import { Stepper } from '../../components/Stepper';
+import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { MemorizationBrowser } from '../../components/MemorizationBrowser';
+import { JuzGrid } from '../../components/onboarding/JuzGrid';
+import { QuestionScreen } from '../../components/onboarding/QuestionScreen';
 import { PillButton } from '../../components/v2/PillButton';
-import { TopBar } from '../../components/v2/TopBar';
+import { Sheet } from '../../components/v2/Sheet';
+import { Tap } from '../../components/v2/Tap';
 import {
   PageStatus,
   applyPendingChanges,
   applyPendingSurahChanges,
   buildInitialPendingForJourney,
   buildInitialPendingSurahsForJourney,
-  countMemorizedWithPending,
   markedPagesNotLoaded,
 } from '../../lib/memorizationChanges';
+import { JUZ_NUMBERS, chosenCounts, juzState, memorizedWithPending, toggleJuz } from '../../lib/onboardingChoices';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
-import { useApp } from '../../context/AppContext';
+import { t } from '../../i18n';
+import { useOnboardingAccess } from './onboardingAccess';
 
 type NavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'JuzSelection'>;
 type RouteProps = RouteProp<OnboardingStackParamList, 'JuzSelection'>;
@@ -34,7 +31,9 @@ export default function JuzSelectionScreen() {
   const route = useRoute<RouteProps>();
   const { palette } = useTheme();
   const { journeyStage } = route.params;
-  const { user, pages, updatePages, saveUser } = useApp();
+  const { user, pages, updatePages, saveUser } = useOnboardingAccess();
+  const [bySurah, setBySurah] = useState(false);
+  const { height } = useWindowDimensions();
 
   // Local buffer for the user's selection. Stays in component state until
   // Continue is tapped, then flushes to global pages + Firestore in one batch.
@@ -68,16 +67,22 @@ export default function JuzSelectionScreen() {
     });
   }, [pages, journeyStage, user]);
 
-  // Effective memorized count = base memorized status with pendingChanges
-  // applied, over every page number: a marked page counts before it has loaded,
-  // as its juz's check already shows it (ONBOARD-1).
-  const effectiveMemorizedCount = useMemo(
-    () => countMemorizedWithPending(pages, pendingChanges),
-    [pages, pendingChanges],
-  );
+  // What's chosen, over every page number: a marked page counts before it has
+  // loaded, as its juz's cell already shows it (ONBOARD-1).
+  const chosen = useMemo(() => memorizedWithPending(pages, pendingChanges), [pages, pendingChanges]);
+  const states = useMemo(() => {
+    const set = new Set(chosen);
+    return JUZ_NUMBERS.map((juz) => juzState(juz, set));
+  }, [chosen]);
   // Marked pages the phone hasn't loaded yet (a new account's pages arrive in
   // two batches): saving now would leave them out, so Continue waits for them.
   const notLoaded = useMemo(() => markedPagesNotLoaded(pages, pendingChanges), [pages, pendingChanges]);
+
+  const onToggleJuz = (juz: number) => {
+    const next = toggleJuz(juz, pages, pendingChanges, user?.memorizedSurahs ?? [], pendingSurahChanges);
+    setPendingChanges(next.pending);
+    setPendingSurahChanges(next.pendingSurahs);
+  };
 
   const handleContinue = async () => {
     if (notLoaded.length > 0) return;
@@ -95,10 +100,10 @@ export default function JuzSelectionScreen() {
       );
       await saveUser({ ...user, memorizedSurahs: nextSurahs });
     }
-    navigation.navigate('Schedule', { journeyStage });
+    navigation.navigate('DailyAmount', { journeyStage });
   };
 
-  const canContinue = effectiveMemorizedCount > 0 && notLoaded.length === 0;
+  const canContinue = chosen.length > 0 && notLoaded.length === 0;
 
   // The button shows it's saving, and a second tap waits.
   const [saving, setSaving] = useState(false);
@@ -112,82 +117,95 @@ export default function JuzSelectionScreen() {
     }
   };
 
-  const subtext =
-    journeyStage === 'complete'
-      ? 'All marked as memorized — adjust if needed.'
-      : 'Mark your completed surahs and juz.';
+  // Counts only: "1 juz and 1 page chosen". A name here could carry ayah numbers.
+  const counts = chosenCounts(chosen);
+  const summary =
+    counts.juz > 0 && counts.pages > 0
+      ? t('onboarding.juz.chosenBoth', {
+          juz: t('common.juzCount', { count: counts.juz }),
+          pages: t('onboarding.juz.pagesCount', { count: counts.pages }),
+        })
+      : counts.juz > 0
+        ? t('onboarding.juz.chosenJuz', { count: counts.juz })
+        : counts.pages > 0
+          ? t('onboarding.juz.chosenPages', { count: counts.pages })
+          : t('onboarding.juz.none');
 
-  // The title scrolls with the list, so the largest text sizes still leave
-  // room for it; the count and the action stay at the foot, over a hairline.
   return (
-    <ScreenSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} testID="juz-selection">
-      <TopBar onBack={() => navigation.goBack()} center={<Stepper total={3} current={2} />} />
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={v2.scroll}
-        showsVerticalScrollIndicator={false}
-        testID="juz-selection-scroll"
-      >
-        <View style={v2.header}>
+    <QuestionScreen
+      step={2}
+      title={t('onboarding.juz.title')}
+      subtitle={t('onboarding.juz.subtitle')}
+      onBack={() => navigation.goBack()}
+      testID="juz-selection"
+      foot={
+        <>
           <Text
-            style={[typeV2.title, { color: palette.text }]}
-            accessibilityRole="header"
+            style={[typeV2.meta, styles.summary, { color: palette.secondary }]}
             maxFontSizeMultiplier={1.6}
+            numberOfLines={2}
+            accessibilityLiveRegion="polite"
+            testID="juz-selection-summary"
           >
-            Select memorized portions
+            {summary}
           </Text>
-          <Text style={[typeV2.body, v2.subtext, { color: palette.secondary }]}>{subtext}</Text>
-        </View>
-        {/* Full-width rows with their own gutter, as on the Memorization screen. */}
-        <MemorizationBrowser
-          pages={pages}
-          pendingChanges={pendingChanges}
-          onChange={setPendingChanges}
-          baseMemorizedSurahs={user?.memorizedSurahs ?? []}
-          pendingSurahChanges={pendingSurahChanges}
-          onSurahChange={setPendingSurahChanges}
-          markMode
-          hideMarkToggle
-        />
-      </ScrollView>
-
-      <View style={[v2.footer, { borderTopColor: palette.separator }]} testID="juz-selection-footer">
-        <Text
-          style={[typeV2.body, v2.summary, { color: palette.secondary }]}
-          maxFontSizeMultiplier={1.6}
-          testID="juz-selection-summary"
-        >
-          <Text style={[typeV2.name, typeV2.numeral, { color: palette.accentText }]}>{effectiveMemorizedCount}</Text>
-          {' of 604 pages memorized'}
+          <PillButton
+            title={notLoaded.length > 0 ? t('onboarding.juz.loading') : t('onboarding.continue')}
+            size="lg"
+            onPress={continueV2}
+            disabled={!canContinue}
+            busy={saving}
+            testID="juz-continue"
+          />
+        </>
+      }
+    >
+      <JuzGrid states={states} onToggle={onToggleJuz} />
+      <Tap onPress={() => setBySurah(true)} accessibilityRole="button" style={styles.link} testID="juz-by-surah">
+        <Text style={[typeV2.button, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={1.6}>
+          {t('onboarding.juz.bySurah')}
         </Text>
-        <PillButton
-          title={notLoaded.length > 0 ? 'Loading your pages…' : 'Continue'}
-          size="lg"
-          onPress={continueV2}
-          disabled={!canContinue}
-          busy={saving}
-          testID="juz-continue"
-        />
-      </View>
-    </ScreenSafeAreaView>
+      </Tap>
+
+      {/* Today's list, on the same selection: what's marked there shows in the grid. */}
+      <Sheet
+        visible={bySurah}
+        onClose={() => setBySurah(false)}
+        title={t('onboarding.juz.bySurahTitle')}
+        pinned={
+          <View style={styles.sheetFoot}>
+            <Text style={[typeV2.meta, styles.summary, { color: palette.secondary }]} maxFontSizeMultiplier={1.6} numberOfLines={2}>
+              {summary}
+            </Text>
+            <PillButton title={t('common.done')} size="lg" onPress={() => setBySurah(false)} testID="juz-by-surah-done" />
+          </View>
+        }
+        testID="juz-by-surah-sheet"
+      >
+        {/* Out over the sheet's gutter: the list's rows bring their own. */}
+        <View style={styles.sheetList}>
+          <ScrollView style={{ maxHeight: height * 0.62 }} testID="juz-by-surah-scroll">
+            <MemorizationBrowser
+              pages={pages}
+              pendingChanges={pendingChanges}
+              onChange={setPendingChanges}
+              baseMemorizedSurahs={user?.memorizedSurahs ?? []}
+              pendingSurahChanges={pendingSurahChanges}
+              onSurahChange={setPendingSurahChanges}
+              markMode
+              hideMarkToggle
+            />
+          </ScrollView>
+        </View>
+      </Sheet>
+    </QuestionScreen>
   );
 }
 
-const v2 = StyleSheet.create({
-  scroll: { paddingBottom: 24 },
-  header: { paddingHorizontal: layoutV2.gutter, paddingTop: 8, paddingBottom: 16 },
-  subtext: { marginTop: 4 },
-  footer: {
-    paddingHorizontal: layoutV2.gutter,
-    paddingTop: 12,
-    paddingBottom: 16,
-    gap: 12,
-    borderTopWidth: layoutV2.hairline,
-  },
-  summary: { textAlign: 'center' },
-});
-
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scrollView: { flex: 1 },
+  summary: { textAlign: 'center' },
+  link: { alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, marginTop: 10 },
+  linkText: { textAlign: 'center' },
+  sheetList: { marginHorizontal: -layoutV2.gutter },
+  sheetFoot: { paddingTop: 8, gap: 10 },
 });

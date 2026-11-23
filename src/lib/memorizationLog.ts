@@ -1,3 +1,4 @@
+import { westernDigits } from '../i18n/digits';
 // What saving the memorization manager writes to the log (Majd, Nov 2026): pages newly marked
 // become a dated memorization item for the day the user says (Today), or nothing (Before, which
 // does not log); pages unmarked are removed from the items that hold them.
@@ -31,8 +32,8 @@ export function defaultWhen(marked: number[]): WhenMemorized {
 
 /** A page range typed in the Memorized composer: "From" and "To" (both pages, inclusive), or null when not valid. */
 export function parsePageRange(from: string | undefined, to: string | undefined): number[] | null {
-  const a = Number((from ?? '').trim());
-  const b = Number((to ?? '').trim());
+  const a = Number(westernDigits(from ?? '').trim());
+  const b = Number(westernDigits(to ?? '').trim());
   if (!Number.isInteger(a) || !Number.isInteger(b)) return null;
   if (a < 1 || b > 604 || a > b) return null;
   return Array.from({ length: b - a + 1 }, (_, i) => a + i);

@@ -20,8 +20,9 @@ import { logger } from '../../lib/logger';
 import { typeV2 } from '../../theme/v2';
 import type { RevisionLog } from '../../types';
 import { RevisedMark } from './BlockMark';
-import { InfoLine } from './AddSheetParts';
+import { InfoLine, dayWords } from './AddSheetParts';
 import { revisedOnDay, useDayItems } from './useDayItems';
+import { t } from '../../i18n';
 
 const pagesWord = (n: number) => `${n} ${n === 1 ? 'page' : 'pages'}`;
 
@@ -85,28 +86,28 @@ export function RevisedElsewhereSheet({
     }
   };
 
-  const whose = dayName === 'today' ? 'today’s' : `${dayName}’s`;
+  const dayText = dayWords(dayName);
   return (
     <Sheet
       visible={visible}
       onClose={onClose}
-      title="Revised elsewhere"
+      title={t('activity.elsewhere.title')}
       titleMark={<RevisedMark fraction={due.length > 0 ? doneOfDue / due.length : 0} done={due.length > 0 && doneOfDue >= due.length} size={24} />}
       headerRule="full"
       scroll
-      left={{ label: 'Cancel', onPress: onClose }}
-      right={{ label: saving ? 'Saving…' : 'Add', onPress: handleAdd, strong: true, accent: true, disabled: !canAdd, testID: 'add-revised-add' }}
+      left={{ label: t('common.cancel'), onPress: onClose }}
+      right={{ label: saving ? t('common.saving') : t('activity.add.add'), onPress: handleAdd, strong: true, accent: true, disabled: !canAdd, testID: 'add-revised-add' }}
       testID="add-revised-sheet"
     >
       <View style={styles.body}>
         {choices.length === 0 ? (
           <Text style={[typeV2.body, styles.empty, { color: palette.secondary }]} testID="add-revised-none">
-            {due.length > 0 ? `All of ${whose} pages are revised.` : `Nothing was scheduled for ${dayName}.`}
+            {due.length > 0 ? t('activity.elsewhere.allRevised', { day: dayText }) : t('activity.elsewhere.nothingScheduled', { day: dayText })}
           </Text>
         ) : (
           <>
             <Text style={[typeV2.meta, styles.label, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-              {`Untick any of ${whose} pages you didn’t revise.`}
+              {t('activity.elsewhere.untick', { day: dayText })}
             </Text>
             {choices.map((p, i) => {
               const on = !unticked.has(p);
@@ -138,8 +139,8 @@ export function RevisedElsewhereSheet({
             <InfoLine
               text={
                 ticked.length === 0
-                  ? 'Tick the pages you revised.'
-                  : `Adds ${pagesWord(ticked.length)}: ${dayName === 'today' ? 'today' : dayName} becomes ${doneOfDue} of ${due.length}.`
+                  ? t('activity.elsewhere.tick')
+                  : t('activity.elsewhere.adds', { pages: pagesWord(ticked.length), day: dayText, done: doneOfDue, due: due.length })
               }
               testID="add-revised-info"
             />

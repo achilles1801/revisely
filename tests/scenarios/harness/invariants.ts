@@ -6,6 +6,7 @@
 
 import type { OpenApp } from './phone';
 import type { SeedPlan } from '../../../functions/src/testScenarios';
+import { SESSIONS_READ } from './testScenario';
 import type { User, UserPage } from '../../../src/types';
 
 type Fajr = typeof import('../../../src/lib/fajrBoundary');
@@ -35,18 +36,34 @@ export async function checkInvariants(app: OpenApp, plan: SeedPlan): Promise<voi
   const carry = app.mods.require<CarryOver>('src/lib/carryOver');
   const ahead = app.mods.require<AheadCredit>('src/lib/aheadCredit');
   const svc = app.mods.require<Service>('src/services/firestoreService');
+  const ayahs = app.mods.require<typeof import('../../../src/lib/memorizedAyahs')>('src/lib/memorizedAyahs');
   const user = app.app.user as User;
   const logs = app.app.logs;
-  const memorized: UserPage[] = app.app.pages.filter((p) => p.status === 'memorized');
+  // The pages revised: memorized, or memorized in part (MEM-4); the plan holds both.
+  const memorized: UserPage[] = ayahs.revisablePages(app.app.pages);
   const memorizedSet = new Set(memorized.map((p) => p.pageNumber));
   const today = fajr.getRevisionDayForUser(user);
   const scheduled = (day: string) => algorithm.getPagesScheduledForDate(user, localDate(day), memorized);
+  // A day's plan as it was then: from the pages memorized (or begun) by that day, as the server built it.
+  const begun = new Map(plan.pages.map((p) => [p.pageNumber, (p.dateMemorized ?? p.startedAt) as number]));
+  const scheduledThen = (day: string) =>
+    algorithm.getPagesScheduledForDate(
+      user,
+      localDate(day),
+      memorized.filter((p) => begun.has(p.pageNumber) && fajr.revisionDayOf(begun.get(p.pageNumber)!, user) <= day),
+    );
 
   // RESET-3: the phone shows the account as the scenario made it.
   if (!app.app.onboardingComplete) fail('RESET-3', 'onboarding is not done');
   const want = plan.pages.map((p) => p.pageNumber);
   if (JSON.stringify([...memorizedSet].sort((a, b) => a - b)) !== JSON.stringify(want)) {
-    fail('RESET-3', `memorized pages ${memorizedSet.size}, the scenario has ${want.length}`);
+    fail('RESET-3', `revised pages ${memorizedSet.size}, the scenario has ${want.length}`);
+  }
+  for (const p of plan.pages.filter((x) => x.status === 'learning')) {
+    const shown = app.app.pages.find((x) => x.pageNumber === p.pageNumber);
+    if (shown?.status !== 'in_progress' || JSON.stringify(shown.verses) !== JSON.stringify(p.verses)) {
+      fail('MEM-1', `page ${p.pageNumber} memorized in part shows ${shown?.status} ${JSON.stringify(shown?.verses)}`);
+    }
   }
   // Changes still waiting on the phone (the Offline queue scenario holds them) show
   // through the outbox; the server's sessions are the rest.
@@ -61,7 +78,8 @@ export async function checkInvariants(app: OpenApp, plan: SeedPlan): Promise<voi
     .filter((l) => !waiting.has(l.date))
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((l) => `${l.date}:${l.pagesRevised.join(',')}`);
-  const seeded = plan.sessions.map((s) => `${s.date}:${s.pagesRevised.join(',')}`);
+  // The latest 100 days of sessions: what the app reads (SYNC-6).
+  const seeded = plan.sessions.slice(-SESSIONS_READ).map((s) => `${s.date}:${s.pagesRevised.join(',')}`);
   if (JSON.stringify(shown) !== JSON.stringify(seeded)) fail('RESET-3', `sessions ${shown.join(' ')} vs ${seeded.join(' ')}`);
 
   // DAY-1, DAY-2: the revision day is the one the scenario was built for.
@@ -92,12 +110,10 @@ export async function checkInvariants(app: OpenApp, plan: SeedPlan): Promise<voi
   } else if (todays.length !== Math.min(user.dailyPageCapacity, memorizedSet.size)) {
     fail('SCHED-1', `today has ${todays.length} pages, the plan ${user.dailyPageCapacity}`);
   }
-  // Each day's session was given that day's pages (the server's plan is the app's).
-  if (plan.scenario !== 'heavy-activity') {
-    for (const s of plan.sessions) {
-      if (JSON.stringify(s.assignedPages) !== JSON.stringify(scheduled(s.date))) {
-        fail('SCHED-5', `${s.date}'s session holds ${s.assignedPages.join(',')}, the schedule ${scheduled(s.date).join(',')}`);
-      }
+  // Each day's session was given that day's pages, from the pages memorized by then (the server's plan is the app's).
+  for (const s of plan.sessions) {
+    if (JSON.stringify(s.assignedPages) !== JSON.stringify(scheduledThen(s.date))) {
+      fail('SCHED-5', `${s.date}'s session holds ${s.assignedPages.join(',')}, the schedule ${scheduledThen(s.date).join(',')}`);
     }
   }
 
@@ -109,8 +125,8 @@ export async function checkInvariants(app: OpenApp, plan: SeedPlan): Promise<voi
     }
   }
 
-  // SESS-2: a day whose own pages were all revised is done.
-  for (const s of plan.sessions) {
+  // SESS-2: a day whose own pages were all revised is done (of the days the app reads).
+  for (const s of plan.sessions.slice(-SESSIONS_READ)) {
     if (s.state !== 'COMPLETED') continue;
     const done = ahead.doneOnDay(logs, s.date);
     for (const p of s.assignedPages) if (!done.has(p)) fail('SESS-2', `${s.date} was completed, page ${p} not done`);

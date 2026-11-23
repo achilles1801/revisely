@@ -4,6 +4,7 @@
  * app's words (surah and juz first). No JSON and no field names: the model repeats what it reads
  * (Nov 7 2026). A fact that is missing is said to be missing, so Revo can say it can't see it.
  */
+import { takeText } from './recitation';
 import type { RevoAttachment, RevoDayFacts, RevoPassageFacts, RevoPlanTally, RevoTimes } from './types';
 
 const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -143,6 +144,11 @@ export function attachedText(a: RevoAttachment, opts: AttachTextOptions = {}): s
       return passageText(a.label, a.facts, smart);
     case 'revisionDay':
       return dayText(a.label, a.facts, smart);
+    case 'reciteTake':
+      return takeText(a.label, a.facts);
+    case 'insight':
+      // Insights' Recitation section (Revisely Dev): its figures are the context's recitation part.
+      return a.insight === 'recitation' ? `Attached: ${a.label}, Insights’ Recitation section. Its figures are their recitation in the context above.` : null;
     default:
       return null;
   }

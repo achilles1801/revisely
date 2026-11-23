@@ -42,7 +42,7 @@ describe('the Notes block (sub-rows carry no actions)', () => {
         notes={[note('n1', 'fyy')]}
         onEditReading={jest.fn()}
         onDeleteReading={jest.fn()}
-        onOpenLog={jest.fn()}
+        onEditNote={jest.fn()} onDeleteNote={jest.fn()} onDeleteAllNotes={jest.fn()}
         revisedLog={null}
         onDeleteRevised={jest.fn()}
         onDeleteMemorized={jest.fn()}
@@ -59,7 +59,7 @@ describe('the Notes block (sub-rows carry no actions)', () => {
 
   it('a day with no notes shows no Notes block at all', async () => {
     render(
-      <DayBlocks day="2026-11-05" revisionNotes={[]} memorizationNotes={[]} readings={[]} notes={[]} onEditReading={jest.fn()} onDeleteReading={jest.fn()} onOpenLog={jest.fn()} revisedLog={null} onDeleteRevised={jest.fn()} onDeleteMemorized={jest.fn()} onOpenRecording={jest.fn()} />,
+      <DayBlocks day="2026-11-05" revisionNotes={[]} memorizationNotes={[]} readings={[]} notes={[]} onEditReading={jest.fn()} onDeleteReading={jest.fn()} onEditNote={jest.fn()} onDeleteNote={jest.fn()} onDeleteAllNotes={jest.fn()} revisedLog={null} onDeleteRevised={jest.fn()} onDeleteMemorized={jest.fn()} onOpenRecording={jest.fn()} />,
     );
     await new Promise((r) => setTimeout(r, 0));
     expect(screen.queryByTestId('activity-block-notes')).toBeNull();
@@ -88,7 +88,7 @@ describe('the blocks as mock d1 and d2 read them', () => {
     notes: [],
     onEditReading: jest.fn(),
     onDeleteReading: jest.fn(),
-    onOpenLog: jest.fn(),
+    onEditNote: jest.fn(), onDeleteNote: jest.fn(), onDeleteAllNotes: jest.fn(),
     revisedLog: null,
     onDeleteRevised: jest.fn(),
     onDeleteMemorized: jest.fn(),

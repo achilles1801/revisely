@@ -8,6 +8,7 @@ import { layoutV2, typeV2 } from '../../theme/v2';
 import { Mark } from '../v2/Mark';
 import { RowText, ThreadRow } from '../v2/ThreadRow';
 import { Tap } from '../v2/Tap';
+import { t } from '../../i18n';
 
 const KIND_ICON: Record<ActivityKind, keyof typeof Ionicons.glyphMap> = {
   revision: 'repeat-outline',
@@ -42,7 +43,7 @@ export function ActivityItemRow({
       meta={when}
       onPress={onPress}
       onMenu={onMenu}
-      menuLabel="Session options"
+      menuLabel={t('activity.row.sessionOptions')}
       separator={separator}
       accessibilityLabel={`${item.title}, ${when}. ${item.detail}`}
       testID={`item-${item.key}`}
@@ -61,7 +62,7 @@ export function ActivityItemRow({
  * items, or one quiet line when there are none.
  */
 export function RecentSection({
-  title = 'Recent',
+  title = t('activity.row.recent'),
   count,
   emptyText,
   onSeeAll,
@@ -84,8 +85,8 @@ export function RecentSection({
           {title}
         </Text>
         {count > 0 ? (
-          <Tap onPress={onSeeAll} hitSlop={10} accessibilityRole="button" accessibilityLabel={`See all ${title.toLowerCase()}`} testID="see-all">
-            <Text style={[typeV2.body, { color: palette.link }]}>See all</Text>
+          <Tap onPress={onSeeAll} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('activity.row.seeAllOf', { what: title.toLowerCase() })} testID="see-all">
+            <Text style={[typeV2.body, { color: palette.link }]}>{t('activity.row.seeAll')}</Text>
           </Tap>
         ) : null}
       </View>

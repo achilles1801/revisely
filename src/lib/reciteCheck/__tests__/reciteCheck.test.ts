@@ -212,3 +212,32 @@ describe('labels after a take (Not a mistake, and taking it back)', () => {
     expect(await sendLabel('dismiss', 't', 'id', 1, { token: async () => 'tok', fetch })).toBe(false);
   });
 });
+
+describe('waking the checker', () => {
+  it('wakes both services: recite-check and recite-check-pair (a GET of /health each, failures ignored)', async () => {
+    const { warmUpReciteCheck, RECITE_CHECK_URL, RECITE_CHECK_PAIR_URL } = require('../service');
+    const fetch = jest.fn(() => Promise.reject(new Error('offline')));
+    warmUpReciteCheck({ fetch });
+    await Promise.resolve();
+    expect(fetch.mock.calls.map((c: unknown[]) => c[0])).toEqual([`${RECITE_CHECK_URL}/health`, `${RECITE_CHECK_PAIR_URL}/health`]);
+  });
+
+  it('the pair service’s answer says whether takes may go there: 403 closes it for an hour, an answer opens it, no answer changes nothing', async () => {
+    const { warmUpReciteCheck } = require('../service');
+    const { pairAnswered, pairOpen } = require('../../reciteLive/pairService');
+    const answers = (pair: unknown) => jest.fn((url: string) => (url.includes('pair') ? pair : Promise.resolve({ ok: true, status: 200 })));
+    const settle = async () => {
+      for (let i = 0; i < 5; i++) await Promise.resolve();
+    };
+    pairAnswered();
+    warmUpReciteCheck({ fetch: answers(Promise.resolve({ ok: false, status: 403 })) });
+    await settle();
+    expect(pairOpen()).toBe(false);
+    warmUpReciteCheck({ fetch: answers(Promise.reject(new Error('offline'))) });
+    await settle();
+    expect(pairOpen()).toBe(false);
+    warmUpReciteCheck({ fetch: answers(Promise.resolve({ ok: true, status: 200 })) });
+    await settle();
+    expect(pairOpen()).toBe(true);
+  });
+});

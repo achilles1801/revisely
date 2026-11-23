@@ -433,7 +433,8 @@ describe('deleting every recording ("Delete all")', () => {
       deleteAll: deleteAll as any,
     });
     expect(ok).toBe(true);
-    expect(deleteAll).toHaveBeenCalledWith('u1', { withBackup: true, alsoIds: ['r1', 'r2'] });
+    // Recite takes' audio stays with the takes (RMEM-6).
+    expect(deleteAll).toHaveBeenCalledWith('u1', { withBackup: true, alsoIds: ['r1', 'r2'], keepTakes: true });
   });
 
   it('can’t reach the backup: deletes nothing', async () => {

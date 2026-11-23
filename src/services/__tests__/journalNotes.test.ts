@@ -62,16 +62,30 @@ describe('applyJournalNote', () => {
     expect(mockTx.set).toHaveBeenCalledTimes(1);
     const [ref, data] = mockTx.set.mock.calls[0];
     expect(ref.path).toBe(`users/u1/journal/${DAY}/entries/n1`);
-    expect(data).toEqual({ id: 'n1', uid: 'u1', day: DAY, at: note.at, kind: 'revision', text: '5p Maryam', minutes: 10 });
+    expect(data).toEqual({
+      id: 'n1',
+      uid: 'u1',
+      day: DAY,
+      at: note.at,
+      kind: 'revision',
+      text: '5p Maryam',
+      minutes: 10,
+    });
     expect(mockTx.delete).not.toHaveBeenCalled();
   });
 
-  it("a day still in its block moves the block into entries/legacy, clears the block, then writes the note", async () => {
+  it('a day still in its block moves the block into entries/legacy, clears the block, then writes the note', async () => {
     mockTx.get.mockResolvedValue(snap(block({ memorization: '1/2 p3', memorizationMinutes: 20 })));
     await applyJournalNote(DAY, { kind: 'put', note }, 'u1');
     const writes = mockTx.set.mock.calls;
     expect(writes[0][0].path).toBe(`users/u1/journal/${DAY}/entries/legacy`);
-    expect(writes[0][1]).toMatchObject({ id: 'legacy', kind: 'memorization', text: '1/2 p3', minutes: 20, at: 1_699_999_000_000 });
+    expect(writes[0][1]).toMatchObject({
+      id: 'legacy',
+      kind: 'memorization',
+      text: '1/2 p3',
+      minutes: 20,
+      at: 1_699_999_000_000,
+    });
     expect(writes[1][0].path).toBe(`users/u1/journal/${DAY}`);
     expect(writes[1][1]).toMatchObject({ memorization: '', memorizationMinutes: null, notes: '' });
     expect(writes[2][0].path).toBe(`users/u1/journal/${DAY}/entries/n1`);
@@ -81,7 +95,9 @@ describe('applyJournalNote', () => {
     mockTx.get.mockResolvedValue(snap(block({ notes: 'Tired' })));
     await applyJournalNote(DAY, { kind: 'delete', id: 'legacy' }, 'u1');
     expect(mockTx.set.mock.calls.map((c) => c[0].path)).toEqual([`users/u1/journal/${DAY}`]);
-    expect(mockTx.delete).toHaveBeenCalledWith(expect.objectContaining({ path: `users/u1/journal/${DAY}/entries/legacy` }));
+    expect(mockTx.delete).toHaveBeenCalledWith(
+      expect.objectContaining({ path: `users/u1/journal/${DAY}/entries/legacy` }),
+    );
   });
 
   it('a delete of a note on a migrated day only deletes that note', async () => {

@@ -7,6 +7,7 @@ import { layoutV2, typeV2 } from '../../theme/v2';
 import { PillButton } from '../v2/PillButton';
 import { openStore, storeName, useStoreDecision } from '../../lib/updates/storeUpdates';
 import { useBusyReasons } from '../../lib/updates/busy';
+import { t } from '../../i18n';
 
 /**
  * "Update required": over the whole app, with no way past it, while the
@@ -34,17 +35,16 @@ export function UpdateRequired({ installed, minimum }: { installed: string; mini
         <View style={styles.centre}>
           <Ionicons name="arrow-up-circle-outline" size={48} color={palette.text} />
           <Text style={[typeV2.title, styles.centred, { color: palette.text }]} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
-            Update required
+            {t('updates.required.title')}
           </Text>
           <Text style={[typeV2.body, styles.centred, { color: palette.secondary }]} maxFontSizeMultiplier={1.6}>
-            This version of Revisely is no longer supported. Get version {minimum} or later from {storeName()} to keep
-            revising. Your plan, progress and recordings stay as they are.
+            {t('updates.required.body', { minimum, store: storeName() })}
           </Text>
         </View>
         <View style={styles.foot}>
-          <PillButton title="Update" size="lg" onPress={() => void openStore()} testID="update-required-open" />
+          <PillButton title={t('updates.required.update')} size="lg" onPress={() => void openStore()} testID="update-required-open" />
           <Text style={[typeV2.meta, typeV2.numeral, styles.centred, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-            Installed: {installed}
+            {t('updates.required.installed', { version: installed })}
           </Text>
         </View>
       </SafeAreaView>

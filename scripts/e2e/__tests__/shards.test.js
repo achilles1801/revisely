@@ -1,5 +1,5 @@
-// Every flow runs in a full E2E run: each file in .maestro/flows is in exactly one of e2e.yml's
-// `full` jobs. Flows 12 and 13 were in none for a day (Nov 7–8 2026): develop's pushes, PRs into
+// Every flow runs in a full E2E run: each file in .maestro/flows is in exactly one of the `full` jobs
+// (scripts/e2e/jobs.json, which e2e.yml reads; until Nov 16 2026 they were written in e2e.yml). Flows 12 and 13 were in none for a day (Nov 7–8 2026): develop's pushes, PRs into
 // main and the nightly run never ran them, and nothing said so. It caught 15 the same way.
 //
 // And every full job ends inside its time limit. When 09 grew to five files, the iOS job holding it
@@ -12,6 +12,7 @@ const path = require('path');
 const root = path.join(__dirname, '..', '..', '..');
 const workflow = fs.readFileSync(path.join(root, '.github/workflows/e2e.yml'), 'utf8');
 const minutes = require('../flow-minutes.json');
+const jobsFile = require('../jobs.json');
 const flows = fs
   .readdirSync(path.join(root, '.maestro/flows'))
   .filter((f) => f.endsWith('.yaml'))
@@ -24,19 +25,9 @@ const flows = fs
 const OVERHEAD = { ios: 17, android: 9 };
 
 /** A shell glob of the kind e2e.yml uses (`*`, `?`, `[…]`) as a regular expression. */
-function globRegex(glob) {
-  const body = glob
-    .replace(/[.+^${}()|\\]/g, '\\$&')
-    .replace(/\*/g, '[^/]*')
-    .replace(/\?/g, '[^/]');
-  return new RegExp(`^${body}$`);
-}
+const { globRegex } = require('../../../.github/scripts/affected-flows');
 
-function fullJobs() {
-  const line = workflow.split('\n').find((l) => /^\s*full='/.test(l));
-  if (!line) throw new Error("e2e.yml has no full='…' line");
-  return JSON.parse(line.trim().slice("full='".length, -1));
-}
+const fullJobs = () => jobsFile.full;
 
 // A job's flows in the order it runs them: each glob in turn, its matches sorted, as the shell
 // expands them for run.sh. A flow two globs match comes twice, which the one-job check reports.
@@ -81,6 +72,21 @@ it('puts every flow in exactly one job of a full run', () => {
 
 it('names each job by the flows it runs, in the order it runs them', () => {
   for (const job of fullJobs()) expect(job.name).toBe(flowsOf(job).map(short).join(' '));
+});
+
+// e2e.yml reads each list from the file (and none is written in it any more), and the smoke jobs run the
+// smoke set that ci.yml and affected-flows.js name (02 04 05 06), each flow once.
+it('reads the job lists from scripts/e2e/jobs.json', () => {
+  for (const set of ['full', 'smoke_android', 'smoke_ios']) {
+    expect(workflow).toContain(`${set}=$(jq -c .${set} "$jobs")`);
+    expect(workflow).not.toMatch(new RegExp(`\\n\\s*${set}='\\[`));
+  }
+  expect(workflow).toContain('sparse-checkout: scripts/e2e/jobs.json');
+  const smoke = flows.filter((f) => /\/0[2456]-/.test(f));
+  for (const set of ['smoke_android', 'smoke_ios']) {
+    expect(jobsFile[set].flatMap(flowsOf).sort()).toEqual(smoke);
+    for (const job of jobsFile[set]) expect(job.name).toBe(`smoke: ${flowsOf(job).map(short).join(' ')}`);
+  }
 });
 
 it('knows how long every flow takes on each platform (scripts/e2e/flow-minutes.json)', () => {
@@ -130,7 +136,7 @@ it('reads the time limits from e2e.yml', () => {
   }
 });
 
-// A change to shared test code runs the flows it touches, each twice (ci.yml `plan`, `infra`). The
+// A change to shared test code runs the flows it touches, once with a retry (ci.yml `plan`, `infra`). The
 // jobs come from e2e.yml's `infra_jq`, run here with jq as the workflow runs it. They used to be two
 // jobs whatever the flows: #574 touched 21 flows through signup.yaml, and its iOS job of 11 needed
 // about 200 of its 180 minutes (run 43706009559).
@@ -155,7 +161,7 @@ describe('the jobs for a change to shared test code', () => {
     ).map((job) => job.flows.split(' '));
 
   // Each touched flow once, each job a full job's flows in its order with only the touched ones
-  // kept, and each job inside its limit with every flow run twice.
+  // kept, and each job inside its limit with its longest flow run a second time (run.sh's retry).
   function check(touched) {
     const jobs = infraJobs(touched);
     expect(jobs.flat().sort()).toEqual([...touched].sort());
@@ -165,24 +171,51 @@ describe('the jobs for a change to shared test code', () => {
     }
     for (const platform of ['ios', 'android']) {
       const over = jobs
-        .map((job) => ({ job, total: OVERHEAD[platform] + 2 * job.reduce((a, f) => a + minutes[platform][base(f)], 0) }))
-        .filter(({ total }) => total > limit(platform, 2))
-        .map(({ job, total }) => `${job.map(short).join(' ')}: ${total} of ${limit(platform, 2)} minutes`);
+        .map((job) => {
+          const each = job.map((f) => minutes[platform][base(f)]);
+          return { job, total: OVERHEAD[platform] + each.reduce((a, b) => a + b, 0) + Math.max(...each) };
+        })
+        .filter(({ total }) => total > limit(platform))
+        .map(({ job, total }) => `${job.map(short).join(' ')}: ${total} of ${limit(platform)} minutes`);
       expect({ platform, over }).toEqual({ platform, over: [] });
     }
     return jobs;
   }
 
-  it('runs three flows or fewer in one job', () => {
-    const three = flows.slice(0, 3);
-    expect(infraJobs(three)).toEqual([three]);
+  it("runs five flows or fewer in one job, in the full run's order with 10 first, inside its limit even for the five slowest", () => {
+    const five = flows.slice(0, 5);
+    const [job] = infraJobs(five);
+    expect(infraJobs(five)).toHaveLength(1);
+    expect([...job].sort()).toEqual([...five].sort());
+    const order = fullJobs().flatMap(flowsOf);
+    expect(job).toEqual([...five].sort((a, b) => order.indexOf(a) - order.indexOf(b)));
     expect(infraJobs(flows.slice(5, 6))).toEqual([flows.slice(5, 6)]);
+    // 10 deletes its account: after the 09 seeds it took past the app's 30 s (#217), so it goes first.
+    const seeds = flows.filter((f) => /\/(09-activity|09-insights|10-)/.test(f));
+    expect(seeds.length).toBeLessThanOrEqual(5);
+    expect(short(infraJobs([...seeds].reverse())[0][0])).toBe('10');
+    for (const platform of ['ios', 'android']) {
+      const each = [...flows].map((f) => minutes[platform][base(f)]).sort((a, b) => b - a).slice(0, 5);
+      const total = OVERHEAD[platform] + each.reduce((a, b) => a + b, 0) + each[0];
+      expect({ platform, total, fits: total <= limit(platform) }).toEqual({ platform, total, fits: true });
+    }
+  });
+
+  // A change to the workflows runs the smoke set on iOS (affected-flows.js): one macOS job, not three.
+  // With a flow the same PR edits (18), still one.
+  it('runs the smoke set in one job, and the smoke set with one more flow', () => {
+    const smoke = affected(['.github/workflows/e2e.yml']).ios;
+    expect(smoke.map(short)).toEqual(['02', '04', '05', '06']);
+    expect(infraJobs(smoke)).toHaveLength(1);
+    const withEighteen = affected(['.github/workflows/e2e.yml', '.maestro/flows/18-recite-live.yaml']).ios;
+    expect(withEighteen.map(short)).toEqual(['02', '04', '05', '06', '18']);
+    expect(infraJobs(withEighteen)).toHaveLength(1);
   });
 
   it('runs more in the full jobs, keeping only the flows touched, each job inside its limit', () => {
     expect(check(flows)).toEqual(fullJobs().map(flowsOf));
     check(flows.filter((_, i) => i % 3 !== 0));
-    check(flows.slice(0, 4));
+    check(flows.slice(0, 6));
   });
 
   it("fits the flows the sign-up's subflows touch (#574)", () => {

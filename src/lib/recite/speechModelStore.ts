@@ -14,6 +14,7 @@ import {
   SPEECH_MODEL,
 } from './speechModel';
 import { logger } from '../logger';
+import { t } from '../../i18n';
 
 export type SpeechModelState =
   | { status: 'missing'; error: string | null }
@@ -75,8 +76,8 @@ export function startModelDownload(): Promise<boolean> {
         error: cancelled
           ? null
           : err instanceof NotEnoughSpaceError
-            ? `Free up ${formatModelSize()} or more on this iPhone, then try again.`
-            : 'The download stopped. Check your connection and try again.',
+            ? t('recite.model.noSpace', { size: formatModelSize() })
+            : t('recite.model.stopped'),
       });
       return false;
     },

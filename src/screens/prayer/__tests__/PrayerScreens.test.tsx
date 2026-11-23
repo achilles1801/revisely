@@ -35,6 +35,13 @@ jest.mock('expo-location', () => ({
   getCurrentPositionAsync: jest.fn(async () => null),
 }));
 
+jest.mock('../../../components/prayer/useChosenAthanVoice', () => ({
+  useChosenAthanVoice: () => ({ id: 'makkah-regular', name: 'Makkah – Masjid al-Haram' }),
+}));
+// The athan is Revisely Dev's, on iPhone (lib/athan `athanEnabled`).
+const mockAthan = { enabled: true };
+jest.mock('../../../lib/athan', () => ({ athanEnabled: () => mockAthan.enabled }));
+
 import PrayerNotificationsScreen, { alertSummary } from '../PrayerNotificationsScreen';
 import PrayerCalculationScreen, { adjustLabel } from '../PrayerCalculationScreen';
 import { DEFAULT_PRAYER_PREFS, getPrayerPrefs, resetPrayerPrefsForTests } from '../../../lib/prayer/prefs';
@@ -57,6 +64,11 @@ describe('Prayer notifications', () => {
   it('each prayer: off, or what it does (sound · reminder); the summary', () => {
     expect(alertSummary({ on: true, before: 10, sound: 'standard' })).toBe('Standard tone · 10 min before');
     expect(alertSummary({ on: true, before: 0, sound: 'silent' })).toBe('Silent');
+    expect(alertSummary({ on: true, before: 5, sound: 'athan' })).toBe('Athan · 5 min before');
+    // Where the athan isn't offered, a prayer saved with it reads (and plays) as the standard tone.
+    mockAthan.enabled = false;
+    expect(alertSummary({ on: true, before: 5, sound: 'athan' })).toBe('Standard tone · 5 min before');
+    mockAthan.enabled = true;
     resetPrayerPrefsForTests({
       ...DEFAULT_PRAYER_PREFS,
       place: LONDON,
@@ -129,6 +141,39 @@ describe('Prayer notifications', () => {
     });
     expect(getPrayerPrefs().alerts.maghrib.sound).toBe('silent');
     expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('Prayer notifications: the athan voice', () => {
+  const asrOn = () =>
+    resetPrayerPrefsForTests({
+      ...DEFAULT_PRAYER_PREFS,
+      alerts: { ...DEFAULT_PRAYER_PREFS.alerts, asr: { on: true, before: 0, sound: 'standard', voice: null } },
+    });
+
+  it('a prayer’s sound can be the athan; its voice row opens the picker for that prayer', () => {
+    mockAthan.enabled = true;
+    asrOn();
+    render(<PrayerNotificationsScreen />);
+    fireEvent.press(screen.getByTestId('prayer-alert-asr-detail'));
+    expect(screen.queryByTestId('prayer-athan-voice')).toBeNull();
+    fireEvent.press(screen.getByTestId('prayer-sound-athan'));
+    expect(getPrayerPrefs().alerts.asr.sound).toBe('athan');
+    // The athan is listened to in its picker: choosing it posts no tone preview.
+    const row = screen.getByTestId('prayer-athan-voice');
+    expect(within(row).getByText('Makkah – Masjid al-Haram')).toBeTruthy();
+    fireEvent.press(row);
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('AthanVoice', { prayer: 'asr' });
+  });
+
+  it('the store app and Android: no athan among the sounds', () => {
+    mockAthan.enabled = false;
+    asrOn();
+    render(<PrayerNotificationsScreen />);
+    fireEvent.press(screen.getByTestId('prayer-alert-asr-detail'));
+    expect(screen.getByTestId('prayer-sound-standard')).toBeTruthy();
+    expect(screen.queryByTestId('prayer-sound-athan')).toBeNull();
+    mockAthan.enabled = true;
   });
 });
 

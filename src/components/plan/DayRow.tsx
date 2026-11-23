@@ -5,6 +5,9 @@ import { Tap } from '../v2/Tap';
 import { useTheme } from '../../context/ThemeContext';
 import { summarizeDay } from '../../lib/planDisplay';
 import { layoutV2, typeV2 } from '../../theme/v2';
+import { formatDate } from '../../i18n';
+import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 export function addDays(date: Date, days: number): Date {
   const next = new Date(date);
@@ -14,13 +17,13 @@ export function addDays(date: Date, days: number): Date {
 
 /** "Today", "Tomorrow", "Thursday, 3 Oct" */
 export function dayTitle(index: number, today: Date): string {
-  if (index === 0) return 'Today';
-  if (index === 1) return 'Tomorrow';
-  return addDays(today, index).toLocaleDateString(undefined, {
+  if (index === 0) return t('common.today');
+  if (index === 1) return t('common.tomorrow');
+  return formatDate(addDays(today, index), {
     weekday: 'long',
     day: 'numeric',
     month: 'short',
-  });
+  }, 'device');
 }
 
 /**
@@ -31,7 +34,7 @@ export function DateBadge({ index, today }: { index: number; today: Date }) {
   const { palette } = useTheme();
   const date = addDays(today, index);
   const isToday = index === 0;
-  const weekday = date.toLocaleDateString(undefined, { weekday: 'short' });
+  const weekday = formatDate(date, { weekday: 'short' }, 'device');
   return (
     <View style={styles.badge} testID={`date-badge-${index}`}>
       <Text
@@ -40,7 +43,7 @@ export function DateBadge({ index, today }: { index: number; today: Date }) {
         adjustsFontSizeToFit
         maxFontSizeMultiplier={1.3}
       >
-        {isToday ? 'Today' : weekday}
+        {isToday ? t('common.today') : weekday}
       </Text>
       {/* A 40pt column: the date grows only so far, like other chrome text. */}
       <Text
@@ -97,7 +100,7 @@ export function DayRow({
       </View>
       {trailing}
       {showChevron && (onPress || onLongPress) ? (
-        <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+        <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
       ) : null}
     </View>
   );

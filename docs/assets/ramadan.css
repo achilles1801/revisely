@@ -1,0 +1,356 @@
+/*
+ * Revisely dressed for Ramadan (worker/ramadan.ts adds the class, this file and the markup where RAMADAN_THEME is "1":
+ * dev.revisely.app for now). Every rule starts at body.ramadan, so this file does nothing to a page without it.
+ *
+ * The palette: a warm ivory ground by day and a deep night blue by night, a night-blue greeting strip in both, and
+ * gold for the lanterns, the crescent and the stars. The lights' bulbs are gold and amber with the app's three
+ * accents (indigo, rose for crimson, jade), as the app's Ramadan string lights carry its accent.
+ * All art is original SVG; no images to download, no fonts (the Arabic in the greeting strip is drawn as a path from
+ * the site's Amiri, so English pages don't load the font for it).
+ *
+ * Motion (the lights twinkling, the lanterns swaying, the stars) is all inside the prefers-reduced-motion:
+ * no-preference block at the end, so it never runs for someone who asked for less.
+ */
+
+body.ramadan {
+  --rm-bh: 44px;               /* the greeting strip */
+  --rm-lh: 18px;               /* the string of lights under the header's links */
+  --rm-night: #0c1132;
+  --rm-night-2: #1c1852;
+  --rm-gold: #f4c76a;
+  --rm-gold-hi: #ffdc8f;
+  --rm-cream: #efe3c7;
+  --rm-wire: #776c5c;
+
+  /* A warm ivory ground (the site's white otherwise). */
+  --bg: #fffaf1;
+  --fill: #f7f0e3;
+  --separator: #ebe1cf;
+}
+@media (prefers-color-scheme: dark) {
+  body.ramadan {
+    --rm-wire: #8c8170;
+    /* The night sky (black otherwise). */
+    --bg: #050817;
+    --fill: #10132a;
+    --separator: #1b2040;
+  }
+}
+
+/* ---------- The sprite and the sky ---------- */
+
+body.ramadan .rm-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* Warm light from the top corners, as from two lanterns; by night, stars too. Behind everything. */
+body.ramadan .rm-sky {
+  position: absolute; z-index: -1; pointer-events: none;
+  left: 0; right: 0; top: 0; height: 640px;
+  background:
+    radial-gradient(38% 420px at 0 0, rgb(255 186 84 / 0.16), rgb(255 186 84 / 0) 100%),
+    radial-gradient(38% 420px at 100% 0, rgb(255 186 84 / 0.16), rgb(255 186 84 / 0) 100%);
+}
+@media (prefers-color-scheme: dark) {
+  body.ramadan .rm-sky {
+    background:
+      radial-gradient(38% 420px at 0 0, rgb(255 176 70 / 0.12), rgb(255 176 70 / 0) 100%),
+      radial-gradient(38% 420px at 100% 0, rgb(255 176 70 / 0.12), rgb(255 176 70 / 0) 100%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='180'%3E%3Ccircle cx='0.01' cy='165.74' r='0.67' fill='%23fff' fill-opacity='0.47'/%3E%3Ccircle cx='189.64' cy='95.89' r='0.7' fill='%23fff' fill-opacity='0.76'/%3E%3Ccircle cx='196.32' cy='97.71' r='0.96' fill='%23fff' fill-opacity='0.7'/%3E%3Ccircle cx='212.36' cy='43.56' r='0.73' fill='%23fff' fill-opacity='0.74'/%3E%3Ccircle cx='181.49' cy='9.7' r='0.96' fill='%23fff' fill-opacity='0.61'/%3E%3Ccircle cx='239.82' cy='145.33' r='0.54' fill='%23fff' fill-opacity='0.63'/%3E%3Ccircle cx='240.02' cy='123.93' r='0.93' fill='%23fff' fill-opacity='0.67'/%3E%3Ccircle cx='237.12' cy='163.5' r='0.73' fill='%23fff' fill-opacity='0.53'/%3E%3Ccircle cx='217.66' cy='59.81' r='0.56' fill='%23fff' fill-opacity='0.51'/%3E%3C/svg%3E") 0 0 / 260px 180px;
+    /* Stars only in the side margins, never behind words (a star beside Arabic could read as one of its dots). */
+    -webkit-mask-image:
+      linear-gradient(#000 0, #000 45%, transparent 100%),
+      linear-gradient(90deg, #000 calc(50% - 640px), transparent calc(50% - 560px), transparent calc(50% + 560px), #000 calc(50% + 640px));
+    -webkit-mask-composite: source-in;
+    mask-image:
+      linear-gradient(#000 0, #000 45%, transparent 100%),
+      linear-gradient(90deg, #000 calc(50% - 640px), transparent calc(50% - 560px), transparent calc(50% + 560px), #000 calc(50% + 640px));
+    mask-composite: intersect;
+  }
+  body.ramadan .rm-sky::before {
+    content: ""; position: absolute; inset: 0;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='330' height='210'%3E%3Ccircle cx='141.4' cy='61.92' r='1.15' fill='%23ffe2a0' fill-opacity='0.66'/%3E%3Ccircle cx='240.66' cy='184.35' r='0.49' fill='%23fff' fill-opacity='0.5'/%3E%3Ccircle cx='185.01' cy='106.85' r='0.77' fill='%23fff' fill-opacity='0.46'/%3E%3Ccircle cx='299.96' cy='11.52' r='0.72' fill='%23ffe2a0' fill-opacity='0.54'/%3E%3Ccircle cx='219.26' cy='194.11' r='0.84' fill='%23fff' fill-opacity='0.44'/%3E%3Ccircle cx='133.86' cy='59.55' r='0.72' fill='%23fff' fill-opacity='0.58'/%3E%3Ccircle cx='109.75' cy='111.65' r='0.91' fill='%23ffe2a0' fill-opacity='0.48'/%3E%3C/svg%3E") 40px 24px / 330px 210px;
+  }
+}
+
+/* ---------- The greeting strip ---------- */
+
+body.ramadan .rm-banner {
+  position: relative;
+  display: flex; justify-content: center; align-items: stretch; gap: 14px;
+  min-height: var(--rm-bh);
+  padding: 0 var(--gutter);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Cg fill='none' stroke='%23f4c76a' stroke-opacity='.16' stroke-width='1'%3E%3Cpath d='M9 9h18v18H9z'/%3E%3Cpath d='M18 5.3L30.7 18 18 30.7 5.3 18z'/%3E%3Cpath d='M9 9L0 0M27 9l9-9M27 27l9 9M9 27l-9 9'/%3E%3C/g%3E%3C/svg%3E") 50% 50% / 36px 36px,
+    linear-gradient(90deg, var(--rm-night), var(--rm-night-2) 50%, var(--rm-night));
+  box-shadow: inset 0 -1px rgb(244 199 106 / 0.32);
+  color: var(--rm-gold);
+  overflow: hidden;
+}
+body.ramadan .rm-greet {
+  display: flex; align-items: center; justify-content: center; gap: 10px; min-width: 0;
+  margin: 0; padding: 6px 0;
+  font-size: 15px; line-height: 1.3; text-align: center;
+}
+body.ramadan .rm-greet strong { color: var(--rm-gold-hi); font-weight: 700; letter-spacing: 0.01em; white-space: nowrap; }
+body.ramadan .rm-greet .rm-moon { width: 17px; height: 17px; flex: none; filter: drop-shadow(0 0 5px rgb(255 200 90 / 0.6)); }
+body.ramadan .rm-greet-ar { flex: none; display: block; width: 74px; height: 25px; margin-top: 2px; color: var(--rm-gold); }
+body.ramadan .rm-greet-ar svg { width: 100%; height: 100%; fill: currentColor; }
+body.ramadan .rm-greet-line { color: var(--rm-cream); font-size: 14px; opacity: 0.9; }
+@media (max-width: 759px) { body.ramadan .rm-greet-line { display: none; } }
+/* In Arabic the greeting itself is Arabic: the drawn one goes. */
+html[lang="ar"] body.ramadan .rm-greet-ar { display: none; }
+html[lang="ar"] body.ramadan .rm-greet strong { font-size: 18px; letter-spacing: 0; }
+html[lang="ar"] body.ramadan .rm-greet-line { font-size: 16px; }
+
+/* A small lantern at each end of the greeting, hanging from the top of the page. */
+body.ramadan .rm-banner-hang { position: relative; flex: none; width: 17px; }
+body.ramadan .rm-banner-hang::before {
+  content: ""; position: absolute; left: 50%; top: 0; width: 1px; height: 5px; background: rgb(244 199 106 / 0.6);
+}
+body.ramadan .rm-banner-hang .rm-lantern { position: absolute; top: 4px; left: 0; width: 17px; height: auto; transform-origin: 50% 0; }
+
+/* ---------- The lanterns' glass ---------- */
+
+body.ramadan .rm-gold { --rm-glass: #ffc65c; --rm-glass-side: #f39a3b; }
+body.ramadan .rm-rose { --rm-glass: #ff8a8a; --rm-glass-side: #e2546c; }
+body.ramadan .rm-jade { --rm-glass: #6fe3c4; --rm-glass-side: #27a98f; }
+body.ramadan .rm-lantern, body.ramadan .rm-orn { display: block; overflow: visible; }
+
+/* ---------- The lights ---------- */
+
+/* Under the header's links, inside the header's own box (so nothing hangs over the page as it scrolls). */
+body.ramadan .site-header { padding-bottom: var(--rm-lh); }
+body.ramadan .rm-lights {
+  position: absolute; left: 0; right: 0; height: var(--rm-lh);
+  pointer-events: none; overflow: hidden;
+}
+body.ramadan .rm-lights.rm-head { bottom: 0; }
+body.ramadan .rm-lights::before, body.ramadan .rm-lights i {
+  position: absolute; inset: 0;
+  background-repeat: repeat-x; background-position: 50% 0; background-size: 150px 18px;
+}
+body.ramadan .rm-lights::before {
+  content: "";
+  background-color: var(--rm-wire);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='18'%3E%3Cpath d='M0 1.5Q75 13.5 150 1.5' fill='none' stroke='%23000' stroke-width='1.1'/%3E%3C/svg%3E") 50% 0 / 150px 18px repeat-x;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='18'%3E%3Cpath d='M0 1.5Q75 13.5 150 1.5' fill='none' stroke='%23000' stroke-width='1.1'/%3E%3C/svg%3E") 50% 0 / 150px 18px repeat-x;
+}
+body.ramadan .rm-lights i:nth-child(1) { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='18'%3E%3Cdefs%3E%3CradialGradient id='h'%3E%3Cstop offset='0' stop-color='%23ffc94a' stop-opacity='.75'/%3E%3Cstop offset='1' stop-color='%23ffc94a' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='15' cy='7.86' r='5.4' fill='url(%23h)'/%3E%3Crect x='13.7' y='3.36' width='2.6' height='2.1' rx='.6' fill='%235b5248'/%3E%3Cellipse cx='15' cy='7.86' rx='2.4' ry='3.1' fill='%23ffc94a'/%3E%3Cellipse cx='14.3' cy='6.86' rx='.7' ry='1' fill='%23fff' fill-opacity='.75'/%3E%3C/svg%3E"); }
+body.ramadan .rm-lights i:nth-child(2) { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='18'%3E%3Cdefs%3E%3CradialGradient id='h'%3E%3Cstop offset='0' stop-color='%23ff6f87' stop-opacity='.75'/%3E%3Cstop offset='1' stop-color='%23ff6f87' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='45' cy='10.74' r='5.4' fill='url(%23h)'/%3E%3Crect x='43.7' y='6.24' width='2.6' height='2.1' rx='.6' fill='%235b5248'/%3E%3Cellipse cx='45' cy='10.74' rx='2.4' ry='3.1' fill='%23ff6f87'/%3E%3Cellipse cx='44.3' cy='9.74' rx='.7' ry='1' fill='%23fff' fill-opacity='.75'/%3E%3C/svg%3E"); }
+body.ramadan .rm-lights i:nth-child(3) { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='18'%3E%3Cdefs%3E%3CradialGradient id='h'%3E%3Cstop offset='0' stop-color='%239789da' stop-opacity='.75'/%3E%3Cstop offset='1' stop-color='%239789da' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='75' cy='11.7' r='5.4' fill='url(%23h)'/%3E%3Crect x='73.7' y='7.2' width='2.6' height='2.1' rx='.6' fill='%235b5248'/%3E%3Cellipse cx='75' cy='11.7' rx='2.4' ry='3.1' fill='%239789da'/%3E%3Cellipse cx='74.3' cy='10.7' rx='.7' ry='1' fill='%23fff' fill-opacity='.75'/%3E%3C/svg%3E"); }
+body.ramadan .rm-lights i:nth-child(4) { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='18'%3E%3Cdefs%3E%3CradialGradient id='h'%3E%3Cstop offset='0' stop-color='%234ed3b1' stop-opacity='.75'/%3E%3Cstop offset='1' stop-color='%234ed3b1' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='105' cy='10.74' r='5.4' fill='url(%23h)'/%3E%3Crect x='103.7' y='6.24' width='2.6' height='2.1' rx='.6' fill='%235b5248'/%3E%3Cellipse cx='105' cy='10.74' rx='2.4' ry='3.1' fill='%234ed3b1'/%3E%3Cellipse cx='104.3' cy='9.74' rx='.7' ry='1' fill='%23fff' fill-opacity='.75'/%3E%3C/svg%3E"); }
+body.ramadan .rm-lights i:nth-child(5) { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='18'%3E%3Cdefs%3E%3CradialGradient id='h'%3E%3Cstop offset='0' stop-color='%23ffa24a' stop-opacity='.75'/%3E%3Cstop offset='1' stop-color='%23ffa24a' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='135' cy='7.86' r='5.4' fill='url(%23h)'/%3E%3Crect x='133.7' y='3.36' width='2.6' height='2.1' rx='.6' fill='%235b5248'/%3E%3Cellipse cx='135' cy='7.86' rx='2.4' ry='3.1' fill='%23ffa24a'/%3E%3Cellipse cx='134.3' cy='6.86' rx='.7' ry='1' fill='%23fff' fill-opacity='.75'/%3E%3C/svg%3E"); }
+
+/* Along the top of the footer, then a line of greeting. */
+body.ramadan .site-footer { position: relative; padding-top: calc(28px + var(--rm-lh)); border-top-color: var(--rm-wire); }
+body.ramadan .rm-lights.rm-foot { top: 0; }
+body.ramadan .rm-foot-greet { margin-bottom: 18px; }
+body.ramadan .rm-foot-greet p {
+  display: flex; align-items: center; gap: 8px; margin: 0;
+  color: var(--text); font-size: 15px; font-weight: 600;
+}
+body.ramadan .rm-foot-greet .rm-moon { width: 16px; height: 16px; flex: none; fill: #d99a32; }
+
+/* ---------- What hangs into the side margins (wide screens only, never over the content) ---------- */
+
+body.ramadan .rm-hangers { display: none; position: relative; z-index: 4; height: 0; pointer-events: none; }
+body.ramadan .rm-side { position: absolute; top: 0; width: 0; height: 0; }
+body.ramadan .rm-side-start { inset-inline-start: 0; }
+body.ramadan .rm-side-end { inset-inline-end: 0; }
+body.ramadan .rm-hang {
+  --w: 17px;
+  position: absolute; top: 0; width: var(--w);
+  display: flex; flex-direction: column; align-items: center;
+  padding-top: var(--len, 24px);
+  background: linear-gradient(var(--rm-wire), var(--rm-wire)) no-repeat 50% 0 / 1px var(--len, 24px);
+  transform-origin: 50% 0;
+}
+body.ramadan .rm-hang.rm-hl { --w: 38px; }
+body.ramadan .rm-hang svg { width: 100%; height: auto; }
+body.ramadan .rm-hang .rm-lantern { margin-top: -1px; }
+body.ramadan .rm-hang .rm-orn { filter: drop-shadow(0 1px 1.5px rgb(120 70 10 / 0.3)); }
+/* The lantern's light, breathing behind it. */
+body.ramadan .rm-hl::after {
+  content: ""; position: absolute; z-index: -1; left: 50%; top: calc(var(--len, 24px) + var(--w) * 1.05);
+  width: calc(var(--w) * 3.2); aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(255 190 90 / 0.34), rgb(255 190 90 / 0));
+}
+@media (prefers-color-scheme: dark) {
+  body.ramadan .rm-hang .rm-orn { filter: drop-shadow(0 0 4px rgb(255 196 92 / 0.45)); }
+  body.ramadan .rm-hl::after { background: radial-gradient(closest-side, rgb(255 180 70 / 0.3), rgb(255 180 70 / 0)); }
+}
+
+/* --x is where a thread hangs, from the edge (logical, so the sides mirror in Arabic). At 1240px the home's content
+   starts 112px in, so everything stays within 100px of the edge there. */
+body.ramadan .rm-side-start .rm-hang { inset-inline-start: calc(var(--x) - var(--w) / 2); }
+body.ramadan .rm-side-end .rm-hang { inset-inline-end: calc(var(--x) - var(--w) / 2); }
+body.ramadan .rm-h-a { --x: 42px; --len: 18px; }
+body.ramadan .rm-h-b { --x: 88px; --len: 54px; }
+body.ramadan .rm-h-c, body.ramadan .rm-h-d { display: none; }
+@media (min-width: 1240px) { body.ramadan .rm-hangers { display: block; } }
+@media (min-width: 1440px) {
+  body.ramadan .rm-h-a { --x: 56px; --len: 22px; }
+  body.ramadan .rm-h-a.rm-hl { --w: 46px; }
+  body.ramadan .rm-h-b { --x: 112px; --len: 70px; }
+  body.ramadan .rm-h-c { display: flex; --x: 148px; --len: 36px; }
+  body.ramadan .rm-h-d { display: flex; --x: 186px; --len: 96px; }
+  body.ramadan .rm-h-d.rm-hl { --w: 30px; }
+}
+
+/* ---------- The pages ---------- */
+
+/* The home's slideshow fills the screen under the header: the strip and the lights come off its height. */
+body.ramadan.home .show {
+  height: calc(100vh - 60px - var(--rm-lh) - var(--rm-bh));
+  height: calc(100svh - 60px - var(--rm-lh) - var(--rm-bh));
+}
+/* The first slide's crescent and stars, above its title (when there's room beside the phone). */
+@media (min-width: 861px) {
+  body.ramadan.home .s-pitch .copy::before {
+    content: ""; display: block; width: 64px; height: 40px; margin-bottom: 18px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='40' viewBox='0 0 64 40'%3E%3Cg fill='%23e3a63f'%3E%3Cpath transform='translate(2 2) scale(1.55)' d='M11 3.06A9 9 0 1 0 20.54 14.84 7.6 7.6 0 0 1 11 3.06z'/%3E%3Cpath transform='translate(44 9) scale(1.1)' d='M0-4L1-1 4 0 1 1 0 4-1 1-4 0-1-1z'/%3E%3Cpath transform='translate(56 20) scale(0.8)' d='M0-4L1-1 4 0 1 1 0 4-1 1-4 0-1-1z'/%3E%3Cpath transform='translate(42 28) scale(0.65)' d='M0-4L1-1 4 0 1 1 0 4-1 1-4 0-1-1z'/%3E%3C/g%3E%3C/svg%3E") no-repeat 0 0 / 64px 40px;
+  }
+  html[dir="rtl"] body.ramadan.home .s-pitch .copy::before { transform: scaleX(-1); }
+}
+
+/* The sticky header is taller by the lights: anchors land below it. */
+html:has(body.ramadan:not(.home)) { scroll-padding-top: calc(72px + 18px); }
+/* The donate page's glow starts at the top of the header, now taller. */
+body.ramadan .give-hero::before { top: calc(-61px - var(--rm-lh)); }
+
+/* A small ornament over each document's title. */
+body.ramadan .doc h1::before, body.ramadan .page-hero h1::before {
+  content: ""; display: block; width: 140px; height: 16px; margin-bottom: 14px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='16' viewBox='0 0 140 16'%3E%3Cg fill='%23d79f3d'%3E%3Cpath d='M0 7.6h56v.8H0zM84 7.6h56v.8H84z' fill-opacity='.6'/%3E%3Ccircle cx='52' cy='8' r='1.3'/%3E%3Ccircle cx='88' cy='8' r='1.3'/%3E%3Cpath transform='translate(58 -4) scale(1)' d='M12 2.1l2.9 2.9H19v4.1l2.9 2.9-2.9 2.9V19h-4.1L12 21.9 9.1 19H5v-4.1L2.1 12 5 9.1V5h4.1z' /%3E%3C/g%3E%3C/svg%3E") no-repeat 0 50% / 140px 16px;
+}
+html[dir="rtl"] body.ramadan .page-hero h1::before { background-position: 100% 50%; margin-inline-start: 0; }
+
+/* ---------- The phases (ramadan.js sets data-rm-phase on the visitor's clock) ---------- */
+
+/* Only the current phase's words show: before Ramadan (counting down), during it, at Eid. */
+body.ramadan[data-rm-phase="before"] [data-rm-when]:not([data-rm-when~="before"]),
+body.ramadan[data-rm-phase="during"] [data-rm-when]:not([data-rm-when~="during"]),
+body.ramadan[data-rm-phase="eid"] [data-rm-when]:not([data-rm-when~="eid"]) { display: none !important; }
+/* The live numbers wait for ramadan.js, so they never jump from the worker's guess to the visitor's clock. */
+body.ramadan:not(.rm-live) .rm-clock, body.ramadan:not(.rm-live) .rm-unit b { visibility: hidden; }
+
+/* The strip's clock before Ramadan, and its link (wider screens). */
+body.ramadan .rm-clock {
+  flex: none; direction: ltr; unicode-bidi: isolate;
+  min-width: 6.4em; padding: 1px 9px; border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgb(244 199 106 / 0.45);
+  color: var(--rm-gold-hi); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: center;
+}
+body.ramadan .rm-greet-line { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.ramadan .rm-greet-cta {
+  flex: none; padding: 3px 12px; border-radius: 999px;
+  background: var(--rm-gold); color: #1a1438; font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap;
+}
+body.ramadan .rm-greet-cta:hover { background: var(--rm-gold-hi); color: #1a1438; }
+@media (max-width: 899px) { body.ramadan .rm-greet-cta { display: none; } }
+@media (max-width: 479px) {
+  body.ramadan .rm-banner { gap: 8px; }
+  body.ramadan .rm-greet { gap: 8px; }
+  body.ramadan[data-rm-phase="before"] .rm-greet .rm-moon { display: none; }
+  body.ramadan .rm-clock { min-width: 0; padding: 1px 7px; font-size: 13px; }
+  html[lang="ar"] body.ramadan .rm-greet strong { font-size: 16px; }
+}
+body.ramadan .rm-greet-eid { width: 64px; height: 21px; }
+
+/* ---------- The home's card: the countdown, then Ramadan's and Eid's words ---------- */
+
+body.ramadan .rm-count { padding: 64px 0 40px; }
+body.ramadan .rm-count-card {
+  position: relative; overflow: hidden; isolation: isolate;
+  max-width: 880px; margin: 0 auto; padding: 48px 24px 44px; border-radius: 28px;
+  text-align: center; color: var(--rm-cream);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Cg fill='none' stroke='%23f4c76a' stroke-opacity='.16' stroke-width='1'%3E%3Cpath d='M9 9h18v18H9z'/%3E%3Cpath d='M18 5.3L30.7 18 18 30.7 5.3 18z'/%3E%3Cpath d='M9 9L0 0M27 9l9-9M27 27l9 9M9 27l-9 9'/%3E%3C/g%3E%3C/svg%3E") 50% 0 / 36px 36px,
+    radial-gradient(60% 70% at 50% 0, rgb(255 190 90 / 0.2), rgb(255 190 90 / 0)),
+    linear-gradient(160deg, var(--rm-night-2), var(--rm-night) 72%);
+  box-shadow: inset 0 0 0 1px rgb(244 199 106 / 0.24), 0 30px 60px -30px rgb(12 17 50 / 0.55);
+}
+body.ramadan .rm-kicker {
+  display: inline-flex; align-items: center; gap: 8px; margin: 0 0 10px;
+  color: var(--rm-gold); font-size: 14px; font-weight: 600; letter-spacing: 0.02em;
+}
+body.ramadan .rm-kicker .rm-moon { width: 16px; height: 16px; filter: drop-shadow(0 0 5px rgb(255 200 90 / 0.6)); }
+body.ramadan .rm-count-title {
+  color: var(--rm-gold-hi); font-size: clamp(30px, 4.4vw, 48px); line-height: 1.08; letter-spacing: -0.03em; text-wrap: balance;
+}
+body.ramadan .rm-timer { display: flex; justify-content: center; gap: 10px; margin: 28px 0 0; }
+body.ramadan .rm-unit {
+  min-width: 82px; padding: 14px 8px 11px; border-radius: 18px;
+  background: rgb(255 255 255 / 0.06); box-shadow: inset 0 0 0 1px rgb(244 199 106 / 0.28);
+}
+body.ramadan .rm-unit b {
+  display: block; color: #fff3d6; font-size: clamp(30px, 5vw, 46px); font-weight: 700; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+body.ramadan .rm-unit span { display: block; margin-top: 8px; color: var(--rm-cream); font-size: 12px; letter-spacing: 0.04em; opacity: 0.8; }
+body.ramadan .rm-expected { margin: 16px auto 0; max-width: 34rem; color: var(--rm-cream); font-size: 14px; opacity: 0.8; text-wrap: balance; }
+body.ramadan .rm-count-text {
+  margin: 18px auto 0; max-width: 34rem; color: #f6eedb; font-size: clamp(16px, 1.5vw, 18px); line-height: 1.55; text-wrap: pretty;
+}
+body.ramadan .rm-cta {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 48px; margin-top: 26px; padding: 0 28px;
+  border-radius: 999px; background: var(--rm-gold); color: #1a1438; font-size: 16px; font-weight: 700; text-decoration: none;
+}
+body.ramadan .rm-cta:hover { background: var(--rm-gold-hi); color: #1a1438; }
+body.ramadan .rm-cta:focus-visible { outline-color: var(--rm-gold-hi); }
+/* Two lanterns hang into the card's top corners, where there's room beside the title. */
+body.ramadan .rm-count-hang {
+  display: none; position: absolute; top: 0; z-index: -1; width: 34px;
+  padding-top: 22px; background: linear-gradient(rgb(244 199 106 / 0.55), rgb(244 199 106 / 0.55)) no-repeat 50% 0 / 1px 22px;
+  transform-origin: 50% 0;
+}
+body.ramadan .rm-count-hang-start { inset-inline-start: 8%; }
+body.ramadan .rm-count-hang-end { inset-inline-end: 8%; padding-top: 44px; background-size: 1px 44px; }
+body.ramadan .rm-count-hang .rm-lantern { width: 100%; height: auto; }
+@media (min-width: 720px) { body.ramadan .rm-count-hang { display: block; } }
+@media (max-width: 480px) {
+  body.ramadan .rm-count { padding: 44px 0 28px; }
+  body.ramadan .rm-count-card { padding: 40px 16px 34px; border-radius: 22px; }
+  body.ramadan .rm-timer { gap: 8px; }
+  body.ramadan .rm-unit { flex: 1; min-width: 0; padding: 12px 4px 9px; border-radius: 14px; }
+}
+html[dir="rtl"] body.ramadan .rm-count-title { line-height: 1.45; }
+html[dir="rtl"] body.ramadan .rm-unit span { font-size: 15px; }
+html[dir="rtl"] body.ramadan .rm-count-text { font-size: 19px; line-height: 1.8; }
+html[dir="rtl"] body.ramadan .rm-expected, html[dir="rtl"] body.ramadan .rm-kicker { font-size: 16px; }
+html[dir="rtl"] body.ramadan .rm-clock { font-family: var(--font); }
+
+/* ---------- Motion (only for those who haven't asked for less) ---------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  body.ramadan .rm-lights i { animation: rm-twinkle 2.4s ease-in-out infinite alternate; }
+  body.ramadan .rm-lights i:nth-child(1) { animation-duration: 2.1s; }
+  body.ramadan .rm-lights i:nth-child(2) { animation-duration: 2.9s; animation-delay: -1.2s; }
+  body.ramadan .rm-lights i:nth-child(3) { animation-duration: 2.5s; animation-delay: -0.5s; }
+  body.ramadan .rm-lights i:nth-child(4) { animation-duration: 3.3s; animation-delay: -2.1s; }
+  body.ramadan .rm-lights i:nth-child(5) { animation-duration: 2.7s; animation-delay: -1.7s; }
+  body.ramadan .rm-lights.rm-foot i { animation-direction: alternate-reverse; }
+
+  body.ramadan .rm-hang { animation: rm-sway 5.6s ease-in-out infinite alternate; }
+  body.ramadan .rm-h-b { animation-duration: 4.3s; animation-delay: -1.6s; }
+  body.ramadan .rm-h-c { animation-duration: 6.4s; animation-delay: -3s; }
+  body.ramadan .rm-h-d { animation-duration: 7.2s; animation-delay: -0.8s; }
+  body.ramadan .rm-side-end .rm-hang { animation-delay: -2.4s; }
+  body.ramadan .rm-hl::after { animation: rm-breathe 3.2s ease-in-out infinite alternate; }
+  body.ramadan .rm-banner-hang .rm-lantern { animation: rm-sway-small 4.8s ease-in-out infinite alternate; }
+  body.ramadan .rm-banner-hang:last-child .rm-lantern { animation-delay: -2.2s; }
+  body.ramadan .rm-count-hang { animation: rm-sway 6s ease-in-out infinite alternate; }
+  body.ramadan .rm-count-hang-end { animation-duration: 5.2s; animation-delay: -2s; }
+
+  body.ramadan .rm-sky::before { animation: rm-stars 4.5s ease-in-out infinite alternate; }
+}
+
+@keyframes rm-twinkle { from { opacity: 1; } to { opacity: 0.32; } }
+@keyframes rm-sway { from { transform: rotate(-2.6deg); } to { transform: rotate(2.6deg); } }
+@keyframes rm-sway-small { from { transform: rotate(-4deg); } to { transform: rotate(4deg); } }
+@keyframes rm-breathe { from { opacity: 0.7; } to { opacity: 1; } }
+@keyframes rm-stars { from { opacity: 1; } to { opacity: 0.25; } }
+
+@media print {
+  body.ramadan .rm-banner, body.ramadan .rm-lights, body.ramadan .rm-hangers, body.ramadan .rm-sky,
+  body.ramadan .rm-foot-greet, body.ramadan .rm-count, body.ramadan .doc h1::before { display: none; }
+}

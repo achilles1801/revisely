@@ -124,7 +124,12 @@ describe('useVoiceRecorder sessions', () => {
     expect(result.current.phase).toBe('paused');
     expect(result.current.interrupted).toBe(false);
     expect(mockSetAudioMode).toHaveBeenLastCalledWith(false); // playback via the speaker meanwhile
-    expect(mockAppend).toHaveBeenNthCalledWith(1, null, 'cache/seg-1.m4a', expect.objectContaining({ kind: 'reading' }));
+    expect(mockAppend).toHaveBeenNthCalledWith(
+      1,
+      null,
+      'cache/seg-1.m4a',
+      expect.objectContaining({ kind: 'reading' }),
+    );
 
     rerender({ kind: 'reading', day: '2026-10-20', currentPage: 13, onSaved } as any);
     await act(() => result.current.resume());
@@ -273,7 +278,11 @@ describe('useVoiceRecorder sessions', () => {
     // ...and the recording for the note's time once it stops (lib/recordings lets go by itself).
     expect(mockHold).toHaveBeenCalledWith('rec-1');
     expect(mockRelease).not.toHaveBeenCalled();
-    expect(onFinished.mock.calls[0][0].undo).toEqual({ created: true, segments: ['rec-1-0.m4a', 'rec-1-1.m4a'], fromMs: 0 });
+    expect(onFinished.mock.calls[0][0].undo).toEqual({
+      created: true,
+      segments: ['rec-1-0.m4a', 'rec-1-1.m4a'],
+      fromMs: 0,
+    });
   });
 
   it('with no note to show (the screen closed), it uploads at once', async () => {
@@ -852,5 +861,4 @@ describe('haptics', () => {
     expect(Haptics.impactAsync).toHaveBeenCalledTimes(2);
     expect(Haptics.notificationAsync).not.toHaveBeenCalled();
   });
-
 });

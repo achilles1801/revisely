@@ -11,16 +11,20 @@ import { useTheme } from '../../context/ThemeContext';
 import { askCoach, setCoachOptIn, type CoachAnswer } from '../../lib/coach/api';
 import { COACH_FIELDS, coachTotals, type CoachInsight } from '../../lib/coach/totals';
 import { typeV2 } from '../../theme/v2';
+import { t } from '../../i18n';
 
 const CHOICES: { key: CoachInsight; label: string }[] = [
-  { key: 'coverage', label: 'Coverage' },
-  { key: 'consistency', label: 'Consistency' },
-  { key: 'weakSpots', label: 'Weak spots' },
-  { key: 'pace', label: 'Pace' },
+  { key: 'coverage', get label() { return t('coach.insights.coverage'); } },
+  { key: 'consistency', get label() { return t('coach.insights.consistency'); } },
+  { key: 'weakSpots', get label() { return t('coach.insights.weakSpots'); } },
+  { key: 'pace', get label() { return t('coach.insights.pace'); } },
 ];
 
 const WHAT_IS_SENT = (insight: CoachInsight) =>
-  `Only the numbers behind ${CHOICES.find((c) => c.key === insight)?.label.toLowerCase()} are sent: ${COACH_FIELDS[insight].join(', ')}. Never your notes, recordings, names or page lists.`;
+  t('coach.whatIsSent', {
+    insight: CHOICES.find((c) => c.key === insight)?.label.toLowerCase() ?? '',
+    fields: COACH_FIELDS[insight].join(', '),
+  });
 
 export function AskCoachSheet({
   visible,
@@ -63,7 +67,7 @@ export function AskCoachSheet({
       const result = await askCoach(insight, coachTotals(insight, totals), day);
       setAnswer(result);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'The coach is unavailable. Try again.';
+      const message = err instanceof Error ? err.message : t('coach.unavailable');
       // Not turned on yet on the server: show the step that turns it on.
       if (/Turn the coach on first/.test(message)) setOptedIn(false);
       setError(message);
@@ -73,15 +77,15 @@ export function AskCoachSheet({
   };
 
   return (
-    <Sheet visible={visible} onClose={onClose} title="Ask the coach" testID="ask-coach-sheet">
+    <Sheet visible={visible} onClose={onClose} title={t('coach.title')} testID="ask-coach-sheet">
       <View style={styles.body}>
         {!optedIn && !answer ? (
           <>
             <Text style={[typeV2.body, { color: palette.text }]}>
-              The coach answers one question about an Insight, in a sentence or three. It is off until you turn it on.
+              {t('coach.intro')}
             </Text>
             <Text style={[typeV2.meta, { color: palette.secondary }]}>{WHAT_IS_SENT(insight)}</Text>
-            <PillButton title="Turn the coach on" onPress={turnOn} busy={busy} testID="ask-coach-optin" />
+            <PillButton title={t('coach.turnOn')} onPress={turnOn} busy={busy} testID="ask-coach-optin" />
           </>
         ) : (
           <>
@@ -112,12 +116,12 @@ export function AskCoachSheet({
                   {answer.answer}
                 </Text>
                 <Text style={[typeV2.meta, { color: palette.secondary }]}>
-                  {answer.cached ? 'Kept for today. ' : ''}
-                  {`${answer.remainingToday} ${answer.remainingToday === 1 ? 'question' : 'questions'} left today`}
+                  {answer.cached ? t('coach.kept') : ''}
+                  {t('coach.left', { count: answer.remainingToday })}
                 </Text>
               </View>
             ) : (
-              <PillButton title="Ask" onPress={ask} busy={busy} testID="ask-coach-ask" />
+              <PillButton title={t('coach.ask')} onPress={ask} busy={busy} testID="ask-coach-ask" />
             )}
           </>
         )}

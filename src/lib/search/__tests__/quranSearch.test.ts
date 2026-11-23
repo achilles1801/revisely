@@ -122,6 +122,31 @@ describe('searchText', () => {
     expect(searchText(words, 'لم يلد ولم يولد').hits[0]).toMatchObject({ sura: 112, ayah: 3, from, to });
   });
 
+  // From the property test's seed -256462220 (Nov 21 2026): 24:61 runs بيوت إخوانكم أو بيوت
+  // أخواتكم أو بيوت …, and with إخوانكم heard as إخوالكم the two halves read as one phrase said
+  // again a letter differently. That phrase once is the ayah's later بيوت أخوالكم أو, word for
+  // word, which was all that was found.
+  it('finds a run of a repetitive ayah with a word misheard, though it reads as a phrase said again', () => {
+    const [from] = words.verseRange(24, 61);
+    const misheard = 'بيوت إخوالكم أو بيوت أخواتكم أو';
+    for (const text of [misheard, `${misheard} ${misheard}`]) {
+      const r = searchText(words, text);
+      // The run as said, one word off, and the phrase once, word for word, are both listed.
+      expect(r.hits.map((h) => [h.sura, h.ayah, h.from - from, h.to - from])).toEqual([
+        [24, 61, 38, 41],
+        [24, 61, 26, 32],
+      ]);
+      expect(r.hits[1].score).toBeGreaterThan(0.9);
+      expect(r.hits[1].score).toBeLessThan(1);
+      expect([...matchedWords(words, r.hits[1], r.words)].map((i) => i - from)).toEqual([26, 27, 28, 29, 30, 31]);
+    }
+    // Said right, the run alone; a phrase said again that the text doesn't run on with, once.
+    expect(searchText(words, 'بيوت إخوانكم أو بيوت أخواتكم أو').hits.map((h) => [h.from - from, h.to - from])).toEqual([
+      [26, 32],
+    ]);
+    expect(found('بيوت أخوالكم أو بيوت أخوالكم أو')).toEqual(['24:61']);
+  });
+
   it('finds nothing in words that are not in the Quran', () => {
     expect(found('كيف حالك اليوم يا صديقي')).toEqual([]);
     expect(found('ترجمة نانسي قنقر')).toEqual([]);
@@ -145,7 +170,12 @@ describe('searchText: how much work a search does', () => {
   it.each([
     ['12 words of 2:255: lined up once', say(verse(2, 255).slice(0, 12)), 1, 12],
     ['all of 2:255: its first 24 words, once', say(verse(2, 255)), 1, 24],
-    ['words not in the Quran: as said, then without the last, the first, both', 'كيف حالك اليوم يا صديقي', 4, 5 + 4 + 4 + 3],
+    [
+      'words not in the Quran: as said, then without the last, the first, both',
+      'كيف حالك اليوم يا صديقي',
+      4,
+      5 + 4 + 4 + 3,
+    ],
   ])('%s', (_, text, alignments, queryWords) => {
     const work = counted(text);
     expect(work.alignments).toBe(alignments);
@@ -167,7 +197,12 @@ describe('searchText: how much work a search does', () => {
 describe('withoutRepeats', () => {
   const ws = (text: string) => queryWords(text);
   it('keeps a phrase said twice in a row once', () => {
-    expect(withoutRepeats(ws('فارجع البصر فارجع البصر هل ترى')).map((w) => w.key)).toEqual(['فارجع', 'البصر', 'هل', 'تري']);
+    expect(withoutRepeats(ws('فارجع البصر فارجع البصر هل ترى')).map((w) => w.key)).toEqual([
+      'فارجع',
+      'البصر',
+      'هل',
+      'تري',
+    ]);
   });
   it('keeps a short word said twice (it can be in the text twice)', () => {
     expect(withoutRepeats(ws('كلا كلا')).map((w) => w.key)).toEqual(['كلا', 'كلا']);
@@ -175,6 +210,26 @@ describe('withoutRepeats', () => {
   it('keeps neighbouring words a letter apart: one word counts as said twice only when it is the same', () => {
     expect(withoutRepeats(ws('إنما أنا لكم')).map((w) => w.key)).toEqual(['انما', 'انا', 'لكم']);
     expect(withoutRepeats(ws('الرحمن الرحمن الرحيم')).map((w) => w.key)).toEqual(['الرحمن', 'الرحيم']);
+  });
+  it('folds a phrase said again a letter differently, or with near off only word for word', () => {
+    const run = 'بيوت إخوالكم أو بيوت أخواتكم أو';
+    expect(withoutRepeats(ws(run)).map((w) => w.key)).toEqual(['بيوت', 'اخوالكم', 'او']);
+    expect(withoutRepeats(ws(run), false).map((w) => w.key)).toEqual([
+      'بيوت',
+      'اخوالكم',
+      'او',
+      'بيوت',
+      'اخواتكم',
+      'او',
+    ]);
+    expect(withoutRepeats(ws(`${run} ${run}`), false).map((w) => w.key)).toEqual([
+      'بيوت',
+      'اخوالكم',
+      'او',
+      'بيوت',
+      'اخواتكم',
+      'او',
+    ]);
   });
 });
 
@@ -190,6 +245,16 @@ describe('matchedWords', () => {
     const set = matchedWords(words, r.hits[0], r.words);
     const [from] = words.verseRange(22, 49);
     const [next] = words.verseRange(22, 50);
-    expect([...set].sort((a, b) => a - b)).toEqual([from + 1, from + 2, from + 3, from + 4, from + 5, from + 6, from + 7, next, next + 1]);
+    expect([...set].sort((a, b) => a - b)).toEqual([
+      from + 1,
+      from + 2,
+      from + 3,
+      from + 4,
+      from + 5,
+      from + 6,
+      from + 7,
+      next,
+      next + 1,
+    ]);
   });
 });

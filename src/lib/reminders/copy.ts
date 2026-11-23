@@ -7,8 +7,10 @@
 import { getJuzForPage, getSurah, getSurahsForPage } from '../quranData';
 import { describeSurahRuns, pageRuns } from '../pageRanges';
 import { juzLabel } from '../widgets/snapshot';
+import { t } from '../../i18n';
 
-export type ReminderKind = 'morning' | 'midday' | 'evening' | 'congrat';
+/** `away`: the one reminder of a day after tomorrow, for someone who hasn't opened the app since (REMIND-2). */
+export type ReminderKind = 'morning' | 'midday' | 'evening' | 'congrat' | 'away';
 
 export interface ReminderCopy {
   title: string;
@@ -64,6 +66,7 @@ const juzOf = (page: number) => getJuzForPage(page);
 
 export function reminderCopy(input: ReminderCopyInput): ReminderCopy {
   if (input.kind === 'congrat') return congratulation(input);
+  if (input.kind === 'away') return awayCopy(input);
   return input.juzPlan ? juzCopy(input) : pageCopy(input);
 }
 
@@ -74,8 +77,8 @@ function progressOf(input: ReminderCopyInput): number {
 }
 
 function greeting(input: ReminderCopyInput): string {
-  if (!input.beforeNoon) return "Today's revision";
-  return input.name ? `Good morning, ${input.name}` : 'Good morning';
+  if (!input.beforeNoon) return t('reminders.todaysRevision');
+  return input.name ? t('reminders.goodMorningName', { name: input.name }) : t('reminders.goodMorning');
 }
 
 function pageCopy(input: ReminderCopyInput): ReminderCopy {
@@ -90,38 +93,40 @@ function pageCopy(input: ReminderCopyInput): ReminderCopy {
       const body =
         input.variant % 2 === 0
           ? input.beforeNoon
-            ? `Today's revision: ${range}.`
-            : `${range}.`
-          : `Today starts with ${surahOf(input.all[0]).name}.`;
+            ? t('reminders.todayIs', { range })
+            : t('reminders.rangeOnly', { range })
+          : t('reminders.startsWith', { place: surahOf(input.all[0]).name });
       return { title: greeting(input), body };
     }
-    const phrase =
-      position === 'first' ? `with ${surah}` : position === 'end' ? `near the end of ${surah}` : `in ${surah}`;
     return {
-      title: input.beforeNoon ? 'Good morning' : "Today's revision",
-      body: `You've made a good start. Pick up ${phrase}.`,
+      title: input.beforeNoon ? t('reminders.goodMorning') : t('reminders.todaysRevision'),
+      body: t(
+        position === 'first'
+          ? 'reminders.pickUpWith'
+          : position === 'end'
+            ? 'reminders.pickUpNearEnd'
+            : 'reminders.pickUpIn',
+        { place: surah },
+      ),
     };
   }
 
   if (input.kind === 'midday') {
     if (progress === 0) {
-      return { title: `Starting with ${surah}`, body: "A few calm minutes for today's revision?" };
+      return { title: t('reminders.startingWith', { place: surah }), body: t('reminders.calmMinutes') };
     }
     if (progress >= 0.6) {
       return {
-        title: `${surah} is next`,
-        body: 'Most of today is done. A few calm minutes before your next task?',
+        title: t('reminders.isNext', { place: surah }),
+        body: t('reminders.mostDone'),
       };
     }
     if (position === 'first') {
-      return { title: `${surah} is next`, body: 'A good start already. Perfect time for a little more.' };
+      return { title: t('reminders.isNext', { place: surah }), body: t('reminders.goodStart') };
     }
     return {
-      title: `Back to ${surah}`,
-      body:
-        position === 'end'
-          ? "You're near the end of it. Perfect time for a page or two."
-          : 'A good start already. Perfect time for a little more.',
+      title: t('reminders.backTo', { place: surah }),
+      body: position === 'end' ? t('reminders.nearEnd') : t('reminders.goodStart'),
     };
   }
 
@@ -132,54 +137,83 @@ function pageCopy(input: ReminderCopyInput): ReminderCopy {
 function eveningCopy(input: ReminderCopyInput, surah: string, oneLeft: boolean): ReminderCopy {
   if (input.overnight) {
     return {
-      title: 'An hour until Fajr',
-      body: `If you're up, ${surah} is where you left off. What's left can be added to tomorrow.`,
+      title: t('reminders.hourUntilFajr'),
+      body: t('reminders.overnight', { place: surah }),
     };
   }
-  if (oneLeft) return { title: 'An hour left today', body: `Just ${surah} left. You're nearly there.` };
-  return { title: 'An hour left today', body: `Even a page or two of ${surah} counts.` };
+  if (oneLeft) return { title: t('reminders.hourLeft'), body: t('reminders.justLeft', { place: surah }) };
+  return { title: t('reminders.hourLeft'), body: t('reminders.evenAPage', { place: surah }) };
 }
 
 function juzCopy(input: ReminderCopyInput): ReminderCopy {
   const juz = juzOf(input.remaining[0]);
+  const place = t('common.juzN', { n: juz });
   const progress = progressOf(input);
 
   if (input.kind === 'morning') {
     if (progress === 0) {
-      return { title: greeting(input), body: `Today's revision is Juz ${juz}, whenever you're ready.` };
+      return { title: greeting(input), body: t('reminders.juzWhenReady', { juz }) };
     }
     return {
-      title: input.beforeNoon ? 'Good morning' : "Today's revision",
-      body: `You've made a good start. Pick up in Juz ${juz}.`,
+      title: input.beforeNoon ? t('reminders.goodMorning') : t('reminders.todaysRevision'),
+      body: t('reminders.pickUpIn', { place }),
     };
   }
 
   if (input.kind === 'midday') {
     if (progress === 0) {
-      return { title: `Starting with Juz ${juz}`, body: "A few calm minutes for today's revision?" };
+      return { title: t('reminders.startingWith', { place }), body: t('reminders.calmMinutes') };
     }
     if (progress >= 0.6) {
       return {
-        title: `Juz ${juz} is next`,
-        body: 'Most of today is done. A few calm minutes before your next task?',
+        title: t('reminders.isNext', { place }),
+        body: t('reminders.mostDone'),
       };
     }
-    return { title: `Back to Juz ${juz}`, body: 'A good start already. Perfect time for a little more.' };
+    return { title: t('reminders.backTo', { place }), body: t('reminders.goodStart') };
   }
 
   if (input.overnight) {
     return {
-      title: 'An hour until Fajr',
-      body: `If you're up, Juz ${juz} is where you left off. What's left can be added to tomorrow.`,
+      title: t('reminders.hourUntilFajr'),
+      body: t('reminders.overnight', { place }),
     };
   }
   return {
-    title: 'An hour left today',
-    body:
-      progress === 0
-        ? `Juz ${juz} is still open. A few calm minutes would do it.`
-        : `Almost done with Juz ${juz}. A few calm minutes would do it.`,
+    title: t('reminders.hourLeft'),
+    body: progress === 0 ? t('reminders.stillOpen', { place }) : t('reminders.almostDone', { place }),
   };
+}
+
+/**
+ * A day after tomorrow, nothing revised (REMIND-2): one of four wordings by the day, so consecutive days never read
+ * the same, each naming where that day's revision is (the surahs, or the juz on a juz plan).
+ */
+function awayCopy(input: ReminderCopyInput): ReminderCopy {
+  if (input.juzPlan) {
+    const juz = juzOf(input.all[0]);
+    const options: ReminderCopy[] = [
+      { title: greeting(input), body: t('reminders.juzWhenReady', { juz }) },
+      {
+        title: t('reminders.away.placeToday', { place: t('common.juzN', { n: juz }) }),
+        body: t('reminders.away.keepClose'),
+      },
+      { title: t('reminders.away.ready'), body: t('reminders.away.juzWhenever', { juz }) },
+    ];
+    return pick(options, input.variant);
+  }
+  const range = describeSurahRuns(pageRuns(input.all));
+  const place = surahOf(input.all[0]).name;
+  const options: ReminderCopy[] = [
+    {
+      title: greeting(input),
+      body: input.beforeNoon ? t('reminders.todayIs', { range }) : t('reminders.rangeOnly', { range }),
+    },
+    { title: greeting(input), body: t('reminders.startsWith', { place }) },
+    { title: t('reminders.away.placeToday', { place }), body: t('reminders.away.keepClose') },
+    { title: t('reminders.away.ready'), body: t('reminders.away.whenever', { range }) },
+  ];
+  return pick(options, input.variant);
 }
 
 function congratulation(input: ReminderCopyInput): ReminderCopy {
@@ -190,25 +224,25 @@ function congratulation(input: ReminderCopyInput): ReminderCopy {
     const today = juzLabel(input.all.map((p) => ({ juz: juzOf(p) })));
     const tomorrow = input.tomorrow.length ? juzLabel(input.tomorrow.map((p) => ({ juz: juzOf(p) }))) : '';
     options.push({
-      title: `${today} is done`,
-      body: tomorrow ? `That's today's revision. Tomorrow is ${tomorrow}.` : "That's today's revision.",
+      title: t('reminders.done.juz', { today }),
+      body: tomorrow ? t('reminders.done.tomorrowJuz', { tomorrow }) : t('reminders.done.thatsToday'),
     });
   } else {
     options.push({
-      title: "Today's revision is done",
-      body: `${describeSurahRuns(pageRuns(input.all))}, all revised. MashaAllah.`,
+      title: t('reminders.done.title'),
+      body: t('reminders.done.allRevised', { range: describeSurahRuns(pageRuns(input.all)) }),
     });
     const tomorrowFirst = input.tomorrow.length ? surahOf(input.tomorrow[0]).name : '';
     options.push({
-      title: 'Done for today',
-      body: tomorrowFirst ? `Tomorrow starts with ${tomorrowFirst}. Rest well.` : 'Rest well.',
+      title: t('reminders.done.forToday'),
+      body: tomorrowFirst ? t('reminders.done.tomorrowStarts', { place: tomorrowFirst }) : t('reminders.done.restWell'),
     });
   }
 
   if (streakLine) {
     options.push({
-      title: `${input.streak} days in a row`,
-      body: "Today's revision is done. Alhamdulillah.",
+      title: t('reminders.done.streak', { days: input.streak }),
+      body: t('reminders.done.alhamdulillah'),
     });
   }
   return pick(options, input.variant);

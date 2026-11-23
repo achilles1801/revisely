@@ -10,6 +10,7 @@ import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import type { ReadingSession } from '../../types';
 import { Sheet } from '../v2/Sheet';
+import { formatDate, t } from '../../i18n';
 
 /** Assign pages to a session: free-form ranges plus a one-tap suggestion. */
 export function ReadingPagesSheet({
@@ -44,11 +45,11 @@ export function ReadingPagesSheet({
     <>
       <Text style={styles.meta}>
         {formatDuration(session.durationSeconds)} ·{' '}
-        {new Date(session.startedAt).toLocaleDateString([], {
+        {formatDate(new Date(session.startedAt), {
           weekday: 'short',
           month: 'short',
           day: 'numeric',
-        })}
+        }, 'device')}
       </Text>
 
       <View style={styles.inputWrap}>
@@ -71,10 +72,10 @@ export function ReadingPagesSheet({
       </View>
       <Text style={[styles.help, !parsed && { color: theme.error }]}>
         {!parsed
-          ? 'Use page numbers 1–604, like 45–52, 60'
+          ? t('activity.readingPages.hintInvalid')
           : parsed.length > 0
             ? summarizeRevisedPages(parsed)
-            : 'Page numbers or ranges, separated by commas'}
+            : t('activity.readingPages.hintEmpty')}
       </Text>
 
       {suggestion !== '' && suggestion !== formatPageRanges(parsed ?? []) && (
@@ -84,9 +85,9 @@ export function ReadingPagesSheet({
         >
           <Ionicons name="book-outline" size={16} color={theme.accent} />
           <Text style={styles.suggestionText} numberOfLines={1}>
-            Opened in reader: {suggestion}
+            {t('activity.readingPages.openedInReader', { pages: suggestion })}
           </Text>
-          <Text style={styles.suggestionUse}>Use</Text>
+          <Text style={styles.suggestionUse}>{t('activity.add.use')}</Text>
         </PressableScale>
       )}
 
@@ -94,7 +95,7 @@ export function ReadingPagesSheet({
         onPress={() => onDelete(session)}
         style={styles.deleteBtn}
       >
-        <Text style={styles.deleteText}>Delete session</Text>
+        <Text style={styles.deleteText}>{t('activity.readingPages.deleteSession')}</Text>
       </PressableScale>
     </>
   ) : null;
@@ -103,9 +104,9 @@ export function ReadingPagesSheet({
     <Sheet
       visible={!!session}
       onClose={onClose}
-      title="Pages read"
-      left={{ label: 'Cancel', onPress: onClose }}
-      right={{ label: 'Done', onPress: save, strong: true, disabled: !parsed }}
+      title={t('activity.readingPages.title')}
+      left={{ label: t('common.cancel'), onPress: onClose }}
+      right={{ label: t('common.done'), onPress: save, strong: true, disabled: !parsed }}
       keyboard
       testID="reading-pages-sheet"
     >

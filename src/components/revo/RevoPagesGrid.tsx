@@ -14,6 +14,7 @@ import { typeV2 } from '../../theme/v2';
 import { strengthTone } from '../insights/strength';
 import { Tap } from '../v2/Tap';
 import type { AddKey } from '../../lib/revo/addSelection';
+import { t } from '../../i18n';
 
 const COLUMNS = 5;
 const MAX = 60;
@@ -61,8 +62,8 @@ export function RevoPagesGrid({
   return (
     <View testID="revo-add-pages">
       <View style={styles.pickerRow}>
-        <Tap onPress={() => setPicker((v) => !v)} accessibilityRole="button" accessibilityLabel={`Juz ${juz}, choose another`} style={[styles.juz, { borderColor: palette.outline }]} testID="revo-add-juz-picker">
-          <Text style={[typeV2.button, { color: palette.text }]}>Juz {juz}</Text>
+        <Tap onPress={() => setPicker((v) => !v)} accessibilityRole="button" accessibilityLabel={t('revo.grid.juzChoose', { n: juz })} style={[styles.juz, { borderColor: palette.outline }]} testID="revo-add-juz-picker">
+          <Text style={[typeV2.button, { color: palette.text }]}>{t('common.juzN', { n: juz })}</Text>
           <Ionicons name={picker ? 'chevron-up' : 'chevron-down'} size={16} color={palette.text} />
         </Tap>
         <Text style={[typeV2.meta, { color: palette.secondary, flex: 1 }]} numberOfLines={1}>
@@ -86,7 +87,7 @@ export function RevoPagesGrid({
                       setPicker(false);
                     }}
                     accessibilityRole="button"
-                    accessibilityLabel={`Juz ${n}`}
+                    accessibilityLabel={t('common.juzN', { n })}
                     accessibilityState={{ selected: on }}
                     style={[styles.juzCell, { backgroundColor: on ? palette.primary : palette.bubble }]}
                     testID={`revo-add-juz-${n}`}
@@ -111,7 +112,7 @@ export function RevoPagesGrid({
                 key={p}
                 onPress={() => tap(p)}
                 accessibilityRole="button"
-                accessibilityLabel={`Page ${p}${on ? ', chosen' : ''}`}
+                accessibilityLabel={on ? t('revo.grid.pageChosen', { n: p }) : t('common.pageN', { n: p })}
                 accessibilityState={{ selected: on }}
                 style={[styles.cellBox, { backgroundColor: on ? palette.primary : palette.bubble }]}
                 testID={`revo-add-page-${p}`}
@@ -146,12 +147,12 @@ export function RevoPagesGrid({
             onPress={() => !added && canAdd && onAdd(key)}
             disabled={added || !canAdd}
             accessibilityRole="button"
-            accessibilityLabel={added ? 'Added' : 'Add these pages'}
+            accessibilityLabel={added ? t('revo.grid.added') : t('revo.grid.addPages')}
             style={[styles.add, added ? { borderWidth: 1, borderColor: palette.outline } : { backgroundColor: palette.primary }, !added && !canAdd && { opacity: 0.45 }]}
             testID="revo-add-pages-add"
           >
             <Ionicons name={added ? 'checkmark' : 'add'} size={17} color={added ? palette.text : palette.onPrimary} />
-            <Text style={[typeV2.button, { color: added ? palette.text : palette.onPrimary }]}>{added ? 'Added' : 'Add'}</Text>
+            <Text style={[typeV2.button, { color: added ? palette.text : palette.onPrimary }]}>{added ? t('revo.grid.added') : t('revo.add.add')}</Text>
           </Tap>
         </View>
       ) : null}

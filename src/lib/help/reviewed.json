@@ -19,7 +19,7 @@
     "MEM-2": "fa6bccea850e23b7"
   },
   "session.marking": {
-    "SESS-1": "09cd1f564f7eac99"
+    "SESS-1": "6dbfd33bc4a89de6"
   },
   "session.stopping": {
     "SESS-3": "4227fa695c15768c",
@@ -27,17 +27,69 @@
   },
   "session.rating": {
     "ACT-8": "17530ba6416770ba",
-    "ACT-12": "4afb073e2a87d454"
+    "ACT-12": "7646aee12139e593"
   },
-  "session.hidden": {},
+  "session.recite": {
+    "RECITE-9": "311ec4a7b2d1b790"
+  },
   "reader.hold": {},
   "reader.turning": {},
   "reader.recitation": {},
   "reader.sitting": {
-    "REC-1": "971b7fa368411aaa",
+    "REC-1": "dec0b6f83b53c68a",
     "REC-2": "06be0811d7eedf49",
     "MEM-5": "2b610dd93d4012d9",
     "DAY-9": "d1f48e9dc60411f1"
+  },
+  "reader.recite": {
+    "REC-1": "dec0b6f83b53c68a",
+    "REC-2": "06be0811d7eedf49"
+  },
+  "recite.start": {
+    "RECITE-1": "c93d694c7ccaddb2"
+  },
+  "recite.marks": {
+    "RECITE-2": "9342c0e66aaa0f22",
+    "RECITE-3": "b634371d6a67ec19"
+  },
+  "recite.card": {
+    "RECITE-4": "513d0ce716bbf002"
+  },
+  "recite.after": {
+    "RECITE-7": "f7ca3a916a566009",
+    "RMEM-6": "59619cdefc24bef0"
+  },
+  "reciteTake.page": {},
+  "reciteTake.hidden": {
+    "RECITE-6": "f03197f68d4f5bb5"
+  },
+  "reciteTake.peeked": {
+    "RECITE-6": "f03197f68d4f5bb5"
+  },
+  "reciteTake.pause": {},
+  "reciteMemory.page": {
+    "RMEM-2": "d099ae1a78157e30",
+    "RMEM-3": "0acdad49f616daa5"
+  },
+  "reciteMemory.drill": {
+    "RECITE-7": "f7ca3a916a566009"
+  },
+  "reciteMemory.progress": {
+    "RMEM-4": "a81a2f21197bbc1e"
+  },
+  "reciteMemory.activity": {
+    "RMEM-5": "31a0e267b1fd69da",
+    "RMEM-6": "59619cdefc24bef0",
+    "RINS-3": "2072221743aa2f49"
+  },
+  "reciteTest.start": {
+    "RECITE-8": "55d683320bb0e707"
+  },
+  "reciteTest.result": {
+    "RECITE-8": "55d683320bb0e707"
+  },
+  "reciteTest.search": {
+    "SEARCH-4": "f3cf85c5c2440def"
   },
   "schedule.cycle": {
     "SCHED-1": "e34c5d66002488e4",
@@ -70,8 +122,11 @@
     "ACT-1": "27b4c2094c950cdf"
   },
   "activity.adding": {
-    "ACT-5": "492efd0797908129",
+    "ACT-5": "b31b0455db3c890c",
     "ACT-17": "62b54494328e1e9d"
+  },
+  "activity.sections": {
+    "ACT-29": "08ceb1f773563bb5"
   },
   "insights.coverage": {
     "ACT-4": "9105a4f613b7539e",
@@ -84,7 +139,7 @@
     "ACT-23": "bc761a4eb1d943b5"
   },
   "insights.weak": {
-    "ACT-12": "4afb073e2a87d454",
+    "ACT-12": "7646aee12139e593",
     "ACT-8": "17530ba6416770ba",
     "ACT-20": "e576925144fbc092",
     "ACT-24": "84ed5272370beade"
@@ -93,8 +148,20 @@
     "ACT-4": "9105a4f613b7539e",
     "ACT-23": "bc761a4eb1d943b5"
   },
+  "insightsMore.gaps": {
+    "ACT-28": "6603ea8892be0ab0"
+  },
+  "insightsMore.lastRevised": {
+    "ACT-30": "7aaf2461baca35ac"
+  },
+  "insightsMore.recitation": {
+    "RINS-2": "827aac3517cdb95d"
+  },
+  "insightsMore.sections": {
+    "ACT-29": "08ceb1f773563bb5"
+  },
   "day.change": {
-    "ACT-6": "68186ff52bb557fb",
+    "ACT-6": "4ac85a1d24abe2f8",
     "ACT-7": "a1a7e5301dc5560c"
   },
   "day.pages": {
@@ -106,12 +173,12 @@
     "ACT-19": "26b92511a47d4f09"
   },
   "day.adding": {
-    "ACT-5": "492efd0797908129",
+    "ACT-5": "b31b0455db3c890c",
     "ACT-17": "62b54494328e1e9d"
   },
   "day.notes": {
     "ACT-11": "d94a53dd57138182",
-    "ACT-6": "68186ff52bb557fb",
+    "ACT-6": "4ac85a1d24abe2f8",
     "LOG-2": "da9323046be62b09"
   }
 }

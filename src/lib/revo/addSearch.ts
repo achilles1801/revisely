@@ -7,6 +7,7 @@ import { getAllSurahs, getJuzForPage, getSurahDisplay } from '../quranData';
 import { pageOfVerse } from '../verses';
 import { describePassage, plainText } from '../passages';
 import { shiftDay } from '../journal';
+import { t } from '../../i18n';
 
 export type AddFound =
   | { kind: 'surah'; surah: number; label: string }
@@ -49,7 +50,7 @@ function ayahs(text: string): { found: Extract<AddFound, { kind: 'pages' }>; sur
   if (a < 1 || b < a || b > count) return null;
   const pages = range(pageOfVerse({ sura: surah, ayah: a }), pageOfVerse({ sura: surah, ayah: b }));
   const name = plainText(getAllSurahs().find((s) => s.number === surah)!.name);
-  return { found: { kind: 'pages', pages, label: a === b ? `${name}, ayah ${a}` : `${name}, ayahs ${a}–${b}`, ayahs: true }, surah };
+  return { found: { kind: 'pages', pages, label: a === b ? t('revo.attach.ayah', { name, a }) : t('revo.attach.ayahs', { name, a, b }), ayahs: true }, surah };
 }
 
 /** The most recent day (up to today) with this day and month. */
@@ -98,7 +99,7 @@ export function searchAdd(text: string, today: string): AddFound[] {
   const juz = /^(?:juz'?|j)\s*(\d{1,2})$/.exec(lower);
   if (juz) {
     const n = Number(juz[1]);
-    return n >= 1 && n <= 30 ? [{ kind: 'juz', juz: n, label: `Juz ${n}` }] : [];
+    return n >= 1 && n <= 30 ? [{ kind: 'juz', juz: n, label: t('common.juzN', { n }) }] : [];
   }
   const page = /^(?:pp?\.?|pages?)?\s*(\d{1,3})(?:\s*[-–—]\s*(\d{1,3}))?$/.exec(lower);
   if (page) {
@@ -135,6 +136,6 @@ export function juzBeside(pages: readonly number[], juzOf: (page: number) => num
   if (pages.length === 0) return null;
   const a = juzOf(pages[0]);
   const b = juzOf(pages[pages.length - 1]);
-  return a === b ? { kind: 'juz', juz: a, label: `Juz ${a}` } : null;
+  return a === b ? { kind: 'juz', juz: a, label: t('common.juzN', { n: a }) } : null;
 }
 

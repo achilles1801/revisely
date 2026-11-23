@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import { arabicV2, radiusV2, typeV2 } from '../../theme/v2';
+import { arabicForV2, radiusV2, typeV2 } from '../../theme/v2';
 import { Tap } from './Tap';
 
 export interface WheelItem {
@@ -107,7 +107,7 @@ export function WheelPicker({
                 {item.label}
               </Text>
               {item.arabic ? (
-                <Text style={[arabicV2(18), { color }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>
+                <Text style={[arabicForV2(item.arabic, 18), { color }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>
                   {item.arabic}
                 </Text>
               ) : null}

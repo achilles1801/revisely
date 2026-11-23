@@ -1,6 +1,5 @@
-// The daily log writes locally first (Activity spec, C1): a note or a revised portion
-// shows at once, stays put while the server catches up, and the first note of a
-// new day shows without leaving the screen (BEHAVIOUR.md, LOG-4).
+// A day's notes write locally first (Activity spec, C1): a note shows at once, stays put while the
+// server catches up, and the first note of a new day shows without leaving the screen (BEHAVIOUR.md, LOG-4).
 
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
@@ -35,24 +34,21 @@ async function staysVisible(app: any, log: DailyLog, text: string, ms: number): 
   }
 }
 
-describe('the daily log writes locally first (LOG-4)', () => {
-  it('[LOG-4] the first note of a new day shows at once, without leaving the log', async () => {
+describe('a day’s notes write locally first (LOG-4)', () => {
+  it('[LOG-4] the first note of a new day shows at once, without leaving the day', async () => {
     const { app, log } = await openLogOnNewDay();
-    const { fireEvent, within } = app.mods.rtl;
-    fireEvent.press(within(app.screen.getByTestId('journal-kind')).getByText('Note'));
-    await app.act(async () => {
-      fireEvent.changeText(app.screen.getByTestId('journal-text-input'), 'first note');
-    });
-    fireEvent.press(app.screen.getByTestId('journal-send'));
+    await log.write('first note');
     await app.until(() => log.entries().some((e) => e.text === 'first note'), '"first note" to show', SHOWS_WITHIN_MS);
     await staysVisible(app, log, 'first note', STAYS_MS);
     await app.close();
   });
 
-  it('[LOG-4] a revised portion added to the log stays put while it is saved', async () => {
+  it('[LOG-4] a second note stays put, beside the first, while it is saved', async () => {
     const { app, log } = await openLogOnNewDay();
-    await log.add('second revised portion', 'Revised');
-    await staysVisible(app, log, 'second revised portion', STAYS_MS);
+    await log.add('first note');
+    await log.add('second note');
+    await staysVisible(app, log, 'first note', STAYS_MS);
+    await staysVisible(app, log, 'second note', STAYS_MS);
     await app.close();
   });
 });

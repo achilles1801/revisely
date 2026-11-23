@@ -7,6 +7,9 @@ import { useReduceMotion } from '../../design/motion';
 import { typeV2 } from '../../theme/v2';
 import { Confetti } from '../v2/Confetti';
 import { PillButton } from '../v2/PillButton';
+import { Tap } from '../v2/Tap';
+import { t } from '../../i18n';
+import { chevron } from '../../i18n/direction';
 
 /**
  * After a revision session's last page, as one more page: swiping onto it
@@ -16,24 +19,27 @@ import { PillButton } from '../v2/PillButton';
  * check fading in. Pages left: how many are done. The session is saved as it
  * goes, and Back leaves it. When every page is done and a next revision day
  * exists, Keep going continues into its pages (#168). A session that was
- * recorded offers Listen back: the recording over its pages.
+ * recorded offers Listen back: the recording over its pages. After a good
+ * moment, one quiet line asks for a rating (SESS-8, lib/rateAsk).
  */
 export function SessionEndCard({
   total,
   done,
   celebrate,
-  dayLabel = 'today',
+  forDay,
   what,
   next,
   onKeepGoing,
   onListenBack,
+  onRate,
+  onDismissRate,
 }: {
   total: number;
   done: number;
   /** Goes up each time a swipe finished the session. */
   celebrate: number;
-  /** What this card closes: "today", or the weekday of a day revised ahead. */
-  dayLabel?: string;
+  /** The weekday of a day revised ahead ("Tue"); left out, today. */
+  forDay?: string;
   /** What was revised, by surah or juz (lib/passages): "Al-Mujadila to At-Tahrim", "Juz 28". */
   what?: string;
   /**
@@ -44,6 +50,10 @@ export function SessionEndCard({
   onKeepGoing?: () => void;
   /** The session was recorded: play it back over its pages. */
   onListenBack?: () => void;
+  /** It's the moment to ask for a rating (lib/rateAsk): "Enjoying Revisely? Rate it ›" opens the store. */
+  onRate?: () => void;
+  /** The line's ✕: never ask again on this phone. */
+  onDismissRate?: () => void;
 }) {
   const { palette } = useTheme();
   const reduceMotion = useReduceMotion();
@@ -76,7 +86,7 @@ export function SessionEndCard({
           </Reanimated.View>
         ) : null}
         <Text style={[typeV2.title, styles.center, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-          {complete ? 'Revision complete' : `${done} of ${total} revised`}
+          {complete ? t('revision.end.complete') : t('revision.end.progress', { done, total })}
         </Text>
         {complete && what ? (
           <Text style={[typeV2.body, styles.center, { color: palette.text }]} maxFontSizeMultiplier={1.4} testID="session-end-what">
@@ -85,28 +95,56 @@ export function SessionEndCard({
         ) : null}
         <Text style={[typeV2.body, styles.center, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
           {complete
-            ? `${total} ${total === 1 ? 'page' : 'pages'} revised ${dayLabel}`
-            : 'Swipe back for the pages left.'}
+            ? forDay
+              ? t('revision.end.revisedFor', { count: total, day: forDay })
+              : t('revision.end.revisedToday', { count: total })
+            : t('revision.end.swipeBack')}
         </Text>
       </View>
       {complete && next && onKeepGoing ? (
         <View style={styles.keep}>
           <Text style={[typeV2.meta, styles.center, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-            {[next.cycle ? 'Next cycle' : `Next: ${next.label}`, next.what, `${next.pages} ${next.pages === 1 ? 'page' : 'pages'}`]
+            {[next.cycle ? t('revision.end.nextCycle') : t('revision.end.next', { day: next.label }), next.what, t('common.pages', { count: next.pages })]
               .filter(Boolean)
               .join(' · ')}
           </Text>
-          <PillButton title="Keep going" onPress={onKeepGoing} testID="session-end-keep-going" />
+          <PillButton title={t('revision.end.keepGoing')} onPress={onKeepGoing} testID="session-end-keep-going" />
         </View>
       ) : null}
       {onListenBack ? (
         <PillButton
-          title="Listen back"
+          title={t('revision.end.listenBack')}
           icon="headset-outline"
           variant="outline"
           onPress={onListenBack}
           testID="session-end-listen-back"
         />
+      ) : null}
+      {complete && onRate ? (
+        <View style={styles.rate}>
+          <Tap
+            onPress={onRate}
+            accessibilityRole="link"
+            accessibilityLabel={t('revision.end.rateAskLabel')}
+            hitSlop={8}
+            testID="session-end-rate"
+          >
+            <Text style={[typeV2.meta, styles.center, { color: palette.link }]} maxFontSizeMultiplier={1.4}>
+              {`${t('revision.end.rateAsk')} ${chevron()}`}
+            </Text>
+          </Tap>
+          {onDismissRate ? (
+            <Tap
+              onPress={onDismissRate}
+              accessibilityRole="button"
+              accessibilityLabel={t('revision.end.rateAskDismiss')}
+              hitSlop={12}
+              testID="session-end-rate-dismiss"
+            >
+              <Ionicons name="close" size={16} color={palette.secondary} />
+            </Tap>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
@@ -116,6 +154,7 @@ const styles = StyleSheet.create({
   card: { flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 28 },
   body: { alignItems: 'center', gap: 8 },
   keep: { alignItems: 'center', gap: 12 },
+  rate: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   check: {
     width: 64,
     height: 64,

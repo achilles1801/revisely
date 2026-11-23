@@ -1,4 +1,4 @@
-# Delete account: Settings → Delete account, confirmed twice. The real deleteUserAccount function
+# Delete account: Settings → your account → Delete account, confirmed twice. The real deleteUserAccount function
 # (in the functions emulator) removes the account and its data from the server, and the app is
 # back at sign-in.
 # Rules (BEHAVIOUR.md): ACCOUNT-1
@@ -36,23 +36,12 @@ appId: com.revisionbuddy.app
 
 - tapOn:
     id: open-settings
-# The last row: on to the end of Settings, where it sits above the tab bar. Found at the screen's
-# foot, it sat under the tab bar, which took the tap (Android); and a last row can't be centred,
-# so centring it timed out on iOS, with the row in plain view (#328's run, Nov 7 2026).
-# Swipes first, counted, not timed, as settings-row.yaml does: a loaded iOS runner took 20 s a swipe.
-- repeat:
-    while:
-      notVisible:
-        id: settings-delete-account
-    times: 12
-    commands:
-      - scroll
-- scrollUntilVisible:
-    element:
-      id: settings-delete-account
-    direction: DOWN
-    timeout: 60000
-- scroll
+# Settings → your account (SET-1: the first level's top row) → Delete account, at the Account page's foot.
+- runFlow:
+    file: ../subflows/tap-to-open.yaml
+    env:
+      ID: settings-account
+      OPENS: settings-delete-account
 - tapOn:
     id: settings-delete-account
 # Two confirmations (Settings), then the server deletes.

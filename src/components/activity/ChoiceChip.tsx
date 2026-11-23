@@ -15,6 +15,7 @@ export function ChoiceChip({
   accessibilityLabel,
   accessibilityHint,
   size = 'sm',
+  on = false,
   testID,
 }: {
   label: string;
@@ -23,6 +24,8 @@ export function ChoiceChip({
   accessibilityHint: string;
   /** `sm`: 26 tall, beside a title; `md`: 32, the height of the tabs beside it. */
   size?: 'sm' | 'md';
+  /** Filled in ink: a choice that narrows what shows (a filter that isn't All), so it is seen at a glance. */
+  on?: boolean;
   testID?: string;
 }) {
   const { palette } = useTheme();
@@ -33,14 +36,15 @@ export function ChoiceChip({
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
       hitSlop={8}
-      style={[styles.chip, size === 'md' ? styles.md : styles.sm, { borderColor: palette.outline }]}
+      accessibilityState={on ? { selected: true } : undefined}
+      style={[styles.chip, size === 'md' ? styles.md : styles.sm, on ? { backgroundColor: palette.text, borderColor: palette.text } : { borderColor: palette.outline }]}
       testID={testID}
     >
       {/* Chrome: stops growing at 1.4×, as the tabs' labels do. */}
-      <Text style={[size === 'md' ? typeV2.name : [typeV2.meta, styles.smLabel], { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+      <Text style={[size === 'md' ? typeV2.name : [typeV2.meta, styles.smLabel], { color: on ? palette.bg : palette.text }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
         {label}
       </Text>
-      <Ionicons name="chevron-down" size={size === 'md' ? 15 : 13} color={palette.secondary} />
+      <Ionicons name="chevron-down" size={size === 'md' ? 15 : 13} color={on ? palette.bg : palette.secondary} />
     </Tap>
   );
 }

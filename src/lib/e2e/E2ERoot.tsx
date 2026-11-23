@@ -18,6 +18,7 @@ import { e2eVerse, E2EVerse, onE2EVerse } from './demoTranslations';
 import NetInfo from '@react-native-community/netinfo';
 import { paletteV2 } from '../../theme/v2';
 import { onOutboxChange, outboxText } from './outboxStatus';
+import { e2eTakeStatsLine, onE2ETakeStats } from './reciteLive';
 
 function zoneName(): string {
   try {
@@ -42,6 +43,9 @@ export function statusText(): string {
 
 function Status() {
   const [text, setText] = useState(statusText);
+  // A long take's numbers (flow 20), on a line of their own once it has ended.
+  const [take, setTake] = useState(e2eTakeStatsLine);
+  useEffect(() => onE2ETakeStats(() => setTake(e2eTakeStatsLine())), []);
   const [outbox, setOutbox] = useState(outboxText);
   useEffect(() => {
     const update = () => {
@@ -66,6 +70,11 @@ function Status() {
   }, []);
   return (
     <View pointerEvents="none" style={styles.status}>
+      {take ? (
+        <Text testID="e2e-take-stats" style={styles.text} allowFontScaling={false}>
+          {take}
+        </Text>
+      ) : null}
       <Text testID="e2e-status" style={styles.text} allowFontScaling={false} accessibilityLabel={`${text}${outbox}`}>
         {text}
       </Text>

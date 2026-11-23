@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -11,11 +11,12 @@ import { RecordingBackupController } from './src/components/RecordingBackupContr
 import { MushafOfflineController } from './src/components/MushafOfflineController';
 import { WidgetSync } from './src/components/WidgetSync';
 import { PrayerSync } from './src/components/prayer/PrayerSync';
+import { AthanOnTap } from './src/components/prayer/AthanOnTap';
 import { RevisionRemindersSync } from './src/components/RevisionRemindersSync';
 import { DesignProvider } from './src/design/DesignContext';
 import { DesignGate } from './src/design/DesignGate';
 import { AndroidSystemTheme } from './src/components/AndroidSystemTheme';
-import { registerForPushNotificationsAsync } from './src/lib/notifications';
+import { ensureAndroidChannels } from './src/lib/notifications';
 import { setupAppCheck } from './src/lib/appCheck';
 import * as Sentry from '@sentry/react-native';
 import { currentRelease, releaseTags } from './src/lib/releaseInfo';
@@ -23,6 +24,7 @@ import { markUiReady, startOtaUpdates } from './src/lib/updates/ota';
 import { stopTrace } from './src/lib/reciteLive/stopTrace';
 import { startStoreChecks } from './src/lib/updates/storeUpdates';
 import { UpdateRequiredGate } from './src/components/updates/UpdateRequired';
+import { loadLanguageChoice } from './src/i18n/choice';
 
 // Every launch is one Sentry session, labelled with the exact JavaScript it ran
 // (src/lib/releaseInfo.ts): release com.revisionbuddy.app@1.0.2+19.u<update>,
@@ -57,25 +59,8 @@ Sentry.init({
   // declared in the App Store privacy label. Kept off until it's declared.
   replaysSessionSampleRate: 0,
   replaysOnErrorSampleRate: 0,
-  integrations: [
-    // Settings → Report a problem (src/lib/sentry.ts reportProblem). A report
-    // carries the release and tags below, the recent breadcrumbs, and a
-    // screenshot if the user takes one; the native SDK keeps it until it can
-    // be sent when offline.
-    Sentry.feedbackIntegration({
-      formTitle: 'Report a problem',
-      messageLabel: 'What happened?',
-      messagePlaceholder: 'What were you doing, and what went wrong?',
-      submitButtonLabel: 'Send report',
-      showName: false,
-      showEmail: false,
-      isNameRequired: false,
-      isEmailRequired: false,
-      enableScreenshot: false,
-      enableTakeScreenshot: true,
-      successMessageText: 'Thank you. Your report was sent.',
-    }),
-  ],
+  // Settings → Report a problem is the app's own form (components/report); it sends through
+  // Sentry.captureFeedback (lib/sentry sendProblemReport), which needs no integration here.
 
   // uncomment the line below to enable Spotlight (https://spotlightjs.com)
   // spotlight: __DEV__,
@@ -91,6 +76,9 @@ startStoreChecks();
 // Sentry once (src/lib/reciteLive/stopTrace.ts).
 void stopTrace.reportLeftover();
 
+/** How long the splash waits for a restart into the right direction (LANG-1) before showing the app as it is. */
+const RESTART_FALLBACK_MS = 3000;
+
 function App() {
   // Amiri (classical Naskh) for all Arabic UI text. If loading fails we still
   // render — text falls back to the system Arabic face rather than blocking
@@ -101,11 +89,30 @@ function App() {
 
   useEffect(() => {
     setupAppCheck();
-    registerForPushNotificationsAsync();
+    // Android's channels only. Notification permission is asked where it means something (REMIND-4): onboarding's
+    // Start with "Daily reminders" on, or Home for an account with reminders on. Until Nov 2026 it was asked here,
+    // on the first screen of a fresh install before sign-in, and a no there turned reminders off at onboarding.
+    void ensureAndroidChannels();
+  }, []);
+
+  // The language (the one chosen in Settings, where there is a choice) and the layout's direction, before the first
+  // screen (src/i18n/choice.ts). The layout reads the way the app's language does, not the phone's (BEHAVIOUR.md
+  // LANG-1): a launch that started the other way (Android mirrors any app on a phone set to Arabic) restarts once, and
+  // the splash stays up for it. If that restart never comes, the app shows after RESTART_FALLBACK_MS as it is.
+  const [languageReady, setLanguageReady] = useState(false);
+  useEffect(() => {
+    let fallback: ReturnType<typeof setTimeout> | undefined;
+    void loadLanguageChoice()
+      .then(({ restarting }) => {
+        if (restarting) fallback = setTimeout(() => setLanguageReady(true), RESTART_FALLBACK_MS);
+        else setLanguageReady(true);
+      })
+      .catch(() => setLanguageReady(true));
+    return () => clearTimeout(fallback);
   }, []);
 
   // Something to show: the splash can go once the launch check is done.
-  const fontsSettled = fontsLoaded || !!fontError;
+  const fontsSettled = (fontsLoaded || !!fontError) && languageReady;
   useEffect(() => {
     if (fontsSettled) markUiReady();
   }, [fontsSettled]);
@@ -130,6 +137,7 @@ function App() {
                   <MushafOfflineController />
                   <WidgetSync />
                   <PrayerSync />
+                  <AthanOnTap />
                   <RevisionRemindersSync />
                   {/* Last: over everything when this version is no longer supported. */}
                   <UpdateRequiredGate />

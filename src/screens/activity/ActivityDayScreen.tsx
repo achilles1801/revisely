@@ -46,7 +46,9 @@ import { getQuranData } from '../../lib/quranData';
 import { logger } from '../../lib/logger';
 import { spacing } from '../../theme/spacing';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
-import type { JournalEntry, ReadingSession, RevisionLog } from '../../types';
+import type { JournalEntry, JournalNote, ReadingSession, RevisionLog } from '../../types';
+import { UndoQueue } from '../../lib/activityAdd';
+import { AddNoteSheet } from '../../components/activity/AddNoteSheet';
 import { RecordingsList } from '../../components/recordings/RecordingsList';
 import { deleteRecordings, isReadingRecordingDuring } from '../../lib/recordings';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
@@ -68,12 +70,13 @@ import { customPlanAfterUnmemorizing } from '../../lib/memorizationChanges';
 import { MemorizationItem, memorizationItemsWithWaiting } from '../../lib/offline/memorizationItems';
 import { describePassage } from '../../lib/passages';
 import { shiftDay } from '../../lib/journal';
+import { formatDate, formatTime, t, weekdayName } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActivityDay'>;
 type ScreenRoute = RouteProp<HomeStackParamList, 'ActivityDay'>;
 
 function formatTimeOfDay(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return formatTime(new Date(ms));
 }
 
 // 'YYYY-MM-DD' as a local date; new Date('YYYY-MM-DD') is UTC midnight,
@@ -85,14 +88,14 @@ function aheadSummary(log: RevisionLog): string | null {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([day, pages]) => {
       const [y, m, d] = day.split('-').map(Number);
-      return `${pages.length} ahead for ${new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short' })}`;
+      return t('activity.dayScreen.aheadFor', { count: pages.length, day: weekdayName(new Date(y, m - 1, d), 'short') });
     });
   return parts.length > 0 ? parts.join(', ') : null;
 }
 
 function formatLongDay(date: string): string {
   const [y, m, d] = date.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+  return formatDate(new Date(y, m - 1, d), {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
@@ -115,6 +118,8 @@ function sessionPagesOf(log: RevisionLog): number[] {
  */
 /** How long Delete waits for the other memorization items before going on without them (offline). */
 const OTHER_ITEMS_MS = 5000;
+/** How long a deleted note can be brought back (ACT-6). */
+const NOTE_UNDO_MS = 5000;
 
 /** `promise`, or a rejection after `ms`. */
 function withinMs<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -248,16 +253,16 @@ export default function ActivityDayScreen() {
       await queueChange({ kind: 'reading.pages', id: session.id, pages });
     } catch (err) {
       logger.error('Failed to update session pages', err);
-      Alert.alert("Couldn't save pages", 'Please try again.');
+      Alert.alert(t('activity.dayScreen.couldntSavePages'), t('common.pleaseTryAgain'));
       load();
     }
   };
 
   const removeReading = (session: ReadingSession) => {
-    Alert.alert('Delete session?', `${formatDuration(session.durationSeconds)} of reading will be removed, with any recordings made during it.`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('activity.dayScreen.deleteSessionTitle'), t('activity.dayScreen.deleteReadingBody', { duration: formatDuration(session.durationSeconds) }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           setEditingReading(null);
@@ -282,7 +287,58 @@ export default function ActivityDayScreen() {
     ]);
   };
 
-  const openJournal = () => navigation.navigate('JournalEntry', { date });
+  // A note's menu (ACT-6). Edit opens the Note sheet filled in. Delete takes it off at once, with Undo; it is saved
+  // once the undo window has passed, and leaving the screen saves any still waiting.
+  const [editingNote, setEditingNote] = useState<JournalNote | null>(null);
+  const [writingNote, setWritingNote] = useState(false);
+  const noteUndo = useRef(new UndoQueue());
+  const [goneNotes, setGoneNotes] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    const queue = noteUndo.current;
+    return () => queue.flush();
+  }, []);
+  const shownNotes = (journal?.entries ?? []).filter((n) => !goneNotes.has(n.id));
+  const deleteNote = (note: JournalNote) => {
+    const key = `note-${note.id}`;
+    setGoneNotes((g) => new Set(g).add(note.id));
+    noteUndo.current.schedule(key, () => {
+      queueChange({ kind: 'journal.entry.delete', date, id: note.id }).catch((err) => logger.error('Failed to delete a note', err));
+    }, NOTE_UNDO_MS);
+    setUndoOffer({
+      text: t('journal.noteDeleted'),
+      duration: NOTE_UNDO_MS,
+      undo: () => {
+        if (!noteUndo.current.undo(key)) return;
+        setGoneNotes((g) => {
+          const next = new Set(g);
+          next.delete(note.id);
+          return next;
+        });
+      },
+    });
+  };
+  const deleteAllNotes = () => {
+    const all = shownNotes.filter((n) => n.kind === 'note');
+    Alert.alert(t('activity.day.deleteAllNotesTitle'), t('activity.day.deleteAllNotesBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: () => {
+          setGoneNotes((g) => new Set([...g, ...all.map((n) => n.id)]));
+          void (async () => {
+            try {
+              for (const n of all) await queueChange({ kind: 'journal.entry.delete', date, id: n.id });
+            } catch (err) {
+              logger.error('Failed to delete the day’s notes', err);
+              Alert.alert(t('journal.deleteFailed'), t('common.pleaseTryAgain'));
+              load();
+            }
+          })();
+        },
+      },
+    ]);
+  };
 
   // Opened from "Recording saved · View": scroll to the recordings once laid out.
   const onRecordingsLayout = (e: { nativeEvent: { layout: { y: number; height: number } } }) => {
@@ -316,17 +372,17 @@ export default function ActivityDayScreen() {
       return {
         key: log.id,
         mark: <Mark size="reply" done />,
-        name: `${n} ${n === 1 ? 'page' : 'pages'} revised`,
+        name: t('activity.dayScreen.pagesRevised', { count: n }),
         meta: log.durationMinutes != null ? formatMinutes(log.durationMinutes) : undefined,
         body: (
           <RowText secondary numberOfLines={2}>
             {`${describePageRuns(runs)} · ${describeRevised(ownRevised(log), { juzPlan })}${
-              log.pagesSkipped.length > 0 ? ` · ${log.pagesSkipped.length} skipped` : ''
+              log.pagesSkipped.length > 0 ? ` · ${t('activity.dayScreen.skipped', { n: log.pagesSkipped.length })}` : ''
             }${ahead ? ` · ${ahead}` : ''}`}
           </RowText>
         ),
         onPress: () => setEditingLog(log),
-        a11y: `Revision session, ${n} pages revised${ahead ? `, ${ahead}` : ''}. Edit`,
+        a11y: ahead ? t('activity.dayScreen.revisionA11yAhead', { count: n, ahead }) : t('activity.dayScreen.revisionA11y', { count: n }),
       };
     })),
     ...(blocks ? [] : readings.map((r): Reply => ({
@@ -336,25 +392,25 @@ export default function ActivityDayScreen() {
       meta: r.startedAt > 0 ? `${formatTimeOfDay(r.startedAt)} – ${formatTimeOfDay(r.endedAt)}` : undefined,
       body:
         r.pages.length > 0 ? (
-          <RowText secondary numberOfLines={1}>{`Pages ${formatPageRanges(r.pages)}`}</RowText>
+          <RowText secondary numberOfLines={1}>{t('activity.dayScreen.pagesList', { ranges: formatPageRanges(r.pages) })}</RowText>
         ) : (
           <RowText secondary>
-            {r.mode !== 'stopwatch' && r.targetSeconds ? `${Math.round(r.targetSeconds / 60)} min timer` : 'Timed session'}
+            {r.mode !== 'stopwatch' && r.targetSeconds ? t('activity.dayScreen.minTimer', { n: Math.round(r.targetSeconds / 60) }) : t('activity.dayScreen.timedSession')}
           </RowText>
         ),
       footer:
         r.pages.length === 0 ? (
-          <PillButton title="Add pages" size="sm" variant="outline" icon="add" onPress={() => setEditingReading(r)} />
+          <PillButton title={t('activity.dayScreen.addPages')} size="sm" variant="outline" icon="add" onPress={() => setEditingReading(r)} />
         ) : undefined,
       onPress: () => setEditingReading(r),
       onMenu: () => setTimedMenu(r),
-      a11y: `Timed session, ${formatDuration(r.durationSeconds)}. Edit pages`,
+      a11y: t('activity.dayScreen.timedA11y', { duration: formatDuration(r.durationSeconds) }),
     }))),
     // One row per note, in the order they were written.
     ...(blocks
       ? []
       : journal
-      ? journal.entries.map((n): Reply => {
+      ? shownNotes.map((n): Reply => {
           const text = n.text.trim();
           const time = formatEntryTime(n.at, date, user);
           return {
@@ -363,26 +419,26 @@ export default function ActivityDayScreen() {
             name: JOURNAL_KIND_LABELS[n.kind],
             meta: n.minutes != null ? `${time} · ${formatMinutes(n.minutes)}` : time,
             body: text ? <RowText numberOfLines={4}>{text}</RowText> : undefined,
-            onPress: openJournal,
-            a11y: `Daily log, ${JOURNAL_KIND_LABELS[n.kind]} at ${time}. Open the log`,
+            onPress: () => setEditingNote(n),
+            a11y: t('activity.dayScreen.logA11y', { kind: JOURNAL_KIND_LABELS[n.kind], time }),
           };
         })
       : [
           {
             key: 'journal',
             mark: <Mark size="reply" icon="create-outline" />,
-            name: 'Daily log',
-            meta: 'Nothing written',
-            footer: <PillButton title="Write" size="sm" variant="outline" icon="create-outline" onPress={openJournal} />,
-            onPress: openJournal,
-            a11y: 'Daily log: nothing written. Write',
+            name: t('activity.dayScreen.dailyLog'),
+            meta: t('activity.dayScreen.nothingWritten'),
+            footer: <PillButton title={t('activity.dayScreen.write')} size="sm" variant="outline" icon="create-outline" onPress={() => setWritingNote(true)} />,
+            onPress: () => setWritingNote(true),
+            a11y: t('activity.dayScreen.logEmptyA11y'),
           } as Reply,
         ]),
   ];
   const parts = [
-    revisions.length > 0 ? `${revisions.length} revision ${revisions.length === 1 ? 'session' : 'sessions'}` : null,
-    readings.length > 0 ? `${readings.length} timed` : null,
-    journal ? 'daily log' : null,
+    revisions.length > 0 ? t('activity.dayScreen.revisionSessions', { count: revisions.length }) : null,
+    readings.length > 0 ? t('activity.dayScreen.timedCount', { n: readings.length }) : null,
+    journal ? t('activity.dayScreen.dailyLogLower') : null,
   ].filter(Boolean);
   // Deleting a memorization (ACT-7): it takes off exactly the ayahs it added, keeping those another
   // item holds and pages memorized before it (one change to the pages, which also updates this
@@ -429,7 +485,7 @@ export default function ActivityDayScreen() {
               <HelpButton screen="day" />
               <IconButton
                 icon="add"
-                label={date === today || date === previousIsoDay(today) ? 'Add' : 'Add a note'}
+                label={date === today || date === previousIsoDay(today) ? t('activity.add.add') : t('activity.dayScreen.addNote')}
                 onPress={() => setAddOpen(true)}
                 size={28}
                 testID="day-add"
@@ -461,7 +517,7 @@ export default function ActivityDayScreen() {
           {loadError && (
             <Tap onPress={load} style={[v2.banner, { borderBottomColor: palette.separator }]} accessibilityRole="button">
               <Ionicons name="cloud-offline-outline" size={18} color={palette.secondary} />
-              <Text style={[typeV2.body, { color: palette.text, flex: 1 }]}>Couldn't load all of this day. Tap to retry.</Text>
+              <Text style={[typeV2.body, { color: palette.text, flex: 1 }]}>{t('activity.dayScreen.couldntLoad')}</Text>
             </Tap>
           )}
           {!blocks && (
@@ -473,19 +529,21 @@ export default function ActivityDayScreen() {
               separator={false}
               testID="day-post"
             >
-              <RowText secondary>{parts.length > 0 ? parts.join(' · ') : 'Nothing logged yet'}</RowText>
+              <RowText secondary>{parts.length > 0 ? parts.join(' · ') : t('activity.dayScreen.nothingLoggedYet')}</RowText>
             </ThreadRow>
           )}
           {blocks && (
             <DayBlocks
               day={date}
               today={today}
-              revisionNotes={(journal?.entries ?? []).filter((n) => n.kind === 'revision')}
-              memorizationNotes={(journal?.entries ?? []).filter((n) => n.kind === 'memorization')}
+              revisionNotes={shownNotes.filter((n) => n.kind === 'revision')}
+              memorizationNotes={shownNotes.filter((n) => n.kind === 'memorization')}
               readings={readings}
-              notes={(journal?.entries ?? []).filter((n) => n.kind === 'note')}
+              notes={shownNotes.filter((n) => n.kind === 'note')}
               onEditReading={setEditingReading}
-              onOpenLog={openJournal}
+              onEditNote={setEditingNote}
+              onDeleteNote={deleteNote}
+              onDeleteAllNotes={deleteAllNotes}
               revisedLog={logs.find((l) => l.date === date) ?? null}
               onDeleteRevised={(log) => {
                 void deleteLog(log.id);
@@ -498,6 +556,8 @@ export default function ActivityDayScreen() {
               focusBlock={focusBlock}
               onFocusBlockLayout={(y) => scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.md), animated: true })}
               onOpenRecording={(id) => navigation.navigate('ListenBack', { recordingId: id })}
+              onShowTake={(take, page) => navigation.navigate('QuranReader', { pageNumber: page, showTake: take.id })}
+              onSeeAllTakes={() => navigation.navigate('ActivityAll', { kind: 'recitation' })}
               onDeleteReading={removeReading}
               // Memorized today (MEM-4): first tomorrow on an automatic plan, or onto a custom plan's day.
               // A toast says so, with Undo (ACT-24): the tap used to save with no sign of it.
@@ -524,7 +584,7 @@ export default function ActivityDayScreen() {
                 meta={r.meta}
                 onPress={r.onPress}
                 onMenu={r.onMenu}
-                menuLabel="Session options"
+                menuLabel={t('activity.row.sessionOptions')}
                 lineAbove
                 lineBelow={!last}
                 separator={last}
@@ -546,7 +606,7 @@ export default function ActivityDayScreen() {
               onOpen={(r) => navigation.navigate('ListenBack', { recordingId: r.id })}
               header={
                 <Text style={[typeV2.name, v2.section, { color: palette.text }]} accessibilityRole="header">
-                  Recordings
+                  {t('activity.dayScreen.recordings')}
                 </Text>
               }
             />
@@ -557,8 +617,8 @@ export default function ActivityDayScreen() {
       <UndoToast
         visible={undoOffer != null}
         message={undoOffer?.text ?? ''}
-        actionLabel="Undo"
-        duration={6000}
+        actionLabel={t('common.undo')}
+        duration={undoOffer?.duration ?? 6000}
         onUndo={() => {
           const offer = undoOffer;
           setUndoOffer(null);
@@ -571,13 +631,13 @@ export default function ActivityDayScreen() {
       <ActionSheet
         visible={timedMenu != null}
         onClose={() => setTimedMenu(null)}
-        title="Timed session"
+        title={t('activity.dayScreen.timedSession')}
         message={timedMenu ? formatDuration(timedMenu.durationSeconds) : undefined}
         actions={
           timedMenu
             ? [
-                { key: 'pages', label: 'Edit pages', icon: 'create-outline', onPress: () => setEditingReading(timedMenu) },
-                { key: 'delete', label: 'Delete session', icon: 'trash-outline', destructive: true, onPress: () => removeReading(timedMenu) },
+                { key: 'pages', label: t('activity.dayScreen.editPages'), icon: 'create-outline', onPress: () => setEditingReading(timedMenu) },
+                { key: 'delete', label: t('activity.readingPages.deleteSession'), icon: 'trash-outline', destructive: true, onPress: () => removeReading(timedMenu) },
               ]
             : []
         }
@@ -592,8 +652,21 @@ export default function ActivityDayScreen() {
           // Today and yesterday take Revised elsewhere, Memorized and a note; an older day only a
           // note, so its history and the streak can't be rewritten (ACT-17).
           noteOnly={date !== today && date !== previousIsoDay(today)}
+          noteCount={shownNotes.length}
         />
       )}
+      {/* A note being edited; and, without the blocks (which have the +), a new one. */}
+      <AddNoteSheet
+        visible={editingNote != null || writingNote}
+        onClose={() => {
+          setEditingNote(null);
+          setWritingNote(false);
+        }}
+        day={date}
+        dayName={date === today ? 'today' : date === previousIsoDay(today) ? 'yesterday' : heading.title}
+        note={editingNote}
+        noteCount={shownNotes.length}
+      />
       <ReadingPagesSheet
         session={editingReading}
         onClose={() => setEditingReading(null)}

@@ -14,7 +14,9 @@ jest.mock('expo-notifications', () => ({
   cancelScheduledNotificationAsync: jest.fn(async (id: string) => {
     mockScheduled.delete(id);
   }),
-  getAllScheduledNotificationsAsync: jest.fn(async () => [...mockScheduled].map(([identifier, r]) => ({ identifier, ...r }))),
+  getAllScheduledNotificationsAsync: jest.fn(async () =>
+    [...mockScheduled].map(([identifier, r]) => ({ identifier, ...r })),
+  ),
   getPresentedNotificationsAsync: jest.fn(async () => mockPresented),
   dismissNotificationAsync: jest.fn(async () => undefined),
 }));
@@ -27,7 +29,11 @@ const TIMER_ID = 'reading-timer-complete';
 const PRAYER_ID = 'prayer-2026-10-28-asr';
 const ids = () => [...mockScheduled.keys()].sort();
 
-const reminder = (kind: PlannedReminder['kind'], hour: number, interruption: PlannedReminder['interruption'] = 'active'): PlannedReminder => ({
+const reminder = (
+  kind: PlannedReminder['kind'],
+  hour: number,
+  interruption: PlannedReminder['interruption'] = 'active',
+): PlannedReminder => ({
   id: `${REVISION_REMINDER_PREFIX}2026-10-28-${kind}`,
   at: new Date(2026, 9, 28, hour),
   title: 'Title',
@@ -46,7 +52,10 @@ beforeEach(() => {
 describe('syncRevisionReminders', () => {
   it('schedules each planned reminder by its name, at its time, on the reminder channel', async () => {
     await syncRevisionReminders([reminder('morning', 8), reminder('midday', 15)]);
-    expect(ids()).toEqual([`${REVISION_REMINDER_PREFIX}2026-10-28-midday`, `${REVISION_REMINDER_PREFIX}2026-10-28-morning`]);
+    expect(ids()).toEqual([
+      `${REVISION_REMINDER_PREFIX}2026-10-28-midday`,
+      `${REVISION_REMINDER_PREFIX}2026-10-28-morning`,
+    ]);
     const morning = mockScheduled.get(`${REVISION_REMINDER_PREFIX}2026-10-28-morning`)!;
     expect(morning.content).toMatchObject({ title: 'Title', body: 'Body', sound: true, interruptionLevel: 'active' });
     expect(morning.trigger).toEqual({ type: 'date', date: new Date(2026, 9, 28, 8), channelId: 'default' });
@@ -92,13 +101,15 @@ describe('syncRevisionReminders', () => {
 });
 
 describe('dismissPresentedRevisionReminders', () => {
-  it('lifts only this app\'s revision reminders off the lock screen', async () => {
+  it("lifts only this app's revision reminders off the lock screen", async () => {
     mockPresented = [
       { request: { identifier: `${REVISION_REMINDER_PREFIX}2026-10-28-morning` } },
       { request: { identifier: PRAYER_ID } },
     ];
     await dismissPresentedRevisionReminders();
     expect(Notifications.dismissNotificationAsync).toHaveBeenCalledTimes(1);
-    expect(Notifications.dismissNotificationAsync).toHaveBeenCalledWith(`${REVISION_REMINDER_PREFIX}2026-10-28-morning`);
+    expect(Notifications.dismissNotificationAsync).toHaveBeenCalledWith(
+      `${REVISION_REMINDER_PREFIX}2026-10-28-morning`,
+    );
   });
 });

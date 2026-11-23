@@ -4,7 +4,9 @@ import * as Haptics from 'expo-haptics';
 
 jest.mock('@expo/vector-icons', () => {
   const { Text } = require('react-native');
-  return { Ionicons: ({ name, color }: { name: string; color: string }) => <Text testID={`icon-${name}`}>{color}</Text> };
+  return {
+    Ionicons: ({ name, color }: { name: string; color: string }) => <Text testID={`icon-${name}`}>{color}</Text>,
+  };
 });
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 require('react-native-gesture-handler/jestSetup');
@@ -151,11 +153,7 @@ describe('the tab bar in a real navigator', () => {
     render(
       wrap(
         <NavigationContainer>
-          <Tab.Navigator
-            initialRouteName="Read"
-            tabBar={(props: any) => <TabBar {...props} />}
-            swipeableCount={3}
-          >
+          <Tab.Navigator initialRouteName="Read" tabBar={(props: any) => <TabBar {...props} />} swipeableCount={3}>
             <Tab.Screen name="Home" component={Home} />
             <Tab.Screen name="Read" component={ReadStack} />
             <Tab.Screen name="Insights" component={Home} />

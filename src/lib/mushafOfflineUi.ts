@@ -13,46 +13,51 @@ import {
   removeMushafDownload,
 } from './mushafOffline';
 import { networkState, onUnmeteredNetwork } from './networkState';
+import { t } from '../i18n';
+import { formatNumber } from '../i18n';
 
 /** Megabytes as the system counts them (1 MB = 1,000,000 bytes), e.g. "247 MB", never split across lines. */
 export function formatMegabytes(bytes: number): string {
   const mb = bytes / 1e6;
-  return `${mb >= 10 ? Math.round(mb) : Math.max(0.1, Math.round(mb * 10) / 10)}\u00A0MB`;
+  return t('common.megabytesTight', { n: mb >= 10 ? Math.round(mb) : Math.max(0.1, Math.round(mb * 10) / 10) });
 }
 
 /** The row's value (right) and the line under its label. */
 export function describeMushaf(s: MushafStatus): { value: string; subtitle: string } {
   // While the pages are done and the text isn't, the progress names the text.
-  const pages = s.pages >= s.total && !s.textReady ? 'the text and translation' : `${s.pages} of ${s.total} pages`;
-  const percent = `${s.totalBytes > 0 ? Math.floor((s.bytes / s.totalBytes) * 100) : 0}%`;
-  const over = s.prefs.cellular ? 'Wi-Fi or mobile data' : 'Wi-Fi';
+  const pages = s.pages >= s.total && !s.textReady ? t('mushaf.offline.textAndTranslation') : t('mushaf.offline.pagesOf', { pages: s.pages, total: s.total });
+  const percent = formatNumber(s.totalBytes > 0 ? Math.floor((s.bytes / s.totalBytes) * 100) / 100 : 0, { style: 'percent' });
+  const over = s.prefs.cellular ? t('mushaf.offline.wifiOrData') : t('mushaf.offline.wifi');
   switch (s.phase) {
     case 'complete':
       return {
-        value: 'Downloaded',
-        subtitle: `All ${s.total} pages and Saheeh International · ${formatMegabytes(s.bytes)}`,
+        value: t('mushaf.offline.downloaded'),
+        subtitle: t('mushaf.offline.allPages', { total: s.total, size: formatMegabytes(s.bytes) }),
       };
     case 'downloading':
-      return { value: percent, subtitle: `Downloading · ${pages}` };
+      return { value: percent, subtitle: t('mushaf.offline.downloading', { pages }) };
     case 'pending':
       return s.pages > 0 || s.textReady
-        ? { value: percent, subtitle: `Downloads on ${over} · ${pages}` }
-        : { value: '', subtitle: `Downloads on ${over} · ${formatMegabytes(s.totalBytes)}` };
+        ? { value: percent, subtitle: t('mushaf.offline.downloadsOn', { over, what: pages }) }
+        : { value: '', subtitle: t('mushaf.offline.downloadsOn', { over, what: formatMegabytes(s.totalBytes) }) };
     case 'waiting-for-wifi':
-      return { value: 'Download', subtitle: `Waiting for Wi-Fi · ${pages}` };
+      return { value: t('mushaf.offline.download'), subtitle: t('mushaf.offline.waitingWifi', { pages }) };
     case 'offline':
-      return { value: percent, subtitle: `Continues when you're online · ${pages}` };
+      return { value: percent, subtitle: t('mushaf.offline.continuesOnline', { pages }) };
     case 'paused':
       return {
-        value: 'Download',
-        subtitle: s.pages > 0 ? `${s.pages} of ${s.total} pages on this phone` : `Not on this phone · ${formatMegabytes(s.totalBytes)}`,
+        value: t('mushaf.offline.download'),
+        subtitle:
+          s.pages > 0
+            ? t('mushaf.offline.pagesOnPhone', { pages: s.pages, total: s.total })
+            : t('mushaf.offline.notOnPhone', { size: formatMegabytes(s.totalBytes) }),
       };
     case 'no-space':
-      return { value: percent, subtitle: `Not enough free space · ${pages}` };
+      return { value: percent, subtitle: t('mushaf.offline.noSpace', { pages }) };
     case 'error':
-      return { value: percent, subtitle: `Some of it didn't download · tries again soon` };
+      return { value: percent, subtitle: t('mushaf.offline.error') };
     default:
-      return { value: '', subtitle: 'Every page and Saheeh International, for reading offline' };
+      return { value: '', subtitle: t('mushaf.offline.idle') };
   }
 }
 
@@ -67,7 +72,7 @@ export function mushafMenuActions(s: MushafStatus): SheetAction[] {
   if (s.phase !== 'complete') {
     actions.push({
       key: 'download',
-      label: 'Download now',
+      label: t('mushaf.offline.downloadNow'),
       icon: 'cloud-download-outline',
       onPress: () => downloadNow(s),
     });
@@ -76,18 +81,18 @@ export function mushafMenuActions(s: MushafStatus): SheetAction[] {
   if (s.pages > 0 || s.textReady) {
     actions.push({
       key: 'remove',
-      label: 'Remove from this phone',
+      label: t('mushaf.offline.remove'),
       icon: 'trash-outline',
       destructive: true,
       onPress: () => {
         // Remove takes the other print's pages too (Settings → Mushaf); listed on the tap, not each render.
         const freed = s.bytes + otherEditionsOnPhone().reduce((n, o) => n + o.bytes, 0);
         Alert.alert(
-          'Remove the offline mushaf?',
-          `This frees ${formatMegabytes(freed)}. Pages and translations you open still download as you read.`,
+          t('mushaf.offline.removeTitle'),
+          t('mushaf.offline.removeBody', { size: formatMegabytes(freed) }),
           [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Remove', style: 'destructive', onPress: () => void removeMushafDownload() },
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('mushaf.offline.removeButton'), style: 'destructive', onPress: () => void removeMushafDownload() },
           ],
         );
       },
@@ -101,11 +106,11 @@ function downloadNow(s: MushafStatus) {
   const net = networkState();
   if (net?.connected && !onUnmeteredNetwork(net) && !s.prefs.cellular) {
     Alert.alert(
-      'Download over mobile data?',
-      `About ${formatMegabytes(Math.max(0, s.totalBytes - s.bytes))} left to download.`,
+      t('mushaf.offline.dataTitle'),
+      t('mushaf.offline.dataBody', { size: formatMegabytes(Math.max(0, s.totalBytes - s.bytes)) }),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Download', onPress: () => void downloadMushafNow({ overMobileData: true }) },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('mushaf.offline.download'), onPress: () => void downloadMushafNow({ overMobileData: true }) },
       ],
     );
     return;

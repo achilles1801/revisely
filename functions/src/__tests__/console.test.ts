@@ -1,5 +1,6 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { ConsoleDeps, handleAdminConsole } from '../console/handler';
+import { LabelDeps, checkActions, checkLabel } from '../console/labels';
 import { ConsoleError, GRANTS, PERMISSIONS, ROLES, Role, StaffCaller, can, claimsWithRole, permissionsOf, requirePermission, roleOf } from '../console/roles';
 
 describe('console roles', () => {
@@ -85,6 +86,7 @@ describe('adminConsole: who gets what', () => {
       project: 'revisely-dev',
       openDoor: false,
       metricsEnvs: [],
+      labels: false,
     });
     expect(await handleAdminConsole(as('reviewer'), { action: 'me' }, false, deps())).toMatchObject({ roleName: 'Reviewer', openDoor: true });
     expect(await handleAdminConsole(as('dev'), { action: 'me' }, false, deps())).toMatchObject({ permissions: ['metrics.read'], openDoor: false });
@@ -245,5 +247,125 @@ describe('adminConsole: the Staff page (owner only)', () => {
   it('needs App Check like every action but me', async () => {
     const { d } = world(team, emails);
     expect(await refusal(handleAdminConsole(owner, { action: 'staff.list' }, false, d))).toMatch(/^failed-precondition/);
+  });
+});
+
+describe('adminConsole: recitation labels', () => {
+  const untouchable = new Proxy({}, { get: () => { throw new Error('the database was read'); } }) as unknown as Firestore;
+  const labels = (over: Partial<LabelDeps> = {}): LabelDeps => ({
+    db: untouchable,
+    open: true,
+    audio: async () => { throw new Error('audio was read'); },
+    now: () => Date.parse('2026-11-15T12:00:00Z'),
+    ...over,
+  });
+  const deps = (over: Partial<ConsoleDeps> = {}): ConsoleDeps => ({
+    db: untouchable,
+    accounts: async () => { throw new Error('accounts were read'); },
+    accountByEmail: async () => { throw new Error('accounts were read'); },
+    hasPlan: async () => false,
+    programOpen: true,
+    project: 'revisely-dev',
+    now: () => Date.parse('2026-11-15T12:00:00Z'),
+    log: () => undefined,
+    staff: async () => { throw new Error('staff were read'); },
+    setRole: async () => { throw new Error('a role was set'); },
+    labels: labels(),
+    ...over,
+  });
+  const as = (role: Role | null): StaffCaller => ({ uid: 'staff', email: 'staff@example.com', role });
+  async function code(p: Promise<unknown>): Promise<string> {
+    try {
+      await p;
+    } catch (err) {
+      if (err instanceof ConsoleError) return err.code;
+      throw err;
+    }
+    return 'ok';
+  }
+
+  it('is for owners, admins and labellers, where the page is (revisely-dev), and needs App Check', async () => {
+    expect(can('owner', 'recite.label')).toBe(true);
+    expect(can('admin', 'recite.label')).toBe(true);
+    expect(can('labeller', 'recite.label')).toBe(true);
+    expect(can('reviewer', 'recite.label')).toBe(false);
+    expect(can('dev', 'recite.label')).toBe(false);
+    // A labeller may do nothing else in the console.
+    expect(GRANTS.labeller).toEqual(['recite.label']);
+    for (const data of [{ action: 'od.summary' }, { action: 'od.queue' }, { action: 'audit.labels' }, { action: 'audit.roles' }, { action: 'staff.list' }]) {
+      expect(await code(handleAdminConsole(as('labeller'), data, true, deps()))).toBe('permission-denied');
+    }
+    const actions = [{ action: 'labels.next' }, { action: 'labels.get', id: 'c1' }, { action: 'labels.save', id: 'c1', marks: {} }, { action: 'labels.stats' }];
+    for (const data of actions) {
+      for (const role of [null, 'dev', 'reviewer'] as const) {
+        expect(await code(handleAdminConsole(as(role), data, true, deps()))).toBe('permission-denied');
+      }
+      expect(await code(handleAdminConsole(as('owner'), data, false, deps()))).toBe('failed-precondition');
+      expect(await code(handleAdminConsole(as('owner'), data, true, deps({ labels: labels({ open: false }) })))).toBe('failed-precondition');
+      expect(await code(handleAdminConsole(as('owner'), data, true, deps({ labels: undefined })))).toBe('failed-precondition');
+    }
+    expect(await code(handleAdminConsole(as('admin'), { action: 'labels.get', id: '../users/x' }, true, deps()))).toBe('invalid-argument');
+    expect(await code(handleAdminConsole(as('admin'), { action: 'labels.nope' }, true, deps()))).toBe('invalid-argument');
+  });
+
+  it('me says whether the page is open to the caller', async () => {
+    expect(await handleAdminConsole(as('owner'), { action: 'me' }, false, deps())).toMatchObject({ labels: true });
+    expect(await handleAdminConsole(as('admin'), { action: 'me' }, false, deps())).toMatchObject({ labels: true });
+    expect(await handleAdminConsole(as('reviewer'), { action: 'me' }, false, deps())).toMatchObject({ labels: false });
+    expect(await handleAdminConsole(as('labeller'), { action: 'me' }, false, deps())).toMatchObject({ labels: true, roleName: 'Labeller', permissions: ['recite.label'], openDoor: false, metricsEnvs: [] });
+    expect(await handleAdminConsole(as('owner'), { action: 'me' }, false, deps({ labels: labels({ open: false }) }))).toMatchObject({ labels: false });
+    expect(await handleAdminConsole(as('owner'), { action: 'me' }, false, deps({ labels: undefined }))).toMatchObject({ labels: false });
+  });
+
+  it('a label answers every mark (unless the clip is skipped), with known answers, on the clip’s own marks and words', () => {
+    const clip = {
+      marks: [
+        { id: '10:word:', w: 10, kind: 'word' as const },
+        { id: '12:harakat:', w: 12, kind: 'harakat' as const },
+      ],
+      words: [10, 11, 12].map((w) => ({ w, t: 'كلمة', s: 1, a: 1 })),
+    };
+    const ok = { marks: { '10:word:': 'yes', '12:harakat:': 'no' }, words: { 11: 'letter' } };
+    expect(checkLabel(clip, ok)).toEqual({ marks: { '10:word:': 'yes', '12:harakat:': 'no' }, words: { 11: 'letter' }, clip: 'mistakes', answers: 3, actions: [] });
+    // Every mark "not a mistake" and nothing missed: the clip is fine.
+    expect(checkLabel(clip, { marks: { '10:word:': 'no', '12:harakat:': 'unsure' } })).toMatchObject({ clip: 'fine', answers: 2 });
+    expect(() => checkLabel(clip, { marks: { '10:word:': 'yes' } })).toThrow('One mark has no answer yet.');
+    expect(() => checkLabel(clip, { marks: {} })).toThrow('2 marks have no answer yet.');
+    expect(() => checkLabel(clip, { ...ok, marks: { ...ok.marks, '99:word:': 'yes' } })).toThrow('A mark isn’t on this clip.');
+    expect(() => checkLabel(clip, { ...ok, marks: { '10:word:': 'maybe', '12:harakat:': 'no' } })).toThrow('one of yes, no or can’t tell');
+    expect(() => checkLabel(clip, { ...ok, words: { 13: 'word' } })).toThrow('A word isn’t in this clip.');
+    expect(() => checkLabel(clip, { ...ok, words: { 11: 'fine' } })).toThrow('A word’s label isn’t one the page offers.');
+    // A skipped clip may leave marks unanswered; the reason must be a known one.
+    expect(checkLabel(clip, { marks: {}, skip: 'audio' })).toEqual({ marks: {}, words: {}, skip: 'audio', clip: 'unusable', answers: 0, actions: [] });
+    // Notes: optional, on the clip's own words, trimmed to one line, at most 300 characters, any language.
+    expect(checkLabel(clip, { ...ok, wordNotes: { 10: '  sounded like\nqaala  ', 11: '' }, note: 'صوت في الخلفية' })).toMatchObject({
+      wordNotes: { 10: 'sounded like qaala' },
+      note: 'صوت في الخلفية',
+    });
+    expect(checkLabel(clip, ok)).not.toHaveProperty('wordNotes');
+    expect(() => checkLabel(clip, { ...ok, wordNotes: { 99: 'x' } })).toThrow('A note is on a word that isn’t in this clip.');
+    expect(() => checkLabel(clip, { ...ok, note: 'x'.repeat(301) })).toThrow('longer than 300');
+    expect(() => checkLabel(clip, { ...ok, note: { evil: true } })).toThrow('A note has to be text.');
+    expect(() => checkLabel(clip, { marks: {}, skip: 'bored' })).toThrow('That isn’t a reason to skip.');
+  });
+
+  it('keeps the taps the audit log shows, and only those', () => {
+    expect(
+      checkActions([
+        { t: 1200.4, a: 'mark', id: '10:word:', v: 'yes', was: null },
+        { t: 3000, a: 'word', w: 11, v: 'skipped', was: 'word' },
+        { t: 3500, a: 'undo' },
+        { t: 4000, a: 'delete-everything', id: 'x' },
+        { t: 'soon', a: 'fine', extra: { big: true } },
+        'nonsense',
+      ]),
+    ).toEqual([
+      { t: 1200, a: 'mark', id: '10:word:', v: 'yes', was: null },
+      { t: 3000, a: 'word', w: 11, v: 'skipped', was: 'word' },
+      { t: 3500, a: 'undo' },
+      { t: 0, a: 'fine' },
+    ]);
+    expect(checkActions(Array.from({ length: 500 }, () => ({ t: 1, a: 'undo' })))).toHaveLength(300);
+    expect(checkActions('x')).toEqual([]);
   });
 });

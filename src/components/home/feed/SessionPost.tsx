@@ -4,6 +4,7 @@ import { revisionItem } from '../../../lib/activityItems';
 import type { RevisionLog } from '../../../types';
 import { ActivityItemRow } from '../../activity/ActivityItemRow';
 import { ActionSheet } from '../../v2/ActionSheet';
+import { t } from '../../../i18n';
 
 /**
  * A past revision session on Home, the way Activity lists things: what was
@@ -30,9 +31,9 @@ export function SessionPost({
   const [menuOpen, setMenuOpen] = useState(false);
   const item = useMemo(() => revisionItem(log, { juzPlan }), [log, juzPlan]);
   const confirmDelete = () =>
-    Alert.alert('Delete this session?', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: onDelete },
+    Alert.alert(t('home.session.deleteTitle'), t('home.session.deleteBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: onDelete },
     ]);
   return (
     <>
@@ -40,11 +41,11 @@ export function SessionPost({
       <ActionSheet
         visible={menuOpen}
         onClose={() => setMenuOpen(false)}
-        title="Session"
+        title={t('home.session.menuTitle')}
         message={`${item.title} · ${item.detail}`}
         actions={[
-          { key: 'edit', label: 'Edit session', icon: 'create-outline', onPress: onEdit },
-          { key: 'delete', label: 'Delete session', icon: 'trash-outline', destructive: true, onPress: confirmDelete },
+          { key: 'edit', label: t('home.session.edit'), icon: 'create-outline', onPress: onEdit },
+          { key: 'delete', label: t('home.session.delete'), icon: 'trash-outline', destructive: true, onPress: confirmDelete },
         ]}
       />
     </>

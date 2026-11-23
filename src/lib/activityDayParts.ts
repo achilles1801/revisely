@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 // The parts of Activity's day view that are figures, not layout (mock d1, C4 parity):
 // the page strip's cells, the strength counts and the window footer's text.
 // Strength mapping is an assumption until Majd decides (NOTE open point, "weak / okay /
@@ -42,9 +43,9 @@ export function strengthCounts(revised: number[], ratingOf: (page: number) => nu
 export function stripSummary(cells: StripCell[]): string {
   const n = (state: CellState) => cells.filter((c) => c.state === state).length;
   return [
-    n('revised') > 0 ? `${n('revised')} revised` : null,
-    n('skipped') > 0 ? `${n('skipped')} skipped` : null,
-    n('not-reached') > 0 ? `${n('not-reached')} not reached` : null,
+    n('revised') > 0 ? t('lib.activity.revised', { count: n('revised') }) : null,
+    n('skipped') > 0 ? t('lib.activity.skipped', { count: n('skipped') }) : null,
+    n('not-reached') > 0 ? t('lib.activity.notReached', { count: n('not-reached') }) : null,
   ]
     .filter(Boolean)
     .join(' · ');

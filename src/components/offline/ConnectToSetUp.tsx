@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { PillButton } from '../v2/PillButton';
 import { Tap } from '../v2/Tap';
+import { t } from '../../i18n';
 
 /**
  * Signed in, but this phone has no copy of the account yet and the server
@@ -22,8 +23,8 @@ export function ConnectToSetUp() {
 
   useEffect(() => {
     if (!trying) return;
-    const t = setTimeout(() => setTrying(false), 3_000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setTrying(false), 3_000);
+    return () => clearTimeout(timer);
   }, [trying]);
 
   return (
@@ -31,13 +32,13 @@ export function ConnectToSetUp() {
       <View style={styles.body}>
         <Ionicons name="cloud-offline-outline" size={40} color={palette.secondary} />
         <Text style={[typeV2.title, styles.title, { color: palette.text }]} accessibilityRole="header">
-          Connect to the internet to set up
+          {t('offline.setUp.title')}
         </Text>
         <Text style={[typeV2.body, styles.text, { color: palette.secondary }]}>
-          Revisely needs a connection once to load your account on this phone. After that it works offline.
+          {t('offline.setUp.body')}
         </Text>
         <PillButton
-          title="Try again"
+          title={t('common.tryAgain')}
           busy={trying}
           onPress={() => {
             setTrying(true);
@@ -54,7 +55,7 @@ export function ConnectToSetUp() {
           hitSlop={8}
           testID="connect-sign-out"
         >
-          <Text style={[typeV2.meta, { color: palette.secondary }]}>Sign out</Text>
+          <Text style={[typeV2.meta, { color: palette.secondary }]}>{t('common.signOut')}</Text>
         </Tap>
       </View>
     </SafeAreaView>

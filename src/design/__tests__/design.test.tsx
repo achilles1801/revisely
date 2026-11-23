@@ -28,14 +28,30 @@ import { NBHY, NBSP } from '../../lib/todayLines';
 import { plainText } from '../../lib/passages';
 
 /** Today's text as written: names held with no-break hyphens. */
-const held = (s: string) => s.replace(/(\w)-(\w)/g, `$1${NBHY}$2`).split(' → ').join(`${NBSP}→ `);
+const held = (s: string) =>
+  s
+    .replace(/(\w)-(\w)/g, `$1${NBHY}$2`)
+    .split(' → ')
+    .join(`${NBSP}→ `);
 import { revisionItem } from '../../lib/activityItems';
 import { ActionSheet } from '../../components/v2/ActionSheet';
 import { AccentPicker } from '../../components/settings/AccentPicker';
 import { DesignGate as DesignGateForAccent } from '../DesignGate';
 import { dayAgo } from '../../lib/dayAgo';
 import { getReadPalette } from '../../theme/readPalette';
-import { ACCENTS, AccentName, DEFAULT_ACCENT, HERO_FIRST_TEXT_OFFSET, HERO_SHAPE, mixColors, paletteDark, paletteLight, paletteV2, v2ThemeColors } from '../../theme/v2';
+import {
+  ACCENTS,
+  AccentName,
+  DEFAULT_ACCENT,
+  HERO_FIRST_TEXT_OFFSET,
+  HERO_SHAPE,
+  mixColors,
+  paletteDark,
+  paletteLight,
+  paletteV2,
+  ramadanV2,
+  v2ThemeColors,
+} from '../../theme/v2';
 import { DOT } from '../../components/v2/JuzDots';
 import type { RevisionLog, UserPage } from '../../types';
 
@@ -191,13 +207,13 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
   };
 
   it('is the agreed palette', () => {
-    expect([paletteLight.bg, paletteLight.text, paletteLight.secondary, paletteLight.separator, paletteLight.red]).toEqual([
-      '#FFFFFF',
-      '#1A1A1A',
-      '#616977',
-      '#E5E7EB',
-      '#DC2626',
-    ]);
+    expect([
+      paletteLight.bg,
+      paletteLight.text,
+      paletteLight.secondary,
+      paletteLight.separator,
+      paletteLight.red,
+    ]).toEqual(['#FFFFFF', '#1A1A1A', '#616977', '#E5E7EB', '#DC2626']);
     expect([paletteDark.bg, paletteDark.text, paletteDark.secondary, paletteDark.separator, paletteDark.red]).toEqual([
       '#000000',
       '#FFFFFF',
@@ -215,108 +231,249 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
     [`${a}, dark`, a, true],
   ]) as [string, AccentName, boolean][];
 
-  it.each(combos)('%s: every text colour reads at 4.5:1 or more on the ground, fills and sheets', (_name, accent, isDark) => {
-    const p = paletteV2(isDark, accent);
-    for (const ground of [p.bg, p.fill, p.sheet]) {
-      for (const ink of [p.text, p.secondary, p.red, p.good, p.doneText, p.accentText, p.link]) {
-        expect(contrast(ink, ground)).toBeGreaterThanOrEqual(4.5);
+  it.each(combos)(
+    '%s: every text colour reads at 4.5:1 or more on the ground, fills and sheets',
+    (_name, accent, isDark) => {
+      const p = paletteV2(isDark, accent);
+      for (const ground of [p.bg, p.fill, p.sheet]) {
+        for (const ink of [p.text, p.secondary, p.red, p.good, p.doneText, p.accentText, p.link]) {
+          expect(contrast(ink, ground)).toBeGreaterThanOrEqual(4.5);
+        }
       }
-    }
-    // The accent's tint marks a picked or running thing (a time, a drop slot,
-    // the timer chip); its labels are ink or grey.
-    for (const ink of [p.text, p.secondary, p.subtleText]) {
-      expect(contrast(ink, p.accentSubtle)).toBeGreaterThanOrEqual(4.5);
-    }
-    // Labels and glyphs on the accent's fills.
-    expect(contrast(p.onPrimary, p.primary)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(p.onDone, p.done)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(p.onAccentText, p.accentText)).toBeGreaterThanOrEqual(4.5);
-    // The fills themselves stand out from the ground (non-text, 3:1).
-    expect(contrast(p.primary, p.bg)).toBeGreaterThanOrEqual(3);
-    expect(contrast(p.done, p.bg)).toBeGreaterThanOrEqual(3);
-    // The memorized ring around Today's mark, at both ends of its gradient,
-    // and every juz dot stepping along it.
-    for (const stop of p.ring) expect(contrast(stop, p.bg)).toBeGreaterThanOrEqual(3);
-    for (let i = 0; i < 30; i++) expect(contrast(mixColors(p.ring[0], p.ring[1], i / 29), p.bg)).toBeGreaterThanOrEqual(3);
-    // A day's number on each shade of Activity's calendar.
-    p.heat.forEach((shade, i) => expect(contrast(p.heatInk[i], shade)).toBeGreaterThanOrEqual(4.5));
-    // Screens not moved yet get the same colours under the classic names.
-    const c = v2ThemeColors(isDark, accent);
-    for (const ink of [c.textPrimary, c.textSecondary, c.textMuted, c.warning, c.warningText, c.error, c.success, c.accent]) {
-      expect(contrast(ink, c.bg)).toBeGreaterThanOrEqual(4.5);
-    }
-    expect(contrast(c.onAccent, c.accent)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(c.textInverse, c.accent)).toBeGreaterThanOrEqual(4.5);
-  });
+      // The accent's tint marks a picked or running thing (a time, a drop slot,
+      // the timer chip); its labels are ink or grey.
+      for (const ink of [p.text, p.secondary, p.subtleText]) {
+        expect(contrast(ink, p.accentSubtle)).toBeGreaterThanOrEqual(4.5);
+      }
+      // Labels and glyphs on the accent's fills.
+      expect(contrast(p.onPrimary, p.primary)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(p.onDone, p.done)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(p.onAccentText, p.accentText)).toBeGreaterThanOrEqual(4.5);
+      // The fills themselves stand out from the ground (non-text, 3:1).
+      expect(contrast(p.primary, p.bg)).toBeGreaterThanOrEqual(3);
+      expect(contrast(p.done, p.bg)).toBeGreaterThanOrEqual(3);
+      // The memorized ring around Today's mark, at both ends of its gradient,
+      // and every juz dot stepping along it.
+      for (const stop of p.ring) expect(contrast(stop, p.bg)).toBeGreaterThanOrEqual(3);
+      for (let i = 0; i < 30; i++)
+        expect(contrast(mixColors(p.ring[0], p.ring[1], i / 29), p.bg)).toBeGreaterThanOrEqual(3);
+      // A day's number on each shade of Activity's calendar.
+      p.heat.forEach((shade, i) => expect(contrast(p.heatInk[i], shade)).toBeGreaterThanOrEqual(4.5));
+      // Screens not moved yet get the same colours under the classic names.
+      const c = v2ThemeColors(isDark, accent);
+      for (const ink of [
+        c.textPrimary,
+        c.textSecondary,
+        c.textMuted,
+        c.warning,
+        c.warningText,
+        c.error,
+        c.success,
+        c.accent,
+      ]) {
+        expect(contrast(ink, c.bg)).toBeGreaterThanOrEqual(4.5);
+      }
+      expect(contrast(c.onAccent, c.accent)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(c.textInverse, c.accent)).toBeGreaterThanOrEqual(4.5);
+    },
+  );
 
-  it.each(combos)('%s: the live recitation check’s colours (marks, the score, following, Check)', (_name, accent, isDark) => {
-    const p = paletteV2(isDark, accent);
-    // Slips in amber, like mistakes in red and good in green: text on every ground and on its own quiet fill.
-    for (const ground of [p.bg, p.fill, p.sheet]) expect(contrast(p.warn, ground)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(p.onRedSubtle, p.redSubtle)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(p.onRedSubtle, p.bg)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(p.warn, p.warnSubtle)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(p.good, p.goodSubtle)).toBeGreaterThanOrEqual(4.5);
-    // Red and amber tell apart by hue (a mistake from a slip; the card names the kind too).
-    const hue = (hex: string) => {
-      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-      const max = Math.max(r, g, b);
-      const d = max - Math.min(r, g, b);
-      const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-      return (h * 60 + 360) % 360;
-    };
-    expect(Math.abs(hue(p.warn) - hue(p.red))).toBeGreaterThanOrEqual(20);
-    // Following: the page's ink on the line band and the word box.
-    const page = getReadPalette(isDark);
-    const inks = [p.text, page.textPrimary, page.pageTint ?? '#000000'];
-    for (const ground of [p.followBand, p.followWord]) for (const ink of inks) expect(contrast(ink, ground)).toBeGreaterThanOrEqual(4.5);
-    // Mistakes are highlights behind the word, three colours (Majd, Nov 15 2026): the page's ink and the bar's text read
-    // at 4.5:1 on each, and on each firmer shade (a mark whose card is open), which stands out from its own.
-    const groups = [
-      [p.markWord, p.markWordFirm],
-      [p.markSlip, p.markSlipFirm],
-      [p.markTajweed, p.markTajweedFirm],
-    ] as const;
-    for (const [fill, firm] of groups) {
-      for (const ink of inks) {
-        expect(contrast(ink, fill)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(ink, firm)).toBeGreaterThanOrEqual(4.5);
+  it.each(combos)(
+    '%s: the live recitation check’s colours (marks, the score, following, Check)',
+    (_name, accent, isDark) => {
+      const p = paletteV2(isDark, accent);
+      // Slips in amber, like mistakes in red and good in green: text on every ground and on its own quiet fill.
+      for (const ground of [p.bg, p.fill, p.sheet]) expect(contrast(p.warn, ground)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(p.onRedSubtle, p.redSubtle)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(p.onRedSubtle, p.bg)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(p.warn, p.warnSubtle)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(p.good, p.goodSubtle)).toBeGreaterThanOrEqual(4.5);
+      // Red and amber tell apart by hue (a mistake from a slip; the card names the kind too).
+      const hue = (hex: string) => {
+        const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+        const max = Math.max(r, g, b);
+        const d = max - Math.min(r, g, b);
+        const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+        return (h * 60 + 360) % 360;
+      };
+      expect(Math.abs(hue(p.warn) - hue(p.red))).toBeGreaterThanOrEqual(20);
+      // Following: the page's ink on the line band and the word box (the page's one highlight, below).
+      const page = getReadPalette(isDark);
+      const inks = [p.text, page.textPrimary, page.pageTint ?? '#000000'];
+      for (const ground of [p.highlightSoft, p.highlight, p.highlightFirm])
+        for (const ink of inks) expect(contrast(ink, ground)).toBeGreaterThanOrEqual(4.5);
+      // Mistakes are highlights behind the word, three colours (Majd, Nov 15 2026): the page's ink and the bar's text read
+      // at 4.5:1 on each, and on each firmer shade (a mark whose card is open), which stands out from its own.
+      const groups = [
+        [p.markWord, p.markWordFirm],
+        [p.markSlip, p.markSlipFirm],
+        [p.markTajweed, p.markTajweedFirm],
+      ] as const;
+      for (const [fill, firm] of groups) {
+        for (const ink of inks) {
+          expect(contrast(ink, fill)).toBeGreaterThanOrEqual(4.5);
+          expect(contrast(ink, firm)).toBeGreaterThanOrEqual(4.5);
+        }
+        expect(contrast(firm, fill)).toBeGreaterThan(1.15);
+        // Seen on the page (a tint, not text): a little apart from the ground, more than the grey word box.
+        expect(contrast(fill, page.pageBg)).toBeGreaterThan(1.3);
       }
-      expect(contrast(firm, fill)).toBeGreaterThan(1.15);
-      // Seen on the page (a tint, not text): a little apart from the ground, more than the grey word box.
-      expect(contrast(fill, page.pageBg)).toBeGreaterThan(1.3);
-    }
-    // The three tell apart by hue, and words from slips by lightness too (red and amber are close for colour blindness).
-    const [word, slip, tajweed] = [p.markWord, p.markSlip, p.markTajweed];
-    const apart = (a: string, b: string) => Math.min(Math.abs(hue(a) - hue(b)), 360 - Math.abs(hue(a) - hue(b)));
-    expect(apart(word, slip)).toBeGreaterThanOrEqual(25);
-    expect(apart(word, tajweed)).toBeGreaterThanOrEqual(60);
-    expect(apart(slip, tajweed)).toBeGreaterThanOrEqual(60);
-    expect(contrast(word, slip)).toBeGreaterThanOrEqual(1.25);
-    // The follow blue as text (the word being said in the bar) on every ground.
-    for (const ground of [p.bg, p.fill, p.sheet, p.bubble]) expect(contrast(p.followInk, ground)).toBeGreaterThanOrEqual(4.5);
-    // The box stands out from the band (non-text, a little).
-    expect(contrast(p.followWord, p.followBand)).toBeGreaterThan(1.15);
-    // None of it follows the accent (Majd, Nov 14 2026): a mistake is red, a slip amber and the follow blue with every
-    // accent, so Crimson's follow never looks like a mistake.
-    const jade = paletteV2(isDark, 'jade');
-    const fixed = ['red', 'warn', 'followBand', 'followWord', 'followInk', 'markWord', 'markWordFirm', 'markSlip', 'markSlipFirm', 'markTajweed', 'markTajweedFirm'] as const;
-    for (const k of fixed) expect(p[k]).toBe(jade[k]);
-    // Blue (the bar's word being said) tells apart from red and amber by hue, and from the tajweed violet.
-    expect(Math.abs(hue(p.followInk) - hue(p.red))).toBeGreaterThanOrEqual(90);
-    expect(Math.abs(hue(p.followInk) - hue(p.warn))).toBeGreaterThanOrEqual(90);
-    expect(apart(p.followInk, p.markTajweed)).toBeGreaterThanOrEqual(20);
-    // Check, drawn special: each end as text on the sheet, and the glyph on each end.
-    for (const end of p.premium) {
-      expect(contrast(end, p.sheet)).toBeGreaterThanOrEqual(4.5);
-      expect(contrast(p.onPremium, end)).toBeGreaterThanOrEqual(4.5);
-    }
-  });
+      // The three tell apart by hue, and words from slips by lightness too (red and amber are close for colour blindness).
+      const [word, slip, tajweed] = [p.markWord, p.markSlip, p.markTajweed];
+      const apart = (a: string, b: string) => Math.min(Math.abs(hue(a) - hue(b)), 360 - Math.abs(hue(a) - hue(b)));
+      expect(apart(word, slip)).toBeGreaterThanOrEqual(25);
+      expect(apart(word, tajweed)).toBeGreaterThanOrEqual(60);
+      expect(apart(slip, tajweed)).toBeGreaterThanOrEqual(60);
+      expect(contrast(word, slip)).toBeGreaterThanOrEqual(1.25);
+      // Pastel (Majd, Nov 21 2026: "I also like their color shades its like more pastel which is what we should aim for"):
+      // soft, never strong (CIE L*a*b* chroma at most 36), light on a light page and muted on a dark one.
+      const labOf = (hex: string) => {
+        const [r, g, b] = [1, 3, 5].map((i) => {
+          const v = parseInt(hex.slice(i, i + 2), 16) / 255;
+          return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+        });
+        const xyz = [
+          (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047,
+          0.2126 * r + 0.7152 * g + 0.0722 * b,
+          (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883,
+        ].map((t) => (t > 216 / 24389 ? Math.cbrt(t) : ((24389 / 27) * t + 16) / 116));
+        return [116 * xyz[1] - 16, 500 * (xyz[0] - xyz[1]), 200 * (xyz[1] - xyz[2])];
+      };
+      for (const fill of [word, slip, tajweed]) {
+        const [l, a, b] = labOf(fill);
+        expect(Math.hypot(a, b)).toBeLessThanOrEqual(36);
+        if (isDark) expect(l).toBeLessThanOrEqual(45);
+        else expect(l).toBeGreaterThanOrEqual(78);
+      }
+      // The following green (Majd, Nov 22 2026): as text (the word being said in the bar) on every ground, and as ink on the
+      // page (the newest word shown on a hidden page, drawn in it over its own ink).
+      for (const ground of [p.bg, p.fill, p.sheet, p.bubble, page.pageBg])
+        expect(contrast(p.followInk, ground)).toBeGreaterThanOrEqual(4.5);
+      // The box stands out from the band (non-text, a little): the word being recited on a shown page, inside the ayah's band.
+      expect(contrast(p.highlight, p.highlightSoft)).toBeGreaterThan(1.15);
+      expect(contrast(p.highlightFirm, p.highlight)).toBeGreaterThan(1.2);
+      // None of it follows the accent (Majd, Nov 14 2026): a mistake is red, a slip amber and the following green with every
+      // accent, so Crimson's follow never looks like a mistake.
+      const jade = paletteV2(isDark, 'jade');
+      const fixed = [
+        'red',
+        'warn',
+        'highlight',
+        'highlightSoft',
+        'highlightFirm',
+        'followInk',
+        'markWord',
+        'markWordFirm',
+        'markSlip',
+        'markSlipFirm',
+        'markTajweed',
+        'markTajweedFirm',
+      ] as const;
+      for (const k of fixed) expect(p[k]).toBe(jade[k]);
+      // The following green tells apart from red and amber by hue, and from the tajweed violet: from the status colours and
+      // from each mistake's wash, so the word followed never reads as a mistake.
+      expect(apart(p.followInk, p.red)).toBeGreaterThanOrEqual(90);
+      expect(apart(p.followInk, p.warn)).toBeGreaterThanOrEqual(90);
+      expect(apart(p.followInk, p.markWord)).toBeGreaterThanOrEqual(90);
+      expect(apart(p.followInk, p.markSlip)).toBeGreaterThanOrEqual(90);
+      expect(apart(p.followInk, p.markTajweed)).toBeGreaterThanOrEqual(60);
+      // Check, drawn special: each end as text on the sheet, and the glyph on each end.
+      for (const end of p.premium) {
+        expect(contrast(end, p.sheet)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(p.onPremium, end)).toBeGreaterThanOrEqual(4.5);
+      }
+    },
+  );
+
+  it.each(combos)(
+    '%s: the page’s one highlight is a grey apart from every other colour on the page',
+    (_name, accent, isDark) => {
+      // Majd, Nov 21 2026: "we should have one global highlite color that doesnt conflict with other colors, maybe gray?"
+      // An ayah held, playing or found, and Recite's word box, are `highlight`; Recite's line band its lighter shade.
+      const p = paletteV2(isDark, accent);
+      const page = getReadPalette(isDark);
+      const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+      // CIE L*a*b* (D65), and the distance between two colours in it (ΔE 1976: about 2.3 is just noticeable; 20 or more
+      // reads as another colour, not a shade of the same one).
+      const lab = (hex: string) => {
+        const [r, g, b] = rgb(hex).map((c) => {
+          const v = c / 255;
+          return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+        });
+        const xyz = [
+          (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047,
+          0.2126 * r + 0.7152 * g + 0.0722 * b,
+          (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883,
+        ].map((t) => (t > 216 / 24389 ? Math.cbrt(t) : ((24389 / 27) * t + 16) / 116));
+        return [116 * xyz[1] - 16, 500 * (xyz[0] - xyz[1]), 200 * (xyz[1] - xyz[2])];
+      };
+      const deltaE = (a: string, b: string) => {
+        const [x, y] = [lab(a), lab(b)];
+        return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
+      };
+      // Over a word's ink (`over`, the page's tint or black), a veil of `rgba(...)`: the colour the word then shows in.
+      const veiled = (veil: string, over: string) => {
+        const [r, g, b, a] = (veil.match(/[\d.]+/g) ?? []).map(Number);
+        const ink = rgb(over);
+        return (
+          '#' +
+          [r, g, b]
+            .map((c, i) =>
+              Math.round(c * a + ink[i] * (1 - a))
+                .toString(16)
+                .padStart(2, '0'),
+            )
+            .join('')
+        );
+      };
+      const greys = [p.highlight, p.highlightSoft, p.highlightFirm];
+      for (const grey of greys) {
+        // Neutral: no hue to mistake for a mark or an accent.
+        expect(Math.hypot(lab(grey)[1], lab(grey)[2])).toBeLessThan(4);
+        // Never equal to, nor near, a mistake's highlight (red, amber, violet, each with its firmer shade), the peek veil's
+        // grey ink, or the Ramadan theme's colours.
+        const others = [
+          p.markWord,
+          p.markWordFirm,
+          p.markSlip,
+          p.markSlipFirm,
+          p.markTajweed,
+          p.markTajweedFirm,
+          // A peeked word's grey ink: the box on the word being recited is a fill behind the page's own ink, never ink, so
+          // it can't be taken for one (and no grey can be both firmer than the band and 20 apart from it in light).
+          ...(grey === p.highlightFirm ? [] : [veiled(page.peekVeil, page.pageTint ?? '#000000')]),
+          ...(() => {
+            const r = ramadanV2(isDark, accent);
+            return [r.gold, r.glass, r.flame, r.mote, ...r.bulbs];
+          })(),
+        ];
+        for (const other of others) {
+          expect(grey.toUpperCase()).not.toBe(other.toUpperCase());
+          expect(deltaE(grey, other)).toBeGreaterThanOrEqual(20);
+        }
+      }
+      // Seen on the page behind the ink: apart from the paper, and the ink reads on it (checked above with the band).
+      expect(contrast(p.highlight, page.pageBg)).toBeGreaterThan(1.3);
+      expect(contrast(p.highlightSoft, page.pageBg)).toBeGreaterThan(1.1);
+      // The same with every accent, so Crimson's highlight is never a red.
+      const jade = paletteV2(isDark, 'jade');
+      expect([p.highlight, p.highlightSoft, p.highlightFirm]).toEqual([
+        jade.highlight,
+        jade.highlightSoft,
+        jade.highlightFirm,
+      ]);
+    },
+  );
 
   it('Jade is the design as agreed: ink buttons, grey links; a jade glow in light only', () => {
     expect([paletteLight.primary, paletteLight.link, paletteLight.done]).toEqual(['#1A1A1A', '#616977', '#0E6B5A']);
     expect(paletteLight.hero?.[0].color).toBe('#3FA084');
-    expect([paletteDark.primary, paletteDark.link, paletteDark.done, paletteDark.hero]).toEqual(['#FFFFFF', '#8A8A93', '#4DBA9F', null]);
+    expect([paletteDark.primary, paletteDark.link, paletteDark.done, paletteDark.hero]).toEqual([
+      '#FFFFFF',
+      '#8A8A93',
+      '#4DBA9F',
+      null,
+    ]);
     // Classic names, as before the accents.
     expect(v2ThemeColors(false).accent).toBe('#1A1A1A');
     expect(v2ThemeColors(true).accent).toBe('#FFFFFF');
@@ -324,7 +481,12 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
 
   it('Crimson and Indigo start from the colours sampled off the reference apps', () => {
     const crimson = paletteV2(true, 'crimson');
-    expect([crimson.primary, crimson.done, crimson.link, crimson.accentSubtle]).toEqual(['#DC1433', '#DC1433', '#F03C56', '#2E0E15']);
+    expect([crimson.primary, crimson.done, crimson.link, crimson.accentSubtle]).toEqual([
+      '#DC1433',
+      '#DC1433',
+      '#F03C56',
+      '#2E0E15',
+    ]);
     expect([...new Set(crimson.hero?.map((s) => s.color))]).toEqual(['#3E0812', '#33080E', '#2E0E15']);
     expect(paletteV2(false, 'crimson').link).toBe('#DC1433');
     const indigo = paletteV2(true, 'indigo');
@@ -356,26 +518,30 @@ describe('Home’s glow in light', () => {
     for (let i = 1; i < stops.length; i++) {
       const a = stops[i - 1];
       const b = stops[i];
-      if (offset <= b.offset) return a.opacity + ((offset - a.offset) / (b.offset - a.offset)) * (b.opacity - a.opacity);
+      if (offset <= b.offset)
+        return a.opacity + ((offset - a.offset) / (b.offset - a.offset)) * (b.opacity - a.opacity);
     }
     return 0;
   };
 
-  it.each(ACCENTS)('%s: clearly there behind the top bar; grey text and links readable wherever it reaches', (accent) => {
-    const p = paletteV2(false, accent);
-    expect(p.hero).not.toBeNull();
-    const stops = p.hero!;
-    // Visible: at least a fifth of the accent at the top.
-    expect(stops[0].opacity).toBeGreaterThanOrEqual(0.2);
-    // The top bar's ink stays readable over it.
-    expect(contrast(p.text, over(stops[0].color, stops[0].opacity, p.bg))).toBeGreaterThanOrEqual(4.5);
-    // From Home's first grey line down, every grey text and link over it.
-    for (let t = HERO_FIRST_TEXT_OFFSET; t <= 1; t += 0.02) {
-      const ground = over(stops[0].color, alphaAt(stops, t), p.bg);
-      expect(contrast(p.secondary, ground)).toBeGreaterThanOrEqual(4.5);
-      expect(contrast(p.link, ground)).toBeGreaterThanOrEqual(4.5);
-    }
-  });
+  it.each(ACCENTS)(
+    '%s: clearly there behind the top bar; grey text and links readable wherever it reaches',
+    (accent) => {
+      const p = paletteV2(false, accent);
+      expect(p.hero).not.toBeNull();
+      const stops = p.hero!;
+      // Visible: at least a fifth of the accent at the top.
+      expect(stops[0].opacity).toBeGreaterThanOrEqual(0.2);
+      // The top bar's ink stays readable over it.
+      expect(contrast(p.text, over(stops[0].color, stops[0].opacity, p.bg))).toBeGreaterThanOrEqual(4.5);
+      // From Home's first grey line down, every grey text and link over it.
+      for (let t = HERO_FIRST_TEXT_OFFSET; t <= 1; t += 0.02) {
+        const ground = over(stops[0].color, alphaAt(stops, t), p.bg);
+        expect(contrast(p.secondary, ground)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(p.link, ground)).toBeGreaterThanOrEqual(4.5);
+      }
+    },
+  );
 
   it.each(ACCENTS)('%s: reaches past the header and fades out with no edge (the box users saw)', (accent) => {
     const stops = paletteV2(false, accent).hero!;
@@ -541,7 +707,9 @@ describe('Home in the new design (a feed)', () => {
     expect(screen.getByText('Karim')).toBeTruthy();
     expect(screen.getByText('Today · 7-day streak')).toBeTruthy();
     // In progress: where to carry on, then how far today has got.
-    expect(screen.getByTestId('today-title')).toHaveTextContent(held(`Continue at Adh-Dhariyat, ayah${NBSP}31`), { exact: false });
+    expect(screen.getByTestId('today-title')).toHaveTextContent(held(`Continue at Adh-Dhariyat, ayah${NBSP}31`), {
+      exact: false,
+    });
     expect(screen.getByTestId('today-progress')).toHaveTextContent('2 of 3');
     expect(screen.queryByTestId('thread-line')).toBeNull();
     expect(screen.queryByText('Juz 26')).toBeNull();
@@ -557,7 +725,10 @@ describe('Home in the new design (a feed)', () => {
 
   it('missed pages are one line above today’s action, and "Add to today" adds them', async () => {
     const props = post({
-      catchUp: { title: 'Missed yesterday · Revise At-Talaq to Al-Mulk', label: 'Missed yesterday · Revise At-Talaq to Al-Mulk' },
+      catchUp: {
+        title: 'Missed yesterday · Revise At-Talaq to Al-Mulk',
+        label: 'Missed yesterday · Revise At-Talaq to Al-Mulk',
+      },
     });
     await act(async () => {});
     expect(screen.getByTestId('today-catch-up')).toHaveTextContent('Missed yesterday · Revise At-Talaq to Al-Mulk');
@@ -571,7 +742,9 @@ describe('Home in the new design (a feed)', () => {
     await act(async () => {});
     const line = screen.getByText(/^0% of the Quran memorized/);
     expect(line.props.numberOfLines).toBeUndefined();
-    expect(screen.getByTestId('today-memorized').props.accessibilityLabel).toBe('0% of the Quran memorized. Edit memorized pages');
+    expect(screen.getByTestId('today-memorized').props.accessibilityLabel).toBe(
+      '0% of the Quran memorized. Edit memorized pages',
+    );
     expect(screen.getByTestId('today-dots')).toBeTruthy();
   });
 
@@ -586,7 +759,8 @@ describe('Home in the new design (a feed)', () => {
     expect(row.props.accessibilityLabel).toBe('5.0% of the Quran memorized');
     expect(row.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 5 });
     for (let i = 1; i <= 30; i++) expect(screen.getByTestId(`today-dots-${i}`)).toBeTruthy();
-    const width = (id: string) => Object.assign({}, ...[screen.getByTestId(id).props.style].flat(3).filter(Boolean)).width;
+    const width = (id: string) =>
+      Object.assign({}, ...[screen.getByTestId(id).props.style].flat(3).filter(Boolean)).width;
     expect(width('today-dots-30-lit')).toBe(DOT);
     expect(width('today-dots-2-lit')).toBe(DOT / 2);
     expect(screen.queryByTestId('today-dots-1-lit')).toBeNull();
@@ -620,7 +794,9 @@ describe('Home in the new design (a feed)', () => {
   });
 
   it('the primary button is solid in the accent (Indigo by default); the catch-up button is an outline pill', async () => {
-    const props = post({ catchUp: { title: 'Missed yesterday · Revise At-Talaq to At-Tahrim', label: 'Missed yesterday' } });
+    const props = post({
+      catchUp: { title: 'Missed yesterday · Revise At-Talaq to At-Tahrim', label: 'Missed yesterday' },
+    });
     await act(async () => {});
     const flat = (id: string) => Object.assign({}, ...[screen.getByTestId(id).props.style].flat(3).filter(Boolean));
     expect(flat('today-cta').backgroundColor).toBe(paletteV2(false, DEFAULT_ACCENT).primary);
@@ -636,12 +812,18 @@ describe('Home in the new design (a feed)', () => {
     const menu = screen.getByTestId('today-menu');
     // The exact ranges in the header, surahs first and the pages a quiet detail; it grows no further than the rows (1.4).
     expect(
-      within(menu).getByText('Qaf 36 to Adh-Dhariyat 51 · Juz 26–27 · pp. 520–522', { normalizer: plainText }).props.maxFontSizeMultiplier,
+      within(menu).getByText('Qaf 36 to Adh-Dhariyat 51 · Juz 26–27 · pp. 520–522', { normalizer: plainText }).props
+        .maxFontSizeMultiplier,
     ).toBe(1.4);
     expect(within(menu).getByText('Jump to…')).toBeTruthy();
     expect(within(menu).getByText('Start today at another juz, surah or page')).toBeTruthy();
     expect(within(menu).getByText('Edit schedule')).toBeTruthy();
-    for (const gone of ['Edit memorized pages', 'Memorized pages', 'Behind? Move the plan back a day', 'Go back a day']) {
+    for (const gone of [
+      'Edit memorized pages',
+      'Memorized pages',
+      'Behind? Move the plan back a day',
+      'Go back a day',
+    ]) {
       expect(within(menu).queryByText(gone)).toBeNull();
     }
     fireEvent.press(within(menu).getByText('Edit schedule'));
@@ -691,7 +873,9 @@ describe('Home in the new design (a feed)', () => {
     expect(summary.props.accessibilityRole).toBe('button');
     expect(summary.props.accessibilityLabel).toBe('Continue at Adh-Dhariyat, ayah 31. 2 of 3 pages done');
     expect(summary.props.accessibilityHint).toBe('Jump to another start, or edit the schedule');
-    expect(screen.getByTestId('today-memorized').props.accessibilityLabel).toBe('27.5% of the Quran memorized. Edit memorized pages');
+    expect(screen.getByTestId('today-memorized').props.accessibilityLabel).toBe(
+      '27.5% of the Quran memorized. Edit memorized pages',
+    );
   });
 
   it('nothing to revise yet: today’s line isn’t a button and has no ›', async () => {

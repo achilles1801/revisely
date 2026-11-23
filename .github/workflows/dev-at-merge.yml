@@ -1,0 +1,150 @@
+name: Revisely Dev at merge
+
+# Revisely Dev gets a merged PR right away (Majd, Nov 23 2026: "yeah let's do it"): the PR already
+# passed its own CI, so Dev skips waiting for the tests that run again after the merge. Those tests
+# still run; testers' `preview` channel and production still wait for them (preview.yml, promote.yml).
+# The risk Majd accepted: two PRs that each passed but clash can put a broken update on Dev for a
+# while. A failure after the merge opens the develop-red issue.
+#
+# Its own workflow, so nothing here can stop or delay preview's. Only:
+#   - a merge commit of a PR into develop whose `Required` check passed on its head (anything else
+#     reaches Dev after the tests, through preview.yml);
+#   - platforms whose Dev runtime already has a build (a native change builds in preview.yml first).
+# Every publish to the dev channel holds the group eas-dev, one at a time; a newer merge takes a
+# waiting one's place. .github/scripts/publish-update.sh never lets an older commit replace a newer.
+on:
+  push:
+    # The same paths as preview.yml: what doesn't go into the app publishes nothing.
+    branches: [develop]
+    paths-ignore:
+      - 'docs/**'
+      - 'tests/**'
+      - 'functions/**'
+      - 'worker/**'
+      - 'admin/**'
+      - 'wrangler*.jsonc'
+      - '.maestro/**'
+      - 'store/**'
+      - 'scripts/**'
+      - '**/*.md'
+      - 'firestore.rules'
+      - 'firestore.indexes.json'
+      - 'firebase.json'
+      - '.github/**'
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish Revisely Dev update
+    if: ${{ vars.DEV_APP == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: eas-dev
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+    env:
+      APP_VARIANT: dev
+    steps:
+      - name: A merged PR whose own CI passed?
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          pr=$(gh api "repos/$REPO/commits/$SHA/pulls" \
+            --jq "[.[] | select(.merged_at != null and .base.ref == \"develop\" and .merge_commit_sha == \"$SHA\")] | first | \"\(.number) \(.head.sha)\"" 2>/dev/null || true)
+          number=${pr%% *}; head=${pr#* }
+          case "$number" in ''|*[!0-9]*)
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Revisely Dev::$SHA isn't a PR's merge commit: Dev gets it after the tests."
+            exit 0 ;;
+          esac
+          passed=$(gh api "repos/$REPO/commits/$head/check-runs?check_name=Required&per_page=30" \
+            --jq '[.check_runs[] | select(.conclusion == "success")] | length' 2>/dev/null || echo 0)
+          if [ "$passed" -gt 0 ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            echo "#$number passed its own CI: publishing to Dev now."
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Revisely Dev::#$number has no passed Required check on $head: Dev gets it after the tests."
+          fi
+
+      # The whole history: publish-update.sh compares this commit with the one on the channel.
+      - uses: actions/checkout@v4
+        if: ${{ steps.pr.outputs.ok == 'true' }}
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        if: ${{ steps.pr.outputs.ok == 'true' }}
+        with:
+          node-version: '22'
+
+      - run: npm ci --legacy-peer-deps
+        if: ${{ steps.pr.outputs.ok == 'true' }}
+
+      - uses: expo/expo-github-action@v8
+        if: ${{ steps.pr.outputs.ok == 'true' }}
+        with:
+          eas-version: latest
+          # No caches where release secrets are (CLAUDE.md, Health).
+          eas-cache: false
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Write Revisely Dev's Firebase plist
+        if: ${{ steps.pr.outputs.ok == 'true' }}
+        env:
+          PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_DEV }}
+        run: |
+          if [ -z "$PLIST" ]; then
+            echo "::error::Add the GOOGLE_SERVICE_INFO_PLIST_DEV repository secret (base64 of the dev project's plist), or turn DEV_APP off."
+            exit 1
+          fi
+          echo "$PLIST" | base64 -d > GoogleService-Info.plist
+
+      - name: Which platforms have a build
+        id: built
+        if: ${{ steps.pr.outputs.ok == 'true' }}
+        env:
+          ANDROID_RELEASES: ${{ vars.ANDROID_RELEASES }}
+        run: |
+          have=""
+          for P in ios android; do
+            if [ "$P" = android ] && [ "$ANDROID_RELEASES" != true ]; then continue; fi
+            HASH=$(eas env:exec development "npx expo-updates fingerprint:generate --platform $P" --non-interactive | grep '^{' | jq -r .hash)
+            if [ -z "$HASH" ] || [ "$HASH" = "null" ]; then
+              echo "::warning title=Revisely Dev::Could not compute the $P fingerprint: Dev gets it after the tests."
+              continue
+            fi
+            echo "${P}_hash=$HASH" >> "$GITHUB_OUTPUT"
+            if [ -n "$(git ls-remote --tags origin "refs/tags/$P-dev-fp/$HASH")" ]; then
+              have="$have $P"
+            else
+              echo "::notice title=Revisely Dev::No $P build for $HASH yet: preview.yml builds it, then publishes."
+            fi
+          done
+          have=${have# }
+          case "$have" in
+            '') platform="" ;;
+            *" "*) platform=all ;;
+            *) platform=$have ;;
+          esac
+          echo "platform=$platform" >> "$GITHUB_OUTPUT"
+
+      - name: eas update (dev)
+        if: ${{ steps.built.outputs.platform != '' }}
+        env:
+          MESSAGE: ${{ github.event.head_commit.message }}
+          PLATFORM: ${{ steps.built.outputs.platform }}
+          DEV_IOS_RUNTIME: ${{ steps.built.outputs.ios_hash }}
+          DEV_ANDROID_RUNTIME: ${{ steps.built.outputs.android_hash }}
+          DRY_RUN: ${{ github.ref != 'refs/heads/develop' }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: sh .github/scripts/publish-update.sh dev development

@@ -12,6 +12,11 @@
 // the patterns and each day's facts are deployed (the deployed ones refuse fields they don't know), so
 // the app sends them only then. Off (unset) until set with set-app-config.js --revo-patterns on; off
 // again stops them without a deploy.
+//
+// And `revoRecite` (the mistake detection release, 1.0.5): true once the functions that take a question's `recitation`
+// and Insights' `gaps` from any app are deployed (the ones before refuse both, and with them the whole question). Off
+// (unset) until set with set-app-config.js --revo-recite on, on release day after deploying revoAsk,revoDayInReview.
+// Revisely Dev sends them regardless: its backend has always taken them.
 
 import { useSyncExternalStore } from 'react';
 import { AppState } from 'react-native';
@@ -26,6 +31,7 @@ export const REVO_RELEASE_EVERY_MS = 10 * 60_000;
 const READ_TIMEOUT_MS = 10_000;
 export const REVO_RELEASE_KEY = '@revisely_revo_release';
 export const REVO_PATTERNS_KEY = '@revisely_revo_patterns';
+export const REVO_RECITE_KEY = '@revisely_revo_recite';
 
 /** The release a config value gives: 'everyone' and 'off' as written; anything else is 'testers'. */
 export function revoReleaseOf(value: unknown): RevoRelease {
@@ -34,6 +40,7 @@ export function revoReleaseOf(value: unknown): RevoRelease {
 
 let release: RevoRelease = 'testers';
 let patterns = false;
+let recite = false;
 let readAt: number | null = null;
 let started = false;
 let reading: Promise<void> | null = null;
@@ -71,10 +78,12 @@ export function refreshRevoRelease(force = false, now = Date.now()): Promise<voi
       const snap = await withTimeout(getDoc(doc(db, 'config', 'app')));
       const next = revoReleaseOf(snap.exists() ? snap.get('revo') : undefined);
       patterns = snap.exists() && snap.get('revoPatterns') === true;
+      recite = snap.exists() && snap.get('revoRecite') === true;
       readAt = now;
       set(next);
       await AsyncStorage.setItem(REVO_RELEASE_KEY, next).catch(() => undefined);
       await AsyncStorage.setItem(REVO_PATTERNS_KEY, patterns ? '1' : '0').catch(() => undefined);
+      await AsyncStorage.setItem(REVO_RECITE_KEY, recite ? '1' : '0').catch(() => undefined);
     } catch (err) {
       // Offline or refused: the last value stands, and the next return tries again.
       logger.warn('Could not read Revo’s release', err);
@@ -100,6 +109,11 @@ export function startRevoRelease(): void {
       if (saved != null && readAt == null) patterns = saved === '1';
     })
     .catch(() => undefined);
+  void AsyncStorage.getItem(REVO_RECITE_KEY)
+    .then((saved) => {
+      if (saved != null && readAt == null) recite = saved === '1';
+    })
+    .catch(() => undefined);
   void refreshRevoRelease(true);
   onReturn = AppState.addEventListener('change', (s) => {
     if (s === 'active') void refreshRevoRelease();
@@ -118,6 +132,9 @@ export const currentRevoRelease = (): RevoRelease => release;
 /** Whether the server takes the patterns and each day's facts (REVO-40), as last read (no until then). */
 export const revoPatternsOn = (): boolean => patterns;
 
+/** Whether the server takes `recitation` and `gaps` from any app (config/app.revoRecite), as last read (no until then). */
+export const revoReciteOn = (): boolean => recite;
+
 /** The release as last read (testers until then); starts the reads on first use. */
 export function useRevoRelease(): RevoRelease {
   return useSyncExternalStore(subscribe, currentRevoRelease, currentRevoRelease);
@@ -127,6 +144,7 @@ export function useRevoRelease(): RevoRelease {
 export function resetRevoReleaseForTests(): void {
   release = 'testers';
   patterns = false;
+  recite = false;
   readAt = null;
   started = false;
   reading = null;

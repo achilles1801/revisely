@@ -13,6 +13,7 @@ import { Tap } from './v2/Tap';
 import { Toggle } from './v2/TopBar';
 import { layoutV2, typeV2 } from '../theme/v2';
 import { strengthTone } from './insights/strength';
+import { t } from '../i18n';
 
 interface WeaknessModalProps {
   pageNumber: number;
@@ -68,7 +69,7 @@ export function WeaknessModal({
       onClose();
     } catch (err: any) {
       logger.error('[WeaknessModal] Save error:', err);
-      Alert.alert('Error', 'Failed to save rating. Please try again.');
+      Alert.alert(t('common.error'), t('revision.rating.saveFailed'));
       setSaving(false);
     }
   };
@@ -77,10 +78,10 @@ export function WeaknessModal({
     <Sheet
       visible
       onClose={onClose}
-      title="Rate this page"
-      message={`${describePageRange(pageNumber, pageNumber, { form: 'compact' })} · p. ${pageNumber}`}
-      left={{ label: 'Cancel', onPress: onClose }}
-      right={{ label: saving ? 'Saving…' : 'Save', onPress: handleSave, strong: true, disabled: !selectedRating || saving }}
+      title={t('revision.rating.title')}
+      message={t('revision.rating.message', { what: describePageRange(pageNumber, pageNumber, { form: 'compact' }), page: pageNumber })}
+      left={{ label: t('common.cancel'), onPress: onClose }}
+      right={{ label: saving ? t('common.saving') : t('common.save'), onPress: handleSave, strong: true, disabled: !selectedRating || saving }}
       scroll
       testID="rating-sheet"
     >
@@ -106,8 +107,8 @@ export function WeaknessModal({
         );
       })}
       <View style={[v2.row, v2.juz, { borderTopColor: palette.separator }]}>
-        <Text style={[typeV2.body, v2.label, { color: palette.text }]}>Apply to the whole juz</Text>
-        <Toggle value={applyToJuz} onValueChange={setApplyToJuz} accessibilityLabel="Apply to the whole juz" />
+        <Text style={[typeV2.body, v2.label, { color: palette.text }]}>{t('revision.rating.wholeJuz')}</Text>
+        <Toggle value={applyToJuz} onValueChange={setApplyToJuz} accessibilityLabel={t('revision.rating.wholeJuz')} />
       </View>
     </Sheet>
   );

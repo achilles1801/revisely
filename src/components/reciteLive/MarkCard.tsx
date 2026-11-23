@@ -3,7 +3,7 @@ import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
+import { arabicFullV2, layoutV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import { Box, placeMenu } from '../verse/menuPlacement';
 import type { QuranWords } from '../../lib/recite/quranWords';
@@ -19,13 +19,14 @@ import {
   recitedPhrase,
   slipLine,
   tajweedLines,
-  UNCLEAR_NOTE,
+  unclearNote,
 } from '../../lib/reciteLive/describe';
+import { t } from '../../i18n';
 
 const CARD_MARGIN = 12;
 
 /** One mark's part of the card: what it is, where, Expected and Recited (or the tajweed note), and its actions. */
-function MarkBlock({
+export function MarkBlock({
   mark,
   words,
   onDismiss,
@@ -41,7 +42,7 @@ function MarkBlock({
   // Not clear: what the checker thinks it heard is the unclear part, so only what was expected shows, and why.
   const unclear = isUnclear(mark);
   const recited = unclear ? null : recitedPhrase(words, mark);
-  const slip = unclear ? UNCLEAR_NOTE : slipLine(mark);
+  const slip = unclear ? unclearNote() : slipLine(mark);
   return (
     <View style={[styles.block, !first && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]} testID={`mark-card-${mark.kind}`}>
       <View style={styles.head}>
@@ -56,7 +57,7 @@ function MarkBlock({
             {markPlace(mark)}
           </Text>
         </View>
-        <SmallPill label="Not a mistake" onPress={() => onDismiss(mark.id)} testID="mark-card-dismiss" />
+        <SmallPill label={t('reciteLive.card.notMistake')} onPress={() => onDismiss(mark.id)} testID="mark-card-dismiss" />
       </View>
       {mark.kind === 'tajweed' ? (
         <View style={styles.tajweed}>
@@ -67,14 +68,14 @@ function MarkBlock({
             ) : null}
           </View>
           <View style={[styles.arWrap, { backgroundColor: fill }]}>
-            <Text style={[arabicV2(24), { color: palette.text }]} maxFontSizeMultiplier={1.6}>
+            <Text style={[arabicFullV2(24), { color: palette.text }]} maxFontSizeMultiplier={1.6}>
               {words.uthmani(mark.w)}
             </Text>
           </View>
         </View>
       ) : (
         <View>
-          <Row label="Expected" first>
+          <Row label={t('reciteLive.card.expected')} first>
             <Phrase parts={expectedPhrase(words, mark)} fill={fill} />
           </Row>
           {recited ? (
@@ -177,12 +178,12 @@ export function MarkCard({
           <MarkBlock key={m.id} mark={m} words={words} onDismiss={onDismiss} first={i === 0} />
         ))}
         <View style={styles.actions}>
-          <SmallPill icon="volume-high-outline" label="Hear it" onPress={() => onHear(main)} testID="mark-card-hear" />
+          <SmallPill icon="volume-high-outline" label={t('reciteLive.card.hear')} onPress={() => onHear(main)} testID="mark-card-hear" />
           {onYours ? (
-            <SmallPill icon="person-outline" label="Your recitation" onPress={() => onYours(main)} testID="mark-card-yours" />
+            <SmallPill icon="person-outline" label={t('reciteLive.card.yours')} onPress={() => onYours(main)} testID="mark-card-yours" />
           ) : null}
           {hasSimilar ? (
-            <SmallPill icon="git-compare-outline" label="Similar phrases" onPress={() => onSimilar(main)} testID="mark-card-similar" />
+            <SmallPill icon="git-compare-outline" label={t('reciteLive.card.similar')} onPress={() => onSimilar(main)} testID="mark-card-similar" />
           ) : null}
         </View>
       </View>

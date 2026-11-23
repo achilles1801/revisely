@@ -7,6 +7,7 @@ import { describePageRuns, pageRuns } from './pageRanges';
 import { describePassage, describeSession, plainText } from './passages';
 import { getSurahsForPage } from './quranData';
 import { formatClock } from './readingTimer';
+import { formatDate, formatDay, t } from '../i18n';
 
 // Activity as single things done (a revision session, a timed reading, a
 // recording, a day's log), newest first: Recent on Activity and Home, and the
@@ -17,10 +18,18 @@ export type ActivityKind = 'revision' | 'reading' | 'recording' | 'log';
 export const ACTIVITY_KINDS: ActivityKind[] = ['revision', 'reading', 'recording', 'log'];
 
 export const ACTIVITY_KIND_LABELS: Record<ActivityKind, string> = {
-  revision: 'Revision',
-  reading: 'Reading',
-  recording: 'Recordings',
-  log: 'Daily log',
+  get revision() {
+    return t('lib.activity.kindRevision');
+  },
+  get reading() {
+    return t('lib.activity.kindReading');
+  },
+  get recording() {
+    return t('lib.activity.kindRecording');
+  },
+  get log() {
+    return t('lib.activity.kindLog');
+  },
 };
 
 /** What the list needs of a recording (lib/recordings' RecordingMeta has it). */
@@ -66,12 +75,10 @@ export function sessionPages(log: RevisionLog): number[] {
 const passageText = (pages: number[]) => describePassage(pages, { form: 'short', max: 2 });
 
 function dateWords(day: string): string {
-  const [y, m, d] = day.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
   return [
-    date.toLocaleDateString('en-US', { weekday: 'long' }),
-    date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }),
-    date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    formatDay(day, { weekday: 'long' }),
+    formatDay(day, { month: 'long', day: 'numeric' }),
+    formatDay(day, { month: 'short', day: 'numeric' }),
     day,
   ].join(' ');
 }
@@ -131,7 +138,7 @@ export function revisionItem(log: RevisionLog, opts: ActivityLabelOptions = {}):
     day: log.date,
     // No time is stored: a day's session leads that day.
     at: Number.MAX_SAFE_INTEGER,
-    title: total > revised ? `Revised ${revised} of ${plural(total, 'page')}` : `Revised ${plural(revised, 'page')}`,
+    title: total > revised ? t('lib.activity.revisedOf', { revised, count: total }) : t('lib.activity.revisedPages', { count: revised }),
     // What was revised, by surah or juz (SESS-5), then the time.
     detail: [describeSession(pages, { form: 'short', max: 2, juzPlan: opts.juzPlan, revised: ownRevised(log) }), minutes]
       .filter(Boolean)
@@ -149,8 +156,8 @@ function readingItem(s: ReadingSession): ActivityItem {
     kind: 'reading',
     day: s.date,
     at: s.endedAt,
-    title: `Read for ${time}`,
-    detail: pages.length > 0 ? passageText(pages) : 'Timed session',
+    title: t('lib.activity.readFor', { time }),
+    detail: pages.length > 0 ? passageText(pages) : t('lib.activity.timedSession'),
   }, pages);
 }
 
@@ -161,8 +168,8 @@ function recordingItem(r: RecordingItemSource): ActivityItem {
     kind: 'recording',
     day: r.day,
     at: r.createdAt,
-    title: `Recorded ${formatClock(r.durationMs)}`,
-    detail: [passageText(pages), r.kind === 'revision' ? 'During revision' : 'While reading']
+    title: t('lib.activity.recorded', { time: formatClock(r.durationMs) }),
+    detail: [passageText(pages), r.kind === 'revision' ? t('lib.activity.duringRevision') : t('lib.activity.whileReading')]
       .filter(Boolean)
       .join(' · '),
     recordingId: r.id,
@@ -173,7 +180,7 @@ function recordingItem(r: RecordingItemSource): ActivityItem {
 function logItem(day: JournalEntry, note: JournalNote, user?: User | null): ActivityItem {
   const text = note.text.trim();
   const said =
-    note.kind === 'memorization' ? `Memorized ${text}` : note.kind === 'revision' ? `Revised ${text}` : text;
+    note.kind === 'memorization' ? t('lib.activity.logMemorized', { text }) : note.kind === 'revision' ? t('lib.activity.logRevised', { text }) : text;
   const parts = [
     formatEntryTime(note.at, day.date, user),
     said || null,
@@ -184,14 +191,14 @@ function logItem(day: JournalEntry, note: JournalNote, user?: User | null): Acti
     kind: 'log',
     day: day.date,
     at: note.at,
-    title: 'Daily log',
+    title: t('lib.activity.dailyLog'),
     detail: parts.join(' · '),
   });
 }
 
 function weekdayName(day: string): string {
   const [y, m, d] = day.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short' });
+  return formatDate(new Date(y, m - 1, d), { weekday: 'short' });
 }
 
 /**
@@ -212,7 +219,7 @@ function aheadItems(log: RevisionLog, opts: ActivityLabelOptions = {}): Activity
       kind: 'revision',
       day: log.date,
       at,
-      title: `Revised ahead for ${weekdayName(day)} · ${plural(pages.length, 'page')}`,
+      title: t('lib.activity.revisedAheadFor', { day: weekdayName(day), count: pages.length }),
       detail,
     }, pages));
   }

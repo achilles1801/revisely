@@ -232,7 +232,25 @@ describe('<TimerControls /> in the new design', () => {
     expect(mockActions.finish).toHaveBeenCalled();
     expect(Haptics.notificationAsync).toHaveBeenCalledWith('s');
     expect(onClose).toHaveBeenCalled();
-    expect(onSaved).toHaveBeenCalledWith('2026-10-26', expect.any(Number), { pages: [] });
+    expect(onSaved).toHaveBeenCalledWith('2026-10-26', expect.any(Number), { pages: [], sessionId: null });
+  });
+
+  it('[REC-1] End tells the screen the session it saved (for its note’s Undo); a failed save tells nothing', async () => {
+    mockTimer.timer = running();
+    const onSaved = jest.fn();
+    mockActions.finish.mockImplementationOnce(async () => ({ sessionId: 's1' }) as never);
+    v2(<TimerControls onClose={jest.fn()} onSaved={onSaved} onOpenQuran={jest.fn()} />);
+    await act(async () => {});
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Stop and save timer'));
+    });
+    expect(onSaved).toHaveBeenCalledWith('2026-10-26', expect.any(Number), { pages: [], sessionId: 's1' });
+    onSaved.mockClear();
+    mockActions.finish.mockImplementationOnce(async () => null as never);
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Stop and save timer'));
+    });
+    expect(onSaved).not.toHaveBeenCalled();
   });
 
   it('[REC-1] End waits for what runs before it (the reader’s recording), then tells the pages the sitting held', async () => {
@@ -259,7 +277,7 @@ describe('<TimerControls /> in the new design', () => {
       fireEvent.press(screen.getByLabelText('Stop and save timer'));
     });
     expect(order).toEqual(['recording saved', 'finish']);
-    expect(onSaved).toHaveBeenCalledWith('2026-10-26', expect.any(Number), { pages: [562, 563] });
+    expect(onSaved).toHaveBeenCalledWith('2026-10-26', expect.any(Number), { pages: [562, 563], sessionId: null });
   });
 
   it('paused: Resume, and "Paused" under the clock', async () => {

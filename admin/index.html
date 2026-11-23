@@ -35,7 +35,8 @@ html, body { margin: 0; }
       <a href="/audit" data-view="audit" hidden><span class="k"></span>Audit log</a>
       <a href="/accounts" data-view="accounts" hidden><span class="k"></span>Accounts</a>
       <a href="/premium" data-view="premium" hidden><span class="k"></span>Premium</a>
-      <a href="/staff" data-view="staff" hidden><span class="k"></span>Staff</a>
+      <a href="/staff" data-view="staff" hidden><span class="k"></span>Staff <span class="badge" id="staffBadge" hidden></span></a>
+      <a href="/label" id="labelsTab" hidden>Label recitations ›</a>
     </nav>
   </div>
 </header>
@@ -119,6 +120,23 @@ html, body { margin: 0; }
           </table>
         </div>
         <p class="foot" id="accFoot">Tap an account for its conversations and what Revo remembers. Accounts show by their internal id (first characters). Questions, days, reviews and ratings come from Revo's stored chats; cost, tokens and failures from Revo's log lines. A cost marked ≈ is partly estimated (calls from before the logs named the account, at the range's average).</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec" id="sec-retention">
+    <div class="sec-h"><h2>Retention</h2><span class="sub" id="retSub">Accounts that revise, recite or log, and whether they come back</span></div>
+    <div class="tiles" id="retTiles"></div>
+    <div class="grid">
+      <div class="w" id="w-ret-active">
+        <div class="w-h"><h3>Active accounts</h3><span class="sub">Weekly and monthly, each week to Sunday</span></div>
+        <div class="legend"><span><i style="background:var(--s1)"></i>Active in the week</span><span><i style="background:var(--s2)"></i>Active in 30 days</span></div>
+        <div class="chart" id="c-retention"></div>
+      </div>
+      <div class="w" id="w-ret-cohorts">
+        <div class="w-h"><h3>Coming back, by sign-up week</h3><span class="sub">Active on day 1, 7 and 30 after signing up</span></div>
+        <div class="tbl-wrap"><table id="retTable"><thead><tr><th>Week of</th><th class="n">Signed up</th><th class="n">Onboarded</th><th class="n">Day 1</th><th class="n">Day 7</th><th class="n">Day 30</th><th class="n">Day 7+</th></tr></thead><tbody></tbody></table></div>
+        <p class="foot" id="retFoot"></p>
       </div>
     </div>
   </div>
@@ -209,10 +227,11 @@ html, body { margin: 0; }
 <section id="view-audit" hidden aria-labelledby="auditTitle">
   <div class="od-head">
     <h2 id="auditTitle">Audit log</h2>
-    <span class="sub">Every decision and role change: who, what, when. Never applicants’ answers.</span>
+    <span class="sub">Every decision, role change and recitation label: who, what, when. Never applicants’ answers.</span>
     <div class="seg" role="group" aria-label="Show" id="auditKinds" style="margin-left:auto">
       <button type="button" data-kind="decisions" aria-pressed="true">Open Door decisions</button>
       <button type="button" data-kind="roles">Role changes</button>
+      <button type="button" data-kind="labels">Labels</button>
     </div>
   </div>
   <div class="conn" id="auditConn" hidden></div>
@@ -252,14 +271,22 @@ html, body { margin: 0; }
     <span class="sub">Who can use Revisely Console, and what their role opens. Owners only.</span>
   </div>
   <div class="conn" id="staffConn" hidden></div>
-  <form class="staff-give w" id="staffGive" autocomplete="off">
-    <label for="staffEmail">Give a role</label>
-    <input id="staffEmail" type="email" placeholder="Their exact email" spellcheck="false" autocapitalize="off" required>
-    <select id="staffRole" aria-label="Role"></select>
-    <button type="submit" class="btn">Give role</button>
-    <p class="sub">They sign in once on the console’s sign-in page first (it says “No access” until they have a role).</p>
-  </form>
-  <div class="w"><div class="tbl-wrap"><table id="staffTable"><thead><tr><th>Account</th><th>Role</th><th>Last sign-in</th><th></th></tr></thead><tbody></tbody></table></div></div>
+  <div class="w req-box" id="staffReqBox">
+    <div class="w-h"><h3>Access requests</h3><span class="sub" id="staffReqSub">People who signed in to the console without a role. They see nothing until you act.</span></div>
+    <div class="req-list" id="staffReqs"></div>
+  </div>
+  <div class="w"><div class="w-h"><h3>Have a role</h3></div><div class="tbl-wrap"><table id="staffTable"><thead><tr><th>Account</th><th>Role</th><th>Last sign-in</th><th></th></tr></thead><tbody></tbody></table></div></div>
+  <div class="w" id="staffInvitesBox" hidden><div class="w-h"><h3>Invited</h3><span class="sub">The role attaches when they first sign in with this email.</span></div>
+    <div class="tbl-wrap"><table id="staffInvites"><thead><tr><th>Email</th><th>Role</th><th>Invited</th><th></th></tr></thead><tbody></tbody></table></div></div>
+  <details class="w staff-more">
+    <summary>Add someone by email instead</summary>
+    <form class="staff-give" id="staffGive" autocomplete="off">
+      <input id="staffEmail" type="email" placeholder="Their email" spellcheck="false" autocapitalize="off" required aria-label="Their email">
+      <select id="staffRole" aria-label="Role"></select>
+      <button type="submit" class="btn">Add</button>
+      <p class="sub">Already signed in once: the role is theirs now. Not yet: they get it the first time they sign in with this email (Google, or the email link).</p>
+    </form>
+  </details>
   <div class="sec-h" style="margin-top:18px"><h2>What each role opens</h2></div>
   <div class="grid staff-roles" id="staffRoles"></div>
 </section>

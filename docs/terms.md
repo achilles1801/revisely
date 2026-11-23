@@ -6,9 +6,9 @@ permalink: /terms/
 # Terms of Service for Revisely
 
 **Effective date: 2026-05-11**
-**Last updated: 2026-11-08**
+**Last updated: 2026-11-21**
 
-These Terms of Service ("Terms") govern your use of the Revisely mobile application ("the app", "Revisely"). Revisely is operated by `Majd Khawaldeh` ("we", "us", or "our"). By creating an account or using Revisely, you agree to these Terms. If you do not agree, do not use the app.
+These Terms of Service ("Terms") govern your use of the Revisely mobile application ("the app", "Revisely"). These Terms are an agreement between you and **Revisely LLC**, a Texas limited liability company ("Revisely", "we", "us", or "our"). By creating an account or using Revisely, you agree to these Terms. If you do not agree, do not use the app.
 
 ## 1. Eligibility
 
@@ -64,7 +64,7 @@ We do not use your content to train any AI model, and Anthropic, which writes Re
 
 ## 6. Intellectual property
 
-Revisely, including its name, logo, design, and code, is the property of `Majd Khawaldeh` and is protected by copyright, trademark, and other laws. These Terms do not grant you any rights in our intellectual property except the limited license to use the app in accordance with these Terms.
+Revisely, including its name, logo, design, and code, is the property of Revisely LLC and is protected by copyright, trademark, and other laws. These Terms do not grant you any rights in our intellectual property except the limited license to use the app in accordance with these Terms.
 
 The Holy Quran itself is in the public domain. Page images displayed in the app are renderings of the Madani Mushaf produced with the King Fahd Glorious Qur'an Printing Complex fonts, via the open-source quran.com-images project. The translation, ordering, and metadata of Quranic content provided in the app are presented for educational and devotional use.
 
@@ -72,9 +72,20 @@ The Holy Quran itself is in the public domain. Page images displayed in the app 
 
 Revisely relies on third-party services to operate, including Apple, Google (Firebase), Sentry, Expo and Anthropic (Revo's answers). Your use of Sign in with Apple or Google Sign-In is also subject to their terms. Section 5 of the [Privacy Policy](/privacy/) lists each service and what it is used for.
 
-## 8. Pricing
+## 8. Pricing and Premium early access
 
-Revisely is currently free to download and use, and contains no in-app purchases or subscriptions. If we introduce paid features in the future, they will be sold exclusively through Apple's In-App Purchase system, any auto-renewing terms will be clearly disclosed at the point of sale, and these Terms will be updated before any charge applies.
+Revisely is currently free to download and use, and contains no in-app purchases or subscriptions: nothing in it is for sale.
+
+**Premium early access.** Revisely Premium (for example, marking mistakes as you recite) is in early access: it is free for everyone who signs up during early access, which has no end date yet. After early access ends, Premium will be paid. Every account that gets Premium during early access keeps it for life, still free of charge, bi-idhnillah (بإذن الله). That means:
+
+- It belongs to the Revisely account it was given to. It can't be moved to another account, sold or exchanged, and deleting the account ends it.
+- It includes every Premium feature, including features added later, as Premium is for everyone at the time.
+- For life means for as long as the account exists and Revisely runs. We may end it for an account that breaks these Terms (Section 11).
+- Nothing is charged for it, so there is nothing to refund.
+
+When early access ends, new accounts no longer get Premium for free.
+
+If we introduce paid features in the future, they will be sold through Apple's In-App Purchase on iPhone and Google Play's billing on Android, any auto-renewing terms will be clearly disclosed at the point of sale, and these Terms will be updated before any charge applies.
 
 ## 9. Disclaimer of warranties
 
@@ -86,7 +97,7 @@ To the fullest extent permitted by law, we disclaim all implied warranties, incl
 
 ## 10. Limitation of liability
 
-To the maximum extent permitted by law, in no event shall `Majd Khawaldeh`, our affiliates, or our processors be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of profits, revenue, data, or use, arising out of or related to your use of Revisely, even if we have been advised of the possibility of such damages.
+To the maximum extent permitted by law, in no event shall Revisely LLC, its members, our affiliates, or our processors be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of profits, revenue, data, or use, arising out of or related to your use of Revisely, even if we have been advised of the possibility of such damages.
 
 Our total liability to you for any claim arising from or related to Revisely is limited to the greater of (a) the amount you have paid us, if any, in the 12 months preceding the claim, or (b) USD $10.
 

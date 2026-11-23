@@ -43,6 +43,9 @@ on:
         required: false
       SENTRY_AUTH_TOKEN:
         required: false
+      # Revisely Dev's private engine (modules-dev/recite-engine/core/fetch.js): without it, Dev builds the stub.
+      RECITE_CORE_TOKEN:
+        required: false
       PLAY_SERVICE_ACCOUNT_JSON:
         required: false
 
@@ -95,6 +98,18 @@ jobs:
           mkdir -p ~/.gradle
           echo 'org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8' >> ~/.gradle/gradle.properties
 
+      # Revisely Dev's private engine (modules-dev/recite-engine/core/fetch.js). The only step that holds the token, and
+      # before `npm ci`, so no third-party install script ever runs beside it; the script has no dependencies. With no
+      # secret it leaves the stub. core/__tests__/tokenScope.test.js holds all of this.
+      - name: Fetch the on-device engine
+        id: engine
+        if: ${{ inputs.variant == 'dev' }}
+        env:
+          RECITE_CORE_TOKEN: ${{ secrets.RECITE_CORE_TOKEN }}
+        run: |
+          got=$(node modules-dev/recite-engine/core/fetch.js android "$RUNNER_TEMP/recite-core")
+          echo "mode=$(node -p 'JSON.parse(process.argv[1]).mode' "$got")" >> "$GITHUB_OUTPUT"
+
       - run: npm ci --legacy-peer-deps
 
       - uses: expo/expo-github-action@v8
@@ -119,12 +134,21 @@ jobs:
           SENTRY_DISABLE_AUTO_UPLOAD: ${{ secrets.SENTRY_AUTH_TOKEN == '' && 'true' || 'false' }}
           # A failed upload costs readable stack traces, not the release.
           SENTRY_ALLOW_FAILURE: 'true'
+          # What the fetch step brought (the token itself is not in this step, where install scripts run).
+          RECITE_CORE_PREFETCHED: ${{ inputs.variant == 'dev' && format('{0}/recite-core', runner.temp) || '' }}
         run: eas build --local --profile "$PROFILE" --platform android --non-interactive --output "$RUNNER_TEMP/revisely.aab"
+
+      # A build that fetched the engine must carry it, or every take would quietly go to the server.
+      - name: Check the engine is in the build
+        if: ${{ steps.engine.outputs.mode == 'engine' }}
+        run: node modules-dev/recite-engine/core/check-build.js android "$RUNNER_TEMP/revisely.aab"
 
       # For the first upload, which Google Play takes only through Play Console, and for a look
       # without Play. The repository is public, so anyone signed in to GitHub can download it while
-      # it is kept (an .aab holds nothing that the app on Play won't).
+      # it is kept (an .aab holds nothing that the app on Play won't). So a bundle with the private on-device engine
+      # is never attached: Revisely Dev reaches its testers through Play's internal track.
       - uses: actions/upload-artifact@v4
+        if: ${{ steps.engine.outputs.mode != 'engine' }}
         with:
           name: revisely-${{ inputs.variant == 'dev' && 'dev-' || '' }}android-${{ github.sha }}
           path: ${{ runner.temp }}/revisely.aab
