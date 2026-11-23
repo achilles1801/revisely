@@ -155,7 +155,7 @@ already in memory is shown in the first frame (`peekVerseText`), with no spinner
   percentages only; `"26.5%"` throws an exception that a grep for `FAILED` misses.
 
 **The athan** (Revisely Dev, iPhone; Majd, Nov 22 2026: "genuine adthan notifications like the athan actually
-playing … the most popular widely known ones"; BEHAVIOUR.md ATHAN-1 to ATHAN-3): a prayer's notification sound can be
+playing … the most popular widely known ones"; BEHAVIOUR.md ATHAN-1 to ATHAN-4): a prayer's notification sound can be
 the athan.
 - **History:** built on Oct 28–29 2026 (#124, #125, #133) and removed a day later (2216ecf6, Majd: "All the athans
   suck"; its voices were chosen for clear licences). Nov 22's version is that code restored, without a bundled voice,
@@ -168,12 +168,26 @@ the athan.
 - **Never quiet:** no voice chosen, a clip not downloaded yet, removed or withdrawn, or the gate off: the standard tone
   (`lib/prayer/sync` `iosSound`). A reminder before a prayer is never the athan.
 - **Choosing:** Settings → Prayer → Athan voice (every prayer), or a prayer's Sound → Athan → Voice (that prayer; the
-  picker's `prayer` param). Fajr takes the voice's Fajr athan (`lib/prayer/athanChoice`).
+  picker's `prayer` param). Fajr takes the voice's Fajr athan (`lib/prayer/athanChoice`). A prayer's reminder and sound
+  is one sheet (`prayer/PrayerAlertSheet`), opened from Prayer notifications and from a prayer's row in the prayer
+  sheet's times.
+- **The picker** (Majd, Nov 23 2026): one list, every entry a choice; a row is the voice's name and its clip's size
+  (its progress while it downloads, the reason if that failed), nothing else. No "Report a rights issue": support's
+  email does that. He also took Hafiz Murad out: "the rest can stay as the final list".
+- **The whole athan on a tap** (ATHAN-4; Majd accepted "29.5 s clip on iPhone plus full athan on tap"): a prayer's
+  notification that plays a voice's clip carries the voice in its data (`athan`, `lib/prayer/sync`). `prayer/AthanOnTap`
+  (mounted in App.tsx beside PrayerSync) answers a tap within 15 minutes (`lib/athan/tapped`) by streaming the voice's
+  `full/<id>.m4a` under a `v2/Sheet` with Stop. It stops on leaving the app (`background`, not `inactive`).
+- **The voices** (Nov 22 2026): 41 in dev Storage. Majd sent another app's list: "i want all these people as options.
+  get the most popular one from each". A Fajr athan with no regular partner of its style is an entry for Fajr alone
+  (`athanChoices`): chosen for every prayer it changes Fajr only, and another prayer's picker leaves it out. Board, sources and the upload tool: `~/Documents/revisely-athan` (`tools/athan_release.py`,
+  `tools/athan_upload.js`, `release/held.json` for voices built but not offered).
 - **Android** takes a notification's sound from its channel, and expo-notifications gives a channel only sounds built
   into the app (the plugin's `sounds` in app.config.js, which moves both fingerprints). That, and a channel per voice
   (a channel's sound is fixed once made), wait for a native build (the 1.0.6 list).
-- **The audio pipeline** is outside the repository: `~/Documents/revisely-athan` (`build_athan.py` cuts, fades and
-  levels the 29.5 s clip and the full copy; `RESULTS.md`).
+- **The audio pipeline** is outside the repository: `~/Documents/revisely-athan` (`tools/athan_cut.py` cuts each
+  recording to the athan alone from the bounds in `board/measurements.json`; `tools/athan_release.py` builds the
+  29.5 s clips, the full copies and `catalog.json`).
 
 **Qibla** (Oct 28 2026; mocks and notes in `~/Documents/revisely-qibla-mocks/`): a compass icon in
 Home's top bar (left of Activity and Settings; `TopBar`'s `sideWidth` 120 keeps the salam centred)
@@ -206,7 +220,7 @@ asks about rights to them, that is the answer; the Qur'an text itself is public 
 print's pages (below) are drawn from the King Fahd Complex's own vector files, which its rights page
 (dm.qurancomplex.gov.sa/rights/) lets anyone use free, in apps too.
 
-**Mushaf editions** (Settings → Mushaf, `lib/mushafEdition`, `components/mushaf/MushafPickerSheet`;
+**Mushaf editions** (Settings → Mushaf and Recite → Mushaf, `lib/mushafEdition`, `components/mushaf/MushafPickerSheet`;
 Nov 3 2026): the 1405 pages (the default) or the King Fahd Complex's **Madani 1441** print. The
 choice is kept per phone (`@revisely_mushaf_edition:v1`), not on the account.
 - **Page numbers are shared.** 568 pages hold the same verses in both; the other 36 come in runs

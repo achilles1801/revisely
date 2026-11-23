@@ -16,7 +16,7 @@ import { useHaptics } from '../../design/haptics';
 import { copyText } from '../../lib/clipboard';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
-import { arabicV2, layoutV2, typeV2 } from '../../theme/v2';
+import { arabicForV2, arabicFullV2, layoutV2, typeV2 } from '../../theme/v2';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 import { getJuzRange } from '../../lib/quranData';
 import { surahName } from '../../lib/passages';
@@ -376,7 +376,7 @@ export default function QuranSearchScreen() {
         </Text>
         <View style={styles.transcriptBox}>
           {voice.partial ? (
-            <Text style={[arabicV2(30), styles.arabic, { color: palette.text }]} accessibilityLanguage="ar" testID="search-partial">
+            <Text style={[arabicFullV2(30), styles.arabic, { color: palette.text }]} accessibilityLanguage="ar" testID="search-partial">
               {voice.partial}
             </Text>
           ) : null}
@@ -412,7 +412,7 @@ export default function QuranSearchScreen() {
         ListHeaderComponent={
           <View style={styles.resultsHead}>
             {hasArabic(results.query) ? (
-              <Text style={[arabicV2(20), styles.arabic, { color: palette.secondary }]} accessibilityLanguage="ar" numberOfLines={1} maxFontSizeMultiplier={1.3}>
+              <Text style={[arabicForV2(results.query, 20), styles.arabic, { color: palette.secondary }]} accessibilityLanguage="ar" numberOfLines={1} maxFontSizeMultiplier={1.3}>
                 {results.query}
               </Text>
             ) : null}
@@ -490,7 +490,7 @@ export default function QuranSearchScreen() {
             testID="search-recent"
           >
             <Mark size="nested" icon="time-outline" />
-            <Text style={[hasArabic(item) ? arabicV2(18) : typeV2.body, styles.main, { color: palette.text }]} numberOfLines={1}>
+            <Text style={[hasArabic(item) ? arabicForV2(item, 18) : typeV2.body, styles.main, { color: palette.text }]} numberOfLines={1}>
               {item}
             </Text>
           </Tap>

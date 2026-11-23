@@ -10,6 +10,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import { GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { Tap } from '../v2/Tap';
@@ -25,7 +26,7 @@ import { typeV2 } from '../../theme/v2';
 import { RecitedMark } from '../reciteMemory/TakeRows';
 import { BlockMark, RevisedMark } from './BlockMark';
 import type { Memorized, Read, Revised } from '../../lib/activityInsights';
-import { formatDate, t } from '../../i18n';
+import { formatDate, t, weekdayLetters, formatNumber } from '../../i18n';
 import { DEFAULT_SECTIONS, sectionsToShow, type OverviewSection, type TabLayout } from '../../lib/activitySections';
 import { forwardIcon, backIcon } from '../../i18n/direction';
 
@@ -44,7 +45,6 @@ const CELL_GAP = 4;
 const DISC = 34;
 
 /** The letters above the grid, Sunday first, as monthGrid's weeks are (activityHeatmap.weekStart). */
-const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 /** The picked day's preview rows, each the block of the day it opens at (DayBlocks' DayBlockKind). */
 export type PreviewBlock = 'revised' | 'memorized' | 'read' | 'notes' | 'recited';
@@ -84,6 +84,7 @@ export function CalendarMonth({
   recited,
   sections = DEFAULT_SECTIONS.overview,
   gap = null,
+  gridSwipe,
 }: {
   /** 'YYYY-MM' (the month shown, and the grid's days). */
   month: string;
@@ -108,6 +109,9 @@ export function CalendarMonth({
   sections?: TabLayout<'overview'>;
   /** A gap from Insights, marked on its days (ACT-28); it fades when it goes. */
   gap?: CalendarGap | null;
+  /** The swipe between months or weeks, on the days alone (Activity as a tab, TAB-2). Without it the caller takes the
+   *  swipe over the whole calendar. */
+  gridSwipe?: GestureType;
 }) {
   const { palette } = useTheme();
   const { fontScale } = useWindowDimensions();
@@ -186,13 +190,13 @@ export function CalendarMonth({
           { icon: 'repeat' as const, label: t('activity.day.revised'), value: t('common.days', { count: revisedDays }) },
           { icon: 'leaf-outline' as const, label: t('activity.day.memorized'), value: t('activity.calendar.plusPages', { count: memorizedPages }) },
           { icon: 'book-outline' as const, label: t('activity.day.read'), value: readMinutes > 0 ? formatMinutesLong(readMinutes) : t('activity.calendar.zeroMin') },
-          { icon: 'document-text-outline' as const, label: t('activity.day.notes'), value: String(noteDays) },
+          { icon: 'document-text-outline' as const, label: t('activity.day.notes'), value: formatNumber(noteDays) },
         ].map((t) => (
           <Total key={t.label} {...t} twoByTwo={fontScale >= TOTALS_TWO_BY_TWO} />
         ))}
       </View>
     ) : null;
-  const calendar =
+  const dayGrid =
     span === 'week' ? (
       <View style={styles.grid} testID="calendar-week" onLayout={(e) => setRowWidth(e.nativeEvent.layout.width - 2 * GRID_PAD)}>
         {cue}
@@ -211,7 +215,7 @@ export function CalendarMonth({
       <View style={styles.grid} testID="calendar-grid" onLayout={(e) => setRowWidth(e.nativeEvent.layout.width - 2 * GRID_PAD)}>
         {cue}
         <View style={styles.weekRow}>
-          {WEEKDAYS.map((w, i) => (
+          {weekdayLetters().map((w, i) => (
             <Text key={i} style={[styles.letter, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
               {w}
             </Text>
@@ -225,6 +229,7 @@ export function CalendarMonth({
         ))}
       </View>
     );
+  const calendar = gridSwipe ? <GestureDetector gesture={gridSwipe}>{dayGrid}</GestureDetector> : dayGrid;
   const key = (
     <View style={styles.legend} testID="calendar-legend">
       <LegendItem label={t('activity.day.revised')}>
@@ -304,10 +309,10 @@ export function CalendarMonth({
             {r.value}
           </Text>
           {r.mics ? (
-            <View style={styles.mics} accessible accessibilityLabel={`${r.mics} ${r.mics === 1 ? 'recording' : 'recordings'}`} testID={`preview-recordings-${r.key}`}>
+            <View style={styles.mics} accessible accessibilityLabel={t('lib.activity.recordings', { count: r.mics })} testID={`preview-recordings-${r.key}`}>
               <Ionicons name="mic-outline" size={13} color={palette.secondary} />
               <Text style={[typeV2.meta, styles.tabular, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
-                {r.mics}
+                {formatNumber(r.mics)}
               </Text>
             </View>
           ) : null}
@@ -610,7 +615,7 @@ function DayDisc({ ring, isToday, isFuture, number }: { ring: number | null; isT
         minimumFontScale={0.6}
         maxFontSizeMultiplier={MAX_SCALE}
       >
-        {number}
+        {formatNumber(number)}
       </Text>
     </View>
   );

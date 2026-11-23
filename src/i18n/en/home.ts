@@ -74,6 +74,8 @@ export const home = {
     undoFailed: "Couldn't undo",
     qibla: 'Find the Qibla',
     activity: 'Open activity',
+    /** The Activity tab's name for VoiceOver (Revisely Dev's Activity tab, TAB-2). */
+    activityTab: 'Activity',
     settings: 'Open settings',
     recent: 'Recent sessions',
     noSessions: 'No sessions yet. Start your first revision above.',

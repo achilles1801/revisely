@@ -9,7 +9,7 @@ import { CheckerModels, readCheckerModels, shortModel } from '../../lib/reciteCh
 
 type State = { kind: 'reading' } | { kind: 'read'; models: CheckerModels } | { kind: 'failed' };
 
-/** "Recite v7 · Words & harakat v7 · Strict v5". */
+/** "Recite v7 · Mistakes v7 · Strict v5". */
 export function modelsLine(m: CheckerModels): string {
   return t('settings.testing.modelLine', {
     recite: shortModel(m.recite),

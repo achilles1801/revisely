@@ -258,9 +258,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Apple only sends fullName on the FIRST sign-in. Use it to seed displayName.
         const displayName =
-          user.displayName ||
-          [fullName?.givenName, fullName?.familyName].filter(Boolean).join(' ') ||
-          null;
+          user.displayName || [fullName?.givenName, fullName?.familyName].filter(Boolean).join(' ') || null;
 
         try {
           const existingUser = await firestoreService.getUser(user.uid);

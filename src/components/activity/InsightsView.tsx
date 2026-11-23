@@ -86,14 +86,13 @@ import {
   weeksGrid,
   type InsightsRange,
 } from '../../lib/insightsRange';
-import { t } from '../../i18n';
+import { t, weekdayLetters, formatNumeral, formatPercentage, formatNumber } from '../../i18n';
 import { chevron, forwardIcon } from '../../i18n/direction';
 
 /** Consistency's weeks grid: the gap between cells, and the largest a cell gets (3 months on a wide phone). */
 const GRID_GAP = 3;
 const GRID_CELL_MAX = 18;
 /** Its rows' weekday initials (Sunday first, as weeksGrid) and their column's width. */
-const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const GRID_LABEL_W = 12;
 
 export interface InsightsData {
@@ -368,11 +367,11 @@ function Figure({
   const inner = (
     <>
       <ChromeText style={[styles.big, { color: palette.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-        {value}
+        {formatNumeral(value)}
       </ChromeText>
       <ChromeText style={[typeV2.body, styles.flex, { color: palette.secondary }]}>
         {text}
-        {onPress ? ' ›' : ''}
+        {onPress ? ` ${chevron()}` : ''}
       </ChromeText>
       {right}
     </>
@@ -461,7 +460,7 @@ function Coverage({
   const untouched = untouchedJuz(tiles);
   const tileText = (text: string | number) => (color: string, dim: boolean) => (
     <ChromeText style={[styles.tileText, { color, opacity: dim ? 0.7 : 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-      {text}
+      {typeof text === 'number' ? formatNumber(text) : text}
     </ChromeText>
   );
   const tile = (jt: JuzTile) => {
@@ -559,7 +558,7 @@ function Coverage({
       <Figure
         // All time in cycles: over a long range the share nears 100%, so how many times round says more. Only
         // from the first whole cycle: before it, the share, as the other ranges show it (never "0 cycles").
-        value={inCycles ? cyclesText : `${pct}%`}
+        value={inCycles ? cyclesText : formatPercentage(pct)}
         text={
           inCycles
             ? t('activity.insights.cyclesOfYour', {
@@ -654,7 +653,7 @@ function Coverage({
                 accessibilityHint={t('activity.insights.opensJuz', { juz: r.juz })}
                 testID={`coverage-page-row-${r.juz}`}
               >
-                <ChromeText style={[styles.pageLabelText, { color: palette.secondary }]}>{r.juz}</ChromeText>
+                <ChromeText style={[styles.pageLabelText, { color: palette.secondary }]}>{formatNumber(r.juz)}</ChromeText>
               </Tap>
               <View style={styles.cells}>
                 {r.cells.map((c) => (
@@ -787,7 +786,7 @@ function UncoveredLine({ row, separator, onPress }: { row: UncoveredRow; separat
     >
       <View style={[styles.uncoveredMark, { backgroundColor: palette.bubble }]}>
         {row.kind === 'juz' ? (
-          <ChromeText style={[typeV2.name, { color: palette.red }]}>{row.juz}</ChromeText>
+          <ChromeText style={[typeV2.name, { color: palette.red }]}>{formatNumber(row.juz)}</ChromeText>
         ) : (
           <Ionicons name="leaf-outline" size={18} color={palette.text} />
         )}
@@ -886,7 +885,7 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
             accessibilityElementsHidden
             testID="insights-grid-weekdays"
           >
-            {WEEKDAY_INITIALS.map((letter, i) => (
+            {weekdayLetters().map((letter, i) => (
               <View key={i} style={[styles.gridLabel, { height: cell }]}>
                 <ChromeText style={[styles.gridLabelText, { color: palette.secondary, fontSize: cell >= 14 ? 11 : 9 }]}>{letter}</ChromeText>
               </View>
@@ -1177,8 +1176,8 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
       ) : (
         <Figure
           value={String(data.memorized.size)}
-          text={[data.memorized.size === 1 ? 'page' : 'pages', share].filter(Boolean).join(' · ')}
-          right={added > 0 ? <ChromeText style={[typeV2.name, { color: palette.good }]}>{`+${added} ${span.inWords}`}</ChromeText> : undefined}
+          text={[t('activity.insights.pagesWord', { count: data.memorized.size }), share].filter(Boolean).join(' · ')}
+          right={added > 0 ? <ChromeText style={[typeV2.name, { color: palette.good }]}>{`+${formatNumber(added)} ${span.inWords}`}</ChromeText> : undefined}
           testID="insights-memorization-figure"
         />
       )}
@@ -1202,7 +1201,7 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
               accessibilityState={{ selected: picked === m.month }}
               testID={`insights-month-${m.month}`}
             >
-              {lit && m.pages > 0 ? <ChromeText style={[typeV2.meta, styles.monthValue, { color: palette.text }]}>{m.pages}</ChromeText> : null}
+              {lit && m.pages > 0 ? <ChromeText style={[typeV2.meta, styles.monthValue, { color: palette.text }]}>{formatNumber(m.pages)}</ChromeText> : null}
               <View style={[styles.monthBar, { height: Math.round((72 * m.pages) / top), backgroundColor: palette.primary, opacity: lit ? 1 : 0.4 }]} />
             </Tap>
           );
@@ -1327,7 +1326,7 @@ function Pace({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (day: strin
         </View>
         <View style={[styles.paceTile, { backgroundColor: palette.bubble }]}>
           <View style={styles.paceFigure}>
-            <ChromeText style={[styles.paceNumber, { color: palette.text }]}>{p.dayMinutes}</ChromeText>
+            <ChromeText style={[styles.paceNumber, { color: palette.text }]}>{formatNumber(p.dayMinutes)}</ChromeText>
             <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{t('activity.insights.min')}</ChromeText>
           </View>
           <ChromeText style={[typeV2.meta, styles.paceText, { color: palette.secondary }]}>{t('activity.insights.dayAtPace', { n: p.capacity })}</ChromeText>

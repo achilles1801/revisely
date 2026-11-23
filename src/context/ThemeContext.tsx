@@ -57,7 +57,11 @@ export function resolveThemeMode(
 /** Keys an earlier launch leaves behind: the sign-in, or the app's own settings. */
 export function isExistingInstall(keys: readonly string[]): boolean {
   return keys.some(
-    (k) => k.startsWith('firebase:authUser:') || k.startsWith('@revisely_') || k.startsWith('@revision_buddy') || k.startsWith('@revisley_'),
+    (k) =>
+      k.startsWith('firebase:authUser:') ||
+      k.startsWith('@revisely_') ||
+      k.startsWith('@revision_buddy') ||
+      k.startsWith('@revisley_'),
   );
 }
 
@@ -97,7 +101,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   return (
     <ThemeContext.Provider
-      value={{ themeMode, isDark, theme: v2ThemeColors(isDark, accent), palette: paletteV2(isDark, accent), setThemeMode }}
+      value={{
+        themeMode,
+        isDark,
+        theme: v2ThemeColors(isDark, accent),
+        palette: paletteV2(isDark, accent),
+        setThemeMode,
+      }}
     >
       {children}
     </ThemeContext.Provider>

@@ -89,7 +89,9 @@ The words and rules (one term per concept, plurals, digits, typography) are in `
   A change restarts the app, since React Native lays out right to left only from a launch. The store app offers
   `SHIPPED` (English) alone and reads nothing.
 - **Right to left** needs no native change: `I18nManager.forceRTL` is a flag React Native reads at launch on iOS
-  whatever languages the app declares, and Android's manifest already allows it. The native release adds the
+  whatever languages the app declares, and Android's manifest already allows it. A launch that started the other way
+  (the first on a phone whose language reads the other way) restarts once in the splash (`loadLanguageChoice`,
+  `restartForDirection`; LANG-1), and not again if that restart didn't take. The native release adds the
   system's side: Arabic in iOS Settings → Revisely → Language (`CFBundleLocalizations`), Arabic permission prompts,
   Android 13's per-app language, and the widgets' Swift labels. All of them move the store fingerprints.
 - **"Phone's language"** follows the phone only once that release declares Arabic. Until then iOS gives the app

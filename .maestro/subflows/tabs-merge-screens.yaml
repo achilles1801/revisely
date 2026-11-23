@@ -81,11 +81,12 @@ appId: com.revisionbuddy.app
 - runFlow:
     file: settings-row.yaml
     env:
+      PAGE: revision
       ROW: smart-tracking-switch
 - tapOn:
     id: smart-tracking-switch
-- tapOn:
-    id: back
+# Back from Revision, then from Settings' first level.
+- runFlow: back-home.yaml
 - extendedWaitUntil:
     visible:
       id: today-post
@@ -110,7 +111,7 @@ appId: com.revisionbuddy.app
     file: shot.yaml
     env:
       NAME: tabs-merge-invite-${THEME}
-# The line opens Settings scrolled to Revision, its switch in view.
+# The line opens Settings at Revision (its page, SET-1), the switch in view.
 - tapOn:
     id: insights-smart-tracking
 - extendedWaitUntil:

@@ -1,4 +1,4 @@
-// A take's audio, kept with the take (Revisely Dev; Settings → Recite → Save recordings when you recite, on by
+// A take's audio, kept with the take (Revisely Dev; Settings → Mushaf and Recite → Save recordings when you recite, on by
 // default; takes with Mark mistakes only). The microphone's samples go to a WAV file in the caches folder as they come,
 // about once a second, so a long take never sits in memory; when the take ends the file joins lib/recordings' store for
 // that day, with the pages it turned through and its waveform, marked `take`: it is the take's audio, never listed as a
@@ -27,6 +27,11 @@ export interface TakeRecording {
   add(pcm: Int16Array): void;
   /** The page on screen now. */
   pageAt(page: number): void;
+  /**
+   * The samples from `from` to `to` (s) while the take is recorded, read back from the file (a long recitation's earlier
+   * takes keep no audio in memory: lib/reciteLive/chain). Null once finished, or when nothing is there.
+   */
+  clip(from: number, to: number): Int16Array | null;
   /** The take ended: the file becomes a recording (null when nothing was kept: too short, or it couldn't be written). */
   finish(): Promise<SavedTake | null>;
 }
@@ -116,6 +121,26 @@ export function startTakeRecording({ day, page, now = Date.now() }: { day: strin
     pageAt(p) {
       if (finished || marks[marks.length - 1].page === p) return;
       marks.push({ atMs: Math.round((samples * 1000) / SAMPLE_RATE), page: p });
+    },
+    clip(from, to) {
+      if (broken || finished || !handle) return null;
+      flush();
+      if (broken || !handle) return null;
+      const a = Math.max(0, Math.floor(from * SAMPLE_RATE));
+      const b = Math.min(samples, Math.ceil(to * SAMPLE_RATE));
+      if (b <= a) return null;
+      // The handle writes at its offset: read where asked, then put it back.
+      const at = handle.offset;
+      try {
+        handle.offset = 44 + a * 2;
+        const bytes = handle.readBytes((b - a) * 2);
+        return new Int16Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 2)).slice();
+      } catch (err) {
+        logger.warn('The take’s recording could not be read back', err);
+        return null;
+      } finally {
+        handle.offset = at;
+      }
     },
     async finish() {
       if (finished) return null;

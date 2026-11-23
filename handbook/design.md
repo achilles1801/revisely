@@ -78,6 +78,11 @@ classic default), and a fresh install starts in light.
     surah names, so the › never stands alone and "Al-" never ends a line. Each line is two lines at most (`maxFontSizeMultiplier` 1.6, then it shrinks to
     fit); the name and streak and the sheet's header stop at 1.4, and so does the greeting, which
     also keeps 12pt from the icons (about 1.05 on an iPhone SE).
+  - **Edit schedule, tidied** (Majd chose option A of the Edit schedule audit, Nov 22 2026: "for edit schedule let's
+    do option A (tidy up) for now"; mocks `~/Documents/revisely-schedule-mocks/`, A1): the header says how much a day and
+    how often each page comes round (never "Automatic"); Daily amount is the first row; the days don't fold; "Create
+    new plan" and "Saved plans" (a sheet) are two rows; an edit on the automatic schedule says before Save that it
+    becomes a custom plan (MEM-6). Other directions are being explored as mocks only.
   - Activity is a calendar (`activity/ActivityCalendar`): **a month by default**, ‹ › to step,
     and **Week as the finest view** (seven rows, each day's facts), kept per device. Day shades
     are `lib/activityHeatmap` levels in `palette.heat` (≥ 2:1 on the ground) with
@@ -105,7 +110,7 @@ classic default), and a fresh install starts in light.
     show: Overview or Insights), and a day's before +. It opens a `v2/Sheet` of at
     most four topics, about two sentences each, then "Ask Revo ›" (only while Revo is on for the
     account, `useRevoPresent`, so it follows Revo's release switch) and "Hide help buttons". Hiding
-    is one switch for every screen, kept on the phone per account; Settings → Support → Help buttons
+    is one switch for every screen, kept on the phone per account; Settings → Help and support → Help buttons
     turns it back on. BEHAVIOUR.md HELP-1 to HELP-3. No first-run guides,
     tooltips, coach marks, or ⓘ beside single controls.
     - **All help text is in `src/lib/help/topics.ts`.** Each topic lists the BEHAVIOUR.md rules it
@@ -147,6 +152,19 @@ classic default), and a fresh install starts in light.
 - Fonts: SF Pro for Latin, Amiri for all Arabic. In a line that mixes them, put the Latin first
   and the Arabic last in a first-strong isolate (`⁨…⁩`): a line that starts with Arabic
   is laid out right to left (Insights' juz rows did).
+- **Amiri's lines never clip** (Majd, Nov 22 2026, on a mistake's card: "u cant even see if theres a dumma or fatha on
+  the top"; #879, #883). A Text draws only inside its own box, and Amiri's marks reach past the line the font declares.
+  - `arabicFullV2(size)` (a 2.51× line) for anything with harakat: Qur'an words, phrases, ayat, the bismillah, the
+    voweled surah names. Every word of the Qur'an reaches 1.481× the size above the baseline and 0.950× below.
+  - `arabicV2(size)` (1.83×) for unvoweled names (a surah's name, the salam, a prayer's name): up to 1.001× above and
+    0.651× below. Its old 1.6× line cut a hamza's top on iOS and a meem's tail on Android.
+  - `arabicForV2(text, size)` where one place shows both (the plan picker's surah and juz names, the wheels, search).
+  - Never Amiri by hand, nor a `lineHeight` over a helper's. A highlight behind a word (a nested Text's background)
+    fills the line, so it covers the marks. A box that clips (`overflow: 'hidden'`, a fixed height) must hold the line,
+    as the Recite bar's capsule caps its words' text size.
+  - The numbers come from `swift scripts/measure-amiri-ink.swift` (CoreText over the word data and the names). Run it
+    again if the font or the text changes. `src/design/__tests__/arabicLines.test.tsx` holds the lines to them and
+    scans the app; `jest/arabicLines`'s `clippedArabic(root)` checks every Amiri line a test renders.
 - **Surahs and juz first, page numbers almost never** (the owner, Nov 7 2026). People memorize by
   surah and juz: "Your revision starts at page 288" means little, "Al-Baqarah" a lot. So the app
   names any part of the Qur'an by its surahs and juz ("Al-Baqarah, ayahs 142–176", "Adh-Dhariyat 7
@@ -174,3 +192,14 @@ classic default), and a fresh install starts in light.
   (`systemAppearanceAvailable()`; `resolveThemeMode` in `context/ThemeContext`).
 - `expo-blur` and `expo-glass-effect` were removed from `package.json` (and the tests' mocks) with
   the background-audio build (Oct 28 2026).
+
+## Settings (SET-1)
+
+Settings is a short first level with a page per group (Majd's option B from the Settings audit, Nov 22 2026; the audit
+and its mocks are in Drive › Revisely › Product and design › Settings audit). `SettingsScreen` draws the first level, or
+the page its route's `page` names (`lib/settingsPages`), pushed again so the back gesture returns to the first level.
+- A new setting goes in its group's page (`page === '…'` in `SettingsScreen`). It shows on the first level only through
+  that page's value: a few words for its state, never a paragraph.
+- Revo's Settings section ids (`REVO_SETTINGS_SECTIONS`) stay as they are on the phone and the server. `pageOfSection` maps
+  each to the page that holds its rows.
+- A path written for users ("Settings → Reminders → …") names the page: in BEHAVIOUR.md, Revo's guide, help and strings.

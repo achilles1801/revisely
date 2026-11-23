@@ -74,6 +74,7 @@ import { wordsData } from '../../../lib/recite/__fixtures__/quranWords';
 import { pageOfVerse } from '../../../lib/verses';
 import { plainText } from '../../../lib/passages';
 import { setMistakeDetectionReleasedForTests } from '../../../lib/release/mistakeDetection';
+import { arabicLines, clippedArabic } from '../../../../jest/arabicLines';
 
 // The release's switch is the kill switch: these tests run with it as each says, and back to as it ships.
 afterEach(() => setMistakeDetectionReleasedForTests(undefined));
@@ -338,6 +339,8 @@ describe('the redesign (Majd, Nov 16 2026: the mic in reach of a thumb, clearer 
     expect(screen.getByTestId('search-partial')).toHaveTextContent('قل لو شاء');
     expect(screen.getByTestId('search-wave')).toBeTruthy();
     expect(screen.getByLabelText('Stop listening')).toBeTruthy();
+    // Every haraka of what's heard shows (arabicFullV2): the speech model writes harakat.
+    expect(clippedArabic(screen.UNSAFE_root as never)).toEqual([]);
     fireEvent.press(within(screen.getByTestId('search-bar')).getByTestId('search-mic'));
     expect(mockVoice.stop).toHaveBeenCalledTimes(1);
   });
@@ -351,6 +354,9 @@ describe('the redesign (Majd, Nov 16 2026: the mic in reach of a thumb, clearer 
     const card = screen.getByTestId('search-verse-10-16');
     expect(within(card).getByText('Yunus, ayah 16', { normalizer: (t) => plainText(t).trim() })).toBeTruthy();
     expect(within(card).getByTestId('search-verse-arabic')).toBeTruthy();
+    // The ayah's every haraka, and the query's line above the results (arabicFullV2).
+    expect(arabicLines(screen.UNSAFE_root as never).length).toBeGreaterThanOrEqual(2);
+    expect(clippedArabic(screen.UNSAFE_root as never)).toEqual([]);
     expect(within(card).getByTestId('search-verse-translation')).toHaveTextContent(/Had Allah willed/);
     expect(within(card).getByText('A note on it.', { exact: false })).toBeTruthy();
     expect(within(card).getByTestId('search-verse-credit')).toHaveTextContent(/Saheeh International.*v1\.1\.2.*QuranEnc\.com/);

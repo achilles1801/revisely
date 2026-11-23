@@ -116,8 +116,6 @@ export function LiveOverlay({
     follow: WordFollow;
     cover: string;
     guide: string;
-    /** How the pager tints the page image, so words drawn again match it. */
-    ink?: { colour: string | null; opacity?: number };
     off?: { w: number; words: QuranWords; colour: string } | null;
     /**
      * A take is running: nothing is drawn on a word still hidden, its marks and past mistakes included (Majd's Dev take,
@@ -141,11 +139,12 @@ export function LiveOverlay({
   const washes: InkWash[] = [];
   if (hidden && words && shown) {
     for (const { mark, fill, opacity, picked } of coverMarks?.marks ?? []) {
-      if (words.pageOf(mark.w) !== page) continue;
-      if (hidden.duringTake && !shown(mark.w)) continue;
+      // A shown word's wash is behind its ink (the underlay); over the covers only a word still hidden's, and none of
+      // those during a take.
+      if (words.pageOf(mark.w) !== page || shown(mark.w) || hidden.duringTake) continue;
       const g = markGroup(mark);
       const past = opacity != null;
-      const id = shown(mark.w) ? (past ? `past-highlight-${g}` : `live-highlight-${g}`) : past ? `cover-past-${g}` : `cover-highlight-${g}`;
+      const id = past ? `cover-past-${g}` : `cover-highlight-${g}`;
       washes.push({ box: markHighlight(words, mark), colour: fill, opacity: picked ? undefined : opacity, testID: picked ? `${id}-picked` : id });
     }
     const off = hidden.off && words.pageOf(hidden.off.w) === page && !shown(hidden.off.w) ? hidden.off : null;
@@ -160,7 +159,6 @@ export function LiveOverlay({
           words={words}
           shown={shown}
           image={image}
-          ink={hidden.ink ?? { colour: null }}
           colors={{ cover: hidden.cover, guide: hidden.guide }}
           washes={washes}
           follow={follow ? { w: follow.w, colour: follow.colour } : null}
@@ -175,6 +173,33 @@ export function LiveOverlay({
             />
           ))
         : null}
+    </View>
+  );
+}
+
+/**
+ * On a hidden page, behind the page's ink: the washes of the words it shows (a take's marks and past mistakes, lighter;
+ * the one a card is open for in its firm shade), seen through the covers' openings, the ink on top.
+ */
+export function ShownWashes({
+  page,
+  scale,
+  words,
+  marks,
+}: {
+  page: number;
+  scale: number;
+  words: QuranWords;
+  marks: readonly { mark: Mark; fill: string; opacity?: number; picked?: boolean }[];
+}) {
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`shown-washes-${page}`}>
+      {marks.map(({ mark, fill, opacity, picked }) => {
+        if (words.pageOf(mark.w) !== page) return null;
+        const g = markGroup(mark);
+        const id = opacity != null && !picked ? `past-highlight-${g}` : `live-highlight-${g}`;
+        return <Wash key={mark.w} testID={picked ? `${id}-picked` : id} box={markHighlight(words, mark)} scale={scale} colour={fill} opacity={picked ? undefined : opacity} />;
+      })}
     </View>
   );
 }

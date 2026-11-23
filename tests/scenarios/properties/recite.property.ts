@@ -68,8 +68,9 @@ import { runs } from './fixtures';
 import { ayahBand, cursorBox, markHighlight, wordBox } from '../../../src/lib/reciteLive/geometry';
 import { followCues, washOf, washReach } from '../../../src/lib/reciteLive/wash';
 import { followBox, hiddenInkPlan } from '../../../src/components/reciteLive/HiddenInkLayer';
-import { hiddenTakeInfo, revealedOnHide } from '../../../src/lib/reciteLive/hideSwitch';
+import { hiddenTakeInfo, keepRecited, revealedOnHide } from '../../../src/lib/reciteLive/hideSwitch';
 import { pageLines } from '../../../src/lib/recite/pageLines';
+import { CAP_S, chainView, endsAyah, nextLinkStart, ROLL_FROM_S, ROLL_NOW_S, rolloverDue } from '../../../src/lib/reciteLive/chain';
 
 const words = quranWords();
 const KINDS: MarkKind[] = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'];
@@ -1361,42 +1362,61 @@ describe('[RECITE-20] a hidden page is drawn empty: faint rules where words are 
     });
   });
 
-  it('every line is covered; each word shown is inside a run drawn in ink on its line, each hidden word outside them; every marker is drawn whole', () => {
+  it('ready at once: covers over the words still hidden, the markers and the words shown left open in the page’s own ink; no rule under them', () => {
     fc.assert(
       fc.property(caseArb, ({ page, start, length, extra }) => {
         const shown = (w: number) => (w >= start && w < start + length) || extra.includes(w);
         const plan = hiddenInkPlan(words, page, shown);
         const lines = pageLines(page);
         expect(plan.lines.map((l) => l.line)).toEqual(lines.map((l) => l.line));
-        const runsOn = (line: number) => {
-          const l = lines.find((x) => x.line === line)!;
-          return plan.ink.filter((p) => p.kind === 'shown' && p.box.y0 === l.coverTop).map((p) => p.box);
-        };
+        const lineOf = (line: number) => lines.find((x) => x.line === line)!;
+        const coversOn = (line: number) => plan.lines.find((x) => x.line === line)!.covers;
+        const openOn = (line: number, kind: 'marker' | 'shown') => plan.open.filter((p) => p.kind === kind && p.line === line).map((p) => p.box);
+        const coveredAt = (line: number, x: number, y: number) => coversOn(line).some((c) => c.x0 <= x && x <= c.x1 && c.y0 <= y && y <= c.y1);
         const [from, to] = words.pageRange(page);
         for (let w = from; w < to; w++) {
           const r = words.rect(w);
-          const runs = runsOn(words.lineOf(w));
-          if (shown(w)) expect(runs.some((b) => b.x0 <= r.x0 && b.x1 >= r.x1)).toBe(true);
-          else {
-            // A run spans only consecutive words shown, so a hidden word's middle is never in one, unless the word data
-            // puts it inside a shown word's own box (a few boxes overlap their neighbours; the fitted boxes fix those).
-            const mid = (r.x0 + r.x1) / 2;
-            const insideShownWord = (() => {
-              for (let v = from; v < to; v++) {
-                if (!shown(v) || words.lineOf(v) !== words.lineOf(w)) continue;
-                const o = words.rect(v);
-                if (o.x0 < mid && mid < o.x1) return true;
-              }
-              return false;
-            })();
-            if (!insideShownWord) expect(runs.filter((b) => b.x0 + 1 < mid && mid < b.x1 - 1)).toEqual([]);
+          const mid = (r.x0 + r.x1) / 2;
+          const line = words.lineOf(w);
+          if (shown(w)) {
+            // Open, whole: inside a run, and no cover reaches into the word.
+            expect(openOn(line, 'shown').some((b) => b.x0 <= r.x0 && b.x1 >= r.x1)).toBe(true);
+            for (const c of coversOn(line)) expect(Math.min(c.x1, r.x1) - Math.max(c.x0, r.x0)).toBeLessThanOrEqual(0);
+          } else {
+            // Hidden: its middle under a cover, unless the word data puts it inside a shown word's own box (a few boxes
+            // overlap their neighbours; the fitted boxes fix those).
+            let insideShown = false;
+            for (let v = from; v < to; v++) {
+              if (!shown(v) || words.lineOf(v) !== line) continue;
+              const o = words.rect(v);
+              if (o.x0 < mid && mid < o.x1) insideShown = true;
+            }
+            if (!insideShown) expect(coversOn(line).some((c) => c.x0 <= mid && mid <= c.x1)).toBe(true);
           }
         }
         for (const l of lines) {
-          for (const [a, b] of l.markers) expect(plan.ink.some((p) => p.kind === 'marker' && p.box.x0 <= a && p.box.x1 >= b && p.box.y0 === l.coverTop)).toBe(true);
+          l.markers.forEach(([a, b], k) => {
+            const [top, bottom] = l.markerRows[k];
+            // Every marker whole: open in its rows, and no cover reaches into it.
+            expect(openOn(l.line, 'marker').some((m) => m.x0 <= a && m.x1 >= b && m.y0 <= top && m.y1 >= bottom)).toBe(true);
+            for (const c of coversOn(l.line)) expect(Math.min(c.x1, b) - Math.max(c.x0, a) <= 0 || Math.min(c.y1, bottom) - Math.max(c.y0, top) <= 0).toBe(true);
+            // Over and under it, each half with its side's word (page 379's ۲٤ showed a sajdah's overline): the right half
+            // covered while the word before it (right to left) is hidden, the left half while the word after is.
+            const mid = (a + b) / 2;
+            const onLine = [...Array(to - from).keys()].map((i) => from + i).filter((w) => words.lineOf(w) === l.line);
+            const before = onLine.filter((w) => words.rect(w).x0 >= mid).sort((p, q) => words.rect(p).x0 - words.rect(q).x0)[0];
+            const after = onLine.filter((w) => words.rect(w).x1 <= mid).sort((p, q) => words.rect(q).x1 - words.rect(p).x1)[0];
+            const inShown = (x: number) => openOn(l.line, 'shown').some((o) => o.x0 <= x && x <= o.x1);
+            for (const [x, word] of [[(mid + b) / 2, before], [(a + mid) / 2, after]] as const) {
+              if (inShown(x)) continue;
+              const hidden = word == null || !shown(word);
+              if (top > l.coverTop + 1) expect({ marker: [page, l.line, k], x, over: coveredAt(l.line, x, (l.coverTop + top) / 2) }).toEqual({ marker: [page, l.line, k], x, over: hidden });
+              if (bottom < l.coverBottom - 1) expect({ marker: [page, l.line, k], x, under: coveredAt(l.line, x, (bottom + l.coverBottom) / 2) }).toEqual({ marker: [page, l.line, k], x, under: hidden });
+            }
+          });
           // The rule never runs under a word shown or a marker.
           const rules = plan.lines.find((x) => x.line === l.line)!.rules;
-          for (const box of runsOn(l.line)) for (const [a, b] of rules) expect(Math.min(b, box.x1 - 1) - Math.max(a, box.x0 + 1)).toBeLessThanOrEqual(0);
+          for (const box of openOn(l.line, 'shown')) for (const [a, b] of rules) expect(Math.min(b, box.x1 - 1) - Math.max(a, box.x0 + 1)).toBeLessThanOrEqual(0);
         }
         // The newest word's ink: its own x, its line's band.
         if (length > 0) {
@@ -1426,6 +1446,117 @@ describe('[RECITE-19] on a shown page the band is the whole ayah being recited',
         expect(bands.some((b) => b.y0 <= mid && mid <= b.y1)).toBe(true);
         // One rect a line, top to bottom, none overlapping the next.
         for (let i = 1; i < bands.length; i++) expect(bands[i].y0).toBeGreaterThanOrEqual(bands[i - 1].y0);
+      }),
+      { numRuns: runs(200) },
+    );
+  });
+});
+
+describe('[RECITE-22] a recitation past the checker’s 15 minutes: chained takes never overlap, never leave a gap, never lose the reciter’s place', () => {
+  /**
+   * A recitation from the top of a page: each word 0.5–1.6 s, a breath of 0–2.5 s after each ayah, for 16–46 minutes. A
+   * checker that decides a word as the voice stops (`voice`) says so of an ayah's last word half a second into a breath
+   * long enough; otherwise a word is decided as the next one begins.
+   */
+  const recitationArb = fc.record({
+    page: fc.integer({ min: 1, max: 560 }),
+    pace: fc.array(fc.double({ min: 0.5, max: 1.6, noNaN: true }), { minLength: 32, maxLength: 32 }),
+    breath: fc.array(fc.double({ min: 0, max: 2.5, noNaN: true }), { minLength: 16, maxLength: 16 }),
+    minutes: fc.integer({ min: 16, max: 46 }),
+    voice: fc.boolean(),
+  });
+  type Timed = { t: number; e: LiveEvent };
+  function recitation(r: { page: number; pace: number[]; breath: number[]; minutes: number; voice: boolean }): { events: Timed[]; start: number; end: number } {
+    const start = words.pageRange(r.page)[0];
+    const events: Timed[] = [];
+    let t = 1;
+    for (let w = start, i = 0; t < r.minutes * 60 && w < words.count - 1; w++, i++) {
+      const dur = r.pace[i % r.pace.length];
+      events.push({ t, e: { type: 'at', w } });
+      if (w > start) events.push({ t: t + 0.05, e: { type: 'said', upTo: w - 1 } });
+      let next = t + dur;
+      if (endsAyah(words, w)) {
+        const breath = r.breath[i % r.breath.length];
+        if (r.voice && breath >= 0.6) events.push({ t: t + dur + 0.5, e: { type: 'said', upTo: w } });
+        next += breath;
+      }
+      t = next;
+    }
+    return { events: events.sort((a, b) => a.t - b.t), start, end: t };
+  }
+
+  it('the phone rolls over before the cap, at a pause unless the cap is seconds away, and the screen keeps the reciter throughout', () => {
+    fc.assert(
+      fc.property(recitationArb, (r) => {
+        const { events, start, end } = recitation(r);
+        const fresh = () => applyEvent(liveConnecting({ anywhereFrom: start }), { type: 'ready', take: 't', protocol: 9 });
+        const links: { state: LiveState; offset: number }[] = [];
+        let cur = fresh();
+        let linkStart = 0;
+        let k = 0;
+        let said = -1;
+        for (let step = 1; step / 10 < end; step++) {
+          const now = step / 10;
+          // The current take hears what's said from its own start; it finds the place a second after the first word it hears.
+          while (k < events.length && events[k].t <= now) {
+            const x = events[k];
+            if (cur.start == null) {
+              if (x.e.type !== 'at' || x.t < linkStart) {
+                k++;
+                continue;
+              }
+              if (now < x.t + 1) break;
+              const at = words.ref(x.e.w);
+              cur = applyEvent(cur, { type: 'locked', w: x.e.w, s: at.sura, a: at.ayah });
+            }
+            cur = applyEvent(cur, x.e);
+            k++;
+          }
+          const view = chainView(links, { state: cur, offset: linkStart });
+          if (links.length > 0 || cur.start != null) {
+            // Never loses the reciter: a cursor throughout, and a hidden page's words never covered again.
+            expect(view.cursor).not.toBeNull();
+            expect(view.saidUpTo ?? -1).toBeGreaterThanOrEqual(said);
+            said = view.saidUpTo ?? said;
+            expect(view.status).toBe('listening');
+          }
+          const linkSecs = now - linkStart;
+          // Never the checker's cap.
+          expect(linkSecs).toBeLessThan(CAP_S);
+          if (!rolloverDue(cur, words, linkSecs)) continue;
+          if (linkSecs < ROLL_NOW_S) {
+            // At a pause: the word under the cursor decided, so the next take hears the next word whole.
+            expect(cur.cursor).not.toBeNull();
+            expect(cur.cursor!).toBeLessThanOrEqual(cur.saidUpTo!);
+          }
+          links.push({ state: liveStopping(cur), offset: linkStart });
+          linkStart = now;
+          cur = fresh();
+        }
+        // Each take begins where the last ended (no overlap, no gap) and holds less than the cap.
+        const starts = [...links.map((l) => l.offset), linkStart];
+        for (let i = 1; i < starts.length; i++) expect(starts[i] - starts[i - 1]).toBeLessThan(CAP_S);
+        if (end > CAP_S) expect(links.length).toBeGreaterThanOrEqual(1);
+      }),
+      { numRuns: runs(12) },
+    );
+  });
+
+  it('at the checker’s cap the next take begins where it stopped hearing, with what the phone sent past it: nothing heard twice or missed', () => {
+    const rate = 16_000;
+    fc.assert(
+      fc.property(fc.nat(10_000_000), fc.integer({ min: 0, max: 5 * rate }), fc.boolean(), (linkStart, past, cap) => {
+        const samples = linkStart + Math.round((cap ? CAP_S : ROLL_FROM_S) * rate) + past;
+        const next = nextLinkStart(cap, linkStart, samples, rate);
+        if (!cap) {
+          expect(next).toEqual({ start: samples, tail: null });
+          return;
+        }
+        // The checker heard [linkStart, linkStart + CAP); the next take hears from there, the tail first, then the microphone.
+        const heard = linkStart + Math.round(CAP_S * rate);
+        expect(next.start).toBe(heard);
+        const tail = next.tail ? Math.round((next.tail[1] - next.tail[0]) * rate) : 0;
+        expect(next.start + tail).toBe(samples);
       }),
       { numRuns: runs(200) },
     );
@@ -1486,6 +1617,27 @@ describe('[RECITE-24] the summary: mistakes per page for a long take, Expected a
         const [a0, a1] = words.verseRange(r.sura, r.ayah);
         expect(expected.length).toBeLessThanOrEqual(Math.min(5, a1 - a0));
       }),
+    );
+  });
+});
+
+describe('[RECITE-21] when a take stops, the words it recited stay shown with those shown by hand', () => {
+  it('every word from the take’s start to the last one shown stays, and every word shown by hand', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: words.count - 40 }),
+        fc.integer({ min: 0, max: 30 }),
+        fc.uniqueArray(fc.integer({ min: 0, max: words.count - 1 }), { maxLength: 8 }),
+        (start, n, byHand) => {
+          const kept = keepRecited(new Set(byHand), start, start + n);
+          for (let w = start; w <= start + n; w++) expect(kept.has(w)).toBe(true);
+          for (const w of byHand) expect(kept.has(w)).toBe(true);
+          expect(kept.size).toBe(new Set([...byHand, ...Array.from({ length: n + 1 }, (_, i) => start + i)]).size);
+          // A take that never found its start keeps nothing more.
+          expect(keepRecited(new Set(byHand), null, null).size).toBe(new Set(byHand).size);
+        },
+      ),
+      { numRuns: runs(120) },
     );
   });
 });

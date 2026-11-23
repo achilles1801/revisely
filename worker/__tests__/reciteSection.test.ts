@@ -59,7 +59,11 @@ describe("the home's Recite section", () => {
     const off = await worker.fetch(new Request('https://revisely.app/'), { ...ENV, ASSETS: assets(home) }, ctx());
     expect(await off.text()).toBe(home);
 
-    const on = await worker.fetch(new Request('https://dev.revisely.app/'), { ...ENV, ASSETS: assets(home), RECITE_SECTION: '1' }, ctx());
+    const on = await worker.fetch(
+      new Request('https://dev.revisely.app/'),
+      { ...ENV, ASSETS: assets(home), RECITE_SECTION: '1' },
+      ctx(),
+    );
     const body = await on.text();
     expect(body).toContain(`<body class="home ${RECITE_ON}">`);
     // Before the release the worker adds the class; after it the page already has it and comes through unchanged.
@@ -90,7 +94,9 @@ describe("the home's Recite section", () => {
     expect(files).toHaveLength(8);
     for (const f of files) expect(fs.statSync(path.join(ROOT, 'docs', f)).size).toBeGreaterThan(10_000);
     for (const name of ['follow', 'marks', 'again', 'test']) {
-      expect(files).toEqual(expect.arrayContaining([`assets/img/recite/${name}-light.webp`, `assets/img/recite/${name}-dark.webp`]));
+      expect(files).toEqual(
+        expect.arrayContaining([`assets/img/recite/${name}-light.webp`, `assets/img/recite/${name}-dark.webp`]),
+      );
     }
   });
 });

@@ -105,7 +105,10 @@ jest.mock('@react-native-community/netinfo', () => ({
 jest.mock('../../lib/firebase', () => ({ db: {}, updateAuthDisplayName: jest.fn(async () => undefined) }));
 jest.mock('../../lib/notifications', () => ({ scheduleDailyReminder: jest.fn(async () => undefined) }));
 jest.mock('../../lib/updateChannel', () => ({ applyUpdateChannel: jest.fn(() => null) }));
-jest.mock('../../lib/recordings', () => ({ deleteRecordings: jest.fn(async () => undefined), isRevisionRecordingOf: () => () => false }));
+jest.mock('../../lib/recordings', () => ({
+  deleteRecordings: jest.fn(async () => undefined),
+  isRevisionRecordingOf: () => () => false,
+}));
 jest.mock('@sentry/react-native', () => ({ setTag: jest.fn() }));
 jest.mock('../../lib/logger', () => ({ logger: { log: jest.fn(), warn: jest.fn(), error: jest.fn() } }));
 
@@ -166,10 +169,16 @@ function Probe() {
   app = useApp();
   return <Text>{app.loading ? 'loading' : 'ready'}</Text>;
 }
-const view = () => render(<AppProvider><Probe /></AppProvider>);
-const settle = () => act(async () => {
-  await new Promise((r) => setTimeout(r, 0));
-});
+const view = () =>
+  render(
+    <AppProvider>
+      <Probe />
+    </AppProvider>,
+  );
+const settle = () =>
+  act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
 const goOffline = () => act(() => mockNet.listener?.({ isConnected: false, isInternetReachable: false }));
 const goOnline = async () => {
   mockServer.online = true;
@@ -334,7 +343,14 @@ describe('changes made offline', () => {
     expect(app.logs[0]).toMatchObject({ id: today, pagesRevised: [3, 4] });
     // The next page of the same session, now online.
     await act(async () => {
-      await app.addLog({ date: today, assignedPages: [3, 4, 5], pagesRevised: [5], pagesSkipped: [], weaknessUpdates: [], durationMinutes: 3 });
+      await app.addLog({
+        date: today,
+        assignedPages: [3, 4, 5],
+        pagesRevised: [5],
+        pagesSkipped: [],
+        weaknessUpdates: [],
+        durationMinutes: 3,
+      });
     });
     await act(async () => settleSync('u1'));
     expect(mockServer.applied.map((a) => a.entry.op.kind)).toEqual(['pages', 'session.add', 'session.add']);
@@ -418,7 +434,10 @@ describe('the review’s cases', () => {
     });
     expect(app.pendingChanges).toBe(1);
     await goOnline();
-    expect(mockServer.applied[0].entry.op).toEqual({ kind: 'pages', pages: [{ pageNumber: 3, totalRevisionCount: 1 }] });
+    expect(mockServer.applied[0].entry.op).toEqual({
+      kind: 'pages',
+      pages: [{ pageNumber: 3, totalRevisionCount: 1 }],
+    });
   });
 
   it('a change the server took is in the copy on the phone before it leaves the outbox', async () => {
@@ -427,7 +446,14 @@ describe('the review’s cases', () => {
     await settle();
     goOffline();
     await act(async () => {
-      await app.addLog({ date: '2026-11-02', assignedPages: [3], pagesRevised: [3], pagesSkipped: [], weaknessUpdates: [], durationMinutes: 4 });
+      await app.addLog({
+        date: '2026-11-02',
+        assignedPages: [3],
+        pagesRevised: [3],
+        pagesSkipped: [],
+        weaknessUpdates: [],
+        durationMinutes: 4,
+      });
     });
     await goOnline();
     // No snapshot has come (the listener didn't fire), and the copy has it anyway.
@@ -485,7 +511,11 @@ describe('a sign-in that lapsed offline', () => {
     // Auth comes back: the sign-in is no longer valid. The app shows sign-in;
     // the change stays on the phone for this account.
     mockAuth.provisionalUid = null;
-    r.rerender(<AppProvider><Probe /></AppProvider>);
+    r.rerender(
+      <AppProvider>
+        <Probe />
+      </AppProvider>,
+    );
     await settle();
     expect(app.isAuthenticated).toBe(false);
     expect(app.user).toBeNull();
@@ -494,7 +524,11 @@ describe('a sign-in that lapsed offline', () => {
 
     // Signing in again as the same account sends it.
     mockAuth.firebaseUser = { uid: 'u1' };
-    r.rerender(<AppProvider><Probe /></AppProvider>);
+    r.rerender(
+      <AppProvider>
+        <Probe />
+      </AppProvider>,
+    );
     await settle();
     await act(async () => settleSync('u1'));
     expect(mockServer.applied.map((a) => a.entry.op)).toEqual([

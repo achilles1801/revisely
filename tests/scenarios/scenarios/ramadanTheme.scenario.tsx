@@ -104,7 +104,7 @@ describe('the Ramadan theme', () => {
 
     // Settings → Appearance → Ramadan theme, shown on: turned off, Home has none of it.
     ({ app, home } = await openHome(phone, true));
-    await navigate(app, (n) => n.navigate('Settings'));
+    await navigate(app, (n) => (n.navigate as (name: string, params?: object) => void)('Settings', { page: 'appearance' }));
     await app.until(() => app.screen.queryByTestId('settings-ramadan-theme') != null, 'the Ramadan theme switch');
     expect(app.screen.getByTestId('settings-ramadan-theme').props.value).toBe(true);
     const { fireEvent } = app.mods.rtl;
@@ -130,7 +130,7 @@ describe('the Ramadan theme', () => {
     const { app } = await openHome(phone, false);
     await app.idle(300);
     expect(shown(app)).toEqual([]);
-    await navigate(app, (n) => n.navigate('Settings'));
+    await navigate(app, (n) => (n.navigate as (name: string, params?: object) => void)('Settings', { page: 'appearance' }));
     await app.until(() => app.screen.queryByTestId('accent-row') != null, 'Settings');
     expect(app.screen.queryByTestId('settings-ramadan-theme')).toBeNull();
     await app.close();

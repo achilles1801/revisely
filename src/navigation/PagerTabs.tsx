@@ -17,7 +17,7 @@
 //   once the pager is still, and Android's page textures are switched from the
 //   UI thread. A render mid-swipe froze the pager on Android until it was drawn.
 
-import React, { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { I18nManager, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import {
   createNavigatorFactory,
@@ -34,7 +34,7 @@ import {
   useNavigationBuilder,
 } from '@react-navigation/native';
 import type { StyleProp, ViewStyle } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, type PanGesture } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
   runOnJS,
@@ -109,6 +109,15 @@ export function pagerRoutes<R>(routes: readonly R[], swipeableCount: number, foc
 }
 
 const SPRING = { damping: 32, stiffness: 320, mass: 1, overshootClamping: true } as const;
+
+// The pager's own pan, for a gesture inside a tab that must win over it (`blocksExternalGesture`): Activity's calendar
+// grid swipes between months and weeks when Activity is a tab (Revisely Dev, TAB-2). Null outside the pager.
+const PagerGestureContext = createContext<PanGesture | null>(null);
+
+/** The tab pager's pan gesture, or null outside it. */
+export function usePagerGesture(): PanGesture | null {
+  return useContext(PagerGestureContext);
+}
 
 export type PagerTabOptions = {
   /** `{ display: 'none' }` hides the tab bar on this tab. */
@@ -340,23 +349,25 @@ function PagerTabs({
 
   return (
     <NavigationContent>
-      <View style={styles.fill}>
-        <GestureDetector gesture={pan}>
-          <Animated.View style={[styles.row, { width: width * count }, row]} testID="tab-pager-row">
-            {pages.map((route, i) => (
-              <PagerPage key={route.key} name={route.name} width={width} focused={i === index} moving={moving}>
-                {mounted.has(route.key) ? descriptors[route.key].render() : null}
-              </PagerPage>
-            ))}
-          </Animated.View>
-        </GestureDetector>
-        {tabBar({
-          state,
-          descriptors,
-          navigation,
-          position,
-        })}
-      </View>
+      <PagerGestureContext.Provider value={pan}>
+        <View style={styles.fill}>
+          <GestureDetector gesture={pan}>
+            <Animated.View style={[styles.row, { width: width * count }, row]} testID="tab-pager-row">
+              {pages.map((route, i) => (
+                <PagerPage key={route.key} name={route.name} width={width} focused={i === index} moving={moving}>
+                  {mounted.has(route.key) ? descriptors[route.key].render() : null}
+                </PagerPage>
+              ))}
+            </Animated.View>
+          </GestureDetector>
+          {tabBar({
+            state,
+            descriptors,
+            navigation,
+            position,
+          })}
+        </View>
+      </PagerGestureContext.Provider>
     </NavigationContent>
   );
 }

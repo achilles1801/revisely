@@ -75,6 +75,10 @@ every session must follow goes here. `scripts/__tests__/handbook.test.js` checks
 - **One GitHub API limit for every session.** All sessions share one account's 5,000 requests an hour, and they ran
   out on Nov 15. Check CI once when you need it (`gh pr checks`, or `gh run watch --interval 120`), never in a tight
   loop.
+- **Keep updates short** (Majd, Nov 23 2026: "i dont like how ur responses and updates to me are so incredibly long and
+  verbose" … "the short response rule should be applied to all claude sessions"). Anything Majd reads, and every report
+  to the orchestrator, is a few plain lines: what changed, what's verified, and what he must do. Details go in the
+  shared notes or a doc, linked, for whoever needs them.
 - **Hand off before your context fills, and name sessions by topic and number** (Majd, Nov 14 2026).
   - Check your context with `mcp__ccd_session_mgmt__get_usage` (session "self") at milestones and before big
     reads. Auto-compaction starts at about 97% and keeps you going, but it loses detail.
@@ -194,6 +198,12 @@ eas env:exec production 'npx expo-updates fingerprint:generate --platform ios' |
 Run this before and after any change to `app.config.js`, `fingerprint.config.js`, `package.json` or
 a native dependency. If a change should not be native but the hash moved, find out why before
 merging. `eas fingerprint:generate --json` prints a banner before the JSON, so it does not pipe into `jq`.
+
+**The store app's fingerprints move only in a PR meant to move them** (Nov 23 2026: 1.0.5's on-device Recite is linked
+into Revisely Dev only until the release owner's native PR). CI's Fast checks fail a PR that moves either
+(`scripts/check-store-fingerprints.js` against `scripts/store-fingerprints.json`; computed with no environment, so not
+the published runtime versions). A PR meant to move them runs the script with `--write` and commits the file. How to
+keep native work in Revisely Dev only: `handbook/dev-stack.md`, "Native code in Revisely Dev only".
 
 The root `.gitignore` is a fingerprint source: editing it changes the hash and starts a native build
 (a `coverage/` line did, Oct 26, and the build was cancelled). Ignore new paths with a `.gitignore`

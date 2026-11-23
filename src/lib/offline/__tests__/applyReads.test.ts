@@ -14,7 +14,16 @@ jest.mock('../../logger', () => ({ logger: { warn: jest.fn(), error: jest.fn() }
 
 const mocked = firestoreService as jest.Mocked<typeof firestoreService>;
 const UID = 'u1';
-const session = { date: '2026-11-04', startedAt: 1793800000000, endedAt: 1793800754000, durationSeconds: 754, mode: 'stopwatch' as const, targetSeconds: null, pages: [5, 6], pagesVisited: [5] };
+const session = {
+  date: '2026-11-04',
+  startedAt: 1793800000000,
+  endedAt: 1793800754000,
+  durationSeconds: 754,
+  mode: 'stopwatch' as const,
+  targetSeconds: null,
+  pages: [5, 6],
+  pagesVisited: [5],
+};
 const addEntry: OutboxEntry = { id: 'e1', at: 1, op: { kind: 'reading.add', id: 'r1', session } };
 
 beforeEach(() => jest.clearAllMocks());
@@ -22,7 +31,10 @@ beforeEach(() => jest.clearAllMocks());
 describe('the Read item beside a timed session (C2 dual write)', () => {
   it('writes the item when a session is added', async () => {
     await applyEntry(UID, addEntry);
-    expect(mocked.setReadItem).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1', day: '2026-11-04', pages: [5, 6], minutes: 13 }), UID);
+    expect(mocked.setReadItem).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'r1', day: '2026-11-04', pages: [5, 6], minutes: 13 }),
+      UID,
+    );
   });
 
   it('follows a page edit and a delete', async () => {

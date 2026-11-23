@@ -271,7 +271,7 @@ appId: com.revisionbuddy.app
     timeout: 5000
 - assertVisible:
     id: past-try-wrong
-- assertVisible: "Say it right on 2 different days to clear it."
+- assertVisible: "2 more right takes, on 2 different days, clear it."
 - runFlow:
     file: ../subflows/shot.yaml
     env:
@@ -432,7 +432,7 @@ appId: com.revisionbuddy.app
     timeout: 30000
 - assertVisible:
     id: take-summary-before
-    text: "Before: 1 wrong word, 1 harakat slip"
+    text: "Before: 1 wrong word, 1 wrong haraka"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
@@ -453,6 +453,7 @@ appId: com.revisionbuddy.app
 - runFlow:
     file: ../subflows/settings-row.yaml
     env:
+      PAGE: testing
       ROW: settings-premium
 - tapOn:
     id: settings-premium
@@ -462,8 +463,18 @@ appId: com.revisionbuddy.app
       checked: false
       enabled: true
     timeout: 30000
-- tapOn:
-    id: back
+# Back to Settings' first level, then Home (SET-1): Settings left open stays on Home's stack, and the tab-Home tap after
+# the takes below would show it instead of Home's open-activity.
+- runFlow:
+    file: ../subflows/tap-to-open.yaml
+    env:
+      ID: back
+      OPENS: settings-page-testing
+- runFlow:
+    file: ../subflows/tap-to-open.yaml
+    env:
+      ID: back
+      OPENS: today-post
 - openLink:
     link: revisely://read?page=379
     optional: true

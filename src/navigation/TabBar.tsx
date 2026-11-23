@@ -11,14 +11,22 @@ import { useMiniPlayer } from '../lib/nowPlaying';
 import { MINI_PLAYER_GAP, MINI_PLAYER_HEIGHT } from '../components/player/MiniPlayer';
 import { StringLights } from '../components/ramadan/StringLights';
 import { useRamadanTheme } from '../lib/ramadanTheme';
+import { t } from '../i18n';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
 // Icon-only: outline when idle, filled when selected.
 const TAB_ICONS: Record<string, { active: IconName; inactive: IconName }> = {
   Home: { active: 'home', inactive: 'home-outline' },
+  // Revisely Dev's Activity tab (TAB-2): the pulse, as on the button it replaces at the top of Home.
+  ActivityTab: { active: 'pulse', inactive: 'pulse-outline' },
   Read: { active: 'book', inactive: 'book-outline' },
   Insights: { active: 'stats-chart', inactive: 'stats-chart-outline' },
+};
+
+// What VoiceOver says for a tab: its route's name, but for a route named apart from its screen.
+const TAB_LABELS: Record<string, () => string> = {
+  ActivityTab: () => t('home.screen.activityTab'),
 };
 
 const BAR_HEIGHT = 52;
@@ -232,7 +240,7 @@ function Tab({
     <Pressable
       accessibilityRole="button"
       accessibilityState={focused ? { selected: true } : {}}
-      accessibilityLabel={routeName}
+      accessibilityLabel={TAB_LABELS[routeName]?.() ?? routeName}
       onPress={onPress}
       hitSlop={6}
       style={({ pressed }) => [styles.tab, pressed && { opacity: 0.55 }]}

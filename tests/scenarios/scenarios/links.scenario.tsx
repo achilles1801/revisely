@@ -118,6 +118,7 @@ it('[LINK-1] Privacy Policy, Terms of Service and Revo’s “How your data is u
 
   // A phone that opens links: each page in the app's own browser, never handed to the phone's.
   await tap(app, 'open-settings');
+  await tap(app, 'settings-page-about');
   await tapText(app, 'Privacy Policy');
   await app.until(() => inAppBrowser().opened.length === 1, 'the privacy policy in the app’s browser');
   await tapText(app, 'Terms of Service');
@@ -140,7 +141,12 @@ it('[LINK-1] Privacy Policy, Terms of Service and Revo’s “How your data is u
   alerts[0].buttons[0].onPress?.();
   expect(copied).toEqual(['https://revisely.app/privacy/']);
 
-  // Contact support: no email app takes it either, so its address shows to copy.
+  // Contact support (Settings → Help and support): no email app takes it either, so its address shows to copy.
+  await app.act(async () => {
+    const backs = app.screen.getAllByTestId('back');
+    app.mods.rtl.fireEvent.press(backs[backs.length - 1]);
+  });
+  await tap(app, 'settings-page-help');
   await tapText(app, 'Contact support');
   await app.until(() => alerts.length === 2, 'the support address');
   expect(alerts[1].title).toBe('Couldn’t open an email app');

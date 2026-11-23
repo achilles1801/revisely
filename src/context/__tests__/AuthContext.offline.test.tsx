@@ -53,7 +53,11 @@ afterEach(() => jest.useRealTimers());
 
 it('Auth slow to answer: after a moment the saved account shows; when Auth answers, it takes over', async () => {
   await AsyncStorage.setItem('firebase:authUser:KEY:[DEFAULT]', JSON.stringify({ uid: 'u1', email: 'a@example.com' }));
-  render(<AuthProvider><Probe /></AuthProvider>);
+  render(
+    <AuthProvider>
+      <Probe />
+    </AuthProvider>,
+  );
   expect(auth.provisionalUid).toBeNull();
   await act(async () => {
     await jest.advanceTimersByTimeAsync(AUTH_GRACE_MS);
@@ -67,7 +71,11 @@ it('Auth slow to answer: after a moment the saved account shows; when Auth answe
 });
 
 it('Auth answering in time, or nothing saved: no stand-in account', async () => {
-  render(<AuthProvider><Probe /></AuthProvider>);
+  render(
+    <AuthProvider>
+      <Probe />
+    </AuthProvider>,
+  );
   await act(async () => {
     await jest.advanceTimersByTimeAsync(AUTH_GRACE_MS * 2);
   });
@@ -86,7 +94,11 @@ it('signing out deletes the copy of the account on this phone, but keeps its uns
   await writeAccountPart('u1', 'user', { uid: 'u1' });
   await writeAccountPart('u1', 'pages', [{ pageNumber: 1 }]);
   await enqueue('u1', { kind: 'usage', seconds: 30 });
-  render(<AuthProvider><Probe /></AuthProvider>);
+  render(
+    <AuthProvider>
+      <Probe />
+    </AuthProvider>,
+  );
   act(() => mockAuthChanges.cb!({ uid: 'u1' }));
   expect(await readAccount('u1')).not.toBeNull();
   await act(async () => {

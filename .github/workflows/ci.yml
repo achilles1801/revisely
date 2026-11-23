@@ -334,6 +334,14 @@ jobs:
           npm ci --prefix tests/firestore-rules
           npm ci --prefix scripts/lint
 
+      # The store app's fingerprints (CLAUDE.md "Runtime version is a fingerprint"): a change that
+      # moves one makes Preview build and submit a new store binary on the merge. A PR meant to move
+      # them commits scripts/store-fingerprints.json (`node scripts/check-store-fingerprints.js --write`).
+      - name: Store fingerprints
+        id: storefp
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: node scripts/check-store-fingerprints.js
+
       # The app (tests/scenarios with it; fast-check is its own dependency), and
       # the Cloudflare worker (worker/, wrangler*.jsonc). functions/ and
       # tests/firestore-rules/ have their own and are checked below.
@@ -348,6 +356,14 @@ jobs:
         id: lint
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npx --prefix scripts/lint eslint -c scripts/lint/eslint.config.mjs --quiet .
+
+      # Prettier on the folders formatted so far (scripts/lint/formatted.txt): the rest is formatted a
+      # folder at a time, never all at once. A failure prints the files; `npx --prefix scripts/lint prettier
+      # --config scripts/lint/prettier.config.mjs --write <file>` fixes them.
+      - name: Format (formatted folders)
+        id: format
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npx --prefix scripts/lint prettier --config scripts/lint/prettier.config.mjs --check $(grep -v '^#' scripts/lint/formatted.txt)
 
       - name: Unit + component tests (app)
         id: unit

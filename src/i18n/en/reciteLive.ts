@@ -4,7 +4,7 @@ export const reciteLive = {
   intro: {
     image: 'A page of An-Naml with its mistakes highlighted',
     title: 'Mark my mistakes',
-    body: 'Revisely highlights a wrong, missed or extra word in red, and a haraka or letter slip in amber. Tap one to see what you said.',
+    body: 'Revisely highlights your mistakes: a wrong, missed or extra word in red, and a wrong haraka or letter in amber. Tap one to see what you said.',
     get: 'Get Premium',
     support: 'Can’t afford it? Apply for support',
     // The riwaya it checks (Recite due diligence, row 6): Hafs ʿan ʿĀṣim, the only one the model knows.
@@ -29,12 +29,15 @@ export const reciteLive = {
     /** A word in the bar as VoiceOver reads it: "وَأُوهِيَتْ, wrong word,". */
     wordWithMark: '{{word}}, {{mark}},',
     wrong: 'wrong word',
-    slip: 'slip',
+    wrongHaraka: 'wrong haraka',
+    wrongLetter: 'wrong letter',
     tajweed: 'tajweed note',
     paused: 'Paused',
     /** After Stop, a follow-along take's result in the bar (a tap opens the summary). */
     resultDone: 'Done',
     resultLabel: '{{result}}. Show your recitation',
+    /** Not a mistake's Undo, in the bar's words' place (RECITE-25). */
+    undoLabel: '{{text}}. Undo',
     /** Said once to screen reader users when a take ends (the microphone already off). */
     resultSpoken: 'Take done. {{result}}',
     slow: 'Slow connection: checking is behind',
@@ -92,17 +95,20 @@ export const reciteLive = {
     ayahN: 'ayah {{n}}',
     removed_one: '{{count}} marked not a mistake',
     removed_other: '{{count}} marked not a mistake',
-    /** The findings line: "1 wrong word, 1 harakat slip, 1 tajweed note, 2 not clear". */
+    /** The findings line: "1 wrong word, 1 wrong haraka, 1 wrong letter, 2 not clear, 1 tajweed note (Beta)". */
     wrong_one: '{{count}} wrong word',
     wrong_other: '{{count}} wrong words',
     skipped_one: '{{count}} skipped',
     skipped_other: '{{count}} skipped',
     extra_one: '{{count}} extra',
     extra_other: '{{count}} extra',
-    slips_one: '{{count}} harakat slip',
-    slips_other: '{{count}} harakat slips',
-    tajweed_one: '{{count}} tajweed note',
-    tajweed_other: '{{count}} tajweed notes',
+    harakat_one: '{{count}} wrong haraka',
+    harakat_other: '{{count}} wrong harakat',
+    letters_one: '{{count}} wrong letter',
+    letters_other: '{{count}} wrong letters',
+    /** Tajweed notes are labelled Beta wherever they show (Majd, Nov 22 2026). */
+    tajweed_one: '{{count}} tajweed note (Beta)',
+    tajweed_other: '{{count}} tajweed notes (Beta)',
     unclear_one: '{{count}} not clear',
     unclear_other: '{{count}} not clear',
     unfinished: 'The end of this take wasn’t checked. What it found before then is kept.',
@@ -114,6 +120,9 @@ export const reciteLive = {
     again: 'Recite again',
     recitedLabel: 'In today’s Recited, in Activity',
     recited: 'In today’s Recited',
+    /** A past take's summary (RMEM-8): its own day in Activity, when that isn't today. */
+    recitedDayLabel: 'The day of this take, in Activity',
+    recitedDay: 'Its day in Activity',
     score: 'Score {{score}}, {{mistakes}}',
     before: 'Before: {{before}}',
     intoLabel: '{{line}}. Show it in the reader',
@@ -194,10 +203,13 @@ export const reciteLive = {
     skippedWord: 'Skipped word',
     extraAfterEnd: 'Extra word after the end',
     extraWord: 'Extra word',
-    shaddaSlip: 'Shadda slip',
-    harakatSlip: 'Harakat slip',
-    letterSlip: 'Letter slip',
+    /** A wrong haraka or letter is a mistake like a wrong word (Majd, Nov 22 2026). */
+    wrongShadda: 'Wrong shadda',
+    wrongHaraka: 'Wrong haraka',
+    wrongLetter: 'Wrong letter',
     tajweed: 'Tajweed',
+    /** A tajweed note's title: "Madd munfasil (Beta)". */
+    beta: '{{title}} (Beta)',
     /** "An-Naml, ayah 23": a no-break space keeps "ayah 23" together. */
     place: '{{surah}}, ayah {{ayah}}',
     placeLikely: '{{place}} · likely',

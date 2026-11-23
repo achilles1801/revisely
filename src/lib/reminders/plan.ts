@@ -20,7 +20,12 @@
 // on came back no more often than those without.
 
 import { generateDailyAssignment } from '../algorithm';
-import { getFajrTimeFor, getNextRevisionDayStart, getRevisionDateForUser, getRevisionDayForUser } from '../fajrBoundary';
+import {
+  getFajrTimeFor,
+  getNextRevisionDayStart,
+  getRevisionDateForUser,
+  getRevisionDayForUser,
+} from '../fajrBoundary';
 import type { Place } from '../prayer/prefs';
 import { dayTimes, type CalcSettings } from '../prayer/times';
 import { streakFromLogs } from '../streak';
@@ -139,7 +144,9 @@ function slotsFor(rev: Revision, input: PlanReminderInput): Slot[] {
 
   // Two due within 30 minutes become one: the earlier is dropped.
   const sorted = slots.sort((a, b) => a.at.getTime() - b.at.getTime());
-  return sorted.filter((s, i) => !(i + 1 < sorted.length && sorted[i + 1].at.getTime() - s.at.getTime() <= MERGE_WITHIN_MS));
+  return sorted.filter(
+    (s, i) => !(i + 1 < sorted.length && sorted[i + 1].at.getTime() - s.at.getTime() <= MERGE_WITHIN_MS),
+  );
 }
 
 export function planRevisionReminders(input: PlanReminderInput): PlannedReminder[] {

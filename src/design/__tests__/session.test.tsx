@@ -4,7 +4,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 jest.mock('@expo/vector-icons', () => {
   const { Text } = require('react-native');
-  return { Ionicons: ({ name, color }: { name: string; color: string }) => <Text testID={`icon-${name}`}>{color}</Text> };
+  return {
+    Ionicons: ({ name, color }: { name: string; color: string }) => <Text testID={`icon-${name}`}>{color}</Text>,
+  };
 });
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn(async () => undefined),
@@ -38,8 +40,16 @@ beforeEach(async () => {
 
 describe('the session and reader in the new design', () => {
   it('the page palette uses the new greys around the same white and black pages', () => {
-    expect(getReadPalette(false)).toMatchObject({ pageBg: '#FFFFFF', textSecondary: paletteLight.secondary, divider: paletteLight.separator });
-    expect(getReadPalette(true)).toMatchObject({ pageBg: '#000000', textSecondary: paletteDark.secondary, divider: paletteDark.separator });
+    expect(getReadPalette(false)).toMatchObject({
+      pageBg: '#FFFFFF',
+      textSecondary: paletteLight.secondary,
+      divider: paletteLight.separator,
+    });
+    expect(getReadPalette(true)).toMatchObject({
+      pageBg: '#000000',
+      textSecondary: paletteDark.secondary,
+      divider: paletteDark.separator,
+    });
   });
 
   it('header buttons are bare icons; a page marked revised is the jade done check', async () => {
@@ -48,13 +58,21 @@ describe('the session and reader in the new design', () => {
       v2(
         <>
           <RoundButton icon="ellipsis-horizontal" label="Session menu" onPress={jest.fn()} palette={palette} />
-          <RoundButton icon="checkmark-outline" label="Unmark current page" onPress={jest.fn()} palette={palette} active />
+          <RoundButton
+            icon="checkmark-outline"
+            label="Unmark current page"
+            onPress={jest.fn()}
+            palette={palette}
+            active
+          />
         </>,
       ),
     );
     await act(async () => {});
     expect(flat(screen.getByLabelText('Session menu').props.style).backgroundColor).toBeUndefined();
-    expect(flat(screen.getByTestId('round-button-active').props.style).backgroundColor).toBe(paletteV2(false, DEFAULT_ACCENT).done);
+    expect(flat(screen.getByTestId('round-button-active').props.style).backgroundColor).toBe(
+      paletteV2(false, DEFAULT_ACCENT).done,
+    );
     expect(screen.getByTestId('icon-checkmark').props.children).toBe(paletteLight.onDone);
   });
 

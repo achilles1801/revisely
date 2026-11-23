@@ -1,12 +1,4 @@
-import React, {
-  createContext,
-  ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Alert, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hapticOf } from '../design/haptics';
@@ -43,11 +35,7 @@ const NOTIFICATION_ID = 'reading-timer-complete';
 
 interface ReadingTimerContextValue {
   timer: ActiveReadingTimer | null;
-  start: (
-    mode: ReadingTimerMode,
-    targetSeconds: number | null,
-    purpose?: ReadingTimerPurpose,
-  ) => void;
+  start: (mode: ReadingTimerMode, targetSeconds: number | null, purpose?: ReadingTimerPurpose) => void;
   pause: () => void;
   resume: () => void;
   /** Stop and save. Resolves false if saving failed (timer is kept). */
@@ -74,7 +62,11 @@ async function scheduleCompletionNotification(timer: ActiveReadingTimer) {
         title: t('timer.readingComplete'),
         body: t('timer.logged', { duration: formatDuration(timer.targetSeconds ?? 0) }),
       },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(at), channelId: REMINDER_CHANNEL_ID },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: new Date(at),
+        channelId: REMINDER_CHANNEL_ID,
+      },
     });
   } catch (err) {
     logger.log('Could not schedule reading timer notification', err);
@@ -96,15 +88,18 @@ export function ReadingTimerProvider({ children }: { children: ReactNode }) {
 
   // A sitting in the reader is saved with the pages it held (REC-2).
   const holdPages = sittingsEnabled(user);
-  const save = useCallback(async (t: ActiveReadingTimer, now: number) => {
-    const session = readingSessionFromTimer(t, now, { pagesHeld: holdPages });
-    const { durationSeconds } = session;
-    if (durationSeconds < MIN_SESSION_SECONDS) return null;
-    // Saved on the phone at once; it reaches the server when it can.
-    const id = autoId();
-    await queueChange({ kind: 'reading.add', id, session });
-    return id;
-  }, [holdPages]);
+  const save = useCallback(
+    async (t: ActiveReadingTimer, now: number) => {
+      const session = readingSessionFromTimer(t, now, { pagesHeld: holdPages });
+      const { durationSeconds } = session;
+      if (durationSeconds < MIN_SESSION_SECONDS) return null;
+      // Saved on the phone at once; it reaches the server when it can.
+      const id = autoId();
+      await queueChange({ kind: 'reading.add', id, session });
+      return id;
+    },
+    [holdPages],
+  );
 
   const finish = useCallback(async (): Promise<{ sessionId: string | null } | null> => {
     const running = timerRef.current;
@@ -175,13 +170,7 @@ export function ReadingTimerProvider({ children }: { children: ReactNode }) {
 
   const start = useCallback(
     (mode: ReadingTimerMode, targetSeconds: number | null, purpose?: ReadingTimerPurpose) => {
-      const next = startTimer(
-        mode,
-        targetSeconds,
-        getCurrentRevisionDay(user),
-        Date.now(),
-        purpose,
-      );
+      const next = startTimer(mode, targetSeconds, getCurrentRevisionDay(user), Date.now(), purpose);
       setTimer(next);
       scheduleCompletionNotification(next);
     },
@@ -230,9 +219,7 @@ export function ReadingTimerProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <ReadingTimerContext.Provider
-      value={{ timer, start, pause, resume, finish, discard, notePage, noteRevisedPages }}
-    >
+    <ReadingTimerContext.Provider value={{ timer, start, pause, resume, finish, discard, notePage, noteRevisedPages }}>
       {children}
     </ReadingTimerContext.Provider>
   );

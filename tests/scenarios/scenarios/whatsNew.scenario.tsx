@@ -241,7 +241,10 @@ it('[NEW-3] Settings shows it again and changes nothing; a tester’s Show What�
   const { fireEvent } = app.mods.rtl;
   await app.until(() => app.screen.queryByTestId('open-settings') != null, 'Home');
   await app.act(async () => fireEvent.press(app.screen.getByTestId('open-settings')));
-  await app.until(() => app.screen.queryByTestId('settings-whats-new') != null, 'Settings');
+  // Settings → About (SET-1: the first level, then the page).
+  await app.until(() => app.screen.queryByTestId('settings-page-about') != null, 'Settings');
+  await app.act(async () => fireEvent.press(app.screen.getByTestId('settings-page-about')));
+  await app.until(() => app.screen.queryByTestId('settings-whats-new') != null, 'About');
 
   // About → What's new: the cards again, with a ✕; nothing changes.
   await app.act(async () => fireEvent.press(app.screen.getByTestId('settings-whats-new')));
@@ -255,7 +258,14 @@ it('[NEW-3] Settings shows it again and changes nothing; a tester’s Show What�
   await app.until(() => wn.mode() === null, 'the replay to close');
   expect(phone.storage.get(`@revisely_whats_new:v1:${uid}`)).toBeUndefined();
 
-  // Testing → Show What's new at launch: from the next launch, not this one.
+  // Testing → Show What's new at launch: from the next launch, not this one. Back to the first level, then Testing.
+  await app.act(async () => {
+    const backs = app.screen.getAllByTestId('back');
+    fireEvent.press(backs[backs.length - 1]);
+  });
+  await app.until(() => app.screen.queryByTestId('settings-whats-new') == null, 'the first level');
+  await app.act(async () => fireEvent.press(app.screen.getByTestId('settings-page-testing')));
+  await app.until(() => app.screen.queryByTestId('settings-whats-new-launch') != null, 'Testing');
   await app.act(async () => fireEvent(app.screen.getByTestId('settings-whats-new-launch'), 'valueChange', true));
   await app.settle(200);
   expect(wn.mode()).toBeNull();

@@ -36,6 +36,7 @@ appId: com.revisionbuddy.app
 - runFlow:
     file: ../subflows/settings-row.yaml
     env:
+      PAGE: about
       ROW: settings-whats-new
 - tapOn:
     id: settings-whats-new
@@ -67,10 +68,16 @@ appId: com.revisionbuddy.app
       id: whats-new-replay
     timeout: 10000
 
-# NEW-3: Testing → Show What's new at launch, from the next launch.
+# NEW-3: Testing → Show What's new at launch, from the next launch. Back from About to Settings' first level first.
+- runFlow:
+    file: ../subflows/tap-to-open.yaml
+    env:
+      ID: back
+      OPENS: settings-page-testing
 - runFlow:
     file: ../subflows/settings-row.yaml
     env:
+      PAGE: testing
       ROW: settings-whats-new-launch
 - tapOn:
     id: settings-whats-new-launch

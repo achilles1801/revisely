@@ -52,6 +52,18 @@ until its part is set up.
   - Nothing on the dev side stops preview: its fingerprint step can fail without failing the job, and
     preview's update never waits for it. Promote reads only the preview branch.
   - Each native change now builds twice (store and Dev).
+  - **Native code in Revisely Dev only** (Nov 23 2026, for 1.0.5's on-device Recite; measured with local fingerprints
+    before and after: the store app's unchanged, Revisely Dev's moving with the code):
+    - an npm library with native code: the root `react-native.config.js` leaves it out unless
+      `APP_VARIANT === 'dev'`, as it leaves whisper.rn out of Android; its config plugin, if any, behind `DEV`;
+    - our own module: outside `modules/` (everything there is linked into the store app), for example
+      `modules-dev/<name>/`, added to autolinking's search paths by a Dev-only plugin (Podfile
+      `use_expo_modules!(searchPaths: [...])`, settings.gradle `expoAutolinking.searchPaths`), and counted by
+      `fingerprint.config.js`'s `extraSources` only under APP_VARIANT=dev;
+    - files a build fetches or generates go in `fingerprint.config.js`'s `ignorePaths`: EAS fingerprints again inside the
+      build, and a hash that differs there stops it;
+    - the JavaScript loads the module lazily (`requireOptionalNativeModule`) behind `isDevVariant()`.
+    The release owner's native PR then moves it into the store app, and the store fingerprints once.
   - Secrets: `GOOGLE_SERVICE_INFO_PLIST_DEV` and `GOOGLE_SERVICES_JSON_DEV` (base64, as the store app's),
     from `firebase apps:sdkconfig` of the dev project's iOS and Android apps.
 - **The dev backend:** Firebase project `revisely-dev` (number 433792838929; Blaze, a $10 budget alert;
@@ -122,9 +134,21 @@ until its part is set up.
 - **Recitation check** (Majd, Nov 11 2026: "push the best version we have so far on dev"): the lab's mistake
   detection in the Dev app only (`lib/reciteCheck`: `isDevVariant()`, `previewTester`, a binary with the
   microphone stream). The reader's one mic: Recite follows the reciter on the page, and with Mark mistakes (Premium) it
-  marks the words skipped, said wrong or added, harakat and letter slips and, with Strict, tajweed notes (madd lengths
-  per Settings → Recite, qalqalah, ghunnah, ikhfa, idgham, iqlab). The verse menu's old "Check my recitation" row
+  marks the words skipped, said wrong or added, wrong harakat and letters and, with Strict, tajweed notes (madd lengths
+  per Settings → Mushaf and Recite, qalqalah, ghunnah, ikhfa, idgham, iqlab). The verse menu's old "Check my recitation" row
   (record, then check) is gone (Nov 15 2026; nothing showed it any more).
+  - **Two tiers** (Majd, Nov 22 2026: "saying a wrong haraka or letter IS a word mistake. the only two "tiers" is word
+    (including haraqah and letters) mistakes and then second tier is tajweed level mistake which we can market as
+    "beta". but the former should be perfected by release date"; RECITE-2). `markTier` in `lib/reciteLive/contract`:
+    `mistake` (a wrong, skipped or extra word, a wrong haraka, a wrong letter: named "Wrong haraka", "Wrong letter",
+    counted, never a "slip"), `tajweed` (Strict, "(Beta)" after its name in the card, the summary's line, Insights and
+    Settings' "Strict (Beta)"; never counted) and `unclear` (Not clear, never counted, not a tier). Settings' levels are
+    "Mistakes" and "Strict (Beta)"; there is no words-only level. `markGroup` stays what a mark is about: Recite memory
+    keys words by it.
+    - **Colours aren't decided** (Majd's decision says nothing about them): they stay by `markGroup`. The one switch is
+      `COLOURS_FOLLOW_TIERS` in `components/reciteLive/markColours` (`colourGroup`, `markFill`, `markFirm`, the bar's
+      `toneFill`): on, every mistake is red, amber only Not clear. Every page wash must read `markFill`/`markFirm` for it
+      to reach them (LiveUnderlay and the hidden page's marks index colours by group until the shading PR moves them).
   - **In revision sessions too** (Majd, Nov 17 2026: "add the mistake detection and mic functionality same as mushaf to
     the revision sessions themselves and get rid of that old hidden view thing on the top"; RECITE-9). Everything Recite
     puts on a page lives in `components/reciteLive/useReciteLayer`, used by the reader and `ActiveRevisionScreen` alike:
@@ -197,9 +221,12 @@ until its part is set up.
     shouldn't be an always there highlight at the top when the verses are hidden").
   - **The hidden page is drawn empty** (RECITE-20, `components/reciteLive/HiddenInkLayer`; Majd, Nov 22 2026, of
     Tarteel's: "i dont see the words being a different color as its recited with page hidden", "let's do it and test
-    it"): each line covered, a faint rule where its words are still hidden, the washes over the covers, then the markers
-    and every run of words shown drawn again from the page's image through their boxes (given by MushafPager's
-    `pageOverlay`), the newest tinted green. A word with a mark keeps its wash and the page's ink instead.
+    it"): covers over the words still hidden with a faint rule on each, leaving the markers and every run of words shown
+    open in the page's own ink (ready at once: #877 first drew them again as ~30 copies of the page image, which filled
+    in one by one), and the newest word drawn again tinted green (the one copy; the page image from MushafPager's
+    `pageOverlay`). A shown word's wash is behind the ink (`ShownWashes`), a hidden word's on its cover with no take
+    running. A word with a mark keeps its wash and the page's ink instead. When a take stops, what it recited stays shown
+    (`keepRecited`).
     - During a take nothing is drawn on a word still hidden: not the word being said, not its marks or past mistakes
       (Majd's Dev take, Nov 22 2026: they gave words away). With no take running, a hidden word's marks show on its place.
     - Switched to hidden mid-take it keeps everything behind the reciter (the page before the start too) and hides only
@@ -210,7 +237,7 @@ until its part is set up.
     Tarteel's "blurb or splash": RECITE-19; `components/reciteLive/Wash`, `lib/reciteLive/wash`: a pill-shaped core
     whose edge fades out all round in its own colour, a `boxShadow`, reaching a little past the word so a box a few
     units off never shows an edge; pastel colours, checked in design.test), in three colours (`markGroup`, theme/v2 `markWord`…): red for a wrong,
-    skipped or extra word (an extra word on the word before it: "Extra word"), amber for a haraka or letter slip and
+    skipped or extra word (an extra word on the word before it: "Extra word"), amber for a wrong haraka or letter and
     "Not clear", violet for a tajweed note (Strict). A word with several shows its strongest; the mark a card is open
     for is a firmer shade of its own (`…Firm`), no outline. No red ink, dotted lines or + discs. The bar, the card and
     the summary use the same highlights, and a small flat swatch beside the kind's name (never a round mark): the kind
@@ -223,7 +250,7 @@ until its part is set up.
       Extra word just before it (`off` in `lib/reciteLive/state`).
     - What the lab measured: right 86% of the times it fires, and never on hesitations or pauses.
     - VoiceOver hears nothing: the mic is on throughout a take.
-  - **"Not a mistake" can be undone** (Majd, Nov 15 2026; Tarteel's Removed list): for 5 s an Undo toast above the bar,
+  - **"Not a mistake" can be undone** (Majd, Nov 15 2026; Tarteel's Removed list): for 5 s an Undo in the take's bar, in the words' place (RECITE-25: never a note over the page),
     and after the take the summary's "1 marked not a mistake" (closed until tapped) lists each with Put back
     (`restoreMark`: the mark and what it counted come back). The checker is told both ways, so the lab never keeps a
     wrong label: on the connection while live (`dismiss`, `undismiss`), and after the final answer over HTTP (`POST
@@ -261,6 +288,22 @@ until its part is set up.
     for), and a heartbeat keeps the longest JavaScript stall. The summary on screen, a failure, ✕ or leaving the reader
     removes it. One left at the next launch goes to Sentry once (environment `dev`, "Recite: a take's Stop never
     reached the summary", tag `recite_stop_last`). It holds no audio or words, only event types.
+  - **A recitation past 15 minutes is a chain of takes** (RECITE-22, Nov 22 2026; the release owner's plan): the checker
+    ends a take at 900 s of its audio (`done.why: "too_long"`), and a 20-page session runs 30–45 minutes.
+    - `lib/reciteLive/chain` (pure): from 14:00 of a take, at a pause (`said` ≥ the cursor) after an ayah's or a phrase's
+      last word, the take ends and the next starts, looking from the ayah the reciter continues in to the end of its page
+      (`nextTakeFrom`: from the page's top, the checker's replay locked 2:61 on 2:58); any pause from 14:45, at once
+      from 14:55; a `too_long` done chains too, the next take getting what was sent past 900 s first. At 13:30 `warmUpReciteCheck()`
+      wakes a second recite-check instance (one take an instance) so the next take doesn't wait for a cold one.
+    - `useLiveRecitation` keeps the current take in `curRef` and the takes rolled over in `priorRef`; the screens see
+      `chainView` of both, which is the take itself when it never rolls over. The microphone never stops, every sample
+      goes to one take, and an earlier take's audio goes with its connection once its answer is in.
+    - One record in Recite's memory, with `links` (each take's checker id and first word; `takeOfWord` for labels).
+      Your recitation on an earlier take's mark reads the take's recording file back (`TakeRecording.clip`) while it
+      lasts, and after Stop the file as saved in the day's recordings (`takeFile`, lib/reciteMemory/takeAudio, as a
+      past take's word does). With Save recordings off no file holds the earlier takes' audio.
+    - E2E: `revisely://e2e/recite-live?on=1&long=45&speed=5` (flow 21, 45 minutes in 9): the stand-in enforces the cap,
+      starts each take where the last ended, and beats every 2 s of audio (5 times as often by the clock).
   - **A take starts anywhere on the page** (Majd, Nov 14 2026; protocol 6). The start frame sends `startBy` (the page's
     last ayah), and the checker says where the reciter started (`locked`; recite-contract.md in the shared notes).
     - Until then the bar says Listening…, with no cursor and no score. **It must always find where he is** (Majd, Nov 20
@@ -294,6 +337,14 @@ until its part is set up.
     (some pages and lines draw it smaller, page 3 wider; a sajdah sign stays with its marker) and checks that no marker
     ink is under a cover and no word's ink shows beside a marker, on the originals and Android's w1080 and w1440. Run it
     after any change to the page lines or the images; `hiddenPage.test` pins measured markers (page 2's among them).
+  - **A marker is open in its own rows only** (Nov 22 2026: the end of a sajdah's overline showed above page 379's ۲٤
+    on a hidden page, flow 18). `src/data/markerRows.json` holds each marker's rows (its ink with up to 1.5 units of
+    room), written by the same script's `--write`. Over and under a marker, in its columns, `HiddenInkLayer` covers by
+    halves: the right half while the word before the marker is hidden (the page reads right to left), the left half
+    while the word after is, so a shown word's stroke over a marker (a kaf's top) still shows.
+    - The script fails if a word's ink over or under a marker passes the marker's middle. None does: 53 markers have
+      ink there, 12 of them another line's tip (a descender from above), covered with this line's words.
+    - Ink beside the ring in its own rows (326 markers, up to 16.5 units) shows in any opening, as before.
   - **Every word's box is its ink too** (Majd, Nov 21 2026: the word just recited was "partially cut off").
     - `quranWords.dat`'s x0 and x1 (the hidden view, the cursor's box, the mistakes' highlights) came from glyph data
       2–12 units off the images; the next word's cover cut 84% of words, and on 450:14 one box held its neighbour's.
@@ -357,3 +408,44 @@ until its part is set up.
     in their ayahs (offered for peeks alone too; its summary's "Before:" counts them). Peeks never count in the score
     (the checker counts them as `helped`). In Test me a place said to its end with a peek is "1 word peeked", not
     clean. The words Test me shows to start a place aren't peeks.
+
+## Native code for Revisely Dev only: `modules-dev/` (Recite on the phone, Nov 23 2026)
+
+Majd, Nov 23 2026: "our main priority right now is to get the model on phone to avoid all unnecessary costs". The
+work's notes and owners are in the shared notes (`on-device-recite.md`, the lead's `on-device-plan.md`, the release
+owner's `on-device-release.md`).
+- **Where the code goes.** Native modules for Revisely Dev alone live in `modules-dev/`, never `modules/`: everything
+  in `modules/` is linked into the store app and moves its fingerprints, which makes Preview build and submit store
+  binaries by itself. `plugins/withDevModules` (loaded only with APP_VARIANT=dev) adds the folder to autolinking's
+  search path in Dev's Podfile (`use_expo_modules!(searchPaths: …)`) and settings.gradle
+  (`expoAutolinking.searchPaths`), and `fingerprint.config.js` counts `modules-dev/` toward Dev's fingerprints only.
+  JavaScript loads the module lazily (`requireOptionalNativeModule`, behind `isDevVariant()`): null in the store app,
+  older Dev builds and tests. Before merging a native change, compute both store fingerprints the CI way: they must not
+  move (Nov 23: iOS `d3acdfa5…`, Android `dd5fd2ad…`). The release-native PR (the release owner's) links the module
+  into the store app and moves them once.
+- **`modules-dev/recite-engine`** (the native module `ReciteEngine`): ONNX Runtime 1.31.1, the checker's version.
+  - iOS: `ReviselyOnnxRuntime.podspec.json` takes the xcframework from Microsoft's signed NuGet package
+    (`Microsoft.ML.OnnxRuntime` on nuget.org, pinned by SHA-256). ONNX Runtime's own pod (`onnxruntime-c`) downloads
+    from download.onnxruntime.ai, which served a certificate for another name on Nov 23 2026, and its CocoaPods
+    releases stop at 1.30.0; its GitHub repositories answer 404 since about Nov 17. The iOS build has the CPU, Core ML
+    and XNNPACK providers.
+  - Android: `com.microsoft.onnxruntime:onnxruntime-android:1.31.1` from Maven Central (CPU, XNNPACK, NNAPI).
+  - The bench's core is plain C++ (`ios/RECBenchCore.cpp`) and plain Java (`android/…/Bench.java`, `LogMel.java`),
+    so both run on a Mac against ONNX Runtime's desktop builds of the same version (the NuGet package's osx-arm64
+    library; the `onnxruntime` jar on Maven Central) before a runner build. Their features follow workstream M's spec
+    (`~/revisely-mistake-lab/runs/mobile/SPEC.md`) and match its vectors (Nov 23, Mac: features within 1.3e-6, the
+    model's output identical, every top sound the same).
+- **The on-device bench** (Settings → Testing → On-device model, BEHAVIOUR.md ONDEV-1): its list of runs, the models,
+  the clip (EveryAyah, Husary, page 7, 90 s) and M's vectors live on the dev bucket under `models/recite/`
+  (`bench.json` is the manifest: files with sizes and SHA-256, runs per platform, M's pass marks). Changing the runs or
+  adding a model is an upload, not a build: put the file there with the dev admin key and add it to `bench.json`.
+  The first run in a platform's list is the long run's (5 or 20 minutes at the live cadence, battery and heat each
+  minute: research's protocol); a run with `fromMemory` opens its model from bytes, as the real path will after
+  decrypting it (the bench's files themselves are plain: Dev only, signed in; the real path's pack is encrypted).
+  Only watermarked models go there (the lead, Nov 23: never v7 in the clear; M's `v7m-*` files). Storage rules let
+  only accounts with the `onDeviceBench` custom claim read `models/recite/` (Revisely Dev is open to anyone with its
+  link, so signing in isn't enough): `GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-dev-admin.json node
+  scripts/set-bench-access.js <email> [--off] | --list` from `functions/`; the screen refreshes the token before it
+  reads, so a new claim counts at once. Only the admin SDK writes the folder. Each finished bench sends
+  one record to Firestore `onDeviceBench` (create only: the phone, the build, each run's numbers; no uid, no audio);
+  read them with the dev admin key.

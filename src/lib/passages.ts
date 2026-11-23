@@ -93,9 +93,13 @@ export function lastVerseOfPage(page: number, edition: MushafEditionId = getMush
  * («البقرة»).
  */
 export function surahName(sura: number): string {
+  return surahNameIn(sura).split('-').join(NBHY).split(' ').join(NBSP);
+}
+
+/** A surah's name in the app's language, as written (not held together): "Al-Baqarah", «البقرة». */
+export function surahNameIn(sura: number): string {
   const surah = getSurah(sura);
-  const name = currentLanguage() === 'ar' ? (surah?.nameArabic ?? surah?.name) : surah?.name;
-  return (name ?? '').split('-').join(NBHY).split(' ').join(NBSP);
+  return (currentLanguage() === 'ar' ? (surah?.nameArabic ?? surah?.name) : surah?.name) ?? '';
 }
 
 const juzLabel = (a: number, b: number) => (a === b ? t('lib.passages.juz', { n: a }) : t('lib.passages.juzRange', { from: a, to: b }));

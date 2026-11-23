@@ -177,13 +177,14 @@ The English is the app's label (as in `src/i18n/en`), or the concept where there
 | wrong word | كلمة خاطئة | كلمة خطأ | The adjective, not the noun |
 | skipped word | كلمة منسية | متروكة، ساقطة، محذوفة | [TT «الكلمات المنسية»]: the word memorizers already read for it (settled Nov 18). |
 | extra word | كلمة زائدة | | |
-| harakat slip | خطأ في الحركات | خطأ تشكيل, in labels | |
-| letter slip | خطأ في الحروف | | |
+| wrong haraka (was "harakat slip") | خطأ في الحركات | خطأ تشكيل, in labels | A mistake like a wrong word (Majd, Nov 22 2026) |
+| wrong letter (was "letter slip") | خطأ في الحروف | | The same |
 | Not clear | غير واضح | | |
 | tajweed note | ملاحظة تجويد | خطأ تجويد | It is never counted as a mistake |
+| Beta (tajweed, wherever it shows) | تجريبي, after the name: «… (تجريبي)» | بيتا | Majd, Nov 22 2026: tajweed is marketed as Beta |
 | Not a mistake / Put back / Undo | ليس خطأً / إعادة / تراجع | | Undo is تراجع [AP] |
 | Strict | الوضع الصارم | وضع التدقيق | Microsoft Edge's Arabic names its strictest level «صارم» (settled Nov 18) |
-| Words & harakat | الكلمات والحركات | | |
+| Mistakes (the level, was "Words & harakat") | الأخطاء | الكلمات والحركات | Tier 1: words, harakat and letters (Majd, Nov 22 2026) |
 | Peek | إلقاء نظرة | | [TT] |
 | hide the verses / hidden view | إخفاء الآيات | | [TT] |
 | Test me | اختبرني | | |

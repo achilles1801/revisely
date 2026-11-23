@@ -5,7 +5,7 @@ import React from 'react';
 import { AccessibilityInfo, Dimensions, Modal, Text } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { TakeSummarySheet, findingPlace, STACK_FINDINGS_AT } from '../TakeSummarySheet';
+import { TakeSummarySheet, findingPlace, findingsLine, STACK_FINDINGS_AT } from '../TakeSummarySheet';
 import { plainText } from '../../../lib/passages';
 import type { Mark } from '../../../lib/reciteLive/contract';
 
@@ -58,6 +58,24 @@ const grows = (max: number) =>
     .filter((t) => flat(t.props.children).replace(/[-]/g, '').trim() !== '')
     .filter((t) => !(typeof t.props.maxFontSizeMultiplier === 'number' && t.props.maxFontSizeMultiplier <= max))
     .map((t) => flat(t.props.children));
+
+describe('the findings line: two tiers (Majd, Nov 22 2026) [RECITE-2, RECITE-3]', () => {
+  const m = (id: string, over: Partial<Mark>): Mark => ({ id, w: 1, ayah: [27, 23], kind: 'word', sure: 'clear', ...over });
+  it('names a wrong haraka and a wrong letter apart, as mistakes, then what never counts', () => {
+    expect(
+      findingsLine([
+        m('a', { kind: 'letter' }),
+        m('b', { kind: 'harakat' }),
+        m('c', { kind: 'harakat' }),
+        m('d', { kind: 'tajweed', rule: 'ghunnah' }),
+        m('e', { kind: 'harakat', sure: 'likely' }),
+        m('f', { kind: 'word' }),
+      ]),
+    ).toBe('1 wrong word, 2 wrong harakat, 1 wrong letter, 1 not clear, 1 tajweed note (Beta)');
+    // Before, a wrong letter read "1 harakat slip".
+    expect(findingsLine([m('a', { kind: 'letter' })])).toBe('1 wrong letter');
+  });
+});
 
 describe('the take summary with screen readers and the largest text', () => {
   it('at normal sizes a finding’s Arabic word sits beside its title', () => {
@@ -177,7 +195,7 @@ describe('the take summary with screen readers and the largest text', () => {
     expect(swatch.borderRadius).toBeLessThan((swatch.width as number) / 2);
     // The kind is spelled out beside it.
     expect(screen.getByText('Extra word · ayah 23')).toBeTruthy();
-    expect(screen.getByText('1 wrong word, 1 extra, 1 harakat slip, 1 tajweed note')).toBeTruthy();
+    expect(screen.getByText('1 wrong word, 1 extra, 1 wrong haraka, 1 tajweed note (Beta)')).toBeTruthy();
     // The word in ink on its colour, as on the page (the wrong word's, said, on its colour in its phrase: RECITE-24).
     expect(screen.getAllByTestId('take-summary-finding-highlight').map((e) => style(e).backgroundColor)).toEqual([p.markSlip, p.markTajweed, p.markWord]);
     expect(style(screen.getAllByTestId('take-summary-finding-arabic')[0]).color).toBe(p.text);
@@ -247,5 +265,61 @@ describe('where a slip went (`into`, Majd said yes Nov 15 2026)', () => {
   it('none without a way to open it', () => {
     render2({});
     expect(screen.queryByTestId('take-summary-into')).toBeNull();
+  });
+});
+
+describe('[RMEM-8] a finished take’s summary opened again from its card', () => {
+  function showPast(over: Partial<React.ComponentProps<typeof TakeSummarySheet>> = {}) {
+    dims = jest.spyOn(Dimensions, 'get').mockReturnValue({ width: 375, height: 667, scale: 2, fontScale: 1 });
+    render(
+      <SafeAreaProvider initialMetrics={METRICS}>
+        <TakeSummarySheet
+          visible
+          check
+          words={words}
+          from={A23}
+          to={A23 + 20}
+          seconds={102}
+          marks={[]}
+          score={{ text: '100%', level: 'good' }}
+          checkOwned
+          when="Yesterday, 7:51 PM · page hidden"
+          recitedToday={false}
+          onFinding={() => undefined}
+          onCheck={() => undefined}
+          onDone={() => undefined}
+          onRecited={() => undefined}
+          {...over}
+        />
+      </SafeAreaProvider>,
+    );
+  }
+
+  it('says when it was first; has no Recite again, so Done is the main button; links to its own day', () => {
+    showPast();
+    expect(screen.getByTestId('take-summary-when').props.children).toBe('Yesterday, 7:51 PM · page hidden');
+    expect(screen.queryByTestId('take-summary-again')).toBeNull();
+    expect(screen.getByTestId('take-summary-done')).toBeTruthy();
+    expect(within(screen.getByTestId('take-summary-recited')).getByText(/Its day in Activity/)).toBeTruthy();
+  });
+
+  it('offers Recite the mistakes again when it has one, and the words peeked and Removed it kept', () => {
+    const m = wrong(A23 + 3, [27, 23]);
+    showPast({
+      marks: [m],
+      onDrill: () => undefined,
+      peeked: [{ ayah: [27, 24], words: [A23 + 25] }],
+      removed: [{ ...m, id: 'gone', w: A23 + 5 }],
+      onPutBack: () => undefined,
+    });
+    expect(screen.getByTestId('take-summary-drill')).toBeTruthy();
+    expect(screen.getByTestId('take-summary-peeked-row')).toBeTruthy();
+    expect(screen.getByTestId('take-summary-removed-toggle')).toBeTruthy();
+  });
+
+  it('right after a take there is no such line, and Recite again is there', () => {
+    show();
+    expect(screen.queryByTestId('take-summary-when')).toBeNull();
+    expect(screen.getByTestId('take-summary-again')).toBeTruthy();
   });
 });

@@ -11,6 +11,8 @@ export {
   formatTime,
   formatNumber,
   formatNumeral,
+  formatPercentage,
+  weekdayLetters,
   weekdayName,
   monthName,
   dayMonth,

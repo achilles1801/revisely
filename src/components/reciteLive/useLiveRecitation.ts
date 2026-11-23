@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, AppState, LayoutAnimation } from 'react-native';
 import { getAuth } from 'firebase/auth';
 import * as Sentry from '@sentry/react-native';
@@ -14,9 +14,10 @@ import { AudioSource, decodePcm, startMicStream } from '../../lib/recite/micSour
 import { SAMPLE_RATE } from '../../lib/recite/segmenter';
 import { getQuranWords, loadQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import { checkLevel, type ReciteCheckSettings } from '../../lib/reciteCheck/settings';
-import { sendLabel } from '../../lib/reciteCheck/service';
+import { sendLabel, warmUpReciteCheck } from '../../lib/reciteCheck/service';
 import type { LiveEvent, Mark } from '../../lib/reciteLive/contract';
-import type { LiveConnect, LiveConnection, StartFrame } from '../../lib/reciteLive/feed';
+import type { ClientFrame, LiveConnect, LiveConnection, StartFrame } from '../../lib/reciteLive/feed';
+import { CAP_S, chainTakes, chainView, judgedUpTo, LINK_ANSWER_MS, nextLinkStart, nextTakeFrom, ROLL_FROM_S, rolloverDue, settleLink, WARM_NEXT_S, type ChainLink } from '../../lib/reciteLive/chain';
 import { socketFeed } from '../../lib/reciteLive/socket';
 import { stopHearing } from '../../lib/reciteLive/hearAudio';
 import { clipRange } from '../../lib/reciteLive/phrase';
@@ -27,6 +28,7 @@ import { createTakeStats } from '../../lib/reciteLive/takeStats';
 import { createMistakeCue, playCueSound, playCueTap } from '../../lib/reciteLive/mistakeCue';
 import { reportLongTake, reportUnfinishedTake } from '../../lib/reciteLive/takeReport';
 import { SavedTake, startTakeRecording, TakeRecording } from '../../lib/reciteLive/takeRecording';
+import { takeFile, type TakeFile } from '../../lib/reciteMemory/takeAudio';
 import {
   applyEvent,
   checkerLooks,
@@ -86,6 +88,15 @@ const GATE_FAILURES = new Set(['check_locked', 'premium_required']);
 /** What ended a take: Stop tapped, the app left, iOS took the microphone, or a drill reached its end. */
 type StopWhy = 'tap' | 'background' | 'mic-lost' | 'reached';
 
+/**
+ * A take of a long recitation's chain that has rolled over (lib/reciteLive/chain, RECITE-22): its number, its state (its
+ * final answer still to come, or come), where its audio began in the chain and how long it ran (s).
+ */
+interface PriorLink extends ChainLink {
+  no: number;
+  secs: number;
+}
+
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** E2E builds: a recorded take instead of the microphone and the checker (lib/e2e/reciteLive). */
@@ -143,8 +154,11 @@ export function startFrameFor(
   settings: ReciteCheckSettings,
   anywhere: boolean = START_ANYWHERE,
   span: TakeSpan | null = null,
+  /** A long recitation's next take: looked for from this ayah, not the page's first (lib/reciteLive/chain `nextTakeFrom`). */
+  startAt: [number, number] | null = null,
 ): StartFrame {
-  const first = versesOnPage(page)[0] ?? { sura: 1, ayah: 1 };
+  const top = versesOnPage(page)[0] ?? { sura: 1, ayah: 1 };
+  const first = startAt && !span ? { sura: startAt[0], ayah: startAt[1] } : top;
   const startBy = span ? span.startBy : anywhere ? lastAyahOf(page) : undefined;
   return {
     type: 'start',
@@ -211,7 +225,65 @@ export function useLiveRecitation({
   onRecordingSaved?: (saved: SavedTake) => void;
   connect?: LiveConnect;
 }) {
-  const [state, setState] = useState<LiveState>(LIVE_IDLE);
+  // A long recitation is a chain of takes (lib/reciteLive/chain, RECITE-22): `cur` is the take taking the microphone now,
+  // kept in a ref as well so a rollover moves exactly what has been applied; `prior` the takes rolled over. What the
+  // screens see (`state`) is one take, `chainView` of both: for a take that never rolls over, `cur` itself.
+  const curRef = useRef<LiveState>(LIVE_IDLE);
+  const [cur, setCur] = useState<LiveState>(LIVE_IDLE);
+  /** Every change to the current take's state goes through here (the ref first, then a render). */
+  const update = useCallback((fn: (s: LiveState) => LiveState) => {
+    const next = fn(curRef.current);
+    if (next === curRef.current) return;
+    curRef.current = next;
+    setCur(next);
+  }, []);
+  const priorRef = useRef<PriorLink[]>([]);
+  const [priorTick, setPriorTick] = useState(0);
+  /** The prior links' connections while their answers are to come, and the timers that settle them without one. */
+  const linkConns = useRef(new Map<number, LiveConnection>());
+  const linkTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
+  /** The current link's number (a connection's events go to the link it was opened for), and the take's own. */
+  const linkNo = useRef(0);
+  const takeNo = useRef(0);
+  /** The chain's samples before the current link's first. */
+  const linkStart = useRef(0);
+  /** The take may roll over: one from the mic, not a span (a drill, a Test me place, a voice search's ayahs). */
+  const chainable = useRef(false);
+  /** The link whose next take's instance has been woken (WARM_NEXT_S). */
+  const warmedFor = useRef(0);
+  const updatePrior = useCallback((no: number, fn: (s: LiveState) => LiveState) => {
+    let changed = false;
+    priorRef.current = priorRef.current.map((l) => {
+      if (l.no !== no) return l;
+      const s = fn(l.state);
+      if (s === l.state) return l;
+      changed = true;
+      return { ...l, state: s };
+    });
+    if (changed) setPriorTick((n) => n + 1);
+  }, []);
+  /** The chain let go: every prior link's connection closed, its timer cleared. */
+  const resetChain = useCallback(() => {
+    for (const t of linkTimers.current.values()) clearTimeout(t);
+    linkTimers.current.clear();
+    const conns = [...linkConns.current.values()];
+    linkConns.current.clear();
+    if (priorRef.current.length) {
+      priorRef.current = [];
+      setPriorTick((n) => n + 1);
+    }
+    linkStart.current = 0;
+    savedAudio.current = null;
+    for (const c of conns) c.close();
+  }, []);
+  const state = useMemo(
+    () => chainView(priorRef.current, { state: cur, offset: linkStart.current / SAMPLE_RATE }),
+    // priorTick: the prior links changed (their refs are read here).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cur, priorTick],
+  );
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
   const reduceMotion = useReduceMotion();
   const reduceMotionRef = useRef(reduceMotion);
   reduceMotionRef.current = reduceMotion;
@@ -238,11 +310,13 @@ export function useLiveRecitation({
   }, []);
   /** This take's long-take numbers have gone (once a take, whatever its answer). */
   const reportedLong = useRef(false);
-  // A sound and a tap as a mistake is marked (Settings → Recite → Sound on a mistake; lib/reciteLive/mistakeCue).
+  // A sound and a tap as a mistake is marked (Settings → Mushaf and Recite → Sound on a mistake; lib/reciteLive/mistakeCue).
   const [cue] = useState(() => createMistakeCue({ now: () => Date.now(), sound: playCueSound, tap: playCueTap }));
   const soundRef = useRef(settings.mistakeSound);
   soundRef.current = settings.mistakeSound;
   const [words, setWords] = useState<QuranWords | null>(getQuranWords());
+  const wordsRef = useRef(words);
+  wordsRef.current = words;
   const conn = useRef<LiveConnection | null>(null);
   const source = useRef<AudioSource | null>(null);
   const samples = useRef(0);
@@ -254,6 +328,10 @@ export function useLiveRecitation({
   const [owner] = useState(() => `recite-live-${Math.random().toString(36).slice(2)}`);
   const recordingRef = useRef<TakeRecording | null>(null);
   const [recording, setRecording] = useState(false);
+  // After Stop, a long recitation's recording as saved (its file joined the day's recordings): Your recitation on an
+  // earlier take's mark reads it there, as a past take's does (RECITE-22). `savedTick` shows the screen it came.
+  const savedAudio = useRef<TakeFile | null>(null);
+  const [, setSavedTick] = useState(0);
   // The take went with Keep as test data on: the checker stores it (its `done` no longer says so; a `kept` event
   // follows, after the phone has hung up).
   const [testData, setTestData] = useState(false);
@@ -293,8 +371,8 @@ export function useLiveRecitation({
     appliedFrom.current = queuedSince.current;
     queuedSince.current = null;
     lastApplied.current = Date.now();
-    setState((s) => batch.reduce(applyEvent, s));
-  }, []);
+    update((s) => batch.reduce(applyEvent, s));
+  }, [update]);
   /** A new take, or the take let go: nothing waiting carries over. */
   const dropQueued = useCallback(() => {
     if (batchTimer.current) clearTimeout(batchTimer.current);
@@ -316,8 +394,26 @@ export function useLiveRecitation({
   const counts = useRef({ notMistake: 0, putBack: 0, peeks: 0 });
   const shownT = useRef(0);
   const replayUntil = useRef<number | null>(null);
+  /** The current link's seconds of audio, and where it began in the chain (s). */
+  const linkSecs = useCallback(() => (samples.current - linkStart.current) / SAMPLE_RATE, []);
+  const linkOffset = useCallback(() => linkStart.current / SAMPLE_RATE, []);
+  /** Rolls the take over to the next (set below, once the connections can be opened). */
+  const rollOverRef = useRef<(capDone: LiveEvent | null) => boolean>(() => false);
   /** Each event the take receives: its type to the Stop trace, then the live state. */
   const onEvent = useCallback((e: LiveEvent) => {
+    // The checker's own cap (15 minutes of a take's audio) while the reciter goes on: the next take starts at once
+    // (RECITE-22). Normally the take has rolled over before it, at a pause.
+    if (
+      e.type === 'done' &&
+      e.result.why === 'too_long' &&
+      chainable.current &&
+      source.current &&
+      curRef.current.status === 'listening' &&
+      curRef.current.start != null &&
+      rollOverRef.current(e)
+    ) {
+      return;
+    }
     if (e.type === 'ready') {
       readies.current++;
       // A resume onto a checker that holds less than the page shows: it checks the take again from there.
@@ -335,8 +431,8 @@ export function useLiveRecitation({
       else replayed = true;
     }
     // A re-check's times start again from 0: not the checker's lag (the E2E long take read 306 s).
-    stats.event(e, samples.current / SAMPLE_RATE, replayed);
-    if (replayed && REPLAYED.has(e.type) && (e.type !== 'locked' || traceRef.current.state.start != null)) return;
+    stats.event(e, linkSecs(), replayed);
+    if (replayed && REPLAYED.has(e.type) && (e.type !== 'locked' || curRef.current.start != null)) return;
     if (e.type === 'at' && e.t != null) shownT.current = Math.max(shownT.current, e.t);
     // A new mistake while reciting: its sound and tap at once (never one called Not a mistake, or after Stop).
     if (e.type === 'mark' && traceRef.current.state.status === 'listening' && !traceRef.current.state.dismissed.includes(e.mark.id)) {
@@ -346,7 +442,7 @@ export function useLiveRecitation({
     // The checker's heartbeat is for the connection and the numbers, and a slow connection's note (lib/reciteLive/socket).
     if (e.type === 'beat') {
       if (e.rx != null) {
-        const behind = samples.current / SAMPLE_RATE - e.rx;
+        const behind = linkSecs() - e.rx;
         const before = behindBefore.current;
         // While a re-check catches up it is behind by design: measured again from the first beat after it.
         behindBefore.current = replayed ? null : behind;
@@ -360,7 +456,8 @@ export function useLiveRecitation({
     if (e.type === 'locked' && e.where === 'quran') {
       Sentry.addBreadcrumb({ category: 'recite', message: 'locked elsewhere in the Quran', data: { page: getQuranWords()?.pageOf(e.w) } });
     }
-    if (e.type === 'at' && !wordTimes.current.has(e.w)) wordTimes.current.set(e.w, e.t ?? samples.current / SAMPLE_RATE);
+    // In the chain's seconds (the take's recording runs across a long recitation's takes).
+    if (e.type === 'at' && !wordTimes.current.has(e.w)) wordTimes.current.set(e.w, e.t != null ? e.t + linkOffset() : samples.current / SAMPLE_RATE);
     // Where the slips went, after the summary is up (namesAfter): its rows ease in rather than push the rest down at once
     if (e.type === 'into' && e.names.length && !reduceMotionRef.current) {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -372,7 +469,67 @@ export function useLiveRecitation({
     const wait = e.type === 'done' || e.type === 'error' || LIVE_BATCH_MS <= 0 ? 0 : lastApplied.current + LIVE_BATCH_MS - Date.now();
     if (wait <= 0) applyQueued();
     else if (!batchTimer.current) batchTimer.current = setTimeout(applyQueued, wait);
-  }, [applyQueued, stats, cue]);
+  }, [applyQueued, stats, cue, linkSecs, linkOffset]);
+
+  /** An event from a take rolled over: its final answer, where its slips went, what it decided before them. */
+  const onLinkEvent = useCallback(
+    (no: number, e: LiveEvent) => {
+      if (e.type === 'beat') return;
+      const link = priorRef.current.find((l) => l.no === no);
+      if (!link) return;
+      updatePrior(no, (s) => {
+        const next = applyEvent(s, e);
+        // Its connection failed before its answer: what it found stands, unfinished.
+        return next.status === 'failed' ? settleLink(next, link.secs) : next;
+      });
+      if (e.type === 'done' || e.type === 'error') {
+        const timer = linkTimers.current.get(no);
+        if (timer) clearTimeout(timer);
+        linkTimers.current.delete(no);
+      }
+    },
+    [updatePrior],
+  );
+  /** A rolled-over take's connection closed: its audio goes with it, and without its answer what it found stands. */
+  const onLinkClose = useCallback(
+    (no: number) => {
+      linkConns.current.delete(no);
+      const timer = linkTimers.current.get(no);
+      if (timer) clearTimeout(timer);
+      linkTimers.current.delete(no);
+      const link = priorRef.current.find((l) => l.no === no);
+      if (link) updatePrior(no, (s) => (s.status === 'done' ? s : settleLink(s, link.secs)));
+    },
+    [updatePrior],
+  );
+  /** What the current link does when its connection closes (the microphone stops; E2E's tone). */
+  const closeCurrent = useRef<() => void>(() => undefined);
+  /** How takes connect: the checker's socket, or E2E's stand-ins (kept for the links that follow). */
+  const connectRef = useRef<LiveConnect>(connect);
+  /** A link's connection, its events to the link it was opened for. */
+  const openLink = useCallback(
+    (frame: StartFrame): LiveConnection => {
+      const no = linkNo.current;
+      const holder: { c: LiveConnection | null } = { c: null };
+      const c = connectRef.current(frame, {
+        onEvent: (e) => (no === linkNo.current ? onEvent(e) : onLinkEvent(no, e)),
+        onClose: () => {
+          if (no !== linkNo.current) {
+            onLinkClose(no);
+            return;
+          }
+          stopTrace.step('closed');
+          if (conn.current === holder.c) conn.current = null;
+          closeCurrent.current();
+        },
+      });
+      holder.c = c;
+      conn.current = c;
+      lastConn.current = c;
+      return c;
+    },
+    [onEvent, onLinkEvent, onLinkClose],
+  );
 
   /** The take's recording, kept once the microphone has stopped (on the screen's way out too). */
   const finishRecording = useCallback(() => {
@@ -380,11 +537,21 @@ export function useLiveRecitation({
     recordingRef.current = null;
     setRecording(false);
     if (!rec) return;
+    const forTake = takeNo.current;
+    const chained = linkStart.current > 0;
     rec
       .finish()
       .then((saved) => {
         stopTrace.step(saved ? 'recording-saved' : 'recording-none');
-        if (saved) onSavedRef.current?.(saved);
+        if (!saved) return;
+        onSavedRef.current?.(saved);
+        // The earlier takes' audio is in that file alone now (their connections let theirs go).
+        if (!chained) return;
+        void takeFile(saved.recordingId).then((file) => {
+          if (!file || takeNo.current !== forTake || linkStart.current === 0) return;
+          savedAudio.current = file;
+          setSavedTick((n) => n + 1);
+        });
       })
       .catch((err) => {
         stopTrace.step('recording-failed');
@@ -407,6 +574,20 @@ export function useLiveRecitation({
     setMic('off');
   }, [finishRecording]);
 
+  /** The current link's `end`: on Revisely Dev with its counts (what it showed, the taps, its resumes). */
+  const endFrame = useCallback((): Exclude<ClientFrame, StartFrame> => {
+    if (!isDevVariant()) return { type: 'end' };
+    const st = curRef.current;
+    return {
+      type: 'end',
+      counts: {
+        shown: Object.keys(st.marks).length + Object.keys(st.removed).length,
+        ...counts.current,
+        resumes: Math.max(0, readies.current - 1),
+      },
+    };
+  }, []);
+
   /** Stop: the audio ends, the checker sends its final answer, the live marks stay meanwhile. */
   const stopFor = useCallback(
     (why: StopWhy) => {
@@ -420,29 +601,26 @@ export function useLiveRecitation({
       });
       stopHearing();
       void stopMic();
-      const st = traceRef.current.state;
-      conn.current?.send(
-        isDevVariant()
-          ? {
-              type: 'end',
-              counts: {
-                shown: Object.keys(st.marks).length + Object.keys(st.removed).length,
-                ...counts.current,
-                resumes: Math.max(0, readies.current - 1),
-              },
-            }
-          : { type: 'end' },
-      );
+      conn.current?.send(endFrame());
       applyQueued();
-      setState((s) => liveStopping(s));
+      update((s) => liveStopping(s));
       // The summary within a few seconds, whatever the checker does: what the take found, if its answer is late.
       clearBudget();
       stopBudget.current = setTimeout(() => {
         stopBudget.current = null;
         applyQueued();
-        setState((s) => {
+        // A long recitation's takes rolled over still without their answers: what each found stands too.
+        const chained = priorRef.current.length > 0;
+        for (const l of priorRef.current) {
+          if (l.state.status === 'done') continue;
+          const timer = linkTimers.current.get(l.no);
+          if (timer) clearTimeout(timer);
+          linkTimers.current.delete(l.no);
+          updatePrior(l.no, (s) => (s.status === 'done' ? s : settleLink(s, l.secs)));
+        }
+        update((s) => {
           if (s.status !== 'checking') return s;
-          const settled = settleUnfinished(s, clock.get());
+          const settled = chained ? settleLink(s, linkSecs()) : settleUnfinished(s, clock.get());
           if (settled !== s) {
             stopTrace.step('unfinished', conn.current?.status?.());
             stats.stop(clock.get());
@@ -452,7 +630,7 @@ export function useLiveRecitation({
         });
       }, stopBudgetMs);
     },
-    [stopMic, clock, applyQueued, clearBudget, stats],
+    [stopMic, clock, applyQueued, clearBudget, stats, endFrame, update, updatePrior, linkSecs],
   );
   const stop = useCallback(() => stopFor('tap'), [stopFor]);
 
@@ -469,9 +647,104 @@ export function useLiveRecitation({
     void stopMic();
     conn.current?.close();
     conn.current = null;
-    setState(LIVE_IDLE);
+    resetChain();
+    update(() => LIVE_IDLE);
     setMode(null);
-  }, [stopMic, dropQueued, clearBudget, stats, clock]);
+  }, [stopMic, dropQueued, clearBudget, stats, clock, resetChain, update]);
+
+  /**
+   * Roll the take over to the next (RECITE-22): the current take ends (`end`, or the checker's cap already ended it) and
+   * waits for its answer as a link of the chain; the next starts at once on the page on screen, as any take from the mic
+   * does, and the microphone's samples go to it from the cut on. At the checker's cap, the cut is where the checker
+   * stopped hearing (CAP_S): what was sent past it, held by the take's connection, goes to the next take first.
+   */
+  const rollOver = useCallback(
+    (capDone: LiveEvent | null): boolean => {
+      const a = conn.current;
+      const take = traceRef.current.mode;
+      const qw = wordsRef.current ?? getQuranWords();
+      if (!a || !take || !qw) return false;
+      applyQueued();
+      const secs = linkSecs();
+      const no = linkNo.current;
+      let done = curRef.current;
+      const cutState = done;
+      // Cut mid-word (the cap, or at once near it): this take judged only up to what it had decided (lib/reciteLive/chain).
+      const upTo = judgedUpTo(done);
+      if (capDone) done = applyEvent(done, capDone);
+      else {
+        a.send(endFrame());
+        done = liveStopping(done);
+      }
+      const ran = capDone ? Math.min(secs, CAP_S) : secs;
+      priorRef.current = [...priorRef.current, { no, state: done, offset: linkOffset(), secs: ran, ...(upTo != null ? { upTo } : {}) }];
+      linkConns.current.set(no, a);
+      if (done.status !== 'done') {
+        linkTimers.current.set(
+          no,
+          setTimeout(() => {
+            linkTimers.current.delete(no);
+            updatePrior(no, (s) => (s.status === 'done' ? s : settleLink(s, ran)));
+          }, LINK_ANSWER_MS),
+        );
+      }
+      setPriorTick((n) => n + 1);
+      // The next take: the samples from the cut on.
+      const next = nextLinkStart(capDone != null, linkStart.current, samples.current, SAMPLE_RATE);
+      const tail = next.tail && a.audioClip ? a.audioClip(next.tail[0], next.tail[1]) : null;
+      linkStart.current = next.start;
+      linkNo.current = no + 1;
+      readies.current = 0;
+      shownT.current = 0;
+      replayUntil.current = null;
+      behindBefore.current = null;
+      setSlow(false);
+      counts.current = { notMistake: 0, putBack: 0, peeks: 0 };
+      // From the ayah the reciter is continuing in, to the end of its page (and anywhere in the Qur'an).
+      const from = nextTakeFrom(qw, cutState);
+      const frame = startFrameFor(from?.page ?? pageRef.current, take, settingsRef.current, START_ANYWHERE, null, from?.from ?? null);
+      update(() => connectingFor(frame, qw));
+      const b = openLink(frame);
+      // A second at a time, as the microphone's frames come (an encoded block holds at most 65,535 samples).
+      if (tail) for (let i = 0; i < tail.length; i += SAMPLE_RATE) b.sendAudio(tail.subarray(i, i + SAMPLE_RATE));
+      // Numbers only: where in the take it rolled over, and why.
+      Sentry.addBreadcrumb({ category: 'recite', message: 'take rolled over', data: { secs: Math.round(secs), why: capDone ? 'cap' : 'pause', link: no } });
+      if (process.env.EXPO_PUBLIC_E2E === '1') {
+        // eslint-disable-next-line no-console
+        console.log(`[e2e] recite-live rolled over at ${Math.round(secs)} s (${capDone ? 'cap' : 'pause'})`);
+      }
+      return true;
+    },
+    [applyQueued, linkSecs, linkOffset, endFrame, updatePrior, update, openLink],
+  );
+  rollOverRef.current = rollOver;
+
+  /**
+   * The microphone's samples: to the current link's connection, the take's recording and the clock; then, past
+   * ROLL_FROM_S of the link's audio, whether it's time to roll over. `take`: the take the microphone was opened for.
+   */
+  const feedAudio = useCallback(
+    (take: number, pcm: Int16Array) => {
+      if (take !== takeNo.current) return;
+      const c = conn.current;
+      if (!c) return;
+      c.sendAudio(pcm);
+      recordingRef.current?.add(pcm);
+      const before = Math.floor(samples.current / SAMPLE_RATE);
+      samples.current += pcm.length;
+      if (Math.floor(samples.current / SAMPLE_RATE) !== before) clock.set(Math.floor(samples.current / SAMPLE_RATE));
+      if (!chainable.current || pausedRef.current || !source.current) return;
+      // Wake an instance for the next take while this one holds its own (once a link).
+      if (linkSecs() >= WARM_NEXT_S && warmedFor.current !== linkNo.current) {
+        warmedFor.current = linkNo.current;
+        warmUpReciteCheck();
+      }
+      if (linkSecs() < ROLL_FROM_S) return;
+      const qw = wordsRef.current ?? getQuranWords();
+      if (qw && rolloverDue(curRef.current, qw, linkSecs())) rollOver(null);
+    },
+    [clock, linkSecs, rollOver],
+  );
 
   const start = useCallback(
     async (take: LiveMode, span: TakeSpan | null = null) => {
@@ -482,6 +755,11 @@ export function useLiveRecitation({
         conn.current.close();
         conn.current = null;
       }
+      resetChain();
+      // A new take: its own links, its own microphone; it may chain unless it's a span (which has its own end).
+      takeNo.current++;
+      linkNo.current++;
+      chainable.current = span == null;
       stopHearing();
       pausedRef.current = false;
       setPaused(false);
@@ -529,40 +807,31 @@ export function useLiveRecitation({
         const frame = startFrameFor(page, take, settings, START_ANYWHERE, span);
         setTestData(frame.keep);
         setMode(take);
-        setState(connectingFor(frame, qw));
+        update(() => connectingFor(frame, qw));
         stats.start();
         // A long take (long takes, Nov 20 2026): the real socket to a stand-in checker, the microphone's frames 10 a
-        // second as the native module sends them (lib/e2e/reciteLive).
+        // second as the native module sends them (lib/e2e/reciteLive), `speed` times as many for a long session.
         const long = e2e.e2eLongTakeMinutes() > 0;
-        const c = (long ? e2e.e2eLongConnect() : e2e.e2eLiveConnect())(frame, {
-          onEvent,
-          onClose: () => {
-            stopTrace.step('closed');
-            if (conn.current === c) conn.current = null;
-            const tone = source.current;
-            source.current = null;
-            void tone?.stop();
-            setMic('off');
-          },
-        });
-        conn.current = c;
-        lastConn.current = c;
+        connectRef.current = long ? e2e.e2eLongConnect() : e2e.e2eLiveConnect();
+        closeCurrent.current = () => {
+          const tone = source.current;
+          source.current = null;
+          void tone?.stop();
+          setMic('off');
+        };
+        openLink(frame);
         recordingRef.current = keepsAudio(take, settings.saveRecording, recordingDay)
           ? startTakeRecording({ day: recordingDay as string, page })
           : null;
         setRecording(recordingRef.current != null);
         let second = 0;
+        const thisTake = takeNo.current;
         const openTone = async (): Promise<AudioSource> => {
           if (long) {
             const b64 = e2e.e2eToneFrameBase64();
+            const speed = e2e.e2eLongSpeed();
             const frames = setInterval(() => {
-              if (conn.current !== c) return;
-              const pcm = decodePcm(b64);
-              c.sendAudio(pcm);
-              recordingRef.current?.add(pcm);
-              const before = Math.floor(samples.current / SAMPLE_RATE);
-              samples.current += pcm.length;
-              if (Math.floor(samples.current / SAMPLE_RATE) !== before) clock.set(Math.floor(samples.current / SAMPLE_RATE));
+              for (let i = 0; i < speed; i++) feedAudio(thisTake, decodePcm(b64));
             }, 100);
             return {
               stop: async () => {
@@ -602,31 +871,19 @@ export function useLiveRecitation({
         claimAudio('recorder', owner);
         getRecitation().stop();
         setMode(take);
-        setState(connectingFor(frame, qw));
+        update(() => connectingFor(frame, qw));
         stats.start();
-        const c = connect(frame, {
-          onEvent,
-          onClose: () => {
-            stopTrace.step('closed');
-            if (conn.current === c) conn.current = null;
-            void stopMic();
-          },
-        });
-        conn.current = c;
-        lastConn.current = c;
+        connectRef.current = connect;
+        closeCurrent.current = () => void stopMic();
+        const c = openLink(frame);
         recordingRef.current = keepsAudio(take, settings.saveRecording, recordingDay)
           ? startTakeRecording({ day: recordingDay as string, page })
           : null;
         setRecording(recordingRef.current != null);
+        const thisTake = takeNo.current;
         const handlers = {
-          onAudio: (pcm: Int16Array) => {
-            if (conn.current !== c) return;
-            c.sendAudio(pcm);
-            recordingRef.current?.add(pcm);
-            const before = Math.floor(samples.current / SAMPLE_RATE);
-            samples.current += pcm.length;
-            if (Math.floor(samples.current / SAMPLE_RATE) !== before) clock.set(Math.floor(samples.current / SAMPLE_RATE));
-          },
+          // The current link's connection, whichever it is: a long recitation's next take gets the samples from its start.
+          onAudio: (pcm: Int16Array) => feedAudio(thisTake, pcm),
           // iOS took the microphone (a call, headphones out): the take ends there.
           onStop: () => stopFor('mic-lost'),
         };
@@ -650,16 +907,17 @@ export function useLiveRecitation({
         setMic('on');
       } catch (err) {
         logger.warn('Could not start a live recitation check', err);
-        conn.current?.close();
+        // (openLink set it: the narrowing above can't see that.)
+        (conn.current as LiveConnection | null)?.close();
         conn.current = null;
         await stopMic();
         // The microphone never started: nothing was heard to keep.
         finishRecording();
         setMic('error');
-        setState((s) => (s.status === 'connecting' ? { ...s, status: 'failed', failure: 'server' } : s));
+        update((s) => (s.status === 'connecting' ? { ...s, status: 'failed', failure: 'server' } : s));
       }
     },
-    [connect, owner, settings, stopFor, stopMic, recordingDay, finishRecording, onEvent, clock, dropQueued, clearBudget, cue],
+    [connect, owner, settings, stopFor, stopMic, recordingDay, finishRecording, clock, dropQueued, clearBudget, cue, resetChain, update, openLink, feedAudio, stats],
   );
 
   /**
@@ -718,17 +976,44 @@ export function useLiveRecitation({
     const at = timeOf(m.w) ?? timeOf(m.w - 1);
     return at != null ? [at - 1.2, at + 1.2] : null;
   }, []);
+  /**
+   * Where a moment of the take (in the chain's seconds) is held: the current link's connection (a take that never rolled
+   * over holds all of it there), or, for an earlier link of a long recitation, the take's recording: read back from its
+   * file while it is recorded, and after Stop from the file as saved (earlier links keep no audio in memory). Null:
+   * nowhere (the recording wasn't kept: Save recordings off, or not yet saved).
+   */
+  const clipSource = useCallback((range: [number, number]): 'link' | 'recording' | 'saved' | null => {
+    const linkHas = !!lastConn.current?.audioClip;
+    const off = linkStart.current / SAMPLE_RATE;
+    if (off === 0) return linkHas ? 'link' : null;
+    if (range[0] >= off - 0.05 && linkHas) return 'link';
+    if (recordingRef.current?.clip) return 'recording';
+    if (savedAudio.current?.there()) return 'saved';
+    return linkHas && range[1] > off ? 'link' : null;
+  }, []);
   /** Whether Your recitation has something to play for `m` (cheap: nothing is cut). */
-  const hasClip = useCallback((m: Mark): boolean => !!lastConn.current?.audioClip && clipSeconds(m) != null, [clipSeconds]);
+  const hasClip = useCallback(
+    (m: Mark): boolean => {
+      const range = clipSeconds(m);
+      return range != null && clipSource(range) != null;
+    },
+    [clipSeconds, clipSource],
+  );
   const clipFor = useCallback(
     (m: Mark): Int16Array | null => {
-      const c = lastConn.current;
-      const range = c?.audioClip ? clipSeconds(m) : null;
-      if (!c?.audioClip || !range) return null;
-      const pcm = c.audioClip(Math.max(0, range[0]), range[1]);
+      const range = clipSeconds(m);
+      const from = range ? clipSource(range) : null;
+      if (!range || !from) return null;
+      const off = linkStart.current / SAMPLE_RATE;
+      const pcm =
+        from === 'link'
+          ? (lastConn.current?.audioClip?.(Math.max(0, range[0] - off), range[1] - off) ?? null)
+          : from === 'recording'
+            ? (recordingRef.current?.clip?.(Math.max(0, range[0]), range[1]) ?? null)
+            : (savedAudio.current?.read(Math.max(0, range[0]), range[1]) ?? null);
       return pcm && pcm.length > 0 ? pcm : null;
     },
-    [clipSeconds],
+    [clipSeconds, clipSource],
   );
 
   /**
@@ -738,36 +1023,58 @@ export function useLiveRecitation({
    */
   const testDataRef = useRef(testData);
   testDataRef.current = testData;
-  const label = useCallback((what: 'dismiss' | 'undismiss', id: string) => {
-    const s = traceRef.current.state;
-    if (s.status === 'done') {
-      if (s.take && testDataRef.current) void sendLabel(what, s.take, id, Date.now());
-      return;
+  /**
+   * The take of a long recitation's chain that holds mark `id`: the current link (null), or a link rolled over. A shared
+   * id is the current link's, as the screens show it (lib/reciteLive/chain).
+   */
+  const linkOf = useCallback((id: string): PriorLink | null => {
+    const c = curRef.current;
+    if (c.marks[id] || c.removed[id]) return null;
+    for (let i = priorRef.current.length - 1; i >= 0; i--) {
+      const l = priorRef.current[i];
+      if (l.state.marks[id] || l.state.removed[id]) return l;
     }
-    conn.current?.send({ type: what, id });
+    return null;
   }, []);
+  const label = useCallback(
+    (what: 'dismiss' | 'undismiss', id: string) => {
+      // Its own take's: on that take's connection while its answer is to come, else over HTTP by its take id.
+      const link = linkOf(id);
+      const s = link ? link.state : curRef.current;
+      if (s.status === 'done') {
+        if (s.take && testDataRef.current) void sendLabel(what, s.take, id, Date.now());
+        return;
+      }
+      (link ? linkConns.current.get(link.no) : conn.current)?.send({ type: what, id });
+    },
+    [linkOf],
+  );
 
   /** "Not a mistake": off the page at once, and told to the checker (a label for the lab). It can be put back. */
   const dismiss = useCallback(
     (id: string) => {
+      const link = linkOf(id);
       label('dismiss', id);
       counts.current.notMistake++;
       applyQueued();
-      setState((s) => dismissMark(s, id));
+      if (link) updatePrior(link.no, (s) => dismissMark(s, id));
+      else update((s) => dismissMark(s, id));
     },
-    [label, applyQueued],
+    [label, applyQueued, linkOf, update, updatePrior],
   );
 
   /** Put back (Undo, or the summary's Removed list): the mark returns, and the checker takes the label back. */
   const restore = useCallback(
     (id: string) => {
       if (!traceRef.current.state.removed[id]) return;
+      const link = linkOf(id);
       label('undismiss', id);
       counts.current.putBack++;
       applyQueued();
-      setState((s) => restoreMark(s, id));
+      if (link) updatePrior(link.no, (s) => restoreMark(s, id));
+      else update((s) => restoreMark(s, id));
     },
-    [label, applyQueued],
+    [label, applyQueued, linkOf, update, updatePrior],
   );
 
   /** When the cursor first reached `w`, in seconds of the take (Recite's memory keeps it for ▶ on a right try). */
@@ -789,9 +1096,10 @@ export function useLiveRecitation({
     void stopMic();
     conn.current?.close();
     conn.current = null;
-    setState(LIVE_IDLE);
+    resetChain();
+    update(() => LIVE_IDLE);
     setMode(null);
-  }, [stopMic, dropQueued, clearBudget]);
+  }, [stopMic, dropQueued, clearBudget, resetChain, update]);
 
   // The reciter's place turns the page.
   const live = state.status === 'listening';
@@ -828,11 +1136,12 @@ export function useLiveRecitation({
     }
     if (!conn.current || !words || state.status !== 'listening') return;
     const w = words.pageRange(currentPage)[0];
-    if (checkerLooks(state)) {
+    // The current take's checker (a long recitation's next take may still be starting: it looks on this page instead).
+    if (checkerLooks(curRef.current)) {
       // The reciter is somewhere on this page: the checker looks for where, as at the take's start (protocol 6).
       conn.current.send({ type: 'seek', w, startBy: lastAyahOf(currentPage) });
       applyQueued();
-      setState((s) => seekOnPage(s, w));
+      update((s) => seekOnPage(s, w));
       return;
     }
     conn.current.send({ type: 'seek', w });
@@ -859,8 +1168,9 @@ export function useLiveRecitation({
       stats.stop(clock.get());
       if (process.env.EXPO_PUBLIC_E2E === '1') {
         // eslint-disable-next-line no-console
-        console.log(`[e2e] take stats ${JSON.stringify({ unfinished: isUnfinished(traceRef.current.state), ...stats.snapshot() })}`);
-        e2e?.e2eTakeEnded(stats.snapshot());
+        const links = priorRef.current.length + 1;
+        console.log(`[e2e] take stats ${JSON.stringify({ unfinished: isUnfinished(traceRef.current.state), links, ...stats.snapshot() })}`);
+        e2e?.e2eTakeEnded(stats.snapshot(), links);
       }
       if (!reportedLong.current) {
         reportedLong.current = true;
@@ -874,12 +1184,22 @@ export function useLiveRecitation({
       if (traceRef.current.state.start != null && !GATE_FAILURES.has(failure ?? '')) {
         stats.stop(clock.get());
         reportUnfinishedTake({ why: 'failed', mode: traceRef.current.mode ?? '?', failure, socket: conn.current?.status?.(), stats: stats.snapshot() });
-        setState((s) => (s.status === 'failed' ? settleUnfinished(s, clock.get()) : s));
+        update((s) => (s.status === 'failed' ? settleUnfinished(s, clock.get()) : s));
         return;
       }
       stopTrace.end();
     }
-  }, [status, failure, clearBudget, stats, clock]);
+  }, [status, failure, clearBudget, stats, clock, update]);
+
+  // A long recitation's next take failed (it couldn't start, the connection was lost): the recitation ends there, with
+  // what every take found, its end unchecked (RECITE-22). The microphone has stopped with the connection.
+  const curStatus = cur.status;
+  const curFailure = cur.failure;
+  useEffect(() => {
+    if (curStatus !== 'failed' || priorRef.current.length === 0) return;
+    reportUnfinishedTake({ why: 'failed', mode: traceRef.current.mode ?? '?', failure: curFailure, socket: conn.current?.status?.(), stats: stats.snapshot() });
+    update((s) => (s.status === 'failed' ? settleLink(s, linkSecs()) : s));
+  }, [curStatus, curFailure, update, stats, linkSecs]);
 
   // Leaving the screen throws the take away.
   useEffect(() => () => cancel(), [cancel]);
@@ -895,8 +1215,18 @@ export function useLiveRecitation({
     AccessibilityInfo.announceForAccessibility(t('reciteLive.startedAt', { place: spokenText(placeOfAyah(ayahKey(r.sura, r.ayah))) }));
   }, [state.start, live, searched, words]);
 
+  // A long recitation's takes, for Recite's memory (the lab's labels go by each take's id).
+  const links = useMemo(
+    () => (priorRef.current.length ? chainTakes([...priorRef.current.map((l) => l.state), cur]) : null),
+    // priorTick: the prior links changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cur, priorTick],
+  );
+
   return {
     state,
+    /** A long recitation's takes (RECITE-22): each one's checker take and first word; null for a take that never rolled over. */
+    links,
     /** The running (or last) take's mode; null when idle. */
     mode,
     mic,

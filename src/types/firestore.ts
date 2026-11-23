@@ -196,7 +196,14 @@ export interface FirestoreUser {
   whatsNewSeen?: string;
   /** Pages carried into one revision day (see User.carryOver). */
   /** Who put the pages there: 'insights' for "Revise these first tomorrow" (absent: the schedule's own). */
-  carryOver?: { day: string; pages: number[]; skip?: number; source?: 'insights' | null; from?: Record<string, string>; next?: { day: string; pages: number[]; source?: 'insights' | null } | null } | null;
+  carryOver?: {
+    day: string;
+    pages: number[];
+    skip?: number;
+    source?: 'insights' | null;
+    from?: Record<string, string>;
+    next?: { day: string; pages: number[]; source?: 'insights' | null } | null;
+  } | null;
   /** Pages the schedule has been moved back by carry-overs. */
   scheduleShiftPages?: number;
   /** Translation shown when holding a verse. */
@@ -256,7 +263,14 @@ export interface UpdateUserInput {
   /** The last "What's new" release this account finished, or set up on (lib/help/whatsNew). */
   whatsNewSeen?: string;
   /** Who put the pages there: 'insights' for "Revise these first tomorrow" (absent: the schedule's own). */
-  carryOver?: { day: string; pages: number[]; skip?: number; source?: 'insights' | null; from?: Record<string, string>; next?: { day: string; pages: number[]; source?: 'insights' | null } | null } | null;
+  carryOver?: {
+    day: string;
+    pages: number[];
+    skip?: number;
+    source?: 'insights' | null;
+    from?: Record<string, string>;
+    next?: { day: string; pages: number[]; source?: 'insights' | null } | null;
+  } | null;
   scheduleShiftPages?: number;
   translationId?: string;
   reciter?: string;

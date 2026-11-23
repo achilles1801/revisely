@@ -70,22 +70,38 @@ export const settings = {
   /** screens/main/SettingsScreen. */
   title: 'Settings',
   /** Section titles. Revo opens Settings at one by its title (REVO-31). */
+  /** Settings' pages (SET-1): each is a row on the first level and its page's title. */
   sections: {
     account: 'Account',
-    activity: 'Activity',
-    homeScreen: 'Home screen',
-    prayer: 'Prayer',
-    dayBoundary: 'Day boundary',
     revision: 'Revision',
-    revo: 'Revo AI',
+    reminders: 'Reminders',
+    prayer: 'Prayer',
+    /** The page of the mushaf and, with Recite, its settings. */
+    mushafRecite: 'Mushaf and Recite',
     mushaf: 'Mushaf',
-    recite: 'Recite',
-    notifications: 'Notifications',
+    revo: 'Revo AI',
+    storage: 'Downloads and storage',
     appearance: 'Appearance',
-    support: 'Support',
+    help: 'Help and support',
     about: 'About',
     testing: 'Testing',
     dev: 'Dev',
+  },
+  /** Settings' first level (SET-1): what each page is set to, beside its name. */
+  root: {
+    smartOn: 'Smart Tracking on',
+    smartOff: 'Smart Tracking off',
+    /** Revision reminders on, and prayers that notify: "On · 3 prayers". */
+    onAndPrayers_one: 'On · {{count}} prayer',
+    onAndPrayers_other: 'On · {{count}} prayers',
+    /** Revision reminders off, some prayers notify: "3 prayers". */
+    prayers_one: '{{count}} prayer',
+    prayers_other: '{{count}} prayers',
+    /** Under your name. */
+    premium: 'Premium',
+    premiumEarly: 'Premium · free in early access',
+    /** The account row, for VoiceOver: "Majd, majd@example.com, Premium. Your account". */
+    accountLabel: '{{who}}. Your account',
   },
   /** A row's value: "On", "Off". */
   on: 'On',
@@ -143,9 +159,10 @@ export const settings = {
     memorizedPages: 'Memorized pages',
   },
   homeScreen: {
-    nextPrayer: 'Next prayer',
-    nextPrayerSub: 'A line under the header',
+    /** Prayer's switch for the line under Home's header. */
+    nextPrayer: 'Next prayer on Home',
     fridayKahf: 'Friday Al-Kahf reminder',
+    fridayKahfSub: 'A card on Home on Fridays',
   },
   prayer: {
     times: 'Prayer times',
@@ -195,10 +212,11 @@ export const settings = {
     premiumSub: 'Marking mistakes and Test me are part of it',
     footer: 'Marking mistakes is AI and can make mistakes. Recordings are checked by software; nobody listens.',
     level: 'Mistakes to mark',
-    strict: 'Strict',
-    strictSub: 'The same, and tajweed: madd lengths, qalqalah, ghunnah, ikhfa, idgham, iqlab',
-    words: 'Words & harakat',
-    wordsSub: 'Wrong, skipped and added words, and letter and haraka slips',
+    /** Tajweed is labelled Beta wherever it shows (Majd, Nov 22 2026). */
+    strict: 'Strict (Beta)',
+    strictSub: 'Your mistakes, and tajweed: madd lengths, qalqalah, ghunnah, ikhfa, idgham, iqlab',
+    words: 'Mistakes',
+    wordsSub: 'Wrong, skipped and extra words, and wrong harakat and letters',
     munfasil: 'Madd munfasil',
     muttasil: 'Madd muttasil',
     aared: 'Madd ʿarid',
@@ -210,9 +228,13 @@ export const settings = {
     showPastSub: 'Lightly, until each is said right on 2 different days',
     mistakeSound: 'Sound on a mistake',
     mistakeSoundSub: 'A short tone and a tap as a mistake is marked',
+    /** Revisely Dev only, for every account that recites (RECITE-26). */
+    keep: 'Keep my recitations as test data',
+    keepSub: 'Recitation checks, for Revisely’s tests. Software checks them; nobody listens.',
   },
   notifications: {
-    enable: 'Enable notifications',
+    /** Reminders' switch for the revision reminders (REMIND-1). */
+    enable: 'Revision reminders',
     /** Under the switch while the phone refuses Revisely's notifications (REMIND-5). */
     refused: 'Off in your phone’s Settings, so no reminders can come',
     refusedTitle: 'Notifications are off for Revisely',
@@ -225,6 +247,9 @@ export const settings = {
     dark: 'Dark',
     /** Decorations over the usual design (Revisely Dev until its release switch). */
     ramadan: 'Ramadan theme',
+    /** Activity as a tab between Home and Read (Revisely Dev's switch to compare, TAB-2). */
+    activityTab: 'Activity tab',
+    activityTabSub: 'Between Home and Read, instead of the button at the top of Home',
   },
   /** Settings → Appearance → Language (Revisely Dev until Arabic ships). Each language's own name is LANGUAGE_NAMES. */
   language: {
@@ -282,6 +307,8 @@ export const settings = {
     reciteNoticeTitle: 'Recitation check',
     privacy: 'Privacy Policy',
     terms: 'Terms of Service',
+    /** The row and the page with the recitation model's licence in full (SET-5). */
+    licences: 'Licences',
     /** At the foot of Settings: "Revisely · v1.0.4". */
     version: 'Revisely · v{{version}}',
   },
@@ -298,11 +325,9 @@ export const settings = {
     resetSub: 'Start again as a new account',
     whatsNewAtLaunch: 'Show What’s new at launch',
     whatsNewAtLaunchSub: 'As App Store users will see it after the update',
-    keep: 'Keep my recitations as test data',
-    keepSub: 'Recitation checks, for Revisely’s tests. Software checks them; nobody listens.',
     /** Revisely Dev's row naming the checker's models (components/settings/CheckerModelRow). */
     model: 'Mistake detection model',
-    modelLine: 'Recite {{recite}} · Words & harakat {{harakat}} · Strict {{strict}}',
+    modelLine: 'Recite {{recite}} · Mistakes {{harakat}} · Strict {{strict}}',
     /** The checker's commit, a quiet detail under the models. */
     modelServer: 'Checker {{server}}',
     modelReading: 'Asking the checker…',
@@ -315,6 +340,79 @@ export const settings = {
     scenarioSub: 'Replace your data with a ready-made situation',
     sendHeld: 'Send held changes',
     sendHeldSub: "The test scenario's changes wait on this phone until now",
+    /** Revisely Dev's row opening the on-device bench (screens/main/OnDeviceBenchScreen, ONDEV-1). */
+    bench: 'On-device model',
+    benchSub: 'Time Recite’s model on this phone',
+  },
+  /** Revisely Dev's on-device bench: Recite's model timed on this phone (ONDEV-1). */
+  bench: {
+    title: 'On-device model',
+    missing: 'This Revisely Dev build doesn’t have the on-device model yet. Update it from TestFlight or Google Play.',
+    /** "iPhone16,2 · 6 cores · 8 GB". */
+    device: '{{model}} · {{cores}} cores · {{memory}} GB',
+    reading: 'Reading the list of runs…',
+    readFailed: 'Couldn’t read the list of runs: {{error}}',
+    /** The account lacks the team's bench access (storage.rules, the onDeviceBench claim). */
+    noAccess: 'this account can’t read the bench’s files. The Revisely team gives access to the accounts that run it.',
+    tryAgain: 'Try again',
+    windows: 'Windows a run',
+    windowsFooter: 'A window is 4 seconds of recitation; Recite runs one every half second. Each run is checked on the checker’s own output first.',
+    runs: 'Runs',
+    /** "v7-live-fp32 · Core ML · 2 threads". */
+    plan: '{{model}} · {{provider}} · {{threads}}',
+    threads_one: '{{count}} thread',
+    threads_other: '{{count}} threads',
+    threadsDefault: 'default threads',
+    /** A run whose model is opened from bytes in memory, as the real path will after decrypting it. */
+    fromMemory: '{{plan}} · from memory',
+    /** A run that also holds the engine's second graph: "… · with v7-any-fp32". */
+    alsoModel: '{{plan}} · with {{model}}',
+    providerCpu: 'CPU',
+    providerCoreml: 'Core ML',
+    providerXnnpack: 'XNNPACK',
+    providerNnapi: 'NNAPI',
+    run: 'Run',
+    downloading: 'Downloading {{file}} of {{files}} · {{percent}}%',
+    long: 'Long run',
+    longFooter: 'The first chosen run, a window every half second as a live take does, with the battery and the phone’s heat noted each minute. Unplug the phone, keep its brightness as it is, and leave it on this screen.',
+    minutes_one: '{{count}} minute',
+    minutes_other: '{{count}} minutes',
+    /** "Long run: v7-live-fp32 · CPU · 2 threads". */
+    longRun: 'Long run: {{plan}}',
+    /** "v7-live-fp32 · CPU · 2 threads: minute 3 of 20". */
+    runningLong: '{{plan}}: minute {{done}} of {{total}}',
+    longTitle: '{{plan}} · {{minutes}} minutes',
+    longCool: 'Never hot (hottest: {{heat}})',
+    longHot: 'Got hot: {{heat}}',
+    longSteady: 'Steady: the last minute {{percent}}% off the first',
+    longDrift: 'Slowed down: the last minute {{percent}}% off the first',
+    longBattery: 'Battery down {{drop}} points ({{perHour}} an hour)',
+    longCharging: 'On a charger: nothing to say about the battery',
+    longLate_one: '{{count}} window started late',
+    longLate_other: '{{count}} windows started late',
+    /** "Minute 3 · 41.2 ms · p95 52.0 · 97.5% · nominal". */
+    longMinute: 'Minute {{minute}} · {{p50}} ms · p95 {{p95}} · {{battery}} · {{heat}}',
+    /** "v7-live-fp32 · CPU · 2 threads: 34 of 60". */
+    running: '{{plan}}: {{done}} of {{total}}',
+    results: 'Results',
+    model: 'Model {{p50}} ms · p90 {{p90}} · p95 {{p95}} · worst {{max}}',
+    gateUnder: 'Under the 150 ms mark at p95',
+    gateOver: 'Over the 150 ms mark at p95',
+    features: 'Features {{ms}} ms · real time ×{{factor}}',
+    load: 'Load {{load}} s · again {{again}} s · first run {{first}} ms',
+    memory: 'Memory {{loaded}} MB with the model ({{added}} MB for it)',
+    memoryBoth: 'Memory {{both}} MB with both models ({{added}} MB for them)',
+    heat: 'First windows {{first}} ms, last {{last}} ms · heat {{heat}}',
+    checkExact: 'Matches the checker’s output',
+    checkSame: 'Same sounds as the checker; values differ by up to {{diff}}',
+    checkDiffers: 'Differs from the checker: same top sound on {{percent}}% of frames',
+    checkFeatures: 'Features differ from the checker’s by {{diff}}',
+    checkFailed: 'Couldn’t check: {{error}}',
+    failed: 'Failed: {{error}}',
+    sending: 'Sending the results…',
+    sent: 'Sent to the dev backend',
+    sendFailed: 'Couldn’t send the results: {{error}}',
+    share: 'Share results',
   },
   dev: {
     replay: 'Replay onboarding',

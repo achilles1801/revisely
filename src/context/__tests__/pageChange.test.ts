@@ -31,7 +31,11 @@ describe('a page change and its ayahs (MEM-1)', () => {
       pageNumber: 563,
       verses: [67013, 67014, 67015],
     });
-    expect(pageChange(page('memorized'), page('in_progress', [67013, 67014]))).toEqual({ pageNumber: 563, status: 'memorized', verses: null });
+    expect(pageChange(page('memorized'), page('in_progress', [67013, 67014]))).toEqual({
+      pageNumber: 563,
+      status: 'memorized',
+      verses: null,
+    });
   });
 
   it('a page that never had ayahs is never written with them', () => {
@@ -40,6 +44,9 @@ describe('a page change and its ayahs (MEM-1)', () => {
       status: 'memorized',
       dateMemorized: Date.parse('2026-11-03T12:00:00.000Z'),
     });
-    expect(pageChange({ ...page('memorized'), weaknessRating: 2 }, page('memorized'))).toEqual({ pageNumber: 563, weaknessRating: 2 });
+    expect(pageChange({ ...page('memorized'), weaknessRating: 2 }, page('memorized'))).toEqual({
+      pageNumber: 563,
+      weaknessRating: 2,
+    });
   });
 });

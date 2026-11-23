@@ -45,7 +45,7 @@ jest.mock('../../../lib/athan', () => ({
   cancelAthanDownload: (id: string) => mockCancel(id),
 }));
 
-import AthanVoiceScreen, { rightsIssueUrl } from '../AthanVoiceScreen';
+import AthanVoiceScreen from '../AthanVoiceScreen';
 import type { AthanVoice } from '../../../lib/athan/catalog';
 import { DEFAULT_PRAYER_PREFS, getPrayerPrefs, resetPrayerPrefsForTests } from '../../../lib/prayer/prefs';
 import { claimAudio } from '../../../lib/audioFocus';
@@ -89,20 +89,41 @@ beforeEach(() => {
 });
 
 describe('Athan voice', () => {
-  it('lists the voices a prayer can play, none chosen at first; a Fajr athan goes with its voice; the rest to listen to', () => {
+  it('one list, none chosen at first: each row is the voice’s name and its clip’s size, nothing else', () => {
+    mockVoices = [...VOICES, voice('ayasofya-fajr', 'turkiye', { name: 'Ayasofya (Fajr)', fajr: true })];
     render(<AthanVoiceScreen />);
     expect(checked('egypt-abdul-basit')).toBe(false);
     expect(checked('makkah-regular')).toBe(false);
-    expect(within(screen.getByTestId('athan-voice-egypt-abdul-basit')).getByText('Downloads when chosen · 338 KB')).toBeTruthy();
     const makkah = screen.getByTestId('athan-voice-makkah-regular');
-    expect(within(makkah).getByText('Downloads when chosen · 338 KB · With its Fajr athan')).toBeTruthy();
-    // The credit is shown (unclear provenance needs it).
-    expect(within(makkah).getByText('Recorded at Masjid al-Haram')).toBeTruthy();
-    // Makkah's Fajr athan isn't a choice of its own; listen-only voices can't be chosen.
+    expect(within(makkah).getByText('Makkah – Masjid al-Haram')).toBeTruthy();
+    expect(within(makkah).getByText('338 KB')).toBeTruthy();
+    // No credit, no "Downloads when chosen", no "With its Fajr athan" (Majd, Nov 23 2026).
+    expect(within(makkah).queryByText('Recorded at Masjid al-Haram')).toBeNull();
+    expect(screen.queryByText(/Downloads when chosen|With its Fajr athan|listen only/i)).toBeNull();
+    // No second list: there is one header, and nothing that can't be chosen.
+    expect(screen.queryByText('Listen')).toBeNull();
+    expect(screen.queryByTestId('athan-voice-madinah-fajr')).toBeNull();
+    expect(screen.queryByTestId('athan-voice-tr-gocek-fajr')).toBeNull();
+    // Makkah's Fajr athan goes with Makkah; a Fajr athan that stands alone is a choice.
     expect(screen.queryByTestId('athan-voice-makkah-fajr')).toBeNull();
-    expect(screen.getByTestId('athan-voice-madinah-fajr')).toBeTruthy();
-    expect(screen.queryByTestId('athan-choose-madinah-fajr')).toBeNull();
-    expect(within(screen.getByTestId('athan-voice-tr-gocek-fajr')).getByText('Fajr athan · listen only')).toBeTruthy();
+    expect(screen.getByTestId('athan-choose-ayasofya-fajr')).toBeTruthy();
+  });
+
+  it('a Fajr athan that stands alone: chosen for Fajr only, ticked beside the other prayers’ voice; not offered for another prayer', async () => {
+    mockVoices = [...VOICES, voice('ayasofya-fajr', 'turkiye', { name: 'Ayasofya (Fajr)', fajr: true })];
+    const view = render(<AthanVoiceScreen />);
+    await act(async () => fireEvent.press(screen.getByTestId('athan-choose-aqsa-maghrib')));
+    await act(async () => fireEvent.press(screen.getByTestId('athan-choose-ayasofya-fajr')));
+    const alerts = getPrayerPrefs().alerts;
+    expect(alerts.fajr.voice).toBe('ayasofya-fajr');
+    expect(alerts.dhuhr.voice).toBe('aqsa-maghrib');
+    expect(checked('ayasofya-fajr')).toBe(true);
+    expect(checked('aqsa-maghrib')).toBe(true);
+    expect(mockDownload).toHaveBeenLastCalledWith('ayasofya-fajr');
+    view.unmount();
+    mockRoute.params = { prayer: 'asr' };
+    render(<AthanVoiceScreen />);
+    expect(screen.queryByTestId('athan-voice-ayasofya-fajr')).toBeNull();
   });
 
   it('one tap chooses a voice for every prayer, Fajr its Fajr athan, and downloads them', async () => {
@@ -138,19 +159,19 @@ describe('Athan voice', () => {
 
   it('listening: plays the preview, a second tap stops it; something else taking the audio stops it too', () => {
     render(<AthanVoiceScreen />);
-    fireEvent.press(screen.getByTestId('athan-preview-madinah-fajr'));
-    expect(mockPlayer.replace).toHaveBeenCalledWith({ uri: 'https://revisely.app/athan/notif/madinah-fajr.m4a' });
+    fireEvent.press(screen.getByTestId('athan-preview-egypt-abdul-basit'));
+    expect(mockPlayer.replace).toHaveBeenCalledWith({ uri: 'https://revisely.app/athan/notif/egypt-abdul-basit.m4a' });
     expect(mockPlayer.play).toHaveBeenCalled();
-    expect(screen.getByLabelText('Stop Madinah (Fajr)')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('athan-preview-madinah-fajr'));
+    expect(screen.getByLabelText('Stop Abdul Basit')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('athan-preview-egypt-abdul-basit'));
     expect(mockPlayer.pause).toHaveBeenCalled();
-    expect(screen.getByLabelText('Listen to Madinah (Fajr)')).toBeTruthy();
+    expect(screen.getByLabelText('Listen to Abdul Basit')).toBeTruthy();
     fireEvent.press(screen.getByTestId('athan-preview-aqsa-maghrib'));
     act(() => claimAudio('recitation', 'someone-else'));
     expect(screen.getByLabelText('Listen to Al-Aqsa (Maghrib)')).toBeTruthy();
   });
 
-  it('a voice’s menu: its licence, where it’s from, and "Report a rights issue"', async () => {
+  it('a voice’s menu: its licence and where it’s from; no "Report a rights issue" (support’s email does that)', async () => {
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
     render(<AthanVoiceScreen />);
     fireEvent.press(screen.getByTestId('athan-menu-makkah-regular'));
@@ -162,15 +183,10 @@ describe('Athan voice', () => {
     fireEvent.press(screen.getByText('Where it’s from'));
     dismissMenus();
     expect(open).toHaveBeenLastCalledWith('https://archive.org/details/makkah-regular');
-    fireEvent.press(screen.getByTestId('athan-menu-makkah-regular'));
-    fireEvent.press(screen.getByText('Report a rights issue'));
-    dismissMenus();
-    expect(open).toHaveBeenLastCalledWith(rightsIssueUrl(VOICES[2]));
-    expect(VOICES[2].id).toBe('makkah-regular');
-    expect(rightsIssueUrl(VOICES[2])).toMatch(/^mailto:support@revisely\.app\?subject=Athan%20voice%20rights%20issue%3A%20Makkah/);
     // Not downloaded: nothing to remove.
     fireEvent.press(screen.getByTestId('athan-menu-makkah-regular'));
     expect(screen.queryByText('Remove download')).toBeNull();
+    expect(screen.queryByText(/rights issue/i)).toBeNull();
     open.mockRestore();
   });
 
@@ -180,7 +196,7 @@ describe('Athan voice', () => {
       'aqsa-maghrib': { status: 'downloading', progress: 0.42 },
     };
     render(<AthanVoiceScreen />);
-    expect(within(screen.getByTestId('athan-voice-makkah-regular')).getByText('Downloaded · With its Fajr athan')).toBeTruthy();
+    expect(within(screen.getByTestId('athan-voice-makkah-regular')).getByText('338 KB')).toBeTruthy();
     expect(within(screen.getByTestId('athan-voice-aqsa-maghrib')).getByText('Downloading 42%')).toBeTruthy();
     fireEvent.press(screen.getByTestId('athan-menu-makkah-regular'));
     fireEvent.press(screen.getByText('Remove download'));

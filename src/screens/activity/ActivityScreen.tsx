@@ -9,7 +9,8 @@ import {
   View,
 } from 'react-native';
 import { TopSafeAreaView } from '../../components/SafeAreaView';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, useScrollToTop } from '@react-navigation/native';
+import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useTabBarFootprint } from '../../navigation/TabBar';
@@ -56,6 +57,11 @@ const RECENT_ITEMS = 3;
  */
 export default function ActivityScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute();
+  // Activity as a tab of its own (Revisely Dev's switch, TAB-2): this screen is the bottom of its tab's stack. Opened from
+  // Home (or from anywhere in the store app) it is pushed over Dashboard, as it always was. A screen's place in its
+  // stack never changes, so this is read once.
+  const isTabRoot = useMemo(() => navigation.getState?.()?.routes[0]?.key === route.key, [navigation, route.key]);
   const { user, logs, pages, saveUser } = useApp();
   const { palette } = useTheme();
   // Room for the tab bar (and the mini player) and for Revo's button.
@@ -98,6 +104,8 @@ export default function ActivityScreen() {
   // Insights opening Overview's calendar (the longest gap, a month's bar) starts it at the top: the two views share
   // this scroll, so from deep in Insights the calendar's title was left under the header (ACT-28).
   const scrollRef = useRef<ScrollView>(null);
+  // A press on the Activity tab while it shows scrolls to the top, as Home's and Read's do (only as the tab's own screen).
+  useScrollToTop(scrollRef);
   const reduceMotion = useReduceMotion();
   const showTop = useCallback(() => scrollRef.current?.scrollTo({ y: 0, animated: !reduceMotion }), [reduceMotion]);
   const recordingDays = useMemo(() => recordings.map((rec) => rec.day), [recordings]);
@@ -128,6 +136,10 @@ export default function ActivityScreen() {
     return () => setRevoActivityView('calendar');
   }, [view]);
 
+  // As a tab, the tab pager's swipe must be able to start on the screen: Gesture Handler's scroll view lets it (over
+  // React Native's own, the pager's pan never started; CLAUDE.md, UI traps). Opened from Home, React Native's, as before.
+  const Scroll = isTabRoot ? GestureScrollView : ScrollView;
+
   const recentItems = items.slice(0, RECENT_ITEMS);
   const openItem = (it: ActivityItem) =>
     navigation.navigate('ActivityDay', { date: it.day, ...(it.recordingId ? { focusRecordingId: it.recordingId } : {}) });
@@ -136,7 +148,8 @@ export default function ActivityScreen() {
     <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <TopBar
         title={t('activity.screen.title')}
-        onBack={() => navigation.goBack()}
+        // As a tab it has no back arrow: it is where its tab starts.
+        onBack={isTabRoot ? undefined : () => navigation.goBack()}
         right={
           blocks ? (
             <>
@@ -155,7 +168,7 @@ export default function ActivityScreen() {
           <ActivityIndicator color={palette.secondary} />
         </View>
       ) : (
-        <ScrollView
+        <Scroll
           ref={scrollRef}
           style={styles.scroll}
           contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
@@ -174,6 +187,9 @@ export default function ActivityScreen() {
           {blocks ? (
             <ActivityBlocksViews
               today={today}
+              // As a tab, a sideways swipe moves between the tabs, but on the calendar's days it still steps the month
+              // or week (TAB-2).
+              inTabPager={isTabRoot}
               noteDays={noteDays}
               onOpenDay={openDay}
               onReviseTomorrow={reviseTomorrow}
@@ -231,7 +247,7 @@ export default function ActivityScreen() {
           </RecentSection>
           </>
           ) : null}
-        </ScrollView>
+        </Scroll>
       )}
       <UndoToast
         visible={carryToast != null}

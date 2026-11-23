@@ -54,16 +54,20 @@ describe('reminderCopy', () => {
 
   it('congratulation on a juz plan names the juz', () => {
     const juz = pageRange(582, 604);
-    const c = reminderCopy(base({ kind: 'congrat', juzPlan: true, all: juz, remaining: [], tomorrow: pageRange(1, 2) }));
+    const c = reminderCopy(
+      base({ kind: 'congrat', juzPlan: true, all: juz, remaining: [], tomorrow: pageRange(1, 2) }),
+    );
     expect(c.title).toBe('Juz 30 is done');
   });
 
   it('a streak is mentioned only in a congratulation, and only from two days', () => {
-    const titles = [0, 1, 2, 3].map((variant) =>
-      reminderCopy(base({ kind: 'congrat', remaining: [], streak: 5, variant })).title,
+    const titles = [0, 1, 2, 3].map(
+      (variant) => reminderCopy(base({ kind: 'congrat', remaining: [], streak: 5, variant })).title,
     );
     expect(titles).toContain('5 days in a row');
-    const noStreak = [0, 1, 2, 3].map((variant) => reminderCopy(base({ kind: 'congrat', remaining: [], streak: 1, variant })).title);
+    const noStreak = [0, 1, 2, 3].map(
+      (variant) => reminderCopy(base({ kind: 'congrat', remaining: [], streak: 1, variant })).title,
+    );
     expect(noStreak.some((t) => t.includes('days in a row'))).toBe(false);
     expect(reminderCopy(base({ kind: 'morning', streak: 9 })).title).not.toContain('days');
   });
@@ -75,7 +79,11 @@ describe('reminderCopy', () => {
       for (const juzPlan of [false, true]) {
         for (const overnight of [false, true]) {
           for (let variant = 0; variant < 4; variant++) {
-            for (const remaining of [pageRange(mujadila.startPage, tahrim.endPage), pageRange(tahrim.startPage, tahrim.endPage), []]) {
+            for (const remaining of [
+              pageRange(mujadila.startPage, tahrim.endPage),
+              pageRange(tahrim.startPage, tahrim.endPage),
+              [],
+            ]) {
               const c = reminderCopy(base({ kind, juzPlan, overnight, variant, remaining, streak: 4 }));
               const text = `${c.title} ${c.body}`;
               expect(text).not.toMatch(forbidden);

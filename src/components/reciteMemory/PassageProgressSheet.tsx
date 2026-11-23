@@ -24,7 +24,7 @@ import { t } from '../../i18n';
 import { forwardIcon } from '../../i18n/direction';
 
 /** A word's remembered highlight on the sheet: the page's past shade (PAST_OPACITY) as one solid colour, WordChip's fill. */
-function pastFill(palette: PaletteV2, mark: Pick<Mark, 'kind'>, isDark: boolean): string {
+function pastFill(palette: PaletteV2, mark: Pick<Mark, 'kind' | 'sure'>, isDark: boolean): string {
   return mixColors(palette.sheet, markFill(palette, mark), isDark ? PAST_OPACITY.dark : PAST_OPACITY.light);
 }
 

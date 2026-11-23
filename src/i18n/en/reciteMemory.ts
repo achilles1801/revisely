@@ -69,6 +69,8 @@ export const reciteMemory = {
     label: 'Your take, {{when}}',
     title: 'Your take · {{when}}',
     hidden: 'recited with the page hidden',
+    /** The card opens the take's summary (RMEM-8). */
+    openLabel: 'Your take, {{when}}: {{line}}. Open its summary',
   },
   rows: {
     /** A take's line: "7:51 PM · 1 mistake · 2 cleared · page hidden". */

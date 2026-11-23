@@ -22,7 +22,7 @@ import { markFill } from '../reciteLive/markColours';
 import { PAST_OPACITY } from '../reciteMemory/RememberedLayers';
 import { useQuranWordsWhen } from '../reciteMemory/TakeRows';
 import { PillButton } from '../v2/PillButton';
-import { arabicV2 } from '../../theme/v2';
+import { arabicFullV2 } from '../../theme/v2';
 import { strictOffered } from '../../lib/reciteCheck/settings';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { Mark, MarkKind } from '../../lib/reciteLive/contract';
@@ -317,7 +317,7 @@ export function TakeLines({
             <View key={line[0].w} style={[styles.takeLine, here && { backgroundColor: palette.highlightSoft }]}>
               {line.map(({ w, text }) => (
                 <View key={w} style={[styles.takeWord, fill(w)]}>
-                  <Text style={[arabicV2(19), { color: palette.text }]} maxFontSizeMultiplier={1}>
+                  <Text style={[arabicFullV2(19), { color: palette.text }]} maxFontSizeMultiplier={1}>
                     {text}
                   </Text>
                 </View>

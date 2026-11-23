@@ -26,12 +26,14 @@ jest.mock('../../../components/prayer/useChosenAthanVoice', () => ({
 const mockAthan = { enabled: false };
 jest.mock('../../../lib/athan', () => ({ athanEnabled: () => mockAthan.enabled }));
 
-const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() };
+const mockNavigation = { goBack: jest.fn(), navigate: jest.fn(), push: jest.fn() };
+// The page this render shows (SET-1): none is the first level.
+const mockRoute: { params: Record<string, unknown> | undefined } = { params: undefined };
 jest.mock('@react-navigation/native', () => {
   const { useEffect } = require('react');
   return {
     useNavigation: () => mockNavigation,
-    useRoute: () => ({ params: undefined }),
+    useRoute: () => mockRoute,
     useFocusEffect: (cb: () => void) => useEffect(cb, [cb]),
   };
 });
@@ -114,7 +116,9 @@ const palette = paletteV2(false, DEFAULT_ACCENT);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const flat = (style: unknown): Record<string, any> => StyleSheet.flatten(style as never) ?? {};
 
-async function renderV2() {
+/** Settings at `page` (SET-1), or its first level. */
+async function renderV2(page?: string, params?: Record<string, unknown>) {
+  mockRoute.params = params ?? (page ? { page } : undefined);
   render(
     <DesignProvider initial={{}}>
       <ThemeProvider>
@@ -134,23 +138,24 @@ beforeEach(async () => {
 describe('Settings in the new design: its sheets and rows', () => {
   it('has no glass anywhere; Smart Tracking says what it does under its label; the version line is metadata', async () => {
     await renderV2();
+    expect(flat(screen.getByText(/^Revisely · v/).props.style).color).toBe(palette.secondary);
+    await renderV2('revision');
     expect(screen.getByTestId('smart-tracking-row')).toBeTruthy();
     expect(screen.getByText(/Turn on to rate pages/).props.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ color: palette.secondary })]),
     );
-    expect(flat(screen.getByText(/^Revisely · v/).props.style).color).toBe(palette.secondary);
   });
 
-  it('Notifications is the Enable notifications switch only: no Reminder time row or sheet', async () => {
-    await renderV2();
-    expect(screen.getByText('Enable notifications')).toBeTruthy();
+  it('Reminders: the Revision reminders switch, no Reminder time row or sheet', async () => {
+    await renderV2('reminders');
+    expect(screen.getByText('Revision reminders')).toBeTruthy();
     expect(screen.queryByText('Reminder time')).toBeNull();
     expect(screen.queryByLabelText(/Reminder time/)).toBeNull();
     expect(screen.queryByTestId('time-sheet')).toBeNull();
   });
 
   it('display name: a field on the quiet fill, saved from the header', async () => {
-    await renderV2();
+    await renderV2('account');
     fireEvent.press(screen.getByLabelText('Display name, Majd'));
     await act(async () => {});
     const input = screen.getByTestId('name-sheet-input');
@@ -164,7 +169,7 @@ describe('Settings in the new design: its sheets and rows', () => {
   });
 
   it('feedback: Submit stays off until something is written, then sends it', async () => {
-    await renderV2();
+    await renderV2('help');
     fireEvent.press(screen.getByLabelText('Send feedback'));
     await act(async () => {});
     expect(screen.getByTestId('feedback-sheet-save').props.accessibilityState).toMatchObject({ disabled: true });
@@ -179,20 +184,22 @@ describe('Settings in the new design: its sheets and rows', () => {
 });
 
 describe('Settings: no progress card setting (Home always shows how much is memorized)', () => {
-  it('no Progress card, no Shows, no Progress style; Home screen keeps its other rows', async () => {
-    await renderV2();
-    for (const gone of ['Progress card', 'Shows', 'Juz memorized', 'Pages memorized', 'Surahs memorized', 'Progress style']) {
-      expect(screen.queryByText(gone)).toBeNull();
+  it('no Progress card, no Shows, no Progress style; the Al-Kahf card is in Reminders', async () => {
+    for (const page of [undefined, 'appearance', 'reminders']) {
+      await renderV2(page);
+      for (const gone of ['Progress card', 'Shows', 'Juz memorized', 'Pages memorized', 'Surahs memorized', 'Progress style']) {
+        expect(screen.queryByText(gone)).toBeNull();
+      }
+      expect(screen.queryByTestId('progress-style-row')).toBeNull();
     }
-    expect(screen.queryByTestId('progress-style-row')).toBeNull();
-    expect(screen.getByText('Home screen')).toBeTruthy();
     expect(screen.getByText('Friday Al-Kahf reminder')).toBeTruthy();
+    expect(screen.getByText('A card on Home on Fridays')).toBeTruthy();
   });
 });
 
 describe('Settings: Appearance and haptics (Oct 28)', () => {
   it('Accent is a row like Theme: the label on the left, the three choices on its right', async () => {
-    await renderV2();
+    await renderV2('appearance');
     const row = screen.getByTestId('accent-row');
     expect(flat(row.props.style).flexDirection).toBe('row');
     // The picker sits in the row itself, after the label, pushed to the right.
@@ -207,7 +214,7 @@ describe('Settings: Appearance and haptics (Oct 28)', () => {
   });
 
   it('no Haptics switch: haptics are always on for the moments that matter', async () => {
-    await renderV2();
+    await renderV2('appearance');
     expect(screen.queryByText('Haptics')).toBeNull();
     expect(screen.queryByLabelText('Haptics')).toBeNull();
   });
@@ -219,13 +226,13 @@ describe('Settings: Language (Revisely Dev until Arabic ships)', () => {
   });
 
   it('the store app: no Language row', async () => {
-    await renderV2();
+    await renderV2('appearance');
     expect(screen.queryByTestId('settings-language')).toBeNull();
   });
 
   it("Revisely Dev: the row follows the phone until a language is picked; picking Arabic keeps it and offers a restart", async () => {
     mockDev = true;
-    await renderV2();
+    await renderV2('appearance');
     const row = screen.getByTestId('settings-language');
     expect(within(row).getByText('Phone’s language')).toBeTruthy();
     fireEvent.press(row);
@@ -254,37 +261,41 @@ describe('Settings: Prayer (every account from 1.0.3)', () => {
     delete mockUser.previewTester;
   });
 
-  it('not a tester: Prayer is there too (public), in place of Day boundary', async () => {
+  it('not a tester: Prayer is there too (public), and no Day boundary anywhere', async () => {
     await renderV2();
+    expect(screen.getByTestId('settings-page-prayer')).toBeTruthy();
     expect(screen.queryByText('Day boundary')).toBeNull();
+    await renderV2('reminders');
     expect(screen.getByText('Prayer notifications')).toBeTruthy();
-    expect(screen.getByText('Next prayer')).toBeTruthy();
+    await renderV2('prayer');
+    expect(screen.getByText('Next prayer on Home')).toBeTruthy();
   });
 
-  it('Prayer holds times, notifications, calculation, the Qibla and Start day at fajr; Home screen gets Next prayer', async () => {
+  it('Prayer holds times, calculation, the Qibla and Next prayer on Home; Start day at fajr is in Revision, Prayer notifications in Reminders', async () => {
     mockUser.fajrCalculationMethod = 'MoonsightingCommittee';
-    await renderV2();
-    expect(screen.queryByText('Day boundary')).toBeNull();
-    for (const label of ['Prayer', 'Prayer times', 'Prayer notifications', 'Calculation', 'Qibla', 'Start day at fajr']) {
+    await renderV2('prayer');
+    for (const label of ['Prayer times', 'Calculation', 'Qibla', 'Next prayer on Home']) {
       expect(screen.getByText(label)).toBeTruthy();
     }
-    // The method is under Calculation now, not under the fajr switch.
-    expect(screen.queryByTestId('fajr-method')).toBeNull();
+    expect(screen.queryByText('Start day at fajr')).toBeNull();
     expect(screen.getByText('Moonsighting')).toBeTruthy();
-    expect(screen.getByText('Next prayer')).toBeTruthy();
-    expect(screen.getByText('A line under the header')).toBeTruthy();
-    fireEvent.press(screen.getByText('Prayer notifications'));
-    expect(mockNavigation.navigate).toHaveBeenCalledWith('PrayerNotifications');
     fireEvent.press(screen.getByText('Calculation'));
     expect(mockNavigation.navigate).toHaveBeenCalledWith('PrayerCalculation');
     // No athan in the store app (or on Android).
     expect(screen.queryByText('Athan voice')).toBeNull();
+    await renderV2('revision');
+    expect(screen.getByText('Start day at fajr')).toBeTruthy();
+    // With prayer times the method is under Calculation, not under the fajr switch.
+    expect(screen.queryByTestId('fajr-method')).toBeNull();
+    await renderV2('reminders');
+    fireEvent.press(screen.getByText('Prayer notifications'));
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('PrayerNotifications');
   });
 
   it('Revisely Dev on iPhone: the athan voice, by name, opens its picker', async () => {
     mockAthan.enabled = true;
     try {
-      await renderV2();
+      await renderV2('prayer');
       expect(screen.getByText('Makkah – Masjid al-Haram')).toBeTruthy();
       fireEvent.press(screen.getByText('Athan voice'));
       expect(mockNavigation.navigate).toHaveBeenCalledWith('AthanVoice');
@@ -305,15 +316,15 @@ describe('Settings: the speech model', () => {
 
   it('a binary without the module: no row, tester or not', async () => {
     mockFollowable = false;
-    await renderV2();
+    await renderV2('storage');
     expect(screen.queryByText('Speech model')).toBeNull();
     mockUser.previewTester = true;
-    await renderV2();
+    await renderV2('storage');
     expect(screen.queryByText('Speech model')).toBeNull();
   });
 
   it('[SEARCH-1] any account: the row is for searching by voice, and its download says so', async () => {
-    await renderV2();
+    await renderV2('storage');
     expect(screen.getByText('Speech model')).toBeTruthy();
     expect(screen.getByText('Searches the Quran by voice, on this iPhone')).toBeTruthy();
     expect(screen.getByText('Not downloaded')).toBeTruthy();
@@ -325,7 +336,7 @@ describe('Settings: the speech model', () => {
 
   it('a tester too: voice search alone (the old hidden page that followed the recitation is gone, Nov 17 2026)', async () => {
     mockUser.previewTester = true;
-    await renderV2();
+    await renderV2('storage');
     expect(screen.getByText('Searches the Quran by voice, on this iPhone')).toBeTruthy();
     fireEvent.press(screen.getByText('Speech model'));
     await act(async () => {});
@@ -334,7 +345,7 @@ describe('Settings: the speech model', () => {
 
   it('on the phone: its size, and Delete', async () => {
     mockModelState = { status: 'ready', bytes: 59_707_625 };
-    await renderV2();
+    await renderV2('storage');
     expect(screen.getByText('57 MB')).toBeTruthy();
     fireEvent.press(screen.getByText('Speech model'));
     await act(async () => {});
@@ -352,7 +363,7 @@ describe('Settings: the speech model', () => {
   it('downloading: the progress', async () => {
     mockUser.previewTester = true;
     mockModelState = { status: 'downloading', progress: 0.3 };
-    await renderV2();
+    await renderV2('storage');
     expect(screen.getByText('30%')).toBeTruthy();
   });
 });
@@ -362,8 +373,10 @@ describe('Settings: Reset my data (testers)', () => {
     delete mockUser.previewTester;
   });
 
-  it('not a previewTester account: no Testing section, no row', async () => {
+  it('not a previewTester account: no Testing page, no row', async () => {
     await renderV2();
+    expect(screen.queryByTestId('settings-page-testing')).toBeNull();
+    await renderV2('testing');
     expect(screen.queryByTestId('reset-data-row')).toBeNull();
     expect(screen.queryByText('Reset my data')).toBeNull();
   });
@@ -371,7 +384,9 @@ describe('Settings: Reset my data (testers)', () => {
   it('a previewTester account: the row, in red, says what it does and opens the RESET sheet', async () => {
     mockUser.previewTester = true;
     await renderV2();
-    expect(screen.getByText('Testing')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('settings-page-testing'));
+    expect(mockNavigation.push).toHaveBeenCalledWith('Settings', { page: 'testing' });
+    await renderV2('testing');
     const label = screen.getByText('Reset my data');
     expect(flat(label.props.style).color).toBe(palette.red);
     expect(screen.getByText('Start again as a new account')).toBeTruthy();
@@ -392,18 +407,50 @@ describe("Settings: the checker's model (Revisely Dev's testers)", () => {
   it('Revisely Dev, a tester: the row is in Testing', async () => {
     mockDev = true;
     mockUser.previewTester = true;
-    await renderV2();
-    expect(screen.getByText('Testing')).toBeTruthy();
+    await renderV2('testing');
     expect(screen.getByTestId('settings-checker-model')).toBeTruthy();
   });
 
   it('the store app, tester or not: no row', async () => {
     mockUser.previewTester = true;
-    await renderV2();
+    await renderV2('testing');
     expect(screen.queryByTestId('settings-checker-model')).toBeNull();
     delete mockUser.previewTester;
-    await renderV2();
+    await renderV2('testing');
     expect(screen.queryByTestId('settings-checker-model')).toBeNull();
+  });
+});
+
+describe('[RECITE-26] Keep my recitations as test data: Revisely Dev, every account that recites', () => {
+  afterEach(() => {
+    mockDev = false;
+    delete mockUser.previewTester;
+  });
+
+  it('Revisely Dev, not a tester: on Mushaf and Recite (on until turned off), and no Testing page', async () => {
+    mockDev = true;
+    await renderV2('mushaf');
+    expect(screen.getByText('Keep my recitations as test data')).toBeTruthy();
+    expect(screen.getByTestId('settings-recite-check-keep').props.value).toBe(true);
+    await renderV2();
+    expect(screen.queryByTestId('settings-page-testing')).toBeNull();
+  });
+
+  it('Revisely Dev, a tester: the same row on Mushaf and Recite, none on Testing', async () => {
+    mockDev = true;
+    mockUser.previewTester = true;
+    await renderV2('mushaf');
+    expect(screen.getByTestId('settings-recite-check-keep')).toBeTruthy();
+    await renderV2('testing');
+    expect(screen.queryByTestId('settings-recite-check-keep')).toBeNull();
+  });
+
+  it('the store app, tester or not: never (production’s checker keeps nothing)', async () => {
+    await renderV2('mushaf');
+    expect(screen.queryByTestId('settings-recite-check-keep')).toBeNull();
+    mockUser.previewTester = true;
+    await renderV2('testing');
+    expect(screen.queryByTestId('settings-recite-check-keep')).toBeNull();
   });
 });
 
@@ -417,7 +464,7 @@ describe('Settings: Load test scenario (testers)', () => {
     mockUser.previewTester = true;
     const sync = jest.requireActual('../../../lib/offline/sync');
     sync.holdSync('u1');
-    await renderV2();
+    await renderV2('testing');
     expect(screen.getByTestId('held-changes-row')).toBeTruthy();
     await act(async () => {
       fireEvent.press(screen.getByText('Send held changes'));
@@ -427,14 +474,14 @@ describe('Settings: Load test scenario (testers)', () => {
   });
 
   it('not a previewTester account: no row', async () => {
-    await renderV2();
+    await renderV2('testing');
     expect(screen.queryByTestId('test-scenario-row')).toBeNull();
     expect(screen.queryByText('Load test scenario')).toBeNull();
   });
 
   it('a previewTester account: the row, in red, opens the scenario sheet', async () => {
     mockUser.previewTester = true;
-    await renderV2();
+    await renderV2('testing');
     const label = screen.getByText('Load test scenario');
     expect(flat(label.props.style).color).toBe(palette.red);
     await act(async () => {
@@ -467,7 +514,7 @@ describe('[ACCOUNT-3] Delete account', () => {
         code: 'deadline-exceeded',
       }),
     );
-    await renderV2();
+    await renderV2('account');
     fireEvent.press(screen.getByText('Delete account'));
     await press(alert, 'Delete account?', 'Delete');
     await press(alert, 'Are you absolutely sure?', 'I understand, delete');
@@ -480,5 +527,65 @@ describe('[ACCOUNT-3] Delete account', () => {
     expect(mockDeleteAccount).toHaveBeenCalledTimes(2);
     expect(alert).toHaveBeenLastCalledWith('Account deleted', 'Your account and data have been removed.');
     alert.mockRestore();
+  });
+});
+
+describe('[SET-1] Settings: a short first level, a page per group', () => {
+  afterEach(() => {
+    mockDev = false;
+  });
+
+  it('the first level: your account, then each page with what it is set to; a row opens its page', async () => {
+    await renderV2();
+    expect(screen.getByLabelText('Majd, majd@example.com. Your account')).toBeTruthy();
+    const value = (id: string, label: string) => {
+      const row = screen.getByTestId(id);
+      expect(row.props.accessibilityLabel.startsWith(label)).toBe(true);
+      return row.props.accessibilityLabel.slice(label.length).replace(/^, /, '');
+    };
+    expect(value('settings-page-revision', 'Revision')).toBe('Smart Tracking off');
+    expect(value('settings-page-reminders', 'Reminders')).toMatch(/^On/);
+    expect(value('settings-page-mushaf', 'Mushaf and Recite')).toBe('Madani 1405');
+    expect(value('settings-page-appearance', 'Appearance')).toBe('Light · Indigo');
+    for (const id of ['settings-page-prayer', 'settings-page-storage', 'settings-page-help', 'settings-page-about']) {
+      expect(screen.getByTestId(id)).toBeTruthy();
+    }
+    // Nothing of a page's own rows on the first level.
+    for (const gone of ['smart-tracking-switch', 'settings-notifications', 'accent-row', 'settings-delete-account', 'settings-sign-out']) {
+      expect(screen.queryByTestId(gone)).toBeNull();
+    }
+    fireEvent.press(screen.getByTestId('settings-page-storage'));
+    expect(mockNavigation.push).toHaveBeenCalledWith('Settings', { page: 'storage' });
+    fireEvent.press(screen.getByTestId('settings-account'));
+    expect(mockNavigation.push).toHaveBeenCalledWith('Settings', { page: 'account' });
+  });
+
+  it('a page has its own title and only its rows; Downloads and storage holds the mushaf, the recordings and the speech model', async () => {
+    await renderV2('storage');
+    expect(screen.getByText('Downloads and storage')).toBeTruthy();
+    for (const label of ['Offline mushaf', 'Download over mobile data', 'Recordings', 'Back up recordings', 'Back up over mobile data', 'Speech model']) {
+      expect(screen.getByText(label)).toBeTruthy();
+    }
+    expect(screen.queryByTestId('settings-page-revision')).toBeNull();
+    expect(screen.queryByText(/^Revisely · v/)).toBeNull();
+  });
+
+  it('the Account page: your name, Display name, Time in app, then Sign out and Delete account', async () => {
+    await renderV2('account');
+    expect(screen.getByTestId('settings-account-header')).toBeTruthy();
+    expect(screen.getByLabelText('Display name, Majd')).toBeTruthy();
+    expect(screen.getByText('Time in app')).toBeTruthy();
+    expect(screen.getByTestId('settings-sign-out')).toBeTruthy();
+    expect(screen.getByTestId('settings-delete-account')).toBeTruthy();
+  });
+
+  it("a Settings section (Revo's openScreen, Insights' Turn on Smart Tracking) opens the page that holds it", async () => {
+    await renderV2(undefined, { section: 'notifications' });
+    expect(screen.getByText('Reminders')).toBeTruthy();
+    expect(screen.getByTestId('settings-notifications')).toBeTruthy();
+    await renderV2(undefined, { section: 'revision' });
+    expect(screen.getByTestId('smart-tracking-switch')).toBeTruthy();
+    await renderV2(undefined, { section: 'activity' });
+    expect(screen.getByText('Back up recordings')).toBeTruthy();
   });
 });

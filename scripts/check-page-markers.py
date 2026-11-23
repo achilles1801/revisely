@@ -17,18 +17,26 @@ it is kept with it (all 15, or the run fails). Then, in the rows a cover takes
 
   1. none of a marker's ink is under a cover;
   2. no word's ink shows beside a marker in its opening. (A stroke that reaches
-     over or under a marker, often a kaf's top stroke, shows in any opening: it
-     is counted, never failed.)
+     over a marker in its own rows, often a kaf's top stroke, shows in any
+     opening: it is counted, never failed.)
+  3. none of a marker's ink is above or below its rows (src/data/markerRows.json:
+     a marker is open in its own rows only, Nov 22 2026);
+  4. no word's ink over or under a marker, outside its rows, passes the marker's
+     middle: the app covers there by halves, each with its side's word
+     (HiddenInkLayer), so such a stroke shows with its own word. A tip of another
+     line's word (a descender from above) is counted, never failed: it is covered
+     with this line's words.
 
 --write sets each opening to its marker's ink, with half the gap to the next
-ink on each side (at most PAD), rounded outwards to a tenth.
+ink on each side (at most PAD), rounded outwards to a tenth, and its rows the
+same way (within the cover's rows).
 
   pip install pillow numpy scipy
   mkdir -p /tmp/mushaf && cd /tmp/mushaf && seq -f "%03g" 1 604 | xargs -P 16 -I{} \\
     curl -s -o {}.png https://storage.googleapis.com/revision-buddy-3a398.firebasestorage.app/mushaf/{}.png
   python3 scripts/check-page-markers.py /tmp/mushaf           # check
   python3 scripts/check-page-markers.py /tmp/mushaf --write   # refit the openings
-  (--dump FILE writes what was measured, per marker, as JSON)
+  (--dump FILE writes what was measured, per marker, as JSON; --workers N processes, default 4)
 
 The Android sets (mushaf/w1080/, mushaf/w1440/: the same pages scaled down)
 pass the same check, counting solid ink only (scaling down spreads a faint pixel
@@ -39,6 +47,12 @@ view (MushafEdition.reciteData), so the 1441 print has nothing to check.
 On Nov 15 2026, before the refit, 6,210 of 6,235 markers were clipped (7.5 units
 at the median, 37.4 on page 236), and 17 openings showed a word beside their
 marker (up to 16 units, beside sajdah signs). After it, none, in all three sets.
+
+On Nov 22 2026 the openings took the cover's rows whole, and the end of the sajdah's
+overline over 27:25 showed above page 379's ۲٤ on a hidden page (flow 18). With the
+rows, 53 markers in the originals have ink over or under them outside their rows
+(12 another line's tip; 52 and 50 in w1080 and w1440), none past its middle, in all
+three sets.
 """
 import json
 import math
@@ -51,6 +65,8 @@ from PIL import Image
 from scipy import ndimage, signal
 
 LINES_FILE = Path(__file__).resolve().parent.parent / "src" / "data" / "pageLines.json"
+# Each marker's rows (top, bottom), page by page in the order pageLines.json lists the markers.
+ROWS_FILE = Path(__file__).resolve().parent.parent / "src" / "data" / "markerRows.json"
 # A clean marker with room on both sides: its ornament is the template.
 TEMPLATE_AT = (50, 7)
 # Ink: any pixel that shows (antialiased edges included), light or dark theme.
@@ -140,16 +156,21 @@ def locate(inkhi, t, win):
 
 
 def measure(job):
-    images, page, lines, t = job
+    images, page, lines, rows_file, t = job
     a = alpha(images, page)
     H, W = a.shape
     s = W / 1024
     inkhi = (a > MATCH).astype(np.float32)
     ink = a > INK
     out = []
+    file_rows = rows_file.get(str(page), [])
+    idx = 0
     for l in lines_of(lines[str(page)]):
         b0, b1 = max(0, int(np.floor(l["top"] * s))), min(H, int(np.ceil(l["bot"] * s)))
         for k, (m0, m1) in enumerate(l["markers"]):
+            # The rows open in the file (the cover's rows where there are none yet).
+            rt, rb = (file_rows[2 * idx], file_rows[2 * idx + 1]) if 2 * idx + 1 < len(file_rows) else (l["top"], l["bot"])
+            idx += 1
             win = (max(0, int((l["top"] - 16) * s)), min(H, int((l["bot"] + 16) * s)),
                    max(0, int((min(m0, m1) - 50) * s)), min(W, int((max(m0, m1) + 60) * s)))
             score, py, px, tt = locate(inkhi, t, win)
@@ -204,9 +225,77 @@ def measure(job):
                     if gap * s < 2:
                         clipped[side] = max(0.0, clipped[side] - 3 / s)
                         beside[side] = max(0.0, beside[side] - 3 / s)
-            out.append(dict(page=page, line=int(l["line"]), k=k, at=l["at"], hole=[m0, m1], ink=[round(x0, 2), round(x1, 2)],
+            # Its rows. Open only in the marker's own rows, the opening leaves covered what is over or under the marker in
+            # its columns (Nov 22 2026: a sajdah's overline showed beside ۲٤ on page 379). A word's stroke there (a kaf's
+            # top, a dot) must show while its word does, so each half of the cover over and under the marker goes with
+            # its side's word (the app: HiddenInkLayer): the right half with the word before the marker (the page reads
+            # right to left), the left half with the word after. That holds if no word's ink over or under a marker
+            # reaches past the marker's middle, which this checks.
+            mrows = np.where(mine.any(axis=1))[0]
+            y0, y1 = (b0 + mrows[0]) / s, (b0 + mrows[-1] + 1) / s
+            oc0, oc1 = max(0, c0), max(0, c1)
+            in_cols = other[:, oc0:oc1].any(axis=1)
+            above, below = np.where(in_cols[:mrows[0]])[0], np.where(in_cols[mrows[-1] + 1:])[0]
+            gap_t = (mrows[0] - (above.max() + 1)) / s if above.size else 99.0
+            gap_b = below.min() / s if below.size else 99.0
+            # Against the rows in the file (a row is open if its centre is in them).
+            r0, r1 = int(np.floor(rt * s + 0.5)) - b0, int(np.floor(rb * s + 0.5)) - b0
+            mine_rows = (mine & seen).any(axis=1)
+            clipped_rows = (mine_rows[:max(0, r0)].sum() + mine_rows[max(0, r1):].sum()) / s
+            if W < ORIGINAL_WIDTH:
+                clipped_rows = max(0.0, clipped_rows - 2 / s)  # a scaled marker's edge row, either end
+            vis = other & seen
+            outside = np.zeros_like(vis)
+            outside[:max(0, r0), oc0:oc1] = vis[:max(0, r0), oc0:oc1]
+            outside[max(0, r1):, oc0:oc1] = vis[max(0, r1):, oc0:oc1]
+            covered = outside.any(axis=0).sum() / s
+            over = vis[max(0, r0):max(0, r1), max(cols[0], c0):min(cols[-1] + 1, c1)].any(axis=0).sum() / s
+            # Whose is each piece over or under it: one cut by the cover's top or bottom row is another line's (a
+            # descender from the line above, an alif from the line below: covered with this line's words, as the rest of
+            # its tip in this line's rows); one reaching past the opening on the right is the word before's, on the left
+            # the word after's, both a sajdah's overline (no word's); one within the opening (a dot, a haraka) the side
+            # whose ink is nearer.
+            crosses, overline, other_line = [], False, False
+            if outside.any():
+                mid = (m0 + m1) / 2 * s
+                win_other = vis[:, w0:w1]
+                lab, _ = ndimage.label(win_other, structure=np.ones((3, 3)))
+                near = None
+                for j in np.unique(lab[:, oc0 - w0:oc1 - w0][outside[:, oc0:oc1]]):
+                    if j == 0:
+                        continue
+                    piece = lab == j
+                    prows = np.where(piece.any(axis=1))[0]
+                    if prows[0] == 0 or prows[-1] == piece.shape[0] - 1:
+                        other_line = True
+                        continue
+                    pcols = np.where(piece.any(axis=0))[0] + w0
+                    reach_l, reach_r = pcols[0] < oc0, pcols[-1] >= oc1
+                    if reach_l and reach_r:
+                        overline = True
+                        continue
+                    if reach_l or reach_r:
+                        side = "left" if reach_l else "right"
+                    else:
+                        if near is None:
+                            xs = np.arange(w0, w1)
+                            lmask, rmask = win_other & (xs < oc0)[None, :], win_other & (xs >= oc1)[None, :]
+                            near = (ndimage.distance_transform_edt(~lmask) if lmask.any() else np.full(lmask.shape, 1e9),
+                                    ndimage.distance_transform_edt(~rmask) if rmask.any() else np.full(rmask.shape, 1e9))
+                        side = "left" if near[0][piece].min() <= near[1][piece].min() else "right"
+                    pout = piece & outside[:, w0:w1]
+                    ocols = np.where(pout.any(axis=0))[0] + w0
+                    wrong = (ocols >= mid).sum() if side == "left" else (ocols < mid).sum()
+                    if W < ORIGINAL_WIDTH:
+                        wrong = max(0, wrong - 2)
+                    if wrong:
+                        crosses.append([side, round(float(wrong / s), 2)])
+            out.append(dict(page=page, line=int(l["line"]), k=k, at=l["at"], idx=idx - 1, hole=[m0, m1], ink=[round(x0, 2), round(x1, 2)],
                             gap=[round(gap_l, 2), round(gap_r, 2)], score=round(score, 3), sajdah=sajdah,
-                            clipped=round(float(sum(clipped)), 2), beside=round(float(sum(beside)), 2), over=round(float(over), 2)))
+                            clipped=round(float(sum(clipped)), 2), beside=round(float(sum(beside)), 2), over=round(float(over), 2),
+                            rows=[rt, rb], rows_ink=[round(y0, 2), round(y1, 2)], gap_rows=[round(gap_t, 2), round(gap_b, 2)],
+                            cover=[l["top"], l["bot"]], clipped_rows=round(float(clipped_rows), 2), covered=round(float(covered), 2),
+                            overline=overline, other_line=other_line, crosses=crosses))
     return out
 
 
@@ -218,13 +307,24 @@ def opening(r):
     return [math.floor((x0 - pad_l - 0.01) * 10) / 10, math.ceil((x1 + pad_r + 0.01) * 10) / 10]
 
 
+def opening_rows(r):
+    """The marker's ink rows with room over and under it (half the gap to the next ink, at most PAD), to a tenth,
+    outwards, within the cover's rows."""
+    y0, y1 = r["rows_ink"]
+    top = math.floor((y0 - min(PAD, r["gap_rows"][0] / 2) - 0.01) * 10) / 10
+    bottom = math.ceil((y1 + min(PAD, r["gap_rows"][1] / 2) + 0.01) * 10) / 10
+    return [max(top, r["cover"][0]), min(bottom, r["cover"][1])]
+
+
 def main():
     images = Path(sys.argv[1])
     write = "--write" in sys.argv
     lines = json.loads(LINES_FILE.read_text())
+    rows_file = json.loads(ROWS_FILE.read_text()) if ROWS_FILE.exists() else {}
     t = make_template(images, lines)
-    with ProcessPoolExecutor() as ex:
-        results = [r for rs in ex.map(measure, [(images, p, lines, t) for p in range(1, 605)]) for r in rs]
+    workers = int(sys.argv[sys.argv.index("--workers") + 1]) if "--workers" in sys.argv else 4
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        results = [r for rs in ex.map(measure, [(images, p, lines, rows_file, t) for p in range(1, 605)]) for r in rs]
     if "--dump" in sys.argv:
         Path(sys.argv[sys.argv.index("--dump") + 1]).write_text(json.dumps(results, default=float))
     sajdah = sorted({r["page"] for r in results if r["sajdah"]})
@@ -241,15 +341,24 @@ def main():
             i = r["at"] + 8 + 2 * r["k"]
             flat[i], flat[i + 1] = [int(v) if v == int(v) else v for v in opening(r)]
         LINES_FILE.write_text(json.dumps(lines, separators=(",", ":")))
-        print(f"refitted {len(results)} markers in {LINES_FILE.name}")
+        rows = {}
+        for r in sorted(results, key=lambda r: (r["page"], r["idx"])):
+            rows.setdefault(str(r["page"]), []).extend(int(v) if v == int(v) else v for v in opening_rows(r))
+        ROWS_FILE.write_text(json.dumps(rows, separators=(",", ":")))
+        print(f"refitted {len(results)} markers in {LINES_FILE.name}, their rows in {ROWS_FILE.name}")
         return
-    clipped = [r for r in results if r["clipped"] > 0]
+    clipped = [r for r in results if r["clipped"] > 0 or r["clipped_rows"] > 0]
     beside = [r for r in results if r["beside"] > 0]
     over = [r for r in results if r["over"] > 0]
     touching = [r for r in results if min(r["gap"]) == 0]
+    covered = [r for r in results if r["covered"] > 0]
+    crosses = [r for r in results if r["crosses"]]
     print(f"{len(results)} markers on 604 pages; {sum(r['sajdah'] for r in results)} with a sajdah sign; "
-          f"{len(touching)} touch a word; {len(over)} share columns with a word's ink (shown in any opening), "
-          f"up to {max([r['over'] for r in over] or [0]):.1f} units")
+          f"{len(touching)} touch a word; {len(covered)} have ink over or under them, outside their rows (covered while "
+          f"its side's word is hidden; {sum(r['overline'] for r in results)} a sajdah's overline across it, "
+          f"{sum(r['other_line'] for r in results)} another line's tip), up to "
+          f"{max([r['covered'] for r in covered] or [0]):.1f} units; {len(over)} share columns with a word's ink in their "
+          f"rows (shown in any opening), up to {max([r['over'] for r in over] or [0]):.1f} units")
     if clipped:
         amounts = sorted(r["clipped"] for r in clipped)
         print(f"{len(clipped)} marker(s) clipped by a cover, by up to {amounts[-1]:.1f} units (median {amounts[len(amounts) // 2]:.1f}):",
@@ -257,9 +366,14 @@ def main():
     if beside:
         print(f"{len(beside)} opening(s) show a word's ink beside their marker:",
               ", ".join(f"{r['page']}:{r['line']} ({r['beside']:.1f})" for r in beside[:30]), "…" if len(beside) > 30 else "")
-    if clipped or beside:
+    if crosses:
+        print(f"{len(crosses)} marker(s) with a word's ink over or under them past their middle (its half of the cover "
+              "goes with the other word):", ", ".join(f"{r['page']}:{r['line']} {r['crosses']}" for r in crosses[:30]),
+              "…" if len(crosses) > 30 else "")
+    if clipped or beside or crosses:
         sys.exit(1)
-    print("no marker is clipped, and no opening shows a word's ink beside its marker")
+    print("no marker is clipped, no opening shows a word's ink beside its marker, and no word's ink over or under a "
+          "marker passes its middle")
 
 
 if __name__ == "__main__":

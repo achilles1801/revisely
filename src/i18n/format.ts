@@ -6,7 +6,7 @@
 // the designs chose by hand ("Wednesday 28 October", no comma) stay hand-built in English.
 // Another language uses Intl with its own locale and order for all of them.
 import { localDigits, localNumber, localNumeral } from './digits';
-import { currentLanguage } from './instance';
+import { currentLanguage, t } from './instance';
 
 export type EnglishLocale = 'en-US' | 'en-GB' | 'device';
 
@@ -71,6 +71,17 @@ export function formatTime(
 /** A number, "1,234" (in Arabic "١٢٣٤": digits.ts). */
 export function formatNumber(n: number, options?: Intl.NumberFormatOptions): string {
   return isEnglish() ? n.toLocaleString(numberLocale(), options) : localNumber(n, currentLanguage(), options);
+}
+
+/** "87%", "17.9%" (to `decimals` places); in Arabic «٨٧٪», «١٧٫٩٪». */
+export function formatPercentage(n: number, decimals = 0): string {
+  const text = n.toFixed(decimals);
+  return isEnglish() ? `${text}%` : `${localNumeral(text, currentLanguage())}٪`;
+}
+
+/** The week's day letters, Sunday first: S M T W T F S; in Arabic «ح ن ث ر خ ج س». */
+export function weekdayLetters(): string[] {
+  return t('common.weekdayLetters').split(' ');
 }
 
 /** A number written by the code ("0.4" from toFixed) in the language's digits; unchanged in English. */

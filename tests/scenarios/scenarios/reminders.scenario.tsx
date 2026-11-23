@@ -252,7 +252,15 @@ function settingsStack(mods: Booted): ReactElement {
 
 const REFUSED_LINE = 'Off in your phone’s Settings, so no reminders can come';
 
-it('[REMIND-5] Settings: “Enable notifications” is off while the phone refuses them, says so, and offers Open Settings; allowed there, it is on again', async () => {
+/** Settings → Reminders (SET-1: the first level, then the page). */
+async function openReminders(app: OpenApp): Promise<void> {
+  await app.until(() => app.screen.queryByTestId('settings-page-reminders') != null, 'Settings');
+  await app.act(async () => {
+    app.mods.rtl.fireEvent.press(app.screen.getByTestId('settings-page-reminders'));
+  });
+}
+
+it('[REMIND-5] Settings → Reminders: “Revision reminders” is off while the phone refuses them, says so, and offers Open Settings; allowed there, it is on again', async () => {
   setZone(ZONES.chicago);
   setNow('2026-11-03 09:00');
   const phone = new Phone('phone');
@@ -264,6 +272,7 @@ it('[REMIND-5] Settings: “Enable notifications” is off while the phone refus
   const { fireEvent } = app.mods.rtl;
   const toggle = () => app.screen.getByTestId('settings-notifications');
   try {
+    await openReminders(app);
     await app.until(() => app.screen.queryByTestId('settings-notifications') != null, 'Settings');
     await app.until(() => toggle().props.value === false, 'the switch to show off');
     expect(app.screen.getByText(REFUSED_LINE)).toBeTruthy();
@@ -305,6 +314,7 @@ it('[REMIND-5] Settings: turned on with the phone not asked yet, it asks; a no l
   const { fireEvent } = app.mods.rtl;
   const toggle = () => app.screen.getByTestId('settings-notifications');
   try {
+    await openReminders(app);
     await app.until(() => app.screen.queryByTestId('settings-notifications') != null, 'Settings');
     await app.act(async () => {
       fireEvent(toggle(), 'valueChange', true);
@@ -314,6 +324,43 @@ it('[REMIND-5] Settings: turned on with the phone not asked yet, it asks; a no l
     expect(app.app.user?.notificationsEnabled).toBe(false);
     expect(toggle().props.value).toBe(false);
     expect(app.screen.queryByText('Notifications are off for Revisely')).toBeNull();
+  } finally {
+    await app.close();
+  }
+});
+
+it('[SET-1] Settings opens on its first level, a row per page with what it is set to; a row opens its page with its rows alone, and Back returns', async () => {
+  setZone(ZONES.chicago);
+  setNow('2026-11-03 09:00');
+  const phone = new Phone('phone');
+  allowNotifications();
+  const setup = await newAccount(phone, { memorized: JUZ_30, user: { notificationsEnabled: true, smartTrackingEnabled: false } });
+  await setup.close();
+
+  const app = await phone.open(settingsStack);
+  const { fireEvent } = app.mods.rtl;
+  try {
+    await app.until(() => app.screen.queryByTestId('settings-page-reminders') != null, 'the first level');
+    for (const id of ['settings-account', 'settings-page-revision', 'settings-page-storage', 'settings-page-appearance', 'settings-page-help', 'settings-page-about']) {
+      expect(app.screen.getByTestId(id)).toBeTruthy();
+    }
+    expect(app.screen.getByTestId('settings-page-revision').props.accessibilityLabel).toBe('Revision, Smart Tracking off');
+    // No page's own rows on the first level.
+    expect(app.screen.queryByTestId('settings-notifications')).toBeNull();
+    expect(app.screen.queryByTestId('settings-delete-account')).toBeNull();
+
+    await openReminders(app);
+    await app.until(() => app.screen.queryByTestId('settings-notifications') != null, 'the Reminders page');
+    expect(app.screen.getByTestId('settings-notifications').props.value).toBe(true);
+    expect(app.screen.getByText('Friday Al-Kahf reminder')).toBeTruthy();
+
+    // Back: the first level again.
+    await app.act(async () => {
+      const backs = app.screen.getAllByTestId('back');
+      fireEvent.press(backs[backs.length - 1]);
+    });
+    await app.until(() => app.screen.queryByTestId('settings-notifications') == null, 'the first level again');
+    expect(app.screen.getByTestId('settings-page-reminders')).toBeTruthy();
   } finally {
     await app.close();
   }
