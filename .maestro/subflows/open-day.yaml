@@ -1,4 +1,4 @@
-# Home → Activity → today: the day's blocks. Activity opens on today's month with today picked, and
+# Home → Activity (its tab) → today: the day's blocks. Activity opens on today's month with today picked, and
 # the preview's date opens it (ACT-18).
 appId: com.revisionbuddy.app
 ---
@@ -8,12 +8,16 @@ appId: com.revisionbuddy.app
     maxRetries: 2
     commands:
       - tapOn:
-          id: open-activity
+          id: tab-ActivityTab
           optional: true
       - extendedWaitUntil:
           visible:
             id: activity-blocks-views
           timeout: 10000
+# Activity is a tab and keeps where it was (TAB-2): a press on its tab, now that it shows, takes it back to its top.
+- tapOn:
+    id: tab-ActivityTab
+- waitForAnimationToEnd
 - tapOn:
     id: preview-open
 - extendedWaitUntil:

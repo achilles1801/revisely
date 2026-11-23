@@ -65,8 +65,6 @@ export const home: NonNullable<ArStrings['home']> = {
     nextStartsAt: 'تبدأ مراجعتك التالية من {{where}}',
     jumpFailed: 'تعذّر تحديث جدولك',
     undoFailed: 'تعذّر التراجع',
-    qibla: 'تحديد القبلة',
-    activity: 'فتح النشاط',
     activityTab: 'النشاط',
     settings: 'فتح الإعدادات',
     recent: 'الجلسات الأخيرة',

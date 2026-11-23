@@ -506,7 +506,7 @@ appId: com.revisionbuddy.app
 
 # The button on Activity too.
 - tapOn:
-    id: open-activity
+    id: tab-ActivityTab
 - extendedWaitUntil:
     visible:
       id: revo-button

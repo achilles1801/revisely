@@ -383,15 +383,19 @@ current basic sounds". October 2026's version was removed for the voices it offe
   12 pt sideways opens nothing, whether or not it changed the tab. A press that comes without a touch
   (VoiceOver, TalkBack) always counts. (Nov 22 2026: on Android, a swipe from Read toward Home that the
   tab pager didn't take opened the surah under the finger, 4 swipes in about 100 on the emulator.)
-- **TAB-2.** (Revisely Dev) Settings → Appearance → Activity tab (off until turned on, kept on that phone, not the
-  account) makes Activity a tab of its own between Home and Read, to compare with the button at the top of Home (Majd,
-  Nov 23 2026: "a test toggle in settings for me to see what it's like normal(rn) vs with it"). On: the tab bar is
-  Home, Activity, Read (the pulse icon), a swipe moves between them in that order, and Home's top bar has no Activity
-  button. Activity, with Insights inside it as before, starts its tab with no back arrow; what it opens (a day, See
-  all, the reader, the daily log) is pushed in its tab and Back comes back to it, and a press on the tab while it shows
-  goes back to Activity and its top. On the calendar's days a sideways swipe still steps the month or week; anywhere
-  else on Activity it moves between tabs. Settings' and Revo's ways to Activity open the tab. Off: the app as before. The
-  store app has no switch and never shows the tab (`lib/activityTab`).
+- **TAB-2.** Activity is a tab of its own between Home and Read, for every account (Majd, Nov 23 2026: "i like the new
+  style with the activity being its own tab, let's make that official"; he tried it in Revisely Dev first). The tab bar
+  is Home, Activity (the pulse icon), Read, and a swipe moves between them in that order. Activity, with Insights inside
+  it, starts its tab with no back arrow; what it opens (a day, See all, the reader, the daily log) is pushed in its tab
+  and Back comes back to it, and a press on the tab while it shows goes back to Activity and its top. On the calendar's
+  days a sideways swipe steps the month or week; anywhere else on Activity it moves between tabs. Settings' "Activity",
+  Revo's Activity and Insights buttons and a day's links from elsewhere (the timer, Recite, Revo's Day in review) open it
+  in its tab.
+- **HOME-1.** Home's top bar is the timer chip while a timer runs (on the left) and Settings (on the right), nothing else
+  (Majd, Nov 23 2026: "i say we remove the qibla button/icon completely. that way opening the prayer sheet stays and the
+  qibla is next to it on the sheet if users wanna use it and it also makes the home page way cleaner"). The Prayer sheet
+  (Times | Qibla) opens from the next-prayer line on Home; the Qibla also opens from Settings → Prayer → Qibla and from
+  the Qibla widget, on the sheet's Qibla.
 
 ## Sheets and updates
 
@@ -1021,7 +1025,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   Memorized or timed Read item. A tagged note whose item is gone, and an untagged note, stay in the Notes block.
   While the day's items load, a tagged note shows nowhere (it never flickers into Notes).
 - **ACT-12.** Insights live in Activity (Calendar | Insights), for every account since the November 2026 release
-  (testers' before): the tab bar is Home and Read, with or without Smart Tracking, and there is no Insights tab
+  (testers' before): the tab bar is Home, Activity and Read (TAB-2), with or without Smart Tracking, and there is no Insights tab
   to reach. Without Smart Tracking no page is rated, so Activity's Insights has no Weak spots (no Ask,
   no "See all"): one line stands in its place, "Turn on Smart Tracking to see your weak spots ›" (a link, not a
   guide), which opens Settings at Revision, where its switch is; once it is on, Weak spots shows. With it, Weak

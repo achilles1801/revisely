@@ -72,9 +72,7 @@ export const home = {
     nextStartsAt: 'Your next revision starts at {{where}}',
     jumpFailed: "Couldn't update your schedule",
     undoFailed: "Couldn't undo",
-    qibla: 'Find the Qibla',
-    activity: 'Open activity',
-    /** The Activity tab's name for VoiceOver (Revisely Dev's Activity tab, TAB-2). */
+    /** The Activity tab's name for VoiceOver (TAB-2). */
     activityTab: 'Activity',
     settings: 'Open settings',
     recent: 'Recent sessions',
