@@ -28,7 +28,8 @@ var body = JSON.stringify({
               values: [{ integerValue: '27023' }, { integerValue: '27024' }, { integerValue: '27025' }, { integerValue: '27026' }],
             },
           },
-          dateMemorized: { timestampValue: '2026-11-02T18:00:00.000Z' },
+          // After onboarding's pages, whichever clock stamped them: this is the account's latest entry.
+          dateMemorized: { timestampValue: '2026-12-31T12:00:00.000Z' },
         },
       },
       updateMask: { fieldPaths: ['status', 'verses', 'dateMemorized'] },
