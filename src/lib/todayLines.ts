@@ -2,20 +2,19 @@
 // choice "E", Nov 2026; mocks in ~/Documents/revisely-today-mocks):
 //
 //   not started   Starts at Al-Mujadila ›             20 pages · to At-Tahrim · Juz 28
-//   in progress   Continue at Al-Hashr, ayah 10 ›     ▬▬▭▭▭ 6 of 20
+//   in progress   Continue at Al-Hashr, 3rd page ›    ▬▬▭▭▭ 6 of 20
 //   done          ● Done · 20 pages                   Adh-Dhariyat → Al-Hadid · Juz 27
 //   two ranges    Starts at Ash-Shams ›               20 pages · then Al-Fatihah
-//   carried in    Starts at Al-Hadid, ayah 4 ›        20 pages · 4 from yesterday first
+//   carried in    Starts at Al-Hadid, 2nd page ›      20 pages · 4 from yesterday first
 //
 // "Starts at" names where the page you open to begins (lib/passages placeOfPage:
-// the surah, or its ayah when the page begins mid-surah; surahs and juz first,
-// page numbers almost never, the owner's rule of Nov 7 2026); in progress, the
-// first page not yet revised. Pages are read in the order the session serves
-// them (the end of the cycle, then its start). "ayah 10", "20 pages", "Juz 28"
+// the surah or juz it opens, else which page of the surah, NAME-1); in progress,
+// the first page not yet revised. Pages are read in the order the session serves
+// them (the end of the cycle, then its start). "3rd page", "20 pages", "Juz 28"
 // and the › are held together with no-break spaces, so the › never sits alone.
 // The juz shows when the day spans one or two; two-range days say "then …".
 // The exact ranges, with their page numbers, are in the › sheet's header.
-// A partly memorized page among them (MEM-4) is named by its memorized ayahs:
+// A partly memorized page among them (MEM-4) is named by what is memorized of it:
 // "Starts at An-Nas" when An-Nas is all that is memorized on the last page.
 
 import { getJuzForPage, getSurahsForPage } from './quranData';
@@ -123,17 +122,17 @@ function surahSpan(run: PageRun, partial: PartialPages = NONE): string {
 /**
  * The › sheet's header, the exact ranges: the surahs (with the juz when it helps),
  * then the page numbers as a quiet detail. "Al-Mujadila to At-Tahrim · Juz 28 ·
- * pp. 542–561", "Ash-Shams to An-Nas, then Al-Fatihah to Al-Baqarah 69 · pp. 595–604, 1–10".
+ * pp. 542–561", "Ash-Shams to An-Nas, then Al-Fatihah to Al-Baqarah, 9th page · pp. 595–604, 1–10".
  */
 export function rangesText(list: number[], partial: PartialPages = NONE): string {
   if (list.length === 0) return '';
-  const what = describePagesToRevise(list, partial, { order: 'given', juz: true, wholeJuz: false });
+  const what = describePagesToRevise(list, partial, { order: 'given', juz: true, wholeJuz: false, exact: true });
   return [what, pagesNote(list, { order: 'given' })].filter(Boolean).join(' · ');
 }
 
 /**
  * Done today: the quiet line that opens the next revision day ("Tomorrow starts
- * at Al-Baqarah, ayah 142 ›"). `lead` is "Tomorrow", or the weekday after that.
+ * at Juz 2 ›"). `lead` is "Tomorrow", or the weekday after that.
  */
 export function aheadLine(lead: string, first: number, partial: PartialPages = NONE): { text: string; label: string } {
   const text = t('lib.today.startsAtAhead', { lead, place: placeOf(first, partial) });

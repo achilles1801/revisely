@@ -50,7 +50,7 @@ describe('pages credited to another day (AHEAD-2, SESS-7)', () => {
   const day = '2026-11-03';
   const line = (...a: Parameters<typeof creditLine>) => plainText(creditLine(...a));
   it('names the day by its date and the pages by surah, never as YYYY-MM-DD or page numbers', () => {
-    expect(line(day, { countsFor: '2026-11-04', pages: [562, 563] })).toBe('Ahead for Wednesday 4 November: Al-Mulk 1–26');
+    expect(line(day, { countsFor: '2026-11-04', pages: [562, 563] })).toBe('Ahead for Wednesday 4 November: Al-Mulk, first 2 pages');
     expect(line(day, { fromDay: '2026-11-02', pages: [556, 557] })).toBe('Done ahead on Monday 2 November: At-Taghabun');
   });
   it('a catch-up page reads as caught up for the day it was missed, never as ahead [SESS-7]', () => {

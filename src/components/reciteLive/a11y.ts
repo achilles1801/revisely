@@ -29,5 +29,10 @@ export function say(text: string): void {
   else AccessibilityInfo.announceForAccessibility(text);
 }
 
-/** How long the Undo after "Not a mistake" stays: 5 s, or 15 s with a screen reader (there's a toast to reach first). */
-export const undoMs = (screenReader: boolean) => (screenReader ? 15_000 : 5_000);
+/**
+ * How long the Undo after "Not a mistake" or Clear stays: 5 s, or 15 s with a screen reader (there's a toast to reach
+ * first). E2E builds get the 15 s too: a CI simulator took 5.3 s to see it and tap, and the tap landed on the timer behind
+ * it (flow 18, iOS, Nov 23 2026). The bundler drops this test from every other build.
+ */
+export const undoMs = (screenReader: boolean) =>
+  screenReader || process.env.EXPO_PUBLIC_E2E === '1' ? 15_000 : 5_000;

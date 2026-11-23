@@ -39,7 +39,7 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: session-page
-    text: "At.Tariq and Al.A'la · .*"
+    text: "At.Tariq · .*"
 # AHEAD-5: three of Wednesday's pages, swiped (591–593).
 - runFlow:
     file: ../subflows/swipe-pages.yaml
@@ -57,7 +57,7 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: today-ahead
-    text: "Tomorrow starts at Al.Fajr, ayah.24"
+    text: "Tomorrow starts at Al.Balad"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
@@ -112,7 +112,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: today-title
-      text: "Continue at Al.Fajr, ayah.24[^0-9]*"
+      text: "Continue at Al.Balad[^0-9]*"
     timeout: 20000
 - assertVisible:
     id: today-summary
@@ -152,4 +152,4 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: session-page
-    text: "Al.'Asr, Al.Humazah and Al.Fil · .*"
+    text: "Al.'Asr to Al.Fil · .*"

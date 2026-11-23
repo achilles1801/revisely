@@ -360,7 +360,7 @@ export function RecordingsList({
                               : { backgroundColor: palette.fill, borderColor: palette.separator },
                           ]}
                           accessibilityRole="button"
-                          accessibilityLabel={t('recordings.list.playFrom', { place: spokenText(placeOfPage(m.page, { form: 'long' })) })}
+                          accessibilityLabel={t('recordings.list.playFrom', { place: spokenText(placeOfPage(m.page, { form: 'ayahs' })) })}
                           accessibilityState={{ selected: current }}
                           testID={`recording-page-${r.id}-${m.page}`}
                         >
@@ -368,7 +368,7 @@ export function RecordingsList({
                             style={[styles.chipText, typeV2.numeral, { color: current ? palette.bg : palette.secondary }]}
                             maxFontSizeMultiplier={1.4}
                           >
-                            {placeOfPage(m.page, { form: "short" })}
+                            {placeOfPage(m.page, { form: 'ayahsCompact' })}
                           </Text>
                         </Tap>
                       );
@@ -403,7 +403,7 @@ export function RecordingsList({
                               },
                         ]}
                         accessibilityRole="button"
-                        accessibilityLabel={t('recordings.list.playFrom', { place: spokenText(placeOfPage(m.page, { form: 'long' })) })}
+                        accessibilityLabel={t('recordings.list.playFrom', { place: spokenText(placeOfPage(m.page, { form: 'ayahs' })) })}
                         accessibilityState={{ selected: current }}
                         testID={`recording-page-${r.id}-${m.page}`}
                       >
@@ -415,7 +415,7 @@ export function RecordingsList({
                           ]}
                           maxFontSizeMultiplier={1.4}
                         >
-                          {placeOfPage(m.page, { form: "short" })}
+                          {placeOfPage(m.page, { form: 'ayahsCompact' })}
                         </Text>
                       </Tap>
                     );

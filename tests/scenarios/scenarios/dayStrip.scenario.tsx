@@ -105,7 +105,7 @@ describe('the day’s page strip', () => {
     const { screen, onOpenPage } = open(false);
     await flush();
     const cell = screen.getByTestId('strip-page-549');
-    expect(plainText(cell.props.accessibilityLabel)).toBe('Al-Mumtahanah, ayahs 1 to 5, skipped');
+    expect(plainText(cell.props.accessibilityLabel)).toBe('Al-Mumtahanah, 1st page, skipped');
     expect(cell.props.accessibilityHint).toBe('Opens in the reader');
     fireEvent.press(cell);
     fireEvent.press(screen.getByTestId('strip-page-546'));

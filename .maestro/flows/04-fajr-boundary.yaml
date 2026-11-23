@@ -63,7 +63,7 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: session-page
-    text: "At.Tariq and Al.A'la · .*"
+    text: "At.Tariq · .*"
 - tapOn: "Back"
 
 # LOG-3: a note written at 03:00 belongs to Tuesday, the revision day: Activity's

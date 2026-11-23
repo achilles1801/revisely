@@ -120,15 +120,15 @@ describe('Pages by strength (ACT-12)', () => {
     expect(flat(screen.getByTestId('pill-surahs').props.style).backgroundColor).toBe(palette.text);
   });
 
-  it('a page’s row leads with its surah and ayahs; the page number is only the quiet detail (Majd, Nov 7)', async () => {
+  it('a page’s row leads with its surah and which page of it; the page number is only the quiet detail (Majd, Nov 7)', async () => {
     await open();
     const row = screen.getByTestId('browse-page-50');
-    expect(within(row).getByText("Ali 'Imran, ayahs 1–9", { normalizer: plainText })).toBeTruthy();
+    expect(within(row).getByText("Ali 'Imran, 1st page", { normalizer: plainText })).toBeTruthy();
     expect(within(row).getByText('Weak · Juz 3 · p. 50 · revised 3d ago', { normalizer: plainText })).toBeTruthy();
     // The mark is the surah's number, as in Surahs; no "Page 50" title.
     expect(within(row).getByText('3', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.queryByText(/^Page \d+/)).toBeNull();
-    expect(row.props.accessibilityLabel).toBe("Ali 'Imran, ayahs 1 to 9. Weak · Juz 3 · page 50 · revised 3d ago");
+    expect(row.props.accessibilityLabel).toBe("Ali 'Imran, 1st page. Weak · Juz 3 · page 50 · revised 3d ago");
   });
 
   it('the old Browse: Surahs and Juz, and a juz narrows the pages to it', async () => {

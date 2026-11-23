@@ -107,7 +107,7 @@ it('[REVO-38] [REVO-25] Revo opened from a past day says what that day held and 
     // Yesterday's day in Activity: what it held, by surah, then today's next part.
     await new ActivityDayView(app).open('2026-11-02');
     const day = await greeting('yesterday');
-    expect(day).toMatch(/^Assalamu alaikum\b.*\. Yesterday you revised all 5 pages, Al-Fatihah to Al-Baqarah \d+[^.]*\. Today, [^.]+ is next\.$/);
+    expect(day).toMatch(/^Assalamu alaikum\b.*\. Yesterday you revised all 5 pages, Al-Fatihah to Al-Baqarah[^.]*\. Today, [^.]+ is next\.$/);
     expect(day).not.toMatch(/\bpages? \d|\bp\. ?\d/);
     expect(app.screen.queryByTestId('revo-chip-How did yesterday go?')).not.toBeNull();
     // The day goes with the question, as + would attach it; × could take it away.

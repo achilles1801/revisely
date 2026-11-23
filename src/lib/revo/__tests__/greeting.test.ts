@@ -44,7 +44,7 @@ describe('Revo’s greeting (REVO-20)', () => {
   it('[REVO-20] part way through, with weak pages next: by surah, never page numbers', () => {
     const c = ctx({ revisedPages: 6, nextPages: [548, 549, 550], weakNext: [548, 549] });
     expect(said('Maryam', c)).toBe(
-      'Assalamu alaikum, Maryam. You’re 6 pages into today, and Al-Hashr 17 to Al-Mumtahanah 5 is next. It’s rated weak. Want a short plan for it?',
+      'Assalamu alaikum, Maryam. You’re 6 pages into today, and Al-Hashr to Al-Mumtahanah is next. It’s rated weak. Want a short plan for it?',
     );
     expect(chips(c)).toEqual(['Plan Al-Hashr to Al-Mumtahanah', 'How was my week?', 'How is my pace?']);
   });
@@ -52,7 +52,7 @@ describe('Revo’s greeting (REVO-20)', () => {
   it('[REVO-20] not started: where today starts, by surah; the weak part named', () => {
     const c = ctx({ nextPages: [301, 302], weakNext: [302] });
     expect(said('Maryam', c)).toBe(
-      'Assalamu alaikum, Maryam. Today is 20 pages, starting at Al-Kahf, ayah 62. Al-Kahf, ayahs 75–83 is rated weak. Want a short plan for it?',
+      'Assalamu alaikum, Maryam. Today is 20 pages, starting at Al-Kahf, 9th page. Juz 16, first page is rated weak. Want a short plan for it?',
     );
   });
 
@@ -123,7 +123,7 @@ describe('Revo’s greeting opened again (REVO-35)', () => {
     const later = [1, 2, 3, 4, 5].map((n) => say(n));
     expect(later).toEqual([
       'Assalamu alaikum, Majd. Tomorrow starts at Al-Mulk, 20 pages.',
-      'Assalamu alaikum, Majd. Al-Hashr 17 to Al-Mumtahanah 5 is rated weak. Want a short plan for it?',
+      'Assalamu alaikum, Majd. Al-Hashr to Al-Mumtahanah is rated weak. Want a short plan for it?',
       'Assalamu alaikum, Majd. This week you’ve revised 118 pages on 6 days.',
       'Assalamu alaikum, Majd. You’ve memorized 16.6% of the Quran.',
       'Assalamu alaikum, Majd. Tomorrow starts at Al-Mulk, 20 pages.',
@@ -154,11 +154,11 @@ describe('Revo’s greeting opened again (REVO-35)', () => {
 
   it('[REVO-35] not done: today’s line every time (it is the moment); a second open with nothing changed changes what follows it', () => {
     const c = ctx({ revisedPages: 6, nextPages: [548, 549, 550], weakNext: [548, 549] }, { week });
-    expect(say(0, c, {})).toBe('Assalamu alaikum, Majd. You’re 6 pages into today, and Al-Hashr 17 to Al-Mumtahanah 5 is next. It’s rated weak. Want a short plan for it?');
+    expect(say(0, c, {})).toBe('Assalamu alaikum, Majd. You’re 6 pages into today, and Al-Hashr to Al-Mumtahanah is next. It’s rated weak. Want a short plan for it?');
     expect([1, 2, 3].map((n) => say(n, c, {}))).toEqual([
-      'Assalamu alaikum, Majd. You’re 6 pages into today, and Al-Hashr 17 to Al-Mumtahanah 5 is next. This week you’ve revised 118 pages on 6 days.',
-      'Assalamu alaikum, Majd. You’re 6 pages into today, and Al-Hashr 17 to Al-Mumtahanah 5 is next. You’ve memorized 16.6% of the Quran.',
-      'Assalamu alaikum, Majd. You’re 6 pages into today, and Al-Hashr 17 to Al-Mumtahanah 5 is next. You’re on a 12-day streak.',
+      'Assalamu alaikum, Majd. You’re 6 pages into today, and Al-Hashr to Al-Mumtahanah is next. This week you’ve revised 118 pages on 6 days.',
+      'Assalamu alaikum, Majd. You’re 6 pages into today, and Al-Hashr to Al-Mumtahanah is next. You’ve memorized 16.6% of the Quran.',
+      'Assalamu alaikum, Majd. You’re 6 pages into today, and Al-Hashr to Al-Mumtahanah is next. You’re on a 12-day streak.',
     ]);
     // The weak part's plan stays the first suggestion while it is next.
     expect(chipsAt(1, c, {})).toEqual(['How was my week?', 'Plan Al-Hashr to Al-Mumtahanah', 'How is my pace?']);
@@ -167,7 +167,7 @@ describe('Revo’s greeting opened again (REVO-35)', () => {
   it('[REVO-35] nothing planned: the same line once, then something from the account', () => {
     const none = ctx({ plannedPages: 0 }, { week });
     expect(say(0, none, {})).toBe('Assalamu alaikum, Majd. Nothing is planned for today. Ask me about your progress, your weak spots or your plan.');
-    expect(say(1, none, {})).toBe('Assalamu alaikum, Majd. Al-Hashr 17 to Al-Mumtahanah 5 is rated weak. Want a short plan for it?');
+    expect(say(1, none, {})).toBe('Assalamu alaikum, Majd. Al-Hashr to Al-Mumtahanah is rated weak. Want a short plan for it?');
     expect(say(2, none, {})).toBe('Assalamu alaikum, Majd. This week you’ve revised 118 pages on 6 days.');
   });
 });
@@ -180,7 +180,7 @@ describe('Revo’s greeting without Smart Tracking (REVO-35)', () => {
     const lines = [0, 1, 2, 3, 4].flatMap((n) => [revoGreeting('Majd', notDone, n, off), revoGreeting('Majd', done, n, off)]).map(plainText);
     for (const line of lines) expect(line).not.toMatch(/weak/i);
     expect(plainText(revoGreeting('Majd', notDone, 0, off))).toBe(
-      'Assalamu alaikum, Majd. You’re 6 pages into today, and Al-Hashr 17 to Al-Mumtahanah 5 is next. Ask me anything about your revision.',
+      'Assalamu alaikum, Majd. You’re 6 pages into today, and Al-Hashr to Al-Mumtahanah is next. Ask me anything about your revision.',
     );
     const chips = [0, 1, 2, 3].flatMap((n) => [...revoChips(notDone, n, off), ...revoChips(done, n, off)]);
     expect(chips.filter((c) => /weak|^Plan /.test(c))).toEqual([]);

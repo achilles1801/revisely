@@ -274,7 +274,7 @@ describe('planDisplay', () => {
     expect(summarizeDay([])).toMatchObject({ title: 'Rest Day', isRest: true });
     const s = summarizeDay(range(22, 31));
     expect(s.title).toBe('Juz 2');
-    expect(plainText(s.subtitle)).toBe('Al-Baqarah 142–202 · 10 pages');
+    expect(plainText(s.subtitle)).toBe('Al-Baqarah, 21st to 30th page · 10 pages');
     expect(summarizeDay([21, 22]).title).toBe('Juz 1–2');
     // Surahs first, never page numbers; a whole surah by name; scattered pages list their surahs.
     expect(plainText(summarizeDay(range(542, 561)).subtitle)).toBe('Al-Mujadila to At-Tahrim · 20 pages');
@@ -305,7 +305,7 @@ describe('planDisplay', () => {
 
   it('describes a start page', () => {
     const start = describeStartPage(22);
-    expect({ ...start, title: plainText(start.title) }).toEqual({ title: 'Al-Baqarah, ayah 142', subtitle: 'Juz 2 · p. 22' });
+    expect({ ...start, title: plainText(start.title) }).toEqual({ title: 'Juz 2', subtitle: 'p. 22' });
     expect(plainText(describeStartPage(542).title)).toBe('Al-Mujadila');
   });
 });

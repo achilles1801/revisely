@@ -165,7 +165,7 @@ export function AddMemorizedSheet({
   // When the suggested pages were read: the first session that held one of them.
   const readAt = readings.find((r) => r.pages.some((p) => suggestion.includes(p)))?.startedAt;
   const suggestionText = [
-    describePassage(suggestion, { form: 'compact' }),
+    describePassage(suggestion, { form: 'ayahsCompact' }),
     t('activity.add.readOn', { when: readAt != null && Number.isFinite(readAt) ? partOfDay(readAt, dayName === 'today') : dayWords(dayName) }),
   ].join(' · ');
 
@@ -391,7 +391,7 @@ export function AddMemorizedSheet({
               testIDs={{ from: 'add-memorized-from-ayah', to: 'add-memorized-to-ayah' }}
             />
             <Text style={[typeV2.meta, styles.under, { color: palette.secondary }]} testID="add-memorized-ayahs">
-              {`${describeAyahs(ayahs, { form: 'compact' })} · ${ayahs.length} ${ayahs.length === 1 ? 'ayah' : 'ayahs'}`}
+              {`${describeAyahs(ayahs, { form: 'ayahsCompact' })} · ${ayahs.length} ${ayahs.length === 1 ? 'ayah' : 'ayahs'}`}
             </Text>
           </View>
         ) : (
@@ -412,7 +412,7 @@ export function AddMemorizedSheet({
               testIDs={{ from: 'add-memorized-from', to: 'add-memorized-to' }}
             />
             <Text style={[typeV2.meta, styles.under, { color: palette.secondary }]} testID="add-memorized-pages">
-              {`${describePassage(pageNumbers, { form: 'compact' })} · ${pageNumbers.length} ${pageNumbers.length === 1 ? 'page' : 'pages'}`}
+              {`${describePassage(pageNumbers, { form: 'ayahsCompact' })} · ${pageNumbers.length} ${pageNumbers.length === 1 ? 'page' : 'pages'}`}
             </Text>
           </View>
         )}

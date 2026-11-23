@@ -32,7 +32,7 @@ export function hitAyahs(hit: VerseHit): number[] {
 /** "Yunus, ayah 16", or the run: "Al-Hajj, ayahs 49–50". */
 export function hitTitle(hit: VerseHit): string {
   const ayahs = hitAyahs(hit);
-  return ayahs.length > 1 ? describeAyahs(ayahs, { wholeJuz: false }) : t('read.search.cardTitle', { surah: surahName(hit.sura), ayah: hit.ayah });
+  return ayahs.length > 1 ? describeAyahs(ayahs, { form: 'ayahs', wholeJuz: false }) : t('read.search.cardTitle', { surah: surahName(hit.sura), ayah: hit.ayah });
 }
 
 /**

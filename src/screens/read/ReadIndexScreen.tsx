@@ -28,7 +28,7 @@ import {
 import { useTabBarFootprint } from '../../navigation/TabBar';
 import type { ReadStackParamList } from '../../navigation/MainNavigator';
 import { arabicLabelLines } from '../../lib/platformUi';
-import { ayahsInSurah, spokenText } from '../../lib/passages';
+import { partOfSurah, spokenText } from '../../lib/passages';
 import { formatDate, t, formatNumber } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'ReadIndex'>;
@@ -235,7 +235,7 @@ function RecentRowV2({ entry, onPress }: { entry: ReadingHistoryEntry; onPress: 
   const name = display?.nameDisplay ?? t('common.pageN', { n: entry.pageNumber });
   const when = formatRelativeTime(entry.lastReadAt);
   // The surah's ayahs on that page first, the page number a quiet detail (surahs and juz first, CLAUDE.md).
-  const ayahs = surah ? ayahsInSurah(surah.number, [entry.pageNumber]) : '';
+  const ayahs = surah ? partOfSurah(surah.number, [entry.pageNumber]) : '';
   const meta = [ayahs, t('common.pageShort', { n: entry.pageNumber }), when].filter(Boolean).join(' · ');
   return (
     <Tap

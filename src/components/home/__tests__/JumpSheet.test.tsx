@@ -94,7 +94,7 @@ describe('Jump to (sheet)', () => {
     const onJump = open();
     fireEvent.press(screen.getByText('Page'));
     expect(screen.getByTestId('jump-page-wheel')).toBeTruthy();
-    expect(screen.getByTestId('jump-page-where')).toHaveTextContent(/^Al.Baqarah, ayahs.135–141 · Juz.1 · today starts here$/);
+    expect(screen.getByTestId('jump-page-where')).toHaveTextContent(/^Juz.1, last.page · today starts here$/);
     fireEvent.press(screen.getByTestId('jump-go'));
     expect(onJump).toHaveBeenCalledWith({ kind: 'page', page: 21 });
   });

@@ -412,8 +412,8 @@ describe('how Revo talks (REVO-27)', () => {
     expect(REVO_SYSTEM_PROMPT).toContain('While today isn’t done, the next step is today’s');
     expect(REVO_SYSTEM_PROMPT).toContain('End with one clear next step');
     expect(REVO_SYSTEM_PROMPT).toContain('Never write a date like 2026-11-05');
-    expect(REVO_SYSTEM_PROMPT).toContain('Name parts of the Qur’an by surah and juz');
-    expect(REVO_SYSTEM_PROMPT).toContain('Give a page number only when they use page numbers or ask for one');
+    expect(REVO_SYSTEM_PROMPT).toContain('Name places as a memorizer does: the surah or juz and which page of it');
+    expect(REVO_SYSTEM_PROMPT).toContain('Give a mushaf page number only when they use page numbers or ask for one');
     expect(REVO_SYSTEM_PROMPT).toContain('Never say the numbers disagree');
     expect(REVO_SYSTEM_PROMPT).toContain('Never guess.');
   });

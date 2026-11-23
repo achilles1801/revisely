@@ -141,7 +141,7 @@ describe('activity items (Recent and See all)', () => {
     // By surah, never page numbers (lib/passages; NAME-1).
     expect(plainText(items[0].detail)).toBe('Al-Ahqaf to Adh-Dhariyat · 41 min');
     expect(items[0].done).toBe(true);
-    expect(plainText(items[1].detail)).toBe('Al-Ahqaf 6–14 · During revision');
+    expect(plainText(items[1].detail)).toBe('Al-Ahqaf, 2nd page · During revision');
     expect(plainText(items[2].detail)).toBe('Al-Isra to Al-Kahf');
     expect(items[3].detail).toBe('Timed session');
     expect(items[4].detail).toBe('7:12 am · Memorized 1/2 p3 · 30 min');

@@ -33,7 +33,7 @@ describe('a sitting in the reader (REC-1)', () => {
   });
 
   it('says what was saved, by surah and ayah, and on which day', () => {
-    expect(plainText(sittingSavedText({ day: '2026-11-03', today: '2026-11-03', pages: [562, 563], seconds: 41 * 60 + 3 }))).toBe('Saved to today: Al-Mulk, ayahs 1–26, 41 min');
+    expect(plainText(sittingSavedText({ day: '2026-11-03', today: '2026-11-03', pages: [562, 563], seconds: 41 * 60 + 3 }))).toBe('Saved to today: Al-Mulk, first 2 pages, 41 min');
     expect(sittingSavedText({ day: '2026-11-02', today: '2026-11-03', pages: [], seconds: 20 })).toBe('Saved to Monday: 1 min');
     expect(sittingDayWord('2026-11-03', '2026-11-03')).toBe('today');
   });
@@ -55,7 +55,7 @@ describe('a sitting’s Add to revised line (REC-3)', () => {
   it('names the pages by surah and says how much of the day’s revision they are', () => {
     expect(plainText(sittingToReviseText([556, 557], [556, 557], 'today'))).toBe('At-Taghabun is the 2 pages left of today’s revision.');
     expect(plainText(sittingToReviseText([556, 557], [554, 555, 556, 557], 'today'))).toBe('At-Taghabun is 2 of the 4 pages left of today’s revision.');
-    expect(plainText(sittingToReviseText([562], [562], 'yesterday'))).toBe('Al-Mulk, ayahs 1–12 is the page left of yesterday’s revision.');
+    expect(plainText(sittingToReviseText([562], [562], 'yesterday'))).toBe('Al-Mulk, 1st page is the page left of yesterday’s revision.');
   });
 });
 

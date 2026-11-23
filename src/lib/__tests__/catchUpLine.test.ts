@@ -20,15 +20,15 @@ describe('catchUpLine', () => {
   });
 
   it('a page inside a surah names its ayahs; a surah\'s start or end says so', () => {
-    expect(plain(catchUpLine(one([7], 1))!.title)).toBe('Missed yesterday · Revise Al-Baqarah 38–48');
-    expect(catchUpLine(one([7], 1))?.label).toBe('Missed yesterday · Revise Al-Baqarah 38 to 48');
+    expect(plain(catchUpLine(one([7], 1))!.title)).toBe('Missed yesterday · Revise Al-Baqarah, 6th page');
+    expect(catchUpLine(one([7], 1))?.label).toBe('Missed yesterday · Revise Al-Baqarah, 6th page');
     expect(plain(catchUpLine(one([2, 3], 1))!.title)).toBe('Missed yesterday · Revise the start of Al-Baqarah');
     expect(plain(catchUpLine(one([48, 49], 1))!.title)).toBe('Missed yesterday · Revise the end of Al-Baqarah');
     expect(plain(catchUpLine(one([560, 561], 1))!.title)).toBe('Missed yesterday · Revise At-Tahrim');
   });
 
   it('two days back says how long ago', () => {
-    expect(plain(catchUpLine(one([6, 7], 2))!.title)).toBe('Missed 2 days ago · Revise Al-Baqarah 30–48');
+    expect(plain(catchUpLine(one([6, 7], 2))!.title)).toBe('Missed 2 days ago · Revise Al-Baqarah, 5th to 6th page');
   });
 
   it('several missed days say how many, and name their pages as one passage', () => {
@@ -41,22 +41,22 @@ describe('catchUpLine', () => {
         { day: 'd1', ago: 1, missed: true },
       ],
     });
-    expect(plain(got!.title)).toBe('Missed 3 days · Revise Al-Baqarah 30–134');
+    expect(plain(got!.title)).toBe('Missed 3 days · Revise Al-Baqarah, 5th to 19th page');
   });
 
   it('a partly revised day reads "Left", not "Missed"', () => {
-    expect(plain(catchUpLine(one([13, 14, 15], 1, false))!.title)).toBe('Left yesterday · Revise Al-Baqarah 84–101');
+    expect(plain(catchUpLine(one([13, 14, 15], 1, false))!.title)).toBe('Left yesterday · Revise Al-Baqarah, 12th to 14th page');
   });
 
   it('pages in two runs name both, in page order', () => {
     expect(plain(catchUpLine(one([6, 7, 1, 2], 1))!.title)).toBe(
-      'Missed yesterday · Revise Al-Fatihah to Al-Baqarah and Al-Baqarah 30–48',
+      'Missed yesterday · Revise Al-Fatihah to Al-Baqarah and Al-Baqarah, 5th to 6th page',
     );
   });
 
   it('more than two runs: the first, then how many more', () => {
     expect(plain(catchUpLine(one([1, 3, 5, 7], 1))!.title)).toBe('Missed yesterday · Revise Al-Fatihah and 3 more');
-    expect(plain(catchUpLine(one([563, 559, 561], 1))!.title)).toBe('Missed yesterday · Revise the end of At-Talaq and 2 more');
+    expect(plain(catchUpLine(one([563, 559, 561], 1))!.title)).toBe('Missed yesterday · Revise At-Talaq, last page and 2 more');
   });
 
   it('never a page number', () => {

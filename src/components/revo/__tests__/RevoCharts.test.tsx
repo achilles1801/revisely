@@ -542,7 +542,7 @@ describe('memorized by month', () => {
     layout('revo-chart-memorized-plot', 360, 120);
     await tap('revo-chart-memorized-plot-tap', 10.5 * 30);
     expect(text('revo-chart-memorized-title')).toBe('October · 4 pages');
-    expect(text('revo-chart-memorized-line')).toBe("Al-Ma'idah 32–50");
+    expect(text('revo-chart-memorized-line')).toBe("Al-Ma'idah, 8th to 11th page");
     fireEvent.press(screen.getByTestId('revo-chart-memorized-day-2026-10-13'));
     expect(onOpenDay).toHaveBeenCalledWith('2026-10-13');
     // A month with nothing: it says so.

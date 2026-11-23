@@ -707,7 +707,7 @@ describe('Home in the new design (a feed)', () => {
     expect(screen.getByText('Karim')).toBeTruthy();
     expect(screen.getByText('Today · 7-day streak')).toBeTruthy();
     // In progress: where to carry on, then how far today has got.
-    expect(screen.getByTestId('today-title')).toHaveTextContent(held(`Continue at Adh-Dhariyat, ayah${NBSP}31`), {
+    expect(screen.getByTestId('today-title')).toHaveTextContent(held(`Continue at Juz${NBSP}27`), {
       exact: false,
     });
     expect(screen.getByTestId('today-progress')).toHaveTextContent('2 of 3');
@@ -812,8 +812,9 @@ describe('Home in the new design (a feed)', () => {
     const menu = screen.getByTestId('today-menu');
     // The exact ranges in the header, surahs first and the pages a quiet detail; it grows no further than the rows (1.4).
     expect(
-      within(menu).getByText('Qaf 36 to Adh-Dhariyat 51 · Juz 26–27 · pp. 520–522', { normalizer: plainText }).props
-        .maxFontSizeMultiplier,
+      within(menu).getByText('Qaf, last page to Adh-Dhariyat, 3rd page · Juz 26–27 · pp. 520–522', {
+        normalizer: plainText,
+      }).props.maxFontSizeMultiplier,
     ).toBe(1.4);
     expect(within(menu).getByText('Jump to…')).toBeTruthy();
     expect(within(menu).getByText('Start today at another juz, surah or page')).toBeTruthy();
@@ -871,7 +872,7 @@ describe('Home in the new design (a feed)', () => {
     await act(async () => {});
     const summary = screen.getByTestId('today-summary');
     expect(summary.props.accessibilityRole).toBe('button');
-    expect(summary.props.accessibilityLabel).toBe('Continue at Adh-Dhariyat, ayah 31. 2 of 3 pages done');
+    expect(summary.props.accessibilityLabel).toBe('Continue at Juz 27. 2 of 3 pages done');
     expect(summary.props.accessibilityHint).toBe('Jump to another start, or edit the schedule');
     expect(screen.getByTestId('today-memorized').props.accessibilityLabel).toBe(
       '27.5% of the Quran memorized. Edit memorized pages',

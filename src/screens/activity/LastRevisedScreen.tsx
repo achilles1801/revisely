@@ -34,7 +34,7 @@ import { t } from '../../i18n';
 import { revisablePages } from '../../lib/memorizedAyahs';
 import { coverageSince, lastRevisedDay } from '../../lib/recency';
 import { journalFirstDay } from '../../lib/journal';
-import { ayahsInSurah, describePassage, pagesNote, spokenText } from '../../lib/passages';
+import { partOfSurah, describePassage, pagesNote, spokenText } from '../../lib/passages';
 import {
   lastRevisedPrefsKey,
   lastRevisedRows,
@@ -158,7 +158,7 @@ export default function LastRevisedScreen() {
       const p = item.page;
       const row = item.row;
       // A surah's page by its ayahs (the row names the surah); a juz's or hizb's by its surah and ayahs.
-      const name = (row.view === 'surah' ? ayahsInSurah(row.number, [p.page]) : '') || describePassage([p.page], { form: 'compact' });
+      const name = (row.view === 'surah' ? partOfSurah(row.number, [p.page]) : '') || describePassage([p.page], { form: 'compact' });
       return (
         <PageLine
           name={name}

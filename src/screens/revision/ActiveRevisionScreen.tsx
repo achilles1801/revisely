@@ -54,7 +54,7 @@ import { catchUpDayOf, duePagesOf, insightsPagesOn } from '../../lib/carryOver';
 import { revisablePages } from '../../lib/memorizedAyahs';
 import { creditedOnDay, doneOnDay, sessionCredit } from '../../lib/aheadCredit';
 import { aheadDayLabel, nextRevisionDayPlan, revisionDayPlan, startsCycle, type RevisionDayPlan } from '../../lib/aheadPlan';
-import { describePageRange, describePassage, surahName, surahNamesOfPage, surahsOfPages } from '../../lib/passages';
+import { describePageRange, describePassage, surahName, surahsOfPages } from '../../lib/passages';
 import {
   getHizbForPage,
   getQuranData,
@@ -867,9 +867,9 @@ export default function ActiveRevisionScreen() {
                 maxFontSizeMultiplier={1.3}
                 testID="session-page"
               >
-                {/* What the page holds, by surah name alone; the printed page number is under the page. */}
+                {/* Which page of its surah; the printed page number is under the page. */}
                 {t('revision.session.where', {
-                  what: surahNamesOfPage(displayPageNumber),
+                  what: describePageRange(displayPageNumber, displayPageNumber),
                   juz: currentJuz,
                   hizb: currentHizb,
                 })}

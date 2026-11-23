@@ -97,11 +97,11 @@ describe('the blocks as mock d1 and d2 read them', () => {
   const items = firestoreService.getActivityItemsForDay as jest.Mock;
   const assigned = Array.from({ length: 20 }, (_, i) => 522 + i);
 
-  it('Memorized: its chip and sub-line name the surah, not the page ("Start of Al-Mulk", "Al-Mulk 1–12 · 25 min")', async () => {
+  it('Memorized: its chip and sub-line name the surah and which page of it ("Al-Mulk, 1st page · 25 min")', async () => {
     items.mockResolvedValueOnce({ revisions: [], memorized: [{ id: '2026-11-03', day: '2026-11-03', pages: [562], minutes: 25 }], reads: [], doneAhead: [] });
     render(<DayBlocks {...base} day="2026-11-03" today="2026-11-03" />);
-    expect(await screen.findByText('Start of Al-Mulk', { normalizer: plainText })).toBeTruthy();
-    expect(screen.getByText('Al-Mulk 1–12 · 25 min', { normalizer: plainText })).toBeTruthy();
+    expect(await screen.findByText('Al-Mulk, 1st page', { normalizer: plainText })).toBeTruthy();
+    expect(screen.getByText('Al-Mulk, 1st page · 25 min', { normalizer: plainText })).toBeTruthy();
     expect(screen.queryByText(/p\. 562|Page 562/)).toBeNull();
   });
 
@@ -117,7 +117,7 @@ describe('the blocks as mock d1 and d2 read them', () => {
       doneAhead: [],
     });
     render(<DayBlocks {...base} day="2026-11-03" today="2026-11-03" />);
-    expect(await screen.findByText('Al-Mulk, ayahs 1–26', { normalizer: plainText })).toBeTruthy();
+    expect(await screen.findByText('Al-Mulk, first 2 pages', { normalizer: plainText })).toBeTruthy();
     expect(screen.getByText('Timed in Read')).toBeTruthy();
     expect(screen.getByText('2 pages')).toBeTruthy();
   });
@@ -133,7 +133,7 @@ describe('the blocks as mock d1 and d2 read them', () => {
       doneAhead: [{ fromDay: '2026-11-01', pages: [542] }],
     });
     render(<DayBlocks {...base} day="2026-11-03" today="2026-11-03" />);
-    expect(await screen.findByText('Ahead for Wednesday 4 November: Al-Mulk 1–26', { normalizer: plainText })).toBeTruthy();
+    expect(await screen.findByText('Ahead for Wednesday 4 November: Al-Mulk, first 2 pages', { normalizer: plainText })).toBeTruthy();
     expect(screen.getByText('Catch-up for Monday 2 November: At-Taghabun', { normalizer: plainText })).toBeTruthy();
     expect(screen.getByText(`Done ahead on Sunday 1 November: ${plainText(describePassage([542], { form: 'compact' }))}`, { normalizer: plainText })).toBeTruthy();
     expect(screen.queryByText(/\d{4}-\d{2}-\d{2}/)).toBeNull();

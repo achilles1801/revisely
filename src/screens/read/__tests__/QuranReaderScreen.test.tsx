@@ -253,7 +253,7 @@ describe('QuranReaderScreen: a sitting, the timer and a recording (REC-1)', () =
     mockState.timer = runningOn(3);
     await endTheTimer();
     expect(mockState.calls).toEqual(['recording saved', 'timer saved']);
-    expect(screen.getByText(/^Saved to (today|Tuesday): Al.Baqarah, ayahs 6–16, 41 min$/)).toBeTruthy();
+    expect(screen.getByText(/^Saved to (today|Tuesday): Al.Baqarah, 2nd.page, 41 min$/)).toBeTruthy();
     expect(screen.queryByText('Recording saved')).toBeNull();
   });
 

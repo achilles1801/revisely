@@ -27,7 +27,7 @@ appId: com.revisionbuddy.app
 - runFlow: ../subflows/show-controls.yaml
 - assertVisible:
     id: session-page
-    text: "An.Naba · Juz 30 · .*"
+    text: "An.Naba, 1st.page · Juz 30 · .*"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
@@ -81,7 +81,7 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: session-page
-    text: "At.Tariq and Al.A'la · .*"
+    text: "At.Tariq · .*"
 - runFlow:
     file: ../subflows/shot.yaml
     env:

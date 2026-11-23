@@ -46,7 +46,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: today-title
-      text: "Continue at An.Nazi.at, ayah.16[^0-9]*"
+      text: "Continue at An.Nazi.at, last.page[^0-9]*"
     timeout: 10000
 - assertVisible:
     id: offline-note
@@ -66,7 +66,7 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: today-title
-      text: "Continue at An.Nazi.at, ayah.16[^0-9]*"
+      text: "Continue at An.Nazi.at, last.page[^0-9]*"
     timeout: 20000
 - assertVisible:
     id: offline-note
@@ -108,4 +108,4 @@ appId: com.revisionbuddy.app
       PAGES: 3
 - assertVisible:
     id: today-title
-    text: "Continue at An.Nazi.at, ayah.16[^0-9]*"
+    text: "Continue at An.Nazi.at, last.page[^0-9]*"

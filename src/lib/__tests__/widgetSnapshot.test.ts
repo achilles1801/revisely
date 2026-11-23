@@ -185,8 +185,8 @@ describe('buildWidgetSnapshot', () => {
       status: [10, 11, 50, 90].includes(p.pageNumber) ? 'memorized' : 'not_memorized',
     })) as UserPage[];
     const snap = buildWidgetSnapshot(inputs({ pages: scattered, user: { ...user, dailyPageCapacity: 4 } }));
-    expect(plainText(snap.days[0].title)).toBe('Al-Baqarah 62–76, then 2 more');
-    expect(plainText(snap.days[0].short)).toBe('Al-Baqarah 62');
+    expect(plainText(snap.days[0].title)).toBe('Al-Baqarah, 9th to 10th page, then 2 more');
+    expect(plainText(snap.days[0].short)).toBe('Al-Baqarah, 9th page');
   });
 });
 

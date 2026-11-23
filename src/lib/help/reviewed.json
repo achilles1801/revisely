@@ -36,14 +36,14 @@
   "reader.turning": {},
   "reader.recitation": {},
   "reader.sitting": {
-    "REC-1": "dec0b6f83b53c68a",
-    "REC-2": "06be0811d7eedf49",
+    "REC-1": "a862b6861cbd8a65",
+    "REC-2": "89b0e5f74e690dbb",
     "MEM-5": "2b610dd93d4012d9",
     "DAY-9": "d1f48e9dc60411f1"
   },
   "reader.recite": {
-    "REC-1": "dec0b6f83b53c68a",
-    "REC-2": "06be0811d7eedf49"
+    "REC-1": "a862b6861cbd8a65",
+    "REC-2": "89b0e5f74e690dbb"
   },
   "recite.start": {
     "RECITE-1": "c93d694c7ccaddb2"
@@ -130,7 +130,7 @@
   },
   "insights.coverage": {
     "ACT-4": "9105a4f613b7539e",
-    "ACT-21": "b309872a5b9f1cb8",
+    "ACT-21": "bdfe7e3c3e197fff",
     "ACT-22": "fc6eb76cdbb3b866",
     "ACT-26": "dc4513b928f78113"
   },
@@ -142,7 +142,7 @@
     "ACT-12": "7646aee12139e593",
     "ACT-8": "17530ba6416770ba",
     "ACT-20": "e576925144fbc092",
-    "ACT-24": "84ed5272370beade"
+    "ACT-24": "97518d90d9c910be"
   },
   "insights.pace": {
     "ACT-4": "9105a4f613b7539e",

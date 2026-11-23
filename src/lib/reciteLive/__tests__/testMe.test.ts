@@ -77,7 +77,7 @@ describe('Test me: where it starts (Majd, Nov 15 2026)', () => {
 
   it('names the place by its surah and ayahs', () => {
     const [p] = testPlaces(surah(67), words, { places: 1, random: () => 0 });
-    expect(plainText(testPlaceName(p))).toBe('Al-Mulk, ayahs 1–3');
+    expect(plainText(testPlaceName(p))).toBe('Al-Mulk, 1st page · start');
   });
 });
 

@@ -127,11 +127,11 @@ describe('the take summary with screen readers and the largest text', () => {
 
   it('a finding says its ayah; when the take ran into the next surah, the surah too', () => {
     expect(findingPlace(wrong(A23, [27, 23]), false)).toBe('ayah 23');
-    expect(plainText(findingPlace(wrong(Q1, [28, 1]), true))).toBe('Al-Qasas, ayah 1');
+    expect(plainText(findingPlace(wrong(Q1, [28, 1]), true))).toBe('Al-Qasas, 1st page · start');
     show({ to: Q1 + 4, marks: [wrong(A23 + 3, [27, 23]), wrong(Q1, [28, 1])] });
     const titles = screen.getAllByTestId('take-summary-finding-title').map((t) => plainText(flat(t.props.children)));
-    expect(titles).toEqual(['Wrong word · An-Naml, ayah 23', 'Wrong word · Al-Qasas, ayah 1']);
-    expect(screen.getAllByRole('button', { name: /Al-Qasas, ayah 1\. Show it on the page/ })).toHaveLength(1);
+    expect(titles).toEqual(['Wrong word · An-Naml, 3rd page · start', 'Wrong word · Al-Qasas, 1st page · start']);
+    expect(screen.getAllByRole('button', { name: /Al-Qasas, 1st page · start\. Show it on the page/ })).toHaveLength(1);
   });
 
   it('the score is read as one: the score and the mistakes', () => {
@@ -147,7 +147,7 @@ describe('the take summary with screen readers and the largest text', () => {
     });
     expect(AccessibilityInfo.announceForAccessibilityWithOptions).toHaveBeenCalledTimes(1);
     const [said, opts] = (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mock.calls[0];
-    expect(said).toMatch(/^Your recitation\. An-Naml, ayahs 23 to 2\d\. 1 minute 42 seconds\. 96%, 1 mistake$/);
+    expect(said).toMatch(/^Your recitation\. An-Naml, 3rd page · start\. 1 minute 42 seconds\. 96%, 1 mistake$/);
     expect(opts).toEqual({ queue: true });
   });
 
@@ -163,7 +163,7 @@ describe('the take summary with screen readers and the largest text', () => {
       for (const m of screen.UNSAFE_getAllByType(Modal)) if (m.props.visible !== false) m.props.onShow?.();
     });
     const [said] = (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mock.calls.at(-1)!;
-    expect(said).toMatch(/^Your recitation\. An-Naml, ayahs 23 to 2\d\. 1 minute 42 seconds$/);
+    expect(said).toMatch(/^Your recitation\. An-Naml, 3rd page · start\. 1 minute 42 seconds$/);
   });
 
   it('“not clear” findings come last, each saying it isn’t counted, and the mistakes leave them out', () => {

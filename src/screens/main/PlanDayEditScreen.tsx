@@ -21,7 +21,7 @@ import {
   pageCountLabel,
   summarizeDay,
 } from '../../lib/planDisplay';
-import { ayahsInSurah, describePassage } from '../../lib/passages';
+import { partOfSurah, describePassage } from '../../lib/passages';
 import {
   applyGroupSelection,
   isGroupFullyIncluded,
@@ -303,7 +303,7 @@ export default function PlanDayEditScreen() {
               <GroupedRow
                 key={s.number}
                 title={s.name}
-                subtitle={`${ayahsInSurah(s.number, s.pages)} · ${pageCountLabel(s.pages.length)}`}
+                subtitle={`${partOfSurah(s.number, s.pages)} · ${pageCountLabel(s.pages.length)}`}
                 leading={
                   editing ? (
                     <Tap

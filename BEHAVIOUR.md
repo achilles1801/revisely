@@ -467,14 +467,14 @@ current basic sounds". October 2026's version was removed for the voices it offe
   was on").
 - **REC-1.** A sitting in the reader: ending the timer while a recording runs, or is paused,
   ends both. The recording is saved first, then the timed sitting. One note says what was saved, by
-  surah and ayah, and opens its day: "Saved to today: Al-Mulk, ayahs 1–26, 41 min · Undo · View". Its
+  surah and page, and opens its day: "Saved to today: Al-Mulk, first 2 pages, 41 min · Undo · View". Its
   Undo takes back the sitting and the recording that ended with it, as the day's Delete session does; the
   recording uploads only once the note has gone, so an undone one never leaves the phone. It takes the
   place of the "Session saved" alert and the "Recording saved" note. The sitting is named by the pages
   it held, each on screen a minute or more (time paused doesn't count); a page only glanced at isn't
   named. Stopping only the recording leaves the timer running.
 - **REC-2.** A sitting in the reader is saved with the pages it held, so the Day's Read block
-  counts them and names the sitting by them ("2 pages · Al-Mulk 1–26", the row "Al-Mulk, ayahs 1–26").
+  counts them and names the sitting by them ("2 pages · Al-Mulk, first 2 pages", the row "Al-Mulk, first 2 pages").
   Pages marked revised while it ran come first, and the pages can still be edited. A sitting with no
   pages known reads "Timed in Read".
 - **REC-3.** On today or yesterday in Activity, a sitting from the reader with nothing left to
@@ -556,7 +556,7 @@ has them.
   ("24 Oct · 22 days ago", "14 Nov · yesterday", "Today"). A tap opens it to those pages, in the same order, drawn as
   part of it (Majd: "it's hard to tell which card falls under what when a user opens up a surah"): no disc, indented
   to its name, the thread line from its disc running down through them, one line each with how long ago ("6 days
-  ago"; a surah's pages named by their ayahs alone, "Ayahs 1–5 · p. 2"), and no separator until the group ends. In
+  ago"; a surah's pages named by which of its pages, "1st page · p. 2"), and no separator until the group ends. In
   Pages, each page is one line with its date. A page opens the reader there. A page never revised waits from the day
   it was memorized: "Not revised yet" for its first 30 days, "Never revised" after (ACT-25). Recency only, the same
   with Smart Tracking on or off (ACT-19). (Majd, Nov 16 2026: "being able to click on a page or surah or juz or hizb
@@ -1083,7 +1083,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
 - **ACT-21.** One juz opens in a sheet from its Coverage tile, from the untouched row (whose Plan it stays its
   own button), and from a day's Revised block (the juz most of its pages were in). It names the juz by its
   surahs and says when a memorized page of it was last revised and on how many days in the last 30. A strip
-  of its pages and a row per surah follow: strength with Smart Tracking ("Ayahs 17–24 weak", "Strong ·
+  of its pages and a row per surah follow: strength with Smart Tracking ("Last page weak", "Strong ·
   skipped 3 times"), recency without it ("Last revised 3 days ago · twice in 30 days", the wording Revo uses:
   lib/recency; ACT-19). A page, a row and Open in the
   reader open the reader there, once the sheet has gone; a stale juz offers Plan it for tomorrow first.
@@ -1141,7 +1141,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   only when it is saved (Majd, Nov 8 2026: "a temp change by default with the option to make it a perm
   change"; Plan it used to open that day with the juz alone, and saving replaced the day). The session
   names them ("From Insights: Juz 1"; it said "the weak pages" whatever put them there), and Home says
-  "2 from Insights first". A toast confirms it ("Al-Hashr 17–24 goes first tomorrow"; several passages lead
+  "2 from Insights first". A toast confirms it ("Al-Hashr, last page goes first tomorrow"; several passages lead
   with the outcome, "6 pages go first tomorrow: …"; Undo puts the carry back as it was), and the button
   becomes "First tomorrow ✓", which can't be tapped again. (Majd, Nov 8 2026: "the buttons on the activity
   screen don't work": they saved, silently.)
@@ -1511,7 +1511,7 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 - **MEM-7.** The juz sheet shows a juz being learned (Activity). A page memorized in part is
   filled by the share of it that is memorized ("Part of a page" in the legend). A surah with ayahs
   memorized on such a page reads what is memorized and what is to go ("Ayahs 1–20 · 21–30 to go"),
-  and opens the reader where it goes on. The sheet says what is learned so far ("Al-Mulk 1–20 so far"):
+  and opens the reader where it goes on. The sheet says what is learned so far ("Al-Mulk, first 2 pages so far"):
   as its headline, "Being learned", while nothing of the juz has been revised yet, and on a line of its
   own after that. Its button is Continue at the first ayah not memorized ("Continue at Al-Mulk 21").
   A page marked in progress with no ayahs saved has nothing memorized, and reads as not memorized.
@@ -1584,16 +1584,18 @@ shows up once and they must go through it and complete it … just the main stuf
 
 ## Naming the Qur'an
 
-- **NAME-1.** The app names a part of the Qur'an by its surahs and juz, never by its page numbers
-  (the owner, Nov 7 2026; `lib/passages`): Home's Today post ("Starts at An-Naba", "Continue at
-  Al-Hashr, ayah 17", "Tomorrow starts at …"), its catch-up line, the recent sessions and See all
-  ("Juz 28 · 41 min", "Al-Baqarah 142–176"), the session's end card ("Revision complete", "An-Naba to
-  At-Takwir", "5 pages revised today") and Keep going. Amounts are fine ("20 pages"). Page numbers
-  stay only as a quiet detail after the words (the › sheet's "… · pp. 542–561"), inside the reader
-  and the session (the printed page), and where the user chooses by page (Jump to's Page tab, From
-  and To). Any ayahs, not only whole pages, are named the same way: whole surahs and juz by name,
-  the rest by surah and ayah ("Al-Mulk, ayahs 1–20", "Al-Mulk 27 to Al-Qalam 15"). Whole pages and
-  the ayahs they hold read alike.
+- **NAME-1.** The app names a part of the Qur'an the way people revise and memorize it: by surah or juz and which page
+  of it, almost never by ayah numbers (`lib/passages`; Majd, Nov 23 2026: "almost no one references the quran by ayah
+  numbers when it comes to revising or memorizing ... it should just be the page"). One page is "Maryam, 5th page" (its
+  first "1st page", its last "last page"; a surah of a page or less, its name alone). A run is "Maryam, 3rd to 5th page",
+  "Maryam, first 3 pages", "Maryam, last 3 pages", and at a juz's edge "Juz 2, first 5 pages". Across surahs it is the
+  names, "Maryam to Ta-Ha"; only the › sheet's header gives the page at each end. Part of a page reads "Maryam, 3rd page ·
+  start" (or middle, or end). A page holding two surahs counts for both, and alone is named by the one it opens with, else
+  the one that fills more of it. A place to start is the surah or juz the page opens, else its page: "Starts at Al-Mujadila", "Tomorrow starts at
+  Juz 2", "Continue at Al-Hashr, 3rd page". Amounts are fine ("20 pages"). The mushaf's page numbers stay a quiet detail
+  (the › sheet's "… · pp. 542–561"), inside the reader and the session, and where the user chooses by page (Jump to's Page
+  tab, From and To). Ayah numbers stay only where a verse is cited or played: a held verse, search results, Audio Options
+  and "Play from", and for now the Memorized sheet's picker, which is being rebuilt.
 
 ## Language and layout
 

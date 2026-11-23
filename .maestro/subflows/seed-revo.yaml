@@ -13,5 +13,5 @@ appId: com.revisionbuddy.app
 - extendedWaitUntil:
     visible:
       id: today-title
-      text: "Continue at Al.Hashr, ayah.17[^0-9]*"
+      text: "Continue at Al.Hashr, last.page[^0-9]*"
     timeout: 20000

@@ -654,11 +654,11 @@ describe('memorized pages a custom plan doesn’t hold (MEM-6)', () => {
     });
   };
 
-  it('[MEM-6] an account that isn’t a tester sees them, named by their ayahs, and adds them to tomorrow’s pages', async () => {
+  it('[MEM-6] an account that isn’t a tester sees them, named by their surahs and pages, and adds them to tomorrow’s pages', async () => {
     withPlan();
     await mount(<PlanEditScreen />);
     expect(screen.getByText('Not in your plan')).toBeTruthy();
-    expect(screen.getByText(/Al.Baqarah .* and An.Nas/)).toBeTruthy();
+    expect(screen.getByText(/Al.Baqarah.* and An.Nas/)).toBeTruthy();
     expect(within(screen.getByTestId('plan-not-in-plan')).getByText('3 pages')).toBeTruthy();
     fireEvent.press(screen.getByTestId('plan-not-in-plan'));
     await act(async () => {});

@@ -106,8 +106,8 @@ describe('Insights: Recitation (RINS-2)', () => {
     expect(text('insights-recitation-weeks')).toBe('Up from 98.0% last week | 98.0% | 98.3% | 3 Nov | This week');
     // Al-Kahf 22–23: a wrong word, a harakat slip and a Not clear letter still marked (RMEM-2: Not clear is remembered
     // like a slip, never counted).
-    expect(text('insights-recitation-slip-18-22')).toContain('Al-Kahf, ayahs 22–23 | 3 words still marked · wrong in 3 of 4 takes');
-    expect(text('insights-recitation-slip-2-48')).toContain('Al-Baqarah, ayah 48 | 1 word still marked · wrong in 2 of 2 takes');
+    expect(text('insights-recitation-slip-18-22')).toContain('Al-Kahf, 4th page · middle | 3 words still marked · wrong in 3 of 4 takes');
+    expect(text('insights-recitation-slip-2-48')).toContain('Al-Baqarah, 6th page · end | 1 word still marked · wrong in 2 of 2 takes');
     expect(text('insights-recitation-similar-2-48')).toBe('Al-Baqarah 48 → 123 | You went on with the similar ayah · twice, last yesterday');
     // Words first; the Not clear letter in Al-Kahf 23 never counted. Nothing cleared yet, so one line.
     expect(text('insights-recitation-quiet')).toBe('Mostly words: 4 wrong · 1 skipped · 1 harakat. 1 wasn’t clear enough to check (not counted).');
@@ -125,7 +125,7 @@ describe('Insights: Recitation (RINS-2)', () => {
 
   it('[RINS-2] Smart Tracking on: a passage rated strong that still slips is named, and Weak spots count Recite’s marks', async () => {
     await open(data());
-    expect(text('insights-recitation-strong-2-48')).toBe('Al-Baqarah, ayah 48 | Rated strong · wrong in 2 takes');
+    expect(text('insights-recitation-strong-2-48')).toBe('Al-Baqarah, 6th page · end | Rated strong · wrong in 2 takes');
     expect(screen.queryByTestId('insights-recitation-strong-18-22')).toBeNull();
     expect(text(`weak-spot-${KAHF_PAGE}`)).toContain('3 words still marked in Recite');
   });

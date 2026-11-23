@@ -175,7 +175,7 @@ describe('the juz sheet', () => {
     fireEvent.press(screen.getByTestId('juz-tile-29'));
     await flush();
     expect(screen.getByTestId('juz-sheet-headline').props.children).toBe('Being learned');
-    expect(plainText(String(screen.getByTestId('juz-sheet-learning').props.children)).trim()).toBe('Al-Mulk 1–20 so far');
+    expect(plainText(String(screen.getByTestId('juz-sheet-learning').props.children)).trim()).toBe('Al-Mulk, first 2 pages so far');
     // The page in part is filled by how much of it is memorized; the legend says what that means.
     const fill = Number(String(screen.getByTestId('juz-cell-part-563').props.style.flat().find((x: { height?: string }) => x?.height)?.height).replace('%', ''));
     expect(fill).toBeGreaterThan(40);
