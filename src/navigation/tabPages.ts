@@ -4,13 +4,16 @@
 // Insights tab isn't a route at all (ACT-12; Majd, Nov 6 2026). The Insights tab is what an account
 // without them had, and would have again if the blocks were gated.
 
+// Revisely Dev's Activity tab (TAB-2, lib/activityTab): with its switch on, Activity is a tab of its own between Home
+// and Read, and Home's top bar loses its pulse button.
+
 /**
- * How many tabs, from the first, are in the pager: Home and Read, and Insights
- * only while it is a tab and Smart Tracking is on. Off, Read is the last page
- * (navigation/PagerTabs lays out nothing past it).
+ * How many tabs, from the first, are in the pager: Home and Read (with Activity between them while it is a tab), and
+ * Insights only while it is a tab and Smart Tracking is on. Off, Read is the last page (navigation/PagerTabs lays out
+ * nothing past it).
  */
-export function swipeableTabCount(smartTrackingEnabled: boolean, insightsInActivity = false): number {
-  return smartTrackingEnabled && !insightsInActivity ? 3 : 2;
+export function swipeableTabCount(smartTrackingEnabled: boolean, insightsInActivity = false, activityTab = false): number {
+  return (smartTrackingEnabled && !insightsInActivity ? 3 : 2) + (activityTab ? 1 : 0);
 }
 
 /**
@@ -34,8 +37,20 @@ export function insightsTab(
   };
 }
 
-/** The tab routes, in order: Insights only for an account whose Insights aren't in Activity. */
-export function mainTabRoutes(insightsInActivity: boolean): ('Home' | 'Read' | 'Insights')[] {
-  return insightsInActivity ? ['Home', 'Read'] : ['Home', 'Read', 'Insights']; // i18n-ignore (route names)
+export type MainTabRoute = 'Home' | 'ActivityTab' | 'Read' | 'Insights';
+
+/**
+ * The tab routes, in order: Activity between Home and Read while it is a tab (Revisely Dev's switch, TAB-2), and
+ * Insights only for an account whose Insights aren't in Activity.
+ */
+export function mainTabRoutes(insightsInActivity: boolean, activityTab = false): MainTabRoute[] {
+  // i18n-ignore-start (route names)
+  return [
+    'Home',
+    ...(activityTab ? (['ActivityTab'] as const) : []),
+    'Read',
+    ...(insightsInActivity ? [] : (['Insights'] as const)),
+  ];
+  // i18n-ignore-end
 }
 

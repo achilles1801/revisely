@@ -479,6 +479,17 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- It never shows over the Qur’an’s pages, a revision session’s pages or a Recite take. With Reduce Motion on, it stays still.',
     ),
   },
+  {
+    // Majd, Nov 23 2026: Activity as a tab of its own, to compare with the button at the top of Home; Revisely Dev only.
+    title: 'Activity as a tab',
+    covers: ['TAB-2'],
+    routes: ['Settings', 'Activity', 'Dashboard'],
+    text: lines(
+      '- Settings → Appearance → “Activity tab” makes Activity a tab of its own, between Home and Read, so they can compare it with opening Activity from the top of Home. It’s off until they turn it on, and that choice stays on that phone only.',
+      '- With it on, the tab bar is Home, Activity (the pulse icon), Read, in that order for swiping too, and Home’s top bar has only the compass and the gear. Activity works as before (Overview and Insights, a day, See all), each opened inside its tab; tapping the Activity tab again goes back to its start. A sideways swipe on the calendar’s days still changes the month or week.',
+      '- With it off, Activity opens from the pulse icon at the top of Home, as described in the main guide.',
+    ),
+  },
 ];
 
 /**

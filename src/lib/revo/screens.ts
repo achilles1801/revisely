@@ -3,6 +3,7 @@
 
 import { getJuzRange, getSurah } from '../quranData';
 import { requestPrayerSheet } from '../widgets/links';
+import { activityTabOn } from '../activityTab';
 import { REVO_SCREENS, REVO_SETTINGS_SECTIONS, type RevoAction, type RevoScreen } from './types';
 import { t } from '../../i18n';
 
@@ -25,8 +26,8 @@ export function knownAction(a: RevoAction | null | undefined): a is RevoAction {
 
 /** What opening a screen does: a navigation, and a sheet over Home afterwards. */
 export interface ScreenTarget {
-  /** navigation.navigate(name, params) */
-  name: 'Home' | 'Read';
+  /** navigation.navigate(name, params); ActivityTab is Activity's own tab (Revisely Dev, TAB-2). */
+  name: 'Home' | 'ActivityTab' | 'Read';
   params: { screen: string; params?: object; initial?: false };
   /** Opened over Home once it shows. */
   sheet?: 'jumpTo' | 'prayerTimes' | 'qibla';
@@ -40,7 +41,7 @@ function readerPage(a: OpenScreen): number | null {
 }
 
 // i18n-ignore-start (route names)
-export function screenTarget(a: OpenScreen): ScreenTarget {
+export function screenTarget(a: OpenScreen, activityTab = activityTabOn()): ScreenTarget {
   // `initial: false` keeps Home beneath, so Back comes home.
   const home = (screen: string, params?: object): ScreenTarget => ({ name: 'Home', params: { screen, ...(params ? { params } : {}), initial: false } });
   switch (a.screen) {
@@ -56,7 +57,8 @@ export function screenTarget(a: OpenScreen): ScreenTarget {
       return home('Memorization', { edit: true });
     case 'activity':
     case 'insights':
-      return home('Activity');
+      // Activity's own tab while it is one (Revisely Dev's switch, TAB-2), else on top of Home.
+      return activityTab ? { name: 'ActivityTab', params: { screen: 'Activity' } } : home('Activity');
     case 'dailyLog':
       // No date: today's revision day.
       return home('JournalEntry', {});

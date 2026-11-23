@@ -8,7 +8,7 @@ import { loadRevoMomentSeen, markRevoMomentSeen, revoMomentSeen } from '../../li
 import { RevoMoment } from '../whatsNew/RevoMoment';
 import { auth } from '../../lib/firebase';
 import { logger } from '../../lib/logger';
-import { navigationRef } from '../../navigation/navigationRef';
+import { navigationRef, navigateToActivityDay } from '../../navigation/navigationRef';
 import { useTabBarHeight } from '../../navigation/TabBar';
 import { MINI_PLAYER_GAP, MINI_PLAYER_HEIGHT } from '../player/MiniPlayer';
 import { useMiniPlayer } from '../../lib/nowPlaying';
@@ -485,7 +485,8 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
               onAction={doAction}
               onOpenDay={(date) => {
                 close();
-                if (navigationRef.isReady()) navigationRef.navigate('Home', { screen: 'ActivityDay', params: { date }, initial: false });
+                // On the Home stack, or on Activity's own tab while it is one (Revisely Dev, TAB-2).
+                navigateToActivityDay(date);
               }}
               onOff={() => {
                 setView({ name: 'optin' });
