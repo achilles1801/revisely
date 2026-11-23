@@ -1486,6 +1486,10 @@ export default function SettingsScreen() {
             setPrayerSheet(null);
             navigation.navigate('PrayerCalculation');
           }}
+          onOpenVoice={(prayer) => {
+            setPrayerSheet(null);
+            navigation.navigate('AthanVoice', { prayer });
+          }}
         />
       ) : null}
 

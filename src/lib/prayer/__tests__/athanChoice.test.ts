@@ -1,4 +1,4 @@
-import { athanChoices, athanVoiceFor, athanVoicesFor, chosenAthanVoiceId, withAthanVoice } from '../athanChoice';
+import { athanChoices, athanDownloadsFor, athanVoiceFor, athanVoicesFor, chosenAthanVoiceId, chosenAthanVoiceIds, withAthanVoice } from '../athanChoice';
 import type { AthanVoice } from '../../athan/catalog';
 import { DEFAULT_PRAYER_PREFS } from '../prefs';
 
@@ -24,15 +24,49 @@ const VOICES: AthanVoice[] = [
   voice('makkah-fajr', 'makkah', { fajr: true, provenance: 'unclear' }),
   voice('madinah-fajr', 'madinah', { fajr: true, clip: null, provenance: 'unclear' }),
   voice('aqsa-maghrib', 'aqsa', { provenance: 'unclear' }),
+  voice('ayasofya-fajr', 'turkiye', { fajr: true }),
+  voice('madinah-surayhi', 'madinah-two'),
+  voice('madinah-sunbul', 'madinah-two'),
+  voice('madinah-sunbul-fajr', 'madinah-two', { fajr: true }),
 ];
+const ayasofya = VOICES[5];
+const sunbul = VOICES[7];
 const makkah = VOICES[1];
 const aqsa = VOICES[4];
 
 describe('athanChoices', () => {
-  it('lists the voices with a notification clip; a style’s Fajr athan goes with its voice', () => {
-    const { choices, listenOnly } = athanChoices(VOICES);
-    expect(choices.map((v) => v.id)).toEqual(['makkah-regular', 'aqsa-maghrib']);
-    expect(listenOnly.map((v) => v.id)).toEqual(['tr-gocek-fajr', 'madinah-fajr']);
+  it('one list: every voice with a notification clip; a style’s Fajr athan goes with its voice; a Fajr athan alone is an entry', () => {
+    expect(athanChoices(VOICES).map((v) => v.id)).toEqual(['makkah-regular', 'aqsa-maghrib', 'ayasofya-fajr', 'madinah-surayhi', 'madinah-sunbul']);
+    // Opened from a prayer other than Fajr: no Fajr athan.
+    expect(athanChoices(VOICES, 'asr').map((v) => v.id)).toEqual(['makkah-regular', 'aqsa-maghrib', 'madinah-surayhi', 'madinah-sunbul']);
+    expect(athanChoices(VOICES, 'fajr').map((v) => v.id)).toContain('ayasofya-fajr');
+  });
+});
+
+describe('a Fajr athan that stands alone', () => {
+  it('chosen for every prayer, it is Fajr’s voice and nothing else changes; both it and the other prayers’ voice are ticked', () => {
+    const all = withAthanVoice(DEFAULT_PRAYER_PREFS.alerts, makkah, VOICES);
+    const next = withAthanVoice(all, ayasofya, VOICES);
+    expect(next.fajr).toEqual({ ...all.fajr, voice: 'ayasofya-fajr' });
+    expect(next.dhuhr).toEqual(all.dhuhr);
+    expect([...chosenAthanVoiceIds(next, VOICES)].sort()).toEqual(['ayasofya-fajr', 'makkah-regular']);
+    expect(athanDownloadsFor(ayasofya, VOICES)).toEqual(['ayasofya-fajr']);
+    // A voice's own Fajr athan isn't an entry, so only the voice is ticked.
+    expect([...chosenAthanVoiceIds(all, VOICES)]).toEqual(['makkah-regular']);
+  });
+
+  it('chosen from Fajr’s own picker, it sets Fajr to the athan', () => {
+    const next = withAthanVoice(DEFAULT_PRAYER_PREFS.alerts, ayasofya, VOICES, 'fajr');
+    expect(next.fajr).toMatchObject({ sound: 'athan', voice: 'ayasofya-fajr' });
+    expect([...chosenAthanVoiceIds(next, VOICES, 'fajr')]).toEqual(['ayasofya-fajr']);
+  });
+
+  it('two voices sharing a Fajr athan: the one the prayers use is ticked, not the first of the style', () => {
+    const next = withAthanVoice(DEFAULT_PRAYER_PREFS.alerts, sunbul, VOICES);
+    expect(next.fajr.voice).toBe('madinah-sunbul-fajr');
+    expect([...chosenAthanVoiceIds(next, VOICES)]).toEqual(['madinah-sunbul']);
+    expect(chosenAthanVoiceId(next, VOICES, 'fajr')).toBe('madinah-sunbul');
+    expect(athanDownloadsFor(sunbul, VOICES).sort()).toEqual(['madinah-sunbul', 'madinah-sunbul-fajr']);
   });
 });
 
