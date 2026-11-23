@@ -392,9 +392,9 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['REMIND-2', 'REMIND-5'],
     routes: ['Settings'],
     text: lines(
-      '- The revision reminders: today’s and tomorrow’s as usual, then one each morning for the rest of the week after the app was last open (naming where that day’s revision starts, worded differently each day), then none until it is opened again. Opening the app plans them again from that day. There is no setting for how many.',
+      '- The revision reminders: today’s and tomorrow’s, then one each morning for the rest of the week after the app was last open (naming where that day’s revision starts), then none until it is opened again. There is no setting for how many.',
       '- Settings → Testing → “Scheduled reminders” lists the reminders this phone will show and when; “Show the next one in 5 seconds” shows the next as a real notification.',
-      '- Settings → Reminders → “Revision reminders” is off while the phone refuses Revisely’s notifications, and says so; turning it on then offers “Open Settings” (allow notifications for Revisely there, then turn reminders on). Without notifications allowed, no reminder can come.',
+      '- Settings → Reminders → “Revision reminders” is off while the phone refuses Revisely’s notifications, and says so; turning it on then offers “Open Settings”.',
     ),
   },
   {
@@ -487,8 +487,8 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['THEME-1'],
     routes: ['Settings', 'Dashboard'],
     text: lines(
-      '- Settings → Appearance → “Ramadan theme” dresses the app for Ramadan: light falling softly over the top of Home, lanterns hanging at the top of Home (not while the timer shows there), a crescent by the greeting and string lights along the tab bar. It changes nothing the app does. It’s on until they turn it off there, and that choice stays on that phone only.',
-      '- It never shows over the Qur’an’s pages, a revision session’s pages or a Recite take. With Reduce Motion on, it stays still.',
+      '- Settings → Appearance → “Ramadan theme” adds falling light, lanterns and a crescent at the top of Home and string lights along the tab bar. It changes nothing the app does. On until turned off there, on that phone only.',
+      '- Never over the Qur’an’s pages, a session’s pages or a Recite take.',
     ),
   },
   {
