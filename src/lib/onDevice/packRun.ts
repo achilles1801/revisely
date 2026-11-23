@@ -42,8 +42,27 @@ export const CHECK_EVERY_MS = 24 * 60 * 60 * 1000;
 export const RETRY_MS = [60_000, 5 * 60_000, 15 * 60_000];
 /** A pack damaged on this phone is fetched again at most this many times per version: a failing disk mustn't loop. */
 export const MAX_DAMAGED_REFETCHES = 2;
-/** The callable's answers that mean "not for this account or not yet": no retries today. */
-const NOT_NOW = new Set(['PERMISSION_DENIED', 'FAILED_PRECONDITION', 'UNAUTHENTICATED', 'RESOURCE_EXHAUSTED']);
+/** Why this phone has no pack to fetch: the callable's refusal, or (`bad`) the engine's. No retries today. */
+export type PackRefusal = 'account' | 'app' | 'limit' | 'verify' | 'none' | 'bad';
+
+function refusalOf(err: unknown): PackRefusal | null {
+  const { code, message } = err as { code?: string; message?: string };
+  switch (code) {
+    case 'RESOURCE_EXHAUSTED':
+      return 'limit';
+    case 'UNAUTHENTICATED':
+      return 'verify'; // the sign-in or App Check
+    case 'FAILED_PRECONDITION':
+      return 'none';
+    case 'PERMISSION_DENIED':
+      return message?.includes('This app') ? 'app' : 'account'; // functions/src/recitePack/handler.ts
+    default:
+      return null;
+  }
+}
+
+/** The callable counts a phone's calls by the UTC day (handler.ts `packDay`). */
+const utcDay = (): string => new Date(Date.now()).toISOString().slice(0, 10);
 
 export type PackPhase =
   | 'idle'
@@ -65,6 +84,8 @@ export interface PackStatus {
   bytes: number;
   /** The whole pack, once the callable has said. */
   totalBytes: number;
+  /** With `unavailable`: why, when that is known. */
+  why?: PackRefusal | null;
 }
 
 interface Saved {
@@ -77,6 +98,8 @@ interface Saved {
   badPackEngine?: string | null;
   /** How many times this version has been fetched again after its files were damaged on this phone. */
   damaged?: { packId: string; count: number } | null;
+  /** The UTC day the callable said this account had had enough calls: it isn't asked again that day. */
+  limitDay?: string | null;
 }
 
 let saved: Saved = { auto: true, have: null, checkedAt: 0 };
@@ -96,7 +119,9 @@ let stopping = false;
 
 function publish(next: Partial<PackStatus>): void {
   const merged = { ...status, ...next };
+  if (merged.phase !== 'unavailable') delete merged.why;
   if (
+    (merged.why ?? null) === (status.why ?? null) &&
     merged.phase === status.phase &&
     merged.packId === status.packId &&
     merged.bytes === status.bytes &&
@@ -248,16 +273,17 @@ export function requestPackDownload(): void {
     });
 }
 
-async function askForPack(): Promise<PackAnswer | 'not-now'> {
+async function askForPack(): Promise<PackAnswer | { refused: PackRefusal | null }> {
   const engine = benchEngine();
   const user = auth.currentUser;
-  if (!engine || !user) return 'not-now';
+  if (!engine || !user) return { refused: null };
   const key = await engine.packPublicKey();
   let raw: unknown;
   try {
     raw = await callFunction(user, 'recitePack', { publicKey: key.publicKey, keyFormat: key.keyFormat }, { timeoutMs: 30_000 });
   } catch (err) {
-    if (NOT_NOW.has((err as { code?: string }).code ?? '')) return 'not-now';
+    const refused = refusalOf(err);
+    if (refused) return { refused };
     throw err;
   }
   const answer = parsePackAnswer((raw as { result?: unknown } | null)?.result);
@@ -327,7 +353,7 @@ const engineVersion = (): string | null => coreLine(benchEngine())?.version ?? n
 
 async function runOnce(): Promise<void> {
   if (!benchEngine()) {
-    publish({ phase: 'unavailable' });
+    publish({ phase: 'unavailable', why: null });
     return;
   }
   await preparePack();
@@ -341,8 +367,12 @@ async function runOnce(): Promise<void> {
     publish(restingStatus());
     return;
   }
+  if (!holdsCore(saved.have) && saved.limitDay === utcDay()) {
+    publish({ phase: 'unavailable', why: 'limit' });
+    return;
+  }
   if (!holdsCore(saved.have) && saved.badPack && !once && Date.now() - saved.checkedAt < CHECK_EVERY_MS) {
-    publish({ phase: 'unavailable' });
+    publish({ phase: 'unavailable', why: 'bad' });
     return;
   }
   if (!mayUseNetwork()) {
@@ -354,15 +384,16 @@ async function runOnce(): Promise<void> {
   const answer = await askForPack();
   if (gen !== generation) return;
   saved.checkedAt = Date.now();
-  if (answer === 'not-now') {
+  if ('refused' in answer) {
+    if (answer.refused === 'limit') saved.limitDay = utcDay();
     await persist();
-    publish(holdsCore(saved.have) ? restingStatus() : { phase: 'unavailable' });
+    publish(holdsCore(saved.have) ? restingStatus() : { phase: 'unavailable', why: answer.refused });
     return;
   }
 
   if (answer.packId === saved.badPack && !once) {
     await persist();
-    publish({ phase: 'unavailable' });
+    publish({ phase: 'unavailable', why: 'bad' });
     return;
   }
   const total = answer.parts.reduce((n, p) => n + p.bytes, 0);
@@ -445,7 +476,7 @@ export async function dropBadPack(packId: string): Promise<void> {
   saved = { ...saved, have: null, checkedAt: Date.now(), badPack: packId, badPackEngine: engineVersion() };
   await persist();
   deletePackFolder(packId);
-  publish({ phase: 'unavailable', packId: null, bytes: 0, totalBytes: 0 });
+  publish({ phase: 'unavailable', why: 'bad', packId: null, bytes: 0, totalBytes: 0 });
 }
 
 function deletePackFolder(packId: string): void {

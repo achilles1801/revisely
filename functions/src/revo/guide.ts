@@ -509,7 +509,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['Settings'],
     text: lines(
       '- Settings → Downloads and storage → “Recite on the phone” downloads what lets Recite check on the phone (about 50 MB), encrypted and out of backups. A build with the engine uses it for takes Settings → Testing sends to this phone.',
-      '- It starts when they open the reader, on Wi-Fi unless “Download over mobile data” is on. Its menu has Download now and Remove. Some accounts don’t have it yet.',
+      '- It starts when they open the reader, on Wi-Fi unless “Download over mobile data” is on. Its menu has Download now and Remove. Some accounts don’t have it yet; when it isn’t available the row says why, and Download now shows only if trying again can help.',
     ),
   },
   {

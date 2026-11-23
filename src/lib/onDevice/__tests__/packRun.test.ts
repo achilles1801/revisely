@@ -103,6 +103,8 @@ const engine = {
 let mockEngine: typeof engine | null = engine;
 jest.mock('../benchRun', () => ({ benchEngine: () => mockEngine }));
 
+import { describePack, packMenuActions } from '../packUi';
+
 const SHA = { core: 'a'.repeat(64), strict: 'b'.repeat(64) };
 const url = (id: string, part: string) => `https://storage.googleapis.com/revisely-dev.firebasestorage.app/packs/recite/${id}/${part}.rcpk?sig=1`;
 const answer = (id = 'v7m-1', parts: ('core' | 'strict')[] = ['strict', 'core']) => ({
@@ -375,6 +377,49 @@ describe('Recite’s pack on the phone', () => {
     expect(mockDownload).not.toHaveBeenCalled();
     expect(packForEngine()).toBeNull();
     expect(getPackStatus().phase).toBe('waiting-for-wifi');
+  });
+
+  it.each([
+    ['RESOURCE_EXHAUSTED', 'That’s enough downloads for today.', 'limit', 'Too many tries today. It tries again tomorrow', false],
+    ['PERMISSION_DENIED', 'This account can’t download the pack yet.', 'account', 'Not available for this account yet', false],
+    ['PERMISSION_DENIED', 'This app can’t download the pack.', 'app', 'This build can’t download it', false],
+    ['FAILED_PRECONDITION', 'There is no pack to download here.', 'none', 'Nothing to download yet', false],
+    ['UNAUTHENTICATED', 'Unauthenticated', 'verify', 'Couldn’t verify this app. Try again', true],
+  ])('a %s refusal (%s) names its reason, and offers Download now only if it can help', async (code, message, why, line, offered) => {
+    mockCall.mockRejectedValue(Object.assign(new Error(message), { code }));
+    await run();
+    const s = getPackStatus();
+    expect(s).toMatchObject({ phase: 'unavailable', why });
+    expect(describePack(s).subtitle).toBe(line);
+    expect(packMenuActions(s).some((a) => a.key === 'download')).toBe(offered);
+  });
+
+  it('a pack the engine refused still offers Download now', async () => {
+    await run();
+    await dropBadPack('v7m-1');
+    const s = getPackStatus();
+    expect(s.why).toBe('bad');
+    expect(describePack(s).subtitle).toBe('This version didn’t open. Download it again');
+    expect(packMenuActions(s).some((a) => a.key === 'download')).toBe(true);
+  });
+
+  it('after the day’s limit it doesn’t ask again until the next UTC day', async () => {
+    const day = Date.UTC(2026, 10, 23, 23, 50);
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(day);
+    mockCall.mockRejectedValue(Object.assign(new Error('enough'), { code: 'RESOURCE_EXHAUSTED' }));
+    await run();
+    expect(mockCall).toHaveBeenCalledTimes(1);
+    await run();
+    expect(mockCall).toHaveBeenCalledTimes(1);
+    expect(getPackStatus().why).toBe('limit');
+
+    clock.mockReturnValue(Date.UTC(2026, 10, 24, 0, 1));
+    mockCall.mockResolvedValue({ result: { ...answer().result, expiresAt: Date.UTC(2026, 10, 24, 0, 16) } });
+    await run();
+    expect(mockCall).toHaveBeenCalledTimes(2);
+    expect(packForEngine()?.packId).toBe('v7m-1');
+    expect(getPackStatus().why).toBeUndefined();
+    clock.mockRestore();
   });
 
   it('Download now tries a refused pack again', async () => {
