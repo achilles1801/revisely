@@ -98,7 +98,7 @@ import { releaseSync } from '../../lib/offline/sync';
 import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { premiumErrorText, setDevPremium, usePremium } from '../../lib/premium';
 import { earlyAccessLine, useEarlyAccess } from '../../lib/earlyAccess';
-import { checkLevel, setReciteCheckSettings, strictOffered, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
+import { checkLevel, maddChecked, setReciteCheckSettings, strictOffered, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { ReciteCheckNotice } from '../../components/reciteCheck/ReciteCheckNotice';
 import { currentLanguage, t, formatNumber } from '../../i18n';
 import {
@@ -885,6 +885,7 @@ export default function SettingsScreen() {
                   <>
                     <Row
                       label={t('settings.recite.munfasil')}
+                      subtitle={maddChecked('munfasil', reciteCheckSettings.munfasil) ? undefined : t('settings.recite.munfasilTwo')}
                       rightSlot={
                         <PillTabs
                           compact
@@ -898,6 +899,7 @@ export default function SettingsScreen() {
                     />
                     <Row
                       label={t('settings.recite.muttasil')}
+                      subtitle={maddChecked('muttasil', reciteCheckSettings.muttasil) ? undefined : t('settings.recite.muttasilSub')}
                       rightSlot={
                         <PillTabs
                           compact
