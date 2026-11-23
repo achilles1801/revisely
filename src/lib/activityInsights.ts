@@ -112,14 +112,17 @@ function revisedAgainstPlan(own: Pick<Revised, 'pages' | 'assigned'>[]): { done:
   return { done: pages.filter((p) => plan.has(p)).length, assigned: plan.size, pages };
 }
 
-/** One calendar day's marks (C3): the ring is the share of assigned pages revised. */
+/**
+ * One calendar day's marks (C3): the ring is the share of assigned pages revised. A day with pages logged and no plan
+ * is a revised day too, its ring whole (ACT-5).
+ */
 export function dayMarks(
   day: string,
   input: { revised: Revised[]; memorized: Memorized[]; read: Read[]; noteDays: Set<string> },
 ): { ring: number | null; memorized: boolean; read: boolean; note: boolean } {
-  const { done, assigned } = revisedAgainstPlan(input.revised.filter((r) => r.day === day && r.countsFor === day));
+  const { done, assigned, pages } = revisedAgainstPlan(input.revised.filter((r) => r.day === day && r.countsFor === day));
   return {
-    ring: assigned > 0 ? done / assigned : null,
+    ring: assigned > 0 ? done / assigned : pages.length > 0 ? 1 : null,
     memorized: input.memorized.some((m) => m.day === day),
     read: input.read.some((r) => r.day === day),
     note: input.noteDays.has(day),
