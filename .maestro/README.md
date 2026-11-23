@@ -121,12 +121,12 @@ rules it covers in its first lines; recordings have no rule there yet.
 | `02-revision-session` | Leave with nothing marked; swipe; Back; the check; the end card; the tab bar is Home and Read | SESS-1, SESS-2, SESS-3, ACT-12 |
 | `03-revise-ahead` | Keep going; "Tomorrow starts at"; a day partly done ahead | AHEAD-1, -2, -3, -5, DAY-3, SESS-4 |
 | `04-fajr-boundary` | Settings → Revision → Start day at fajr; Home at 03:00 and 08:00; revise ahead and a note before Fajr (Activity's day, then its log) | DAY-1, -2, -3, -5, AHEAD-1, LOG-3 |
-| `05-daily-log` | Two notes (the first from Activity's day, +, which opens its log; the second in the log); one edited, the other deleted; each kept across a cold start | LOG-1, LOG-2, ACT-5 |
+| `05-daily-log` | Two notes from Activity's day (+); one edited and the other deleted from its menu; each kept across a cold start | LOG-1, LOG-2, ACT-5, ACT-6 |
 | `06-offline` | A session offline; a cold start offline; back online, the server has it | SYNC-1, SYNC-2, SESS-3 |
 | `07-recordings` | Record in a session, find it under Revised on Activity's day, play, delete | none yet |
 | `08-time-zone` | Kathmandu (UTC+5:45): the day turns at its midnight | DAY-1, DAY-6 |
 | `10-delete-account` | Settings → Account → Delete account, confirmed twice: the account and its data leave the server, back at sign-in | ACCOUNT-1 |
-| `11-surah-names` | Every screen that names the Qur'an (Home, its › menu, Jump to, All activity, the schedule, the memorized pages, a session, the end card, the daily log), in light and then dark (`…-dark`). No position, so Home has no prayer line | NAME-1 |
+| `11-surah-names` | Every screen that names the Qur'an (Home, its › menu, Jump to, All activity, the schedule, the memorized pages, a session, the end card), in light and then dark (`…-dark`). No position, so Home has no prayer line | NAME-1 |
 | `14-help` | An account that isn't a tester: Home's ? opens How Home works, with no Ask Revo (Revo is for testers here), closes; Hide help buttons, Undo, hidden again; still hidden after a cold start; Settings → Help and support → Help buttons brings it back. In the second job | HELP-1, HELP-2 |
 | `16-whats-new` | A tester: Settings → About → What's new replays the cards with a ✕; Testing → Show What's new at launch runs them after a cold start, no ✕, Android's back to the card before; a relaunch part way reopens the card it was on; after Done it doesn't come back. In the first job | NEW-2, NEW-3 |
 
@@ -162,7 +162,6 @@ Before Nov 7 2026 nothing did: Activity screens that didn't match the approved m
   - the E2E status line's clock (every screen);
   - a session's minutes in Home's "Recent sessions" (real time spent);
   - the next prayer's countdown ("in 2h 15m");
-  - the daily log's note times;
   - Revo's button on Home (Revo is being rebuilt; unmask it when Revo's baselines are approved).
 - **Compared** with pixelmatch (colour distance 0.1, anti-aliasing left out). More than 12 changed
   pixels of the halved image is a change: a changed digit of the 9 pt status line is about 15, and
@@ -387,8 +386,8 @@ Things that bit:
 - An element made accessible as a group is read as one label: the end card is
   `", Revision complete, 10 pages revised today"`, and Home's ahead line is spoken
   ("Tomorrow starts at Al-Fajr, page 594"). Select by `id:` and match the label.
-- A multiline text field's `testID` doesn't reach iOS's accessibility tree: the log's field is
-  found by its label (`subflows/log-input.yaml`).
+- A multiline text field's `testID` doesn't reach iOS's accessibility tree: on iOS a field's
+  text is its value, which `text:` matches (`subflows/type.yaml`).
 - Percentages in `point:` must be whole numbers (CLAUDE.md). Maestro has no sleep: an optional
   wait for an element that never shows (`e2e-never-shown`) stands in.
 - The mushaf runs right to left: the next page comes in from the left. Swipe until a count or the
@@ -407,8 +406,8 @@ Things that bit:
   which waits for the session's header and taps again while Home's button is still on screen.
 - Android waits for the screen to settle after each command. A screen that never settles (a
   recording's timer) needs `waitToSettleTimeoutMs` on the tap, or each tap takes a minute.
-- On Android, text typed into a field as it gains focus can be lost; `subflows/type-in-log.yaml`
-  checks the field and types again. Android also writes times as "12:23 pm" and may show dialog
+- On Android, text typed into a field as it gains focus can be lost; `subflows/type.yaml`
+  waits for the field to hold it. Android also writes times as "12:23 pm" and may show dialog
   buttons in capitals: match with `(?i)`.
 - The iOS Simulator's keyboard can stall under load and drop what is typed meanwhile (run
   42403217365: "Keyboard queue task timeout detected" in `device.log`, the keyboard connection

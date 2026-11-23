@@ -20,7 +20,6 @@ import QuranSearchScreen from '../screens/read/QuranSearchScreen';
 import { RevoHost } from '../components/revo/RevoHost';
 import { ReportProblemHost } from '../components/report/ReportProblemHost';
 import ListenBackScreen from '../screens/activity/ListenBackScreen';
-import JournalEntryScreen from '../screens/journal/JournalEntryScreen';
 import ActivityScreen from '../screens/activity/ActivityScreen';
 import ActivityDayScreen from '../screens/activity/ActivityDayScreen';
 import ActivityAllScreen from '../screens/activity/ActivityAllScreen';
@@ -42,7 +41,6 @@ import { createPagerTabNavigator } from './PagerTabs';
 import { insightsTab, mainTabRoutes, swipeableTabCount } from './tabPages';
 import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPreviewScreen';
 import { useApp } from '../context/AppContext';
-import type { JournalKind } from '../types';
 import type { RevoSettingsSection } from '../lib/revo/types';
 import type { SettingsPage } from '../lib/settingsPages';
 
@@ -94,9 +92,6 @@ export type HomeStackParamList = {
   PagesByStrength: undefined;
   // When each surah, juz, hizb or page was last revised (ACT-30), from Insights' Gaps.
   LastRevised: { sort?: 'recent' | 'waiting' | 'mushaf' } | undefined;
-  // Daily-log editor. date is YYYY-MM-DD; omitted means "today" (fajr-aware
-  // revision day).
-  JournalEntry: { date?: string; kind?: JournalKind } | undefined;
   // Settings → Prayer (testers).
   PrayerCalculation: undefined;
   PrayerNotifications: undefined;
@@ -146,7 +141,6 @@ const HIDE_TAB_BAR_ON = new Set([
   'Memorization', // i18n-ignore (route names)
   'QuranReader',
   'QuranSearch',
-  'JournalEntry',
   'ListenBack',
   'OnboardingPreview', // i18n-ignore (route names)
 ]);
@@ -176,7 +170,6 @@ function sharedScreens() {
       <HomeStack.Screen name="ActivityAll" component={ActivityAllScreen} />
       <HomeStack.Screen name="PagesByStrength" component={PagesByStrengthScreen} />
       <HomeStack.Screen name="LastRevised" component={LastRevisedScreen} />
-      <HomeStack.Screen name="JournalEntry" component={JournalEntryScreen} />
       <HomeStack.Screen name="QuranReader" component={QuranReaderScreen} />
     </>
   );

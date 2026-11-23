@@ -227,8 +227,9 @@ describe('<ActivityScreen /> in the new design', () => {
     expect(screen.getByText(/Nothing yet/)).toBeTruthy();
     expect(screen.getByTestId('recent-empty').props.children).toBe('No sessions yet. Start your first revision from Home.');
     expect(screen.queryByText('See all')).toBeNull();
+    // Today's day, whose + adds a note (the old log page is gone, ACT-6).
     fireEvent.press(screen.getByLabelText('Log today'));
-    expect(mockNavigation.navigate).toHaveBeenCalledWith('JournalEntry', { date: today });
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('ActivityDay', { date: today });
   });
 });
 
@@ -312,11 +313,12 @@ describe('<ActivityDayScreen /> in the new design (a thread)', () => {
     alert.mockRestore();
   });
 
-  it('an empty day still has the daily log to write', async () => {
+  it('an empty day still has a note to write: Write opens the Note sheet', async () => {
     mockRoute.params = { date: today };
     render(<ActivityDayScreen />);
     expect(await screen.findByText('Nothing logged yet')).toBeTruthy();
     fireEvent.press(screen.getByText('Write'));
-    expect(mockNavigation.navigate).toHaveBeenCalledWith('JournalEntry', { date: today });
+    expect(await screen.findByTestId('add-note-sheet')).toBeTruthy();
+    expect(mockNavigation.navigate).not.toHaveBeenCalled();
   });
 });

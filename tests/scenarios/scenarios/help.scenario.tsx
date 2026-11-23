@@ -47,7 +47,7 @@ function homeAndSettings(mods: Booted): ReactElement {
         h(Stack.Screen, { name: 'ActiveRevision', component: Session }),
         h(Stack.Screen, { name: 'Activity', component: Activity }),
         h(Stack.Screen, { name: 'ActivityDay', component: ActivityDay }),
-        ...['PlanEdit', 'PlanDayEdit', 'Memorization', 'ActivityAll', 'Insights', 'QuranReader', 'JournalEntry', 'PagesByStrength', 'ListenBack'].map(
+        ...['PlanEdit', 'PlanDayEdit', 'Memorization', 'ActivityAll', 'Insights', 'QuranReader', 'PagesByStrength', 'ListenBack'].map(
           (name) => h(Stack.Screen, { key: name, name, component: Elsewhere }),
         ),
       ),

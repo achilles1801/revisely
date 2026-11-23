@@ -282,15 +282,15 @@ current basic sounds". October 2026's version was removed for the voices it offe
   Thursday.
 - **KAHF-3.** "Not today" hides the card until that Friday's maghrib, from Thursday evening too.
 
-## The daily log
+## A day's notes
 
 - **LOG-1.** Every note added to a day's log stays, each as its own entry with its text; adding one
   never replaces another.
 - **LOG-2.** Editing a note changes only that note; deleting one removes only it. Both reach every
   phone.
 - **LOG-3.** A note written between midnight and Fajr (boundary on) belongs to the revision day.
-- **LOG-4.** The log writes what is added at once: a note or a revised portion shows as soon as it is sent, stays
-  while the server catches up, and the first note of a day shows without leaving the log.
+- **LOG-4.** A day's notes are written at once: a note shows on the day as soon as it is added, stays while the
+  server catches up, and the first note of a day shows without leaving it.
 
 ## Offline, devices and accounts
 
@@ -386,7 +386,7 @@ current basic sounds". October 2026's version was removed for the voices it offe
 - **TAB-2.** Activity is a tab of its own between Home and Read, for every account (Majd, Nov 23 2026: "i like the new
   style with the activity being its own tab, let's make that official"; he tried it in Revisely Dev first). The tab bar
   is Home, Activity (the pulse icon), Read, and a swipe moves between them in that order. Activity, with Insights inside
-  it, starts its tab with no back arrow; what it opens (a day, See all, the reader, the daily log) is pushed in its tab
+  it, starts its tab with no back arrow; what it opens (a day, See all, the reader) is pushed in its tab
   and Back comes back to it, and a press on the tab while it shows goes back to Activity and its top. On the calendar's
   days a sideways swipe steps the month or week; anywhere else on Activity it moves between tabs. Settings' "Activity",
   Revo's Activity and Insights buttons and a day's links from elsewhere (the timer, Recite, Revo's Day in review) open it
@@ -961,7 +961,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   `createdAt` falls on its `date`); with no sessions, the saved location's zone, then UTC. (Changed Nov 5
   2026: memorized items used to have no Fajr shift; Majd chose one day rule for all of Activity.)
 - **ACT-2.** A day's Revised block is built from its revision items: one per day, with the pages revised
-  ahead for later days listed apart. A revision note in the daily log is not a second entry; it shows
+  ahead for later days listed apart. An older revision entry from the daily log is not a second entry; it shows
   under the Revised block. Every account's since the November 2026 release (testers' before).
 
 - **ACT-3.** The calendar's day shows the share of the day's assigned pages revised (a ring), and a dot for a
@@ -987,10 +987,15 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   for that day, dated that day; its minutes join the day's item once (an add sent again adds none). "From
   your reading" offers the pages read that day that are not memorized yet. Note opens its own sheet: its
   text, and an optional "Show under" choice of the day's Revised, Memorized or Read item (the note's tag).
-  Add is a new note with its own id and time; an empty note cannot be added.
-- **ACT-6.** In the daily log, a note swiped away goes at once, with Undo; the delete is saved after the undo
-  window (five seconds), and leaving the screen saves any delete still waiting. In the Activity day, the rows under
-  a block (notes, timed reads) have no hold and no swipe: they are edited and deleted in the daily log. A block
+  Add is a new note with its own id and time; an empty note cannot be added, and a day holds at most 50 entries. The +
+  is the only way to add to a day (Majd, Nov 23 2026: "why does this page still exist? i thought we replaced it with
+  "+" add to today button"; the old Today log page is gone).
+- **ACT-6.** On a day in Activity, a tap or a hold on a note opens its menu: Edit, Copy (when it has text) and Delete
+  (Majd, Nov 23 2026). Edit opens the same Note sheet the day's + uses, filled in: its text and "Show under", at its
+  own time. An older Revised or Memorized entry from the old log opens there too, with its minutes. Delete takes the
+  note off at once, with Undo; the delete is saved after the undo window (five seconds), and leaving the day saves any
+  delete still waiting. With two or more notes, a hold on the Notes header offers Delete all notes (confirmed first).
+  Timed reads have no hold or swipe of their own. A block
   header (Revised, Memorized, Read) holds a menu: Edit for a timed read, Delete for each item (confirmed first).
   A Memorized entry's menu is exactly Edit and Delete (each named when the day has several entries); Edit opens
   the memorized pages ready to edit, at that entry: its surah open and scrolled to, its pages ringed. A
@@ -998,7 +1003,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   VoiceOver offers the same actions as custom actions on the header (a recording's Delete, on its play button).
   The menu is the iOS-style long-press menu: a preview of the held item (its label and text) with its actions
   beneath it, over the dimmed screen. An action runs once the menu has closed; touching the backdrop runs nothing.
-  The daily log's note menu is the same menu (Edit, and Copy when the note has text).
+  A note's menu is the same menu.
 
 - **ACT-7.** Deleting a Revised session or a Memorized entry asks first, and names what goes. A Memorized
   entry takes off exactly the ayahs it added (MEM-3), and its item is removed: a page it memorized goes back
@@ -1320,8 +1325,8 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   showing its end keeps it in view as the list gets shorter or longer (an answer's chart and plan card included),
   unless the user has scrolled up to read.
 
-- **REVO-25.** Revo's button is a 44pt disc (the smallest touch target, with room around it to tap), bottom-right, 14
-  above the tab bar and the mini player. It shows on Home, Activity (Overview and Insights), a day in Activity, See
+- **REVO-25.** Revo's button is a 44pt disc (the smallest touch target, with room around it to tap), in a bottom corner
+  (REVO-41), 14 above the tab bar and the mini player. It shows on Home, Activity (Overview and Insights), a day in Activity, See
   all and Pages by strength, and nowhere else. There is no Revo on the Read tab (its list or the reader) or in a
   revision session, and their help sheets offer no "Ask Revo" (Majd, Nov 8 2026: "no revo in the revision
   sessions. there should also be no revo in the mushaf tab at all"); none in an editor or Settings either. The
@@ -1361,7 +1366,7 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   as before.
 
 - **REVO-31.** An answer can offer to open a screen (`openScreen`): Jump to…, the schedule editor, the memorized
-  pages, Activity (Insights are a tab at its top), the daily log, Settings at one of its sections, the prayer
+  pages, Activity (Insights are a tab at its top), today's day in Activity (`dailyLog`), Settings at one of its sections, the prayer
   times, the Qibla, or the reader at a surah or a juz. The server drops any other screen, section, surah or juz (the
   answer kept, as with a page Revo wasn't given). An answer that suggests nothing but names one of those screens the way
   the app does ("Edit schedule", "Settings → Appearance", "Jump to…") gets that screen's card from the server, the
@@ -1453,6 +1458,13 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   them. The app sends the patterns and the day facts only once config/app's `revoPatterns` is on (set after the
   functions that take them are deployed: older ones refuse fields they don't know); off, it sends what it sent
   before, and turning it off stops them with no deploy.
+- **REVO-41.** Revo's button can be dragged sideways between the bottom right and the bottom left (Majd, Nov 23 2026:
+  "let's make the revo icon bottom right be movable so a user can drag it to the other side so either just bottom right
+  or bottom left and that position is saved in memory meaning the app remembers it"). It follows the finger and settles
+  in the nearer corner (a flick counts where it was heading); a tap still opens Revo, and the end of a drag doesn't. The
+  corner is kept on that phone, per account, across launches. Until it's moved it sits at the end of the line: right, or
+  left in Arabic. VoiceOver and TalkBack have an action for it ("Move to the left", "Move to the right"), and say where
+  it went. Lists leave the same room at their end on either side.
 
 ## Memorizing
 

@@ -39,6 +39,7 @@ import { parseTag } from '../../lib/noteTags';
 import type { JournalNote, ReadingSession, RevisionLog } from '../../types';
 import { Tap } from '../v2/Tap';
 import { ContextMenu, type ContextMenuAction } from '../v2/ContextMenu';
+import { copyText } from '../../lib/clipboard';
 type SheetAction = ContextMenuAction;
 import { typeV2 } from '../../theme/v2';
 import { useActivityReload } from './useActivityReload';
@@ -60,7 +61,7 @@ import { ayahsOfItem, memorizedAyahsOnPage, memorizedPageShare, revisablePages }
 import { customPlanAfterUnmemorizing } from '../../lib/memorizationChanges';
 import { scheduledDaysFrom } from '../../lib/algorithm';
 import { allFirstTomorrow, firstTomorrowPages } from '../../lib/weakSpotActions';
-import { shiftDay } from '../../lib/journal';
+import { JOURNAL_KIND_LABELS, formatEntryTime, shiftDay } from '../../lib/journal';
 import { AddMemorizedSheet, type SittingToAdd } from './AddMemorizedSheet';
 import { JuzSheet } from './JuzSheet';
 import { smartTrackingOn } from '../../lib/smartTracking';
@@ -92,7 +93,11 @@ interface Props {
   readings: ReadingSession[];
   notes: JournalNote[];
   onEditReading: (session: ReadingSession) => void;
-  onOpenLog: () => void;
+  /** A note's menu (ACT-6): Edit opens the Note sheet filled in; Delete goes at once, with Undo. */
+  onEditNote: (note: JournalNote) => void;
+  onDeleteNote: (note: JournalNote) => void;
+  /** The Notes header's menu, with two or more notes: every note of the day (confirmed first). */
+  onDeleteAllNotes: () => void;
   /** The day's own revision session (its Revised block), if any: deleting it removes the session. */
   revisedLog: RevisionLog | null;
   onDeleteRevised: (log: RevisionLog) => void;
@@ -127,7 +132,7 @@ interface Props {
 }
 
 /** "Al-Mulk, ayahs 1–20 marked memorized · Undo": the toast's words and what Undo does. */
-export type UndoOffer = { text: string; undo: () => void };
+export type UndoOffer = { text: string; undo: () => void; /** How long Undo shows (ms). */ duration?: number };
 
 /**
  * "8:05 – 8:23 AM": from the start to the start plus the minutes, the AM/PM said once when both
@@ -174,7 +179,9 @@ export function DayBlocks({
   readings,
   notes,
   onEditReading,
-  onOpenLog,
+  onEditNote,
+  onDeleteNote,
+  onDeleteAllNotes,
   revisedLog,
   onDeleteRevised,
   onDeleteMemorized,
@@ -222,8 +229,7 @@ export function DayBlocks({
   // A hold on a row opens its menu (C4): Edit and Copy, or Delete (which confirms first).
   const [menu, setMenu] = useState<{ title: string; text?: string; actions: SheetAction[] } | null>(null);
   // A block header holds a menu (Edit / Delete, confirmed where it deletes); VoiceOver offers the
-  // same actions as custom actions. Sub-rows under a block have no hold and no swipe: notes are
-  // edited and deleted in the daily log (Activity spec, row interactions).
+  // same actions as custom actions. A note holds its own (Edit, Copy, Delete; ACT-6).
   const headerMenu = (title: string, actions: SheetAction[], text?: string) =>
     actions.length === 0
       ? {}
@@ -474,23 +480,53 @@ export function DayBlocks({
     })),
   ]);
   const timeOf = (at: number) => formatTime(new Date(at));
+  // A note's menu (ACT-6): Edit, Copy (with text to copy) and Delete, the last with Undo rather than a confirmation.
+  const noteActions = (n: JournalNote): SheetAction[] => [
+    { key: 'edit', label: t('common.edit'), icon: 'create-outline', onPress: () => onEditNote(n) },
+    ...(n.text.trim() !== ''
+      ? [{ key: 'copy', label: t('common.copy'), icon: 'copy-outline' as const, onPress: () => copyText(n.text.trim()) }]
+      : []),
+    { key: 'delete', label: t('common.delete'), icon: 'trash-outline', destructive: true, onPress: () => onDeleteNote(n) },
+  ];
+  // The row of a note or a log entry: a tap or a hold opens its menu, and VoiceOver has its actions.
+  const noteTap = (n: JournalNote, children: React.ReactNode) => {
+    const actions = noteActions(n);
+    const open = () => setMenu({ title: t('activity.day.noteAt', { time: timeOf(n.at) }), text: n.text.trim() || undefined, actions });
+    return (
+      <Tap
+        key={n.id}
+        onPress={open}
+        onLongPress={open}
+        accessibilityRole="button"
+        accessibilityLabel={[JOURNAL_KIND_LABELS[n.kind], n.text.trim(), formatEntryTime(n.at, day, user)].filter(Boolean).join(', ')}
+        accessibilityActions={actions.map((a) => ({ name: a.key, label: a.label }))}
+        onAccessibilityAction={(e) => actions.find((a) => a.key === e.nativeEvent.actionName)?.onPress()}
+        testID={`day-note-${n.id}`}
+      >
+        {children}
+      </Tap>
+    );
+  };
   // A tagged note (ACT-11): "Note · 9:40 PM", then its text.
-  const noteItem = (n: JournalNote) => (
-    <ItemLine key={n.id} icon="document-text-outline">
-      <Text style={[typeV2.meta, { color: palette.secondary }]}>{t('activity.day.noteAt', { time: timeOf(n.at) })}</Text>
-      <Text style={[typeV2.body, { color: palette.text }]}>{n.text.trim()}</Text>
-    </ItemLine>
-  );
+  const noteItem = (n: JournalNote) =>
+    noteTap(
+      n,
+      <ItemLine icon="document-text-outline">
+        <Text style={[typeV2.meta, { color: palette.secondary }]}>{t('activity.day.noteAt', { time: timeOf(n.at) })}</Text>
+        <Text style={[typeV2.body, { color: palette.text }]}>{n.text.trim()}</Text>
+      </ItemLine>,
+    );
   // A hand entry (a revision or memorization line written in the log): its text, then time · minutes.
-  const handItem = (n: JournalNote) => (
-    <ItemLine
-      key={n.id}
-      icon="create-outline"
-      right={[timeOf(n.at), n.minutes != null && n.minutes > 0 ? formatMinutesLong(n.minutes) : null].filter(Boolean).join(' · ')}
-    >
-      <Text style={[typeV2.body, { color: palette.text }]}>{n.text.trim()}</Text>
-    </ItemLine>
-  );
+  const handItem = (n: JournalNote) =>
+    noteTap(
+      n,
+      <ItemLine
+        icon="create-outline"
+        right={[timeOf(n.at), n.minutes != null && n.minutes > 0 ? formatMinutesLong(n.minutes) : null].filter(Boolean).join(' · ')}
+      >
+        <Text style={[typeV2.body, { color: palette.text }]}>{n.text.trim()}</Text>
+      </ItemLine>,
+    );
   const lineItem = (key: string, text: string, testID?: string) => (
     <Text key={key} testID={testID} style={[typeV2.meta, { color: palette.secondary }]}>
       {text}
@@ -676,15 +712,24 @@ export function DayBlocks({
       : []),
     ...readItems.items.flatMap((i) => taggedTo('read', i.id).map(noteItem)),
   ];
-  const notesItems: React.ReactNode[] = notesBlock.map((n) => (
-    // Editing happens in the log: a note here only opens it (no swipe, no menu).
-    <Tap key={n.id} onPress={onOpenLog} accessibilityRole="button" accessibilityLabel={t('activity.day.openLog')}>
-      <Text style={[typeV2.meta, { color: palette.secondary }]}>{timeOf(n.at)}</Text>
-      <Text style={[typeV2.body, { color: palette.text }]} numberOfLines={4}>
-        {n.text.trim()}
-      </Text>
-    </Tap>
-  ));
+  const notesItems: React.ReactNode[] = notesBlock.map((n) =>
+    noteTap(
+      n,
+      <>
+        <Text style={[typeV2.meta, { color: palette.secondary }]}>{timeOf(n.at)}</Text>
+        <Text style={[typeV2.body, { color: palette.text }]} numberOfLines={4}>
+          {n.text.trim()}
+        </Text>
+      </>,
+    ),
+  );
+  // Every note of the day at once, from the Notes header, with two or more (it was the old log page's last row).
+  const notesMenu = headerMenu(
+    t('activity.day.notes'),
+    notes.length >= 2
+      ? [{ key: 'delete-all', label: t('activity.day.deleteAllNotes'), icon: 'trash-outline' as const, destructive: true, onPress: onDeleteAllNotes }]
+      : [],
+  );
   const readPagesCount = readItems.items.reduce((n, i) => n + i.pages.length, 0);
   // The sub-line names the assignment's surahs, first to last ("Al-Mujadila to At-Tahrim"), as it
   // names its juz: the figure says how much of it was revised.
@@ -896,6 +941,7 @@ export function DayBlocks({
           title={t('activity.day.notes')}
           figure={formatNumber(notesBlock.length)}
           items={notesItems}
+          header={notesMenu}
           onLayout={layoutFor('notes')}
           testID="activity-block-notes"
         />

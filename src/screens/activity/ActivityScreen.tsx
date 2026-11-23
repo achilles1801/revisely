@@ -118,7 +118,8 @@ export default function ActivityScreen() {
   const firstDay = useMemo(() => journalFirstDay(user, days), [user, days]);
 
   const openDay = (date: string, focusBlock?: PreviewBlock) => navigation.navigate('ActivityDay', { date, ...(focusBlock ? { focusBlock } : {}) });
-  const logToday = () => navigation.navigate('JournalEntry', { date: today });
+  // Today's day, whose + adds a note (the old log page is gone, ACT-6).
+  const logToday = () => navigation.navigate('ActivityDay', { date: today });
   // Days with a note in the log (the flagged calendar's note dot).
   const noteDays = useMemo(
     () => new Set((journal ?? []).filter((d) => d.entries.some((n) => n.kind === 'note' && n.text.trim() !== '')).map((d) => d.date)),

@@ -58,8 +58,8 @@ for good: it waited for the server to answer for the user document.
   (`provisionalUid`, read from Auth's own AsyncStorage entry) and its copy; nothing is sent until Auth
   confirms it. Offline, Auth keeps an expired sign-in (it can't check it) and refreshes it once online.
 - **Offline note:** Home's `OfflineNote` ("Offline", "Offline · changes saved on this phone").
-- The daily log can't be read offline unless Firestore already holds that day: the screen then says
-  so and can't be saved (a save would overwrite the server's entry).
+- A day's notes can't be read offline unless Firestore already holds that day: the Day screen then says it couldn't
+  load. Adding, editing or deleting a note is that note's own write (`applyJournalNote`), so nothing else is overwritten.
 - The start-up self-heal (`syncPagesFromLogs`) runs only on the server's pages and sessions, never on
   the copy, and compares last-revised dates by day (comparing a day with a timestamp rewrote every
   revised page, unchanged, on every launch).
