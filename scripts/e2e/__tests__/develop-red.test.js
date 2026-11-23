@@ -1,7 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { nextState, parseJob, readAttempts, render, stateOf, verdict } = require('../develop-red');
+const { nextState, parseJob, readAttempts, render, stateOf, suiteVerdict, verdict } = require('../develop-red');
 
 const run = (n) => ({ url: `https://github.com/o/r/actions/runs/${n}`, sha: `${n}abcdef0` });
 const rec = (platform, flows) => ({ version: 1, platform, flows });
@@ -75,6 +75,28 @@ describe('develop-red', () => {
     expect(render(after.state)).toContain('## Real Android phones (Test Lab): red');
     // Not run yet: no section for it.
     expect(render(before)).not.toContain('Real Android phones');
+  });
+
+  it('takes the scenario suite on what landed as its own line: red at once, cleared by its next pass, the E2E platforms as they were', () => {
+    expect(suiteVerdict(parseJob(undefined))).toBeNull();
+    expect(suiteVerdict(parseJob('true:true:cancelled'))).toBeNull();
+    expect(suiteVerdict(parseJob('true:true:success'))).toEqual({ red: false, flows: [] });
+    const failed = suiteVerdict(parseJob('true:true:failure'));
+    const android = { red: true, flows: [{ flow: '09-revo', reason: 'x' }] };
+    const before = nextState(null, run(1), { android }).state;
+    expect(render(before)).not.toContain('Scenario tests');
+    const red = nextState(before, run(2), { scenarios: failed });
+    expect(red.state.android).toEqual(before.android);
+    expect(render(red.state)).toContain('## Scenario tests: red');
+    expect(render(red.state)).toContain('(the scenario suite)');
+    // Its pass clears its own line; the issue stays open for what's still red.
+    const passed = nextState(red.state, run(3), { scenarios: suiteVerdict(parseJob('true:true:success')) });
+    expect(passed.state.scenarios.red).toBe(false);
+    expect(passed.closed).toBe(false);
+    // Red alone, then green: it opens and closes the issue.
+    const alone = nextState(null, run(4), { scenarios: failed });
+    expect(alone.opened).toBe(true);
+    expect(nextState(alone.state, run(5), { scenarios: { red: false, flows: [] } }).closed).toBe(true);
   });
 
   it("reads every job's attempts.json from the downloaded artifacts", () => {

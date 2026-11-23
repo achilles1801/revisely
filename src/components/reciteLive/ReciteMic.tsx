@@ -4,12 +4,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../context/ThemeContext';
 import { Tap } from '../v2/Tap';
+import { PLAYER_BUTTON } from '../reader/PlayerCapsule';
 import { t } from '../../i18n';
 
 /** What a tap on the mic starts: Record, Recite, or Recite marking mistakes ("check", Premium). */
 export type ReciteMicMode = 'record' | 'recite' | 'check';
 
-const SIZE = 40;
+const SIZE = PLAYER_BUTTON;
 
 export const MIC_LABEL: Record<ReciteMicMode, string> = {
   get record() {
@@ -82,7 +83,7 @@ export function ReciteMic({
         {starting ? (
           <ActivityIndicator size="small" color={palette.onPrimary} />
         ) : (
-          <Ionicons name="mic" size={20} color={palette.onPrimary} />
+          <Ionicons name="mic" size={18} color={palette.onPrimary} />
         )}
       </View>
       {mode === 'record' ? (

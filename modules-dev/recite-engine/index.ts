@@ -110,6 +110,8 @@ export type ReciteEngineEvents = {
 
 declare class ReciteEngineModule extends NativeModule<ReciteEngineEvents> {
   deviceInfo(): DeviceInfo;
+  /** Which engine this build linked, as JSON (lib/onDevice/coreInfo reads it). Builds before the pull-in don't have it. */
+  coreInfo?(): string;
   sha256(path: string): Promise<string>;
   bench(plan: BenchPlan): Promise<BenchResult>;
 }

@@ -1,13 +1,13 @@
 {
-  "recordedAt": "2026-11-22T14:26:12.880Z",
-  "how": "functions/scripts/record-anthropic.js",
+  "recordedAt": null,
+  "how": "functions/scripts/record-anthropic.js on 2026-11-22T14:26:12.880Z; request moved by hand to the system prompt after the session Pages sheet (the guide's wording only); the real re-record waits on the coach key",
   "request": {
     "model": "claude-sonnet-5-5",
     "max_tokens": 800,
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "eccdeee8f79820a849e668180f233ec51bf6cee1f60fa15618d73bac86408c3c",
+    "systemSha256": "845e3131c42bbe9e84a85bc6aba3b02d8233239f5fb999da3c198571114e7df2",
     "outputSchemaSha256": "ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e"
   },
   "status": 200,

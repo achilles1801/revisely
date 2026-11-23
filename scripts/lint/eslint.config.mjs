@@ -28,6 +28,8 @@ export default defineConfig([
     'jest.setup.ts',
     'metro/**',
     'modules/**',
+    // Node scripts that run at build time and their tests, not app code (the on-device engine's fetch).
+    'modules-dev/recite-engine/core/**',
     'plugins/**',
     'scripts/**',
     'store/**',

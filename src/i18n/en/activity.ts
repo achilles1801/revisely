@@ -200,6 +200,9 @@ export const activity = {
     cellRead: 'read',
     cellNote: 'note',
     summaryRevised: 'Revised {{done}} of {{assigned}}',
+    /** A day with no plan: pages logged by hand (ACT-32). */
+    summaryRevisedPages_one: 'Revised {{count}} page',
+    summaryRevisedPages_other: 'Revised {{count}} pages',
     summaryMemorized: 'Memorized {{n}}',
     summaryRead_one: 'Read {{count}} page',
     summaryRead_other: 'Read {{count}} pages',

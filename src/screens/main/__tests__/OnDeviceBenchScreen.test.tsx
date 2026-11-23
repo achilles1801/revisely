@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import manifestJson from '../../../lib/onDevice/__tests__/bench.manifest.json';
 import { parseManifest, perMinute, summarize, type PlanSpec } from '../../../lib/onDevice/bench';
 import type { BenchRun } from '../../../lib/onDevice/benchRun';
@@ -26,7 +26,7 @@ jest.mock('@react-navigation/native', () => ({ useNavigation: () => mockNavigati
 
 const mockManifest = parseManifest(manifestJson)!;
 const mockDevice = { platform: 'ios' as const, model: 'iPhone16,2', os: '26.1', cores: 6, memoryMb: 8192, thermal: 'nominal' };
-const mockEngine = { deviceInfo: () => mockDevice };
+const mockEngine: { deviceInfo: () => typeof mockDevice; coreInfo?: () => string } = { deviceInfo: () => mockDevice };
 const mockBench = {
   engine: null as typeof mockEngine | null,
   sent: [] as unknown[],
@@ -120,6 +120,29 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
     expect(screen.getByText('v7m-live-r16 · CPU · 1 thread')).toBeTruthy();
     expect(screen.getByText('v7m-live-f16pack · Core ML · default threads')).toBeTruthy();
     expect(screen.getAllByRole('checkbox')).toHaveLength(mockManifest.plans.ios.length);
+  });
+
+  it('says which engine the build carries: the private library, its stub, a failed self-test, or nothing on an older build', async () => {
+    const info = (over: object) => JSON.stringify({ version: 'recite-core replay 0.1.0', abi: 1, headerAbi: 1, stub: false, selfTest: 'passed', ...over });
+    const line = async (coreInfo?: () => string) => {
+      mockEngine.coreInfo = coreInfo;
+      mockBench.engine = mockEngine;
+      const view = render(<OnDeviceBenchScreen />);
+      await waitFor(() => expect(view.getByTestId('bench-device')).toBeTruthy());
+      const text = view.queryByTestId('bench-engine')?.props.children ?? null;
+      view.unmount();
+      return text;
+    };
+    try {
+      expect(await line(() => info({}))).toBe('Engine: recite-core replay 0.1.0');
+      expect(await line(() => info({ version: 'stub', stub: true, selfTest: 'skipped' }))).toBe('Engine: stub (server path)');
+      expect(await line(() => info({ selfTest: 'failed: frames' }))).toBe('Engine: recite-core replay 0.1.0, self-test failed (frames)');
+      expect(await line(() => info({ abi: 2 }))).toBe('Engine: recite-core replay 0.1.0, self-test failed (ABI 2, app expects 1)');
+      expect(await line(undefined)).toBeNull();
+      expect(await line(() => 'not json')).toBeNull();
+    } finally {
+      delete mockEngine.coreInfo;
+    }
   });
 
   it('runs the chosen ones, shows each result against the 150 ms mark and the checker, and sends the record', async () => {

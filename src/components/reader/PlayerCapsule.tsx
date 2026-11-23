@@ -10,8 +10,12 @@ import type { RecitationState } from '../../lib/recitation';
 import type { Anchor } from './SpeedMenu';
 import { t } from '../../i18n';
 
-/** Height of the capsule; the reader keeps this much free under the page. */
+/** The room the reader keeps free under the page, and the height of a take's bar (its Arabic words need it). */
 export const CAPSULE_HEIGHT = 52;
+/** The player itself, slimmer than that room (Majd, Nov 23 2026: "too bulky ... lets make it slimmer"). */
+export const PLAYER_HEIGHT = 44;
+/** ▶ and the mic, the capsule's filled circles. */
+export const PLAYER_BUTTON = 34;
 
 /** What the capsule needs from the verse actions (useVerseActions().player). */
 export interface PlayerControls {
@@ -127,7 +131,7 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
       ) : (
         <Ionicons
           name={playing ? 'pause' : failed ? 'refresh' : 'play'}
-          size={18}
+          size={16}
           color={theme.onAccent}
           style={!playing && !failed ? styles.playIcon : undefined}
         />
@@ -191,7 +195,7 @@ export function PlayerCapsule({ player, page, record, timer, trailing, compact, 
             accessibilityLabel={t('reader.player.playFromPage')}
             testID="player-play-page"
           >
-            <Ionicons name="play" size={18} color={theme.onAccent} style={styles.playIcon} />
+            <Ionicons name="play" size={16} color={theme.onAccent} style={styles.playIcon} />
           </Pressable>
           <Pressable
             style={styles.text}
@@ -222,7 +226,7 @@ const styles = StyleSheet.create({
   // The recorder fills it, with its own padding.
   recorder: { flex: 1, paddingHorizontal: 0, minWidth: 0 },
   capsule: {
-    height: CAPSULE_HEIGHT,
+    height: PLAYER_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
@@ -244,7 +248,13 @@ const styles = StyleSheet.create({
   speedText: { fontWeight: '600' },
   voiceRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   iconBtn: { width: 30, height: 36, alignItems: 'center', justifyContent: 'center' },
-  playBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  playBtn: {
+    width: PLAYER_BUTTON,
+    height: PLAYER_BUTTON,
+    borderRadius: PLAYER_BUTTON / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   // The play triangle looks centred a point to the right.
   playIcon: { marginLeft: 2 },
   divider: { width: StyleSheet.hairlineWidth * 2, height: 22, marginHorizontal: 2 },

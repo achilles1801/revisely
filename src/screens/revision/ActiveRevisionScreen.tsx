@@ -17,12 +17,12 @@ import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { useHaptics } from '../../design/haptics';
 import { typeV2 } from '../../theme/v2';
 import { getReadPalette } from '../../theme/readPalette';
-import { BulkActionsModal } from '../../components/BulkActionsModal';
 import { WeaknessModal } from '../../components/WeaknessRating';
-import { SessionMenuSheet, SessionMenuAction } from '../../components/revision/SessionMenuSheet';
+import { PagesSheet } from '../../components/revision/PagesSheet';
+import { PAGE_STRIP_HEIGHT, PageStrip } from '../../components/revision/PageStrip';
 import { RecordingSavedToast, SavedRecording } from '../../components/recordings/RecordingSavedToast';
 import { UndoToast } from '../../components/revision/UndoToast';
-import { HELP_ICON, useHelpSheet } from '../../components/help/HelpButton';
+import { useHelpSheet } from '../../components/help/HelpButton';
 import { HelpToast } from '../../components/help/HelpToast';
 import { SessionEndCard } from '../../components/revision/SessionEndCard';
 import { ElsewherePlace, useReciteLayer } from '../../components/reciteLive/useReciteLayer';
@@ -54,7 +54,7 @@ import { catchUpDayOf, duePagesOf, insightsPagesOn } from '../../lib/carryOver';
 import { revisablePages } from '../../lib/memorizedAyahs';
 import { creditedOnDay, doneOnDay, sessionCredit } from '../../lib/aheadCredit';
 import { aheadDayLabel, nextRevisionDayPlan, revisionDayPlan, startsCycle, type RevisionDayPlan } from '../../lib/aheadPlan';
-import { describePageRange, describePassage, passageRunCount } from '../../lib/passages';
+import { describePageRange, describePassage, surahName, surahNamesOfPage, surahsOfPages } from '../../lib/passages';
 import {
   getHizbForPage,
   getQuranData,
@@ -86,7 +86,7 @@ export default function ActiveRevisionScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProp<HomeStackParamList, 'ActiveRevision'>>();
   const { user, pages, logs, updatePages, addLog, updateLog, loadData, error } = useApp();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, palette: colors } = useTheme();
   const haptics = useHaptics();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
@@ -201,8 +201,7 @@ export default function ActiveRevisionScreen() {
   const [sessionStartTime] = useState(Date.now());
   const [saving, setSaving] = useState(false);
 
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [pagesOpen, setPagesOpen] = useState(false);
   const [showRating, setShowRating] = useState(false);
 
   // Hold a verse: highlight, Play (Husary), Translation. Playback stays within
@@ -274,7 +273,7 @@ export default function ActiveRevisionScreen() {
   // ===== Recite: the reader's mic, on the day's pages (Revisely Dev; components/reciteLive/useReciteLayer) =====
   // The same mic, menu, take bar, marks, hidden view, cards and summary as the reader (Majd, Nov 17 2026). A take never
   // marks a page revised (RECITE-9): it turns pages with the pager's scrollToPage, which never reports an advance, so
-  // only a swipe or ✓ marks one (SESS-1). Its page turns stay on the day's pages; a place the session doesn't hold (a
+  // only a swipe or the Pages sheet marks one (SESS-1). Its page turns stay on the day's pages; a place the session doesn't hold (a
   // similar ayah, a past take) opens in the reader over it, and Back comes back here.
   const pageOnScreen =
     currentPageNumber ??
@@ -312,8 +311,7 @@ export default function ActiveRevisionScreen() {
     // Test me jumps to places anywhere in what's memorized: the reader's, not a day's session.
     testMe: false,
   });
-  // The session's help (HELP-1): a row of ⋯, since the header already holds three round buttons. While a take is open:
-  // how Recite works, as in the reader.
+  // The session's help (HELP-1): a row of the Pages sheet. While a take is open: how Recite works, as in the reader.
   const help = useHelpSheet(recite.active ? 'recite' : 'session', { liveRecite: recite.liveOn, hideAs: 'session' });
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -484,7 +482,7 @@ export default function ActiveRevisionScreen() {
 
   const scopeLabel = useMemo(() => {
     // Juz first, as the title is short (surahs and juz first, CLAUDE.md): one juz, or two in a row;
-    // else the day's one surah when it fits; else how many pages.
+    // else the day's one surah, by name alone (no ayah numbers); else how many pages.
     const juzes = [
       ...new Set(
         shownPages
@@ -494,9 +492,8 @@ export default function ActiveRevisionScreen() {
     ].sort((a, b) => a - b);
     if (juzes.length === 1) return t('common.juzN', { n: juzes[0] });
     if (juzes.length === 2 && juzes[1] === juzes[0] + 1) return t('common.juzRange', { from: juzes[0], to: juzes[1] });
-    const words = describePassage(shownPages, { form: 'short', order: 'given', max: 1 });
-    // One run of pages (two or more would read "N more" at max 1): a value, never the English word.
-    if (words && words.length <= 16 && passageRunCount(shownPages, 'given') <= 1) return words;
+    const surahs = surahsOfPages(shownPages);
+    if (surahs.length === 1) return surahName(surahs[0]);
     return t('common.pages', { count: shownPages.length });
   }, [shownPages, quranData]);
 
@@ -745,11 +742,6 @@ export default function ActiveRevisionScreen() {
 
   const isCurrentRevised = completedPages.has(displayPageNumber);
 
-  const handleToggleCurrent = () => {
-    if (isCurrentRevised) unmarkRevised(displayPageNumber);
-    else markRevised(displayPageNumber);
-  };
-
   const handleUndo = () => {
     if (!undoState) return;
     unmarkRevised(undoState.page);
@@ -771,50 +763,22 @@ export default function ActiveRevisionScreen() {
     }
   };
 
-  // ===== Bulk-action handlers (used inside BulkActionsModal) =====
+  // ===== The Pages sheet =====
 
-  // In bulk: the day on screen (today's, or the later day the session is on).
+  // Mark all: the day on screen (today's, or the later day the session is on).
   const handleMarkAllComplete = () => setCompletedPages((prev) => new Set([...prev, ...viewerPages]));
   const handleMarkAllIncomplete = () =>
     setCompletedPages((prev) => new Set([...prev].filter((p) => !viewerPages.includes(p))));
-  const handleMarkJuzComplete = (juzNumber: number) => {
-    const juzPages = viewerPages.filter((pageNum) => {
-      const quranPage = quranData.find((q) => q.pageNumber === pageNum);
-      return quranPage?.juzNumber === juzNumber;
-    });
-    setCompletedPages((prev) => {
-      const next = new Set(prev);
-      const allDone = juzPages.every((p) => next.has(p));
-      juzPages.forEach((p) => (allDone ? next.delete(p) : next.add(p)));
-      return next;
-    });
-  };
   const handleTogglePage = (pageNumber: number) => {
     if (completedPages.has(pageNumber)) unmarkRevised(pageNumber);
     else markRevised(pageNumber);
   };
 
-  // ===== Menu actions =====
-
-  const menuActions: SessionMenuAction[] = [
-    ...(smartTrackingEnabled
-      ? [
-          {
-            key: 'rate',
-            label: t('revision.session.ratePageStrength'),
-            icon: 'fitness-outline' as const,
-            onPress: () => setShowRating(true),
-          },
-        ]
-      : []),
-    {
-      key: 'bulk',
-      label: t('revision.session.bulk'),
-      icon: 'list-outline',
-      onPress: () => setShowBulkActions(true),
-    },
-    ...(help.shown ? [{ key: 'help', label: t('revision.session.help'), icon: HELP_ICON, onPress: help.open }] : []),
-  ];
+  // A jump never marks a page (the pager's scrollToPage reports no advance).
+  const handleJump = (pageNumber: number) => {
+    setPagesOpen(false);
+    pagerRef.current?.scrollToPage(pageNumber);
+  };
 
   const palette = getReadPalette(isDark);
   const crowded = recorder.phase !== 'idle' || timer != null;
@@ -844,6 +808,8 @@ export default function ActiveRevisionScreen() {
         onBackgroundPress={recite.onTap}
         background={palette.pageBg}
         isDark={isDark}
+        strip={<PageStrip pages={viewPages} done={completedPages} current={displayPageNumber} />}
+        stripHeight={PAGE_STRIP_HEIGHT}
         quietHeader={
           <View style={styles.quietHeader}>
             <Text
@@ -901,22 +867,21 @@ export default function ActiveRevisionScreen() {
                 maxFontSizeMultiplier={1.3}
                 testID="session-page"
               >
-                {/* What the page holds, by surah; the printed page number is under the page. */}
+                {/* What the page holds, by surah name alone; the printed page number is under the page. */}
                 {t('revision.session.where', {
-                  what: describePageRange(displayPageNumber, displayPageNumber, { form: 'compact' }),
+                  what: surahNamesOfPage(displayPageNumber),
                   juz: currentJuz,
                   hizb: currentHizb,
                 })}
               </Text>
             </View>
             <RoundButton
-              icon={isCurrentRevised ? 'checkmark' : 'checkmark-outline'}
-              label={isCurrentRevised ? t('revision.edit.unmarkCurrent') : t('revision.edit.markCurrent')}
-              onPress={handleToggleCurrent}
+              icon="list-outline"
+              label={t('revision.pages.title')}
+              onPress={() => setPagesOpen(true)}
               palette={palette}
-              active={isCurrentRevised}
+              testID="session-pages"
             />
-            <RoundButton icon="ellipsis-horizontal" label={t('revision.edit.menu')} onPress={() => setMenuOpen(true)} palette={palette} />
           </View>
         }
         footer={
@@ -938,9 +903,19 @@ export default function ActiveRevisionScreen() {
         pageLabel={
           <View style={styles.pageLabel}>
             <Text style={[styles.pageNum, { color: palette.textPrimary }]} maxFontSizeMultiplier={1.3}>
-              {displayPageNumber}
+              {formatNumber(displayPageNumber)}
             </Text>
-            {isCurrentRevised && <Ionicons name="checkmark" size={12} color={palette.textSecondary} />}
+            {isCurrentRevised ? (
+              <>
+                <Text style={[styles.pageNum, { color: palette.textSecondary }]} maxFontSizeMultiplier={1.3}>
+                  ·
+                </Text>
+                <Ionicons name="checkmark" size={13} color={colors.good} />
+                <Text style={[styles.pageRevised, { color: colors.good }]} maxFontSizeMultiplier={1.3} testID="session-page-revised">
+                  {t('revision.session.revised')}
+                </Text>
+              </>
+            ) : null}
           </View>
         }
         activity={
@@ -1030,25 +1005,18 @@ export default function ActiveRevisionScreen() {
       <HelpToast screen="session" bottomInset={insets.bottom - spacing.sm} />
       {help.sheet}
 
-      <SessionMenuSheet
-        visible={menuOpen}
-        actions={menuActions}
-        onClose={() => setMenuOpen(false)}
-      />
-
-      <BulkActionsModal
-        visible={showBulkActions}
-        onClose={() => setShowBulkActions(false)}
-        pages={viewerPages.map((pageNum) => ({
-          pageNumber: pageNum,
-          isCompleted: completedPages.has(pageNum),
-          weaknessRating: localRatings.get(pageNum) ?? 4,
-        }))}
-        quranData={quranData}
-        onMarkAllComplete={handleMarkAllComplete}
-        onMarkAllIncomplete={handleMarkAllIncomplete}
-        onMarkJuzComplete={handleMarkJuzComplete}
-        onTogglePage={handleTogglePage}
+      <PagesSheet
+        visible={pagesOpen}
+        onClose={() => setPagesOpen(false)}
+        pages={viewerPages}
+        done={completedPages}
+        current={displayPageNumber}
+        onJump={handleJump}
+        onToggle={handleTogglePage}
+        onMarkAll={handleMarkAllComplete}
+        onUnmarkAll={handleMarkAllIncomplete}
+        onRate={smartTrackingEnabled ? () => setShowRating(true) : undefined}
+        onHelp={help.shown ? help.open : undefined}
       />
 
       {verseActions.overlay}
@@ -1145,11 +1113,12 @@ const makeStyles = (theme: ThemeColors) =>
       paddingBottom: spacing.sm,
       justifyContent: 'flex-end',
     },
-    pageLabel: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+    pageLabel: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     pageNum: {
       textAlign: 'center',
       fontSize: 13,
       fontWeight: '500',
       fontVariant: ['tabular-nums'],
     },
+    pageRevised: { fontSize: 13, fontWeight: '600' },
   });
