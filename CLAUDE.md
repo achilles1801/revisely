@@ -75,6 +75,10 @@ every session must follow goes here. `scripts/__tests__/handbook.test.js` checks
 - **One GitHub API limit for every session.** All sessions share one account's 5,000 requests an hour, and they ran
   out on Nov 15. Check CI once when you need it (`gh pr checks`, or `gh run watch --interval 120`), never in a tight
   loop.
+- **Keep updates short** (Majd, Nov 23 2026: "i dont like how ur responses and updates to me are so incredibly long and
+  verbose" … "the short response rule should be applied to all claude sessions"). Anything Majd reads, and every report
+  to the orchestrator, is a few plain lines: what changed, what's verified, and what he must do. Details go in the
+  shared notes or a doc, linked, for whoever needs them.
 - **Hand off before your context fills, and name sessions by topic and number** (Majd, Nov 14 2026).
   - Check your context with `mcp__ccd_session_mgmt__get_usage` (session "self") at milestones and before big
     reads. Auto-compaction starts at about 97% and keeps you going, but it loses detail.
