@@ -77,7 +77,7 @@ export type HomeStackParamList = {
   // date is a revision day, YYYY-MM-DD.
   /** focusRecordingId: scroll to that recording and highlight it. focusBlock: scroll to that block
    *  (a row of Overview's picked day, ACT-18). */
-  ActivityDay: { date: string; focusRecordingId?: string; focusBlock?: 'revised' | 'memorized' | 'read' | 'notes' | 'recited' };
+  ActivityDay: { date: string; focusRecordingId?: string; focusBlock?: 'revised' | 'memorized' | 'read' | 'notes' | 'recited'; addNote?: boolean };
   // The reader over Activity (a page of a day's strip, a weak spot): back returns to where it was
   // opened (ACT-20), unlike the Read tab's reader.
   // `highlight`: ayahs highlighted until the page is turned (Insights' Recitation rows, RINS-2), as the Read tab's.

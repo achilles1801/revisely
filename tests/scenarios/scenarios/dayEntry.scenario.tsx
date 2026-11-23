@@ -1,0 +1,72 @@
+// The picked day under Overview's calendar, as one entry (BEHAVIOUR.md ACT-34, Revisely Dev; Majd, Nov 23 2026: "the thing being
+// modified should be the journal entries beneath it; also i dont think we need to put "journal" for each entry").
+import React from 'react';
+import { fireEvent, render, screen } from '@testing-library/react-native';
+import type { ReactTestInstance } from 'react-test-renderer';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { CalendarMonth } from '../../../src/components/activity/CalendarMonth';
+import type { Revised } from '../../../src/lib/activityInsights';
+
+const mockPalette = new Proxy({}, { get: () => '#000000' });
+jest.mock('../../../src/context/ThemeContext', () => ({ useTheme: () => ({ palette: mockPalette, theme: mockPalette, isDark: false }) }));
+jest.mock('../../../src/lib/variant', () => ({ ...jest.requireActual('../../../src/lib/variant'), isDevVariant: () => true }));
+
+const DAY = '2026-11-22';
+const METRICS = { frame: { x: 0, y: 0, width: 393, height: 852 }, insets: { top: 59, left: 0, right: 0, bottom: 34 } };
+const revised: Revised = { day: DAY, countsFor: DAY, pages: [5, 6], assigned: [5, 6], minutes: 31 } as Revised;
+
+function show(opts: { items?: Revised[]; note?: string | null; memorized?: { day: string; pages: number[] }[] } = {}) {
+  const onOpen = jest.fn();
+  const onAddNote = jest.fn();
+  render(
+    <SafeAreaProvider initialMetrics={METRICS}>
+      <CalendarMonth
+        month="2026-11"
+        week="2026-11-22"
+        span="month"
+        onSpan={jest.fn()}
+        today={DAY}
+        picked={DAY}
+        data={{ revised: opts.items ?? [], memorized: (opts.memorized ?? []) as never, read: [], noteDays: new Set(opts.note ? [DAY] : []) }}
+        onStep={jest.fn()}
+        onPick={jest.fn()}
+        onOpen={onOpen}
+        noteOf={() => opts.note ?? null}
+        onAddNote={onAddNote}
+      />
+    </SafeAreaProvider>,
+  );
+  return { onOpen, onAddNote };
+}
+
+describe('a day’s entry under the calendar', () => {
+  it('[ACT-34] the date and its lines are one button that opens the day: no Open, no Journal label, the note last', () => {
+    const { onOpen } = show({ items: [revised], note: 'Slow down at the second page', memorized: [{ day: DAY, pages: [7] }] });
+    expect(screen.queryByText('Open')).toBeNull();
+    expect(screen.queryByText(/journal/i)).toBeNull();
+    const entry = screen.getByTestId('preview-open');
+    const lines = entry
+      .findAll((n: ReactTestInstance) => typeof n.type === 'string' && /^preview-row-/.test(String(n.props.testID ?? '')))
+      .map((n: ReactTestInstance) => n.props.testID);
+    expect(lines).toEqual(['preview-row-revised', 'preview-row-memorized', 'preview-row-notes']);
+    expect(screen.getByTestId('preview-value-notes').props.children).toBe('Slow down at the second page');
+    expect(screen.queryByTestId('preview-add-note')).toBeNull();
+    fireEvent.press(screen.getByTestId('preview-row-memorized'));
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(onOpen).toHaveBeenCalledWith(DAY);
+  });
+
+  it('[ACT-34] a day with no note offers Add a note, its one other action', () => {
+    const { onOpen, onAddNote } = show({ items: [revised] });
+    expect(screen.queryByTestId('preview-row-notes')).toBeNull();
+    fireEvent.press(screen.getByTestId('preview-add-note'));
+    expect(onAddNote).toHaveBeenCalledWith(DAY);
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it('[ACT-34] a day with nothing says so, and can still take a note', () => {
+    show();
+    expect(screen.getByTestId('preview-nothing')).toBeTruthy();
+    expect(screen.getByTestId('preview-add-note')).toBeTruthy();
+  });
+});

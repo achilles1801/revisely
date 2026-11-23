@@ -14,6 +14,8 @@ import { typeV2 } from '../../theme/v2';
 import type { RevisionLog } from '../../types';
 import { BlockMark, RevisedMark } from './BlockMark';
 import { RevisedElsewhereSheet } from './RevisedElsewhereSheet';
+import { RevisedPickerSheet } from './RevisedPickerSheet';
+import { journalDesignEnabled } from '../../lib/release/journalDesign';
 import { AddMemorizedSheet } from './AddMemorizedSheet';
 import { AddNoteSheet } from './AddNoteSheet';
 import { revisedOnDay, useDayItems } from './useDayItems';
@@ -92,7 +94,11 @@ export function AddToDaySheet({
           ))}
         </View>
       </Sheet>
-      <RevisedElsewhereSheet visible={open === 'revised'} onClose={() => setOpen(null)} day={day} dayName={dayName} logs={logs} />
+      {journalDesignEnabled() ? (
+        <RevisedPickerSheet visible={open === 'revised'} onClose={() => setOpen(null)} day={day} dayName={dayName} logs={logs} />
+      ) : (
+        <RevisedElsewhereSheet visible={open === 'revised'} onClose={() => setOpen(null)} day={day} dayName={dayName} logs={logs} />
+      )}
       <AddMemorizedSheet visible={open === 'memorized'} onClose={() => setOpen(null)} day={day} dayName={dayName} />
       <AddNoteSheet visible={open === 'note'} onClose={() => setOpen(null)} day={day} dayName={dayName} noteCount={noteCount} />
     </>

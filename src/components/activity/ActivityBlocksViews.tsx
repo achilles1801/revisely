@@ -72,6 +72,9 @@ interface Props {
   onTurnOnSmartTracking?: () => void;
   /** Days with a note in the log (the calendar's note dot). */
   noteDays: Set<string>;
+  /** The day's note and the day entry's Add a note (ACT-34). */
+  noteOf?: (day: string) => string | null;
+  onAddNote?: (day: string) => void;
   /** A day; at a block when a preview row opened it (ACT-18). */
   onOpenDay: (day: string, block?: PreviewBlock) => void;
   /** The tab on show changed (Overview or Insights): the top bar's help explains that one. */
@@ -82,7 +85,7 @@ interface Props {
   refreshRef?: React.MutableRefObject<(() => Promise<unknown>) | null>;
 }
 
-export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, onShowTop, refreshRef }: Props) {
+export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, onShowTop, refreshRef }: Props) {
   const { pages, logs, user } = useApp();
   const revo = useRevoAvailable(user);
   const recitation = useRecitation(user);
@@ -365,6 +368,8 @@ export function ActivityBlocksViews({ today, noteDays, onOpenDay, onReviseTomorr
             onStep={(delta) => stepRef.current(delta)}
             onPick={setPicked}
             onOpen={onOpenDay}
+            noteOf={noteOf}
+            onAddNote={onAddNote}
             gap={gapMark}
             recordings={recordings}
             recited={recited}

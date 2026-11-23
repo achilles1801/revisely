@@ -20,6 +20,8 @@ import { useReduceMotion } from '../../design/motion';
 import { ActionSheet } from '../v2/ActionSheet';
 import { ChoiceChip } from './ChoiceChip';
 import { dayMarks, dayPreview } from '../../lib/activityInsights';
+import { journalDesignEnabled } from '../../lib/release/journalDesign';
+import { DayEntry } from './DayEntry';
 import { formatDayLong, formatMinutesLong } from '../../lib/activityFormat';
 import { describePassage } from '../../lib/passages';
 import { describeSurahRuns, pageRuns } from '../../lib/pageRanges';
@@ -81,6 +83,8 @@ export function CalendarMonth({
   onStep,
   onPick,
   onOpen,
+  noteOf,
+  onAddNote,
   recordings,
   recited,
   sections = DEFAULT_SECTIONS.overview,
@@ -102,6 +106,10 @@ export function CalendarMonth({
   onPick: (day: string) => void;
   /** Opens a day; a preview row passes its block, so the day opens at it (ACT-18). */
   onOpen: (day: string, block?: PreviewBlock) => void;
+  /** The day's note, for its entry (ACT-34). */
+  noteOf?: (day: string) => string | null;
+  /** The entry's Add a note (ACT-34). */
+  onAddNote?: (day: string) => void;
   /** Recordings by day: the preview's mic and count beside the block they belong to. */
   recordings?: Map<string, RecordingCounts>;
   /** Recite takes by day (Revisely Dev): the preview's Recited row (RMEM-5). */
@@ -260,7 +268,15 @@ export function CalendarMonth({
   // Open are one button, each row another, edge to edge with no gap between them. Chrome, so it
   // stops growing at 1.4×, and the date gives way: at the largest text it pushed Open off the
   // screen and the rows clipped into each other (Nov 2026).
-  const dayPart = (
+  const dayPart = journalDesignEnabled() ? (
+    <DayEntry
+      date={formatDayLong(shownDay)}
+      lines={previewRows.filter((r) => r.kind !== 'notes')}
+      note={noteOf?.(shownDay) ?? null}
+      onOpen={() => onOpen(shownDay)}
+      onAddNote={() => (onAddNote ?? onOpen)(shownDay)}
+    />
+  ) : (
     <View style={styles.preview} testID="calendar-preview">
       <Tap
         onPress={() => onOpen(shownDay)}

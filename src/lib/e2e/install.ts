@@ -11,6 +11,7 @@ import { flushE2ELog, installLog } from './log';
 import { handleNetworkLink, installNetwork } from './network';
 import { pinFreshTheme } from './theme';
 import { handleUpdateLink } from './updates';
+import { handleJournalDesignLink } from './journalDesign';
 import { handleMemorizedPickerLink } from './memorizedPicker';
 import { handleReciteLiveLink } from './reciteLive';
 import { handleVoiceSearchLink } from './voiceSearch';
@@ -26,6 +27,7 @@ function handle(url: string | null | undefined): void {
   if (handleUpdateLink(url)) return;
   if (handleReciteLiveLink(url)) return;
   if (handleMemorizedPickerLink(url)) return;
+  if (handleJournalDesignLink(url)) return;
   if (handleVoiceSearchLink(url)) return;
   handleNetworkLink(url);
 }

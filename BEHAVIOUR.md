@@ -397,6 +397,9 @@ current basic sounds". October 2026's version was removed for the voices it offe
   qibla is next to it on the sheet if users wanna use it and it also makes the home page way cleaner"). The Prayer sheet
   (Times | Qibla) opens from the next-prayer line on Home; the Qibla also opens from Settings → Prayer → Qibla and from
   the Qibla widget, on the sheet's Qibla.
+- **HOME-2.** (Revisely Dev) One quiet row under Today, "Today's journal", opens today's journal (Majd, Nov 23 2026: it is
+  "a rly big piece of this app and it's almost hidden", "but i wanna avoid clutter on the home page"). It shows today's
+  first note, one still waiting to be sent included, or "Add a note" when there is none.
 
 ## Sheets and updates
 
@@ -980,7 +983,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   session's assignment, or the plan's) that are memorized and not revised for it yet, each ticked; untick the ones not
   done. "Add other pages" adds any other memorized pages, From and To (Majd, Nov 23 2026: "independent of the schedule
   and what a user needs to revise that day"). Add logs them for that day by hand, with no strength and no minutes. A
-  page already revised for the day is never offered again. A day with any pages logged is a revised day: it has its
+  page already revised for the day is never offered again. In Revisely Dev the sheet is ACT-33's search and juz grid. A day with any pages logged is a revised day: it has its
   calendar ring and counts in "Revised N days". Memorized opens its own sheet: From and To, or a surah, and
   optional minutes. From and To are rows that open wheels, the same on its Ayahs and Whole pages tabs
   (Majd, Nov 8 2026): a surah and an ayah wheel, or one wheel of pages whose rows name the surah each page
@@ -1067,12 +1070,24 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   Today, beside the arrows, brings back today's with today picked: its cell highlighted as a tapped day's
   is, and its preview below (Majd, Nov 8 2026). The picked day's whole preview opens
   that day: its date and Open at the top, each of its rows (Revised, Memorized, Read, Notes) scrolled to
-  that block. (Majd, Nov 8 2026: Week and Month as a second row of pills was "a whole tab just to show
+  that block. In Revisely Dev it is ACT-34's one entry. (Majd, Nov 8 2026: Week and Month as a second row of pills was "a whole tab just to show
   weeks instead of month"; Open alone was easy to miss.)
 - **ACT-32.** A day's Revised figure in the calendar counts only that day's plan: "3 of 5" is how many of its 5 planned
   pages were revised, and pages revised beyond the plan never take it past 5 or fill the day's ring. A day with no plan
   (pages logged by hand with no session) never says "2 of 0": it names what was revised and how much ("Al-Baqarah · 2
   pages", and "Revised 2 pages" in the week view). (Majd, Nov 23 2026: "not sure what 2 of 0 even means".)
+- **ACT-33.** (Revisely Dev) Revised elsewhere picks from a search and the thirty juz (Majd, Nov 23 2026: "no one wants
+  to scroll down and find a specific page especially if a user is a hafiz"). Nothing is chosen at first. The search stays
+  above the grid; typing swaps the grid for the surahs and juz it finds, and one surah found brings the juz that hold it.
+  A tap chooses or clears a juz. A hold opens it: its first half, second half (its two hizbs), the whole juz and its four
+  parts. Only memorized pages not revised for the day yet can be chosen, and a juz with none is faded. The foot says what is
+  chosen and how many pages. Add logs them as ACT-5 does: a page on the day's schedule ticks off, and any other never
+  changes the schedule or "N of 20".
+- **ACT-34.** (Revisely Dev) The picked day under Overview's calendar is one entry (Majd, Nov 23 2026: its rows "show up
+  as if they're separate clicks + there's an Open button and they all do the same thing"; "i dont think we need to put
+  journal for each entry"). Its date and one line for each thing that happened (Revised, Memorized, Read, Recited), the
+  note last when there is one, are one button that opens the day. With no note it offers Add a note, which opens that day's
+  Note sheet; a day with nothing says so. The calendar and the rest of Overview don't change.
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
   strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
   stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,
