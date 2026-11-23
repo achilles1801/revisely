@@ -31,6 +31,10 @@ type WindowChoice = (typeof WINDOW_CHOICES)[number];
 // A long run (research's 20-minute protocol): one run at the live cadence, battery and heat each minute.
 const MINUTE_CHOICES = ['5', '20'] as const;
 type MinuteChoice = (typeof MINUTE_CHOICES)[number];
+// The engine's hop by phone (the lead, Nov 23): a window every half second, or every second on slower phones.
+const HOP_CHOICES = ['500', '1000'] as const;
+type HopChoice = (typeof HOP_CHOICES)[number];
+const hopSeconds = (ms: number) => (ms / 1000).toString();
 
 const PROVIDER_LABEL: Record<Provider, () => string> = {
   cpu: () => t('settings.bench.providerCpu'),
@@ -77,6 +81,7 @@ export default function OnDeviceBenchScreen() {
   const [off, setOff] = useState<Set<string>>(new Set());
   const [windows, setWindows] = useState<WindowChoice>('200');
   const [minutes, setMinutes] = useState<MinuteChoice>('20');
+  const [hop, setHop] = useState<HopChoice>('500');
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [runs, setRuns] = useState<BenchRun[]>([]);
   const [record, setRecord] = useState<ReturnType<typeof benchRecord> | null>(null);
@@ -112,7 +117,7 @@ export default function OnDeviceBenchScreen() {
     const n = Number(windows);
     const toRun = long ? chosen.slice(0, 1) : chosen;
     const seconds = Number(minutes) * 60;
-    const length = long ? { durationSec: seconds } : { windows: n };
+    const length = long ? { durationSec: seconds, cadenceMs: Number(hop) } : { windows: n };
     setRuns([]);
     setRecord(null);
     const done: BenchRun[] = [];
@@ -261,6 +266,15 @@ export default function OnDeviceBenchScreen() {
                       testID="bench-minutes"
                     />
                   </View>
+                  <View style={styles.tabs}>
+                    <PillTabs
+                      options={HOP_CHOICES.map((h) => ({ value: h, label: t('settings.bench.hopChoice', { seconds: hopSeconds(Number(h)) }) }))}
+                      value={hop}
+                      onChange={setHop}
+                      disabled={busy}
+                      testID="bench-hop"
+                    />
+                  </View>
                 </GroupedSection>
                 <View style={styles.actions}>
                   <PillButton
@@ -358,7 +372,7 @@ function RunCard({ run, manifest }: { run: BenchRun; manifest: BenchManifest }) 
         </Text>
       ) : null}
       <Text style={[typeV2.body, styles.cardTitle, { color: palette.text }]}>
-        {run.long ? t('settings.bench.longTitle', { plan: planLabel(run.plan), minutes: Math.round(run.long.durationSec / 60) }) : planLabel(run.plan)}
+        {run.long ? t('settings.bench.longTitle', { plan: planLabel(run.plan), minutes: Math.round(run.long.durationSec / 60), hop: hopSeconds(run.long.cadenceMs) }) : planLabel(run.plan)}
       </Text>
       {lines.map((line, i) => (
         <Text key={i} style={[typeV2.meta, typeV2.numeral, { color: palette.secondary }]}>

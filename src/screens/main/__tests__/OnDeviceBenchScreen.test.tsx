@@ -33,7 +33,7 @@ const mockBench = {
   fail: null as string | null,
 };
 
-function mockRun(plan: PlanSpec, ms: number, durationSec?: number): BenchRun {
+function mockRun(plan: PlanSpec, ms: number, durationSec?: number, cadenceMs = 500): BenchRun {
   const count = durationSec ? durationSec * 2 : 20;
   // A long run slows by a tenth over its minutes and the battery falls a point every 4 minutes.
   const runMs = Array.from({ length: count }, (_, i) => (durationSec ? ms * (1 + (0.1 * i) / count) : ms));
@@ -45,7 +45,7 @@ function mockRun(plan: PlanSpec, ms: number, durationSec?: number): BenchRun {
   return {
     plan,
     summary: summarize(runMs, featureMs, 8000),
-    ...(durationSec ? { long: { durationSec, minutes: perMinute(startMs, runMs) } } : {}),
+    ...(durationSec ? { long: { durationSec, cadenceMs, minutes: perMinute(startMs, runMs) } } : {}),
     result: {
       startMs,
       late: durationSec ? 3 : 0,
@@ -82,8 +82,8 @@ jest.mock('../../../lib/onDevice/benchRun', () => {
       if (mockBench.fail) throw new Error(mockBench.fail);
       return {};
     }),
-    runPlan: jest.fn(async (_e: unknown, _m: unknown, plan: PlanSpec, _f: unknown, length: { windows?: number; durationSec?: number }) =>
-      mockRun(plan, plan.provider === 'coreml' ? 4 : 180, length.durationSec),
+    runPlan: jest.fn(async (_e: unknown, _m: unknown, plan: PlanSpec, _f: unknown, length: { windows?: number; durationSec?: number; cadenceMs?: number }) =>
+      mockRun(plan, plan.provider === 'coreml' ? 4 : 180, length.durationSec, length.cadenceMs),
     ),
     benchRecord: (device: object, windows: number, runs: BenchRun[]) => ({ device, windows, runs: runs.map((r) => r.plan.model) }),
     sendBenchRecord: jest.fn(async (rec: unknown) => {
@@ -158,8 +158,8 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
     });
     expect(runPlan).toHaveBeenCalledTimes(1);
     expect(runPlan.mock.calls[0][2]).toEqual(mockManifest.plans.ios[0]);
-    expect(runPlan.mock.calls[0][4]).toEqual({ durationSec: 1200 });
-    expect(screen.getByText('v7m-live-r16 · CPU · 2 threads · 20 minutes')).toBeTruthy();
+    expect(runPlan.mock.calls[0][4]).toEqual({ durationSec: 1200, cadenceMs: 500 });
+    expect(screen.getByText('v7m-live-r16 · CPU · 2 threads · 20 minutes · every 0.5 s')).toBeTruthy();
     expect(screen.getByText('Never hot (hottest: fair)')).toBeTruthy();
     expect(screen.getByText(/^Steady: the last minute (9|10)% off the first$/)).toBeTruthy();
     expect(screen.getByText('Battery down 5.0 points (15.0 an hour)')).toBeTruthy();
@@ -167,6 +167,18 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
     expect(screen.getByText(/^Minute 1 · 18\d\.\d ms · p95 18\d\.\d · 100\.0% · nominal$/)).toBeTruthy();
     expect(screen.getAllByText(/^Minute \d+ · /)).toHaveLength(20);
     expect(mockBench.sent).toHaveLength(1);
+  });
+
+  it('a long run can take a window every second instead, and says which', async () => {
+    await show();
+    const runPlan = jest.requireMock('../../../lib/onDevice/benchRun').runPlan as jest.Mock;
+    runPlan.mockClear();
+    fireEvent.press(screen.getByText('Every 1 s'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('bench-long-run'));
+    });
+    expect(runPlan.mock.calls[0][4]).toEqual({ durationSec: 1200, cadenceMs: 1000 });
+    expect(screen.getByText('v7m-live-r16 · CPU · 2 threads · 20 minutes · every 1 s')).toBeTruthy();
   });
 
   it('a run opened from memory, holding the any-length graph too, says so and gives the memory with both', async () => {

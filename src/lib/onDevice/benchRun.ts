@@ -158,13 +158,16 @@ export interface BenchRun {
   result: BenchResult;
   summary: RunSummary | null;
   /** A long run (research's 20-minute protocol): its length, and its windows a minute at a time. */
-  long?: { durationSec: number; minutes: MinuteStats[] };
+  long?: { durationSec: number; cadenceMs: number; minutes: MinuteStats[] };
   /** The app left the foreground, or the run stalled: its numbers aren't clean. */
   interrupted?: Interruption;
 }
 
-/** How long to run: N windows back to back, or a long run of so many seconds at the live cadence. */
-export type RunLength = { windows: number } | { durationSec: number };
+/**
+ * How long to run: N windows back to back, or a long run of so many seconds at a live pace: a window every `cadenceMs`
+ * (the manifest's hop unless given; the engine's hop is 0.5 s or 1 s by phone).
+ */
+export type RunLength = { windows: number } | { durationSec: number; cadenceMs?: number };
 
 /** Runs one plan; progress(done, total) per timed window (a long run: seconds of its duration). */
 export async function runPlan(
@@ -178,6 +181,8 @@ export async function runPlan(
   const model = manifest.models.find((m) => m.id === plan.model);
   if (!model) throw new Error(`No model ${plan.model}`); // i18n-ignore (an error for logs)
   const also = plan.alsoModel ? manifest.models.find((m) => m.id === plan.alsoModel) : undefined;
+  const manifestHopMs = (manifest.hopSamples / 16000) * 1000;
+  const cadenceMs = 'durationSec' in length ? (length.cadenceMs ?? manifestHopMs) : 0;
   const sub = engine.addListener('onBenchProgress', (e) => onProgress(e.done, e.total));
   const startState = String(AppState.currentState);
   const startT = Date.now();
@@ -197,8 +202,8 @@ export async function runPlan(
       warmup: 2,
       fromMemory: plan.fromMemory === true,
       ...(also ? { alsoModel: files[also.file] } : {}),
-      // A long run hops as a live take does: a window every half second (the manifest's hop), not back to back.
-      ...('durationSec' in length ? { durationSec: length.durationSec, cadenceMs: (manifest.hopSamples / 16000) * 1000 } : {}),
+      // A long run hops as a live take does, not back to back.
+      ...('durationSec' in length ? { durationSec: length.durationSec, cadenceMs } : {}),
       check: {
         pcm: files[manifest.check.pcm],
         mel: files[manifest.check.mel],
@@ -207,14 +212,15 @@ export async function runPlan(
         end: manifest.check.end,
       },
     });
-    const summary = result.ok ? summarize(result.runMs, result.featureMs, manifest.hopSamples) : null;
+    const hopSamples = cadenceMs > 0 ? (cadenceMs / 1000) * 16000 : manifest.hopSamples;
+    const summary = result.ok ? summarize(result.runMs, result.featureMs, hopSamples) : null;
     const disturbed = interruption(startState, changes, startT, Date.now(), result.startMs ?? []);
     return {
       plan,
       result,
       summary,
       ...('durationSec' in length
-        ? { long: { durationSec: length.durationSec, minutes: perMinute(result.startMs ?? [], result.runMs) } }
+        ? { long: { durationSec: length.durationSec, cadenceMs, minutes: perMinute(result.startMs ?? [], result.runMs) } }
         : {}),
       ...(disturbed ? { interrupted: disturbed } : {}),
     };
@@ -277,6 +283,7 @@ export function benchRecord(device: DeviceInfo, windows: number, runs: readonly 
       ...(long
         ? {
             durationSec: long.durationSec,
+            cadenceMs: long.cadenceMs,
             late: result.late,
             startMs: ms(result.startMs ?? []),
             minutes: long.minutes.map((m) => ({ ...m, p50: round(m.p50), p95: round(m.p95), max: round(m.max) })),

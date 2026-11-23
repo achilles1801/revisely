@@ -73,6 +73,17 @@ describe('[ONDEV-1] a run and the foreground', () => {
     expect(remove).toHaveBeenCalledTimes(1);
   });
 
+  it('a long run goes at the chosen pace, and its share of real time is of that hop', async () => {
+    const engine = engineThat(() => undefined) as unknown as { bench: jest.Mock };
+    const run = await runPlan(engine as never, MANIFEST, PLAN, FILES, { durationSec: 60, cadenceMs: 1000 }, () => undefined);
+    expect(engine.bench.mock.calls[0][0]).toMatchObject({ durationSec: 60, cadenceMs: 1000 });
+    expect(run.long?.cadenceMs).toBe(1000);
+    expect(run.summary?.realTime).toBeCloseTo(43 / 1000);
+    const byDefault = await runPlan(engine as never, MANIFEST, PLAN, FILES, { durationSec: 60 }, () => undefined);
+    expect(engine.bench.mock.calls[1][0]).toMatchObject({ cadenceMs: 500 });
+    expect(byDefault.summary?.realTime).toBeCloseTo(43 / 500);
+  });
+
   it('a run the app left during is marked, and its record says so', async () => {
     const engine = engineThat(() => {
       listeners[0]('background');

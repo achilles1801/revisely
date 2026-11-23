@@ -1577,7 +1577,7 @@ shows up once and they must go through it and complete it … just the main stuf
   both take, load and second-load times, memory, and the first and last windows' times with the phone's heat. A run
   can open its model from bytes in memory instead of its file, as the real path will after decrypting it, and hold the
   engine's second (any-length) graph beside it, for the memory with both. A long run
-  (5 or 20 minutes, research's protocol) takes the first chosen run at the live cadence, a window every half second,
+  (5 or 20 minutes, research's protocol) takes the first chosen run at a live pace, a window every 0.5 or 1 second (the choice is on the screen),
   and notes the battery, the thermal state and the window times each minute: it says whether the phone got hot
   (serious or worse), whether the last minute was within 20% of the first, and the battery's drop an hour (nothing on
   a charger). A run the app left the foreground during, or that stalled, says so on its result and in its record ("Don't use these numbers"). A run that fails says why and the others go on. The results go to the dev backend (the phone's model,
