@@ -857,6 +857,20 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Recite's pack for the phone (functions recitePack, Revisely Dev): which pack to give, its key, and each account's
+    // daily limits. Functions and the admin SDK only: a client could otherwise read the key or lift its own limit.
+    match /recitePacks/{packDoc} {
+      allow read, write: if false;
+    }
+
+    match /recitePackKeys/{packId} {
+      allow read, write: if false;
+    }
+
+    match /recitePackLimits/{userId} {
+      allow read, write: if false;
+    }
+
     // Deny all other access
     match /{document=**} {
       allow read, write: if false;
