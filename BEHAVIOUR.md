@@ -1566,7 +1566,9 @@ shows up once and they must go through it and complete it … just the main stuf
 ## Recite on the phone (Revisely Dev)
 
 - **ONDEV-1.** Settings → Testing → On-device model times Recite's model on this phone, the first step to checking
-  recitation on the phone instead of the server (Majd, Nov 23 2026). It lists this platform's runs from the dev
+  recitation on the phone instead of the server (Majd, Nov 23 2026). Under the phone's name it says which Recite engine
+  this build carries: its version, "stub (server path)" for a build without the private engine, or that its self-test
+  failed. It lists this platform's runs from the dev
   backend (each a model file, a processor (CPU, Core ML, XNNPACK or NNAPI) and a thread count; all chosen, any left
   out), downloads what the chosen runs need once (only for accounts the team has given bench access: Revisely Dev is open
   to anyone with its link; the models are the watermarked ones; each file checked by size and SHA-256, kept on the
