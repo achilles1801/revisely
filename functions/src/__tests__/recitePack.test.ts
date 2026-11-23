@@ -25,7 +25,7 @@ import {
 
 const KEY = Buffer.alloc(32, 7);
 const blobs = () => [
-  { name: 'v7-live', data: randomBytes(5000) },
+  { name: 'v7.weights.f16', data: randomBytes(5000) },
   { name: 'words.rcwt', data: randomBytes(3000) },
   { name: 'config.json', data: Buffer.from('{"vocab":["a"]}') },
 ];
@@ -42,9 +42,9 @@ describe('the .rcpk format', () => {
 
   it('holds no plaintext: a blob’s bytes appear nowhere in the file', () => {
     const marker = Buffer.from('THE-MODEL-WEIGHTS-'.repeat(20));
-    const file = seal(packContainer([{ name: 'v7-live', data: marker }]), KEY, { packId: 'v7m-1', part: 'core' });
+    const file = seal(packContainer([{ name: 'v7.weights.f16', data: marker }]), KEY, { packId: 'v7m-1', part: 'core' });
     expect(file.includes(marker.subarray(0, 32))).toBe(false);
-    expect(file.includes(Buffer.from('v7-live'))).toBe(false); // the blob table is sealed too
+    expect(file.includes(Buffer.from('v7.weights.f16'))).toBe(false); // the blob table is sealed too
   });
 
   it('a fresh nonce for every seal, so the same pack sealed twice differs', () => {
@@ -104,6 +104,49 @@ describe('the .rcpk format', () => {
     const c = packContainer(blobs());
     c[c.length - 1] ^= 1;
     expect(() => unpackContainer(c)).toThrow('sha256');
+  });
+
+  it('deflates a blob that shrinks, keeps one that doesn’t, and reads both back', () => {
+    const table = Buffer.from('the same words again and again '.repeat(2000));
+    const weights = randomBytes(40_000);
+    const c = packContainer([{ name: 'words.rcwt', data: table }, { name: 'v7.weights.f16', data: weights }]);
+    expect(c.length).toBeLessThan(weights.length + table.length / 10);
+    expect(c.includes(weights)).toBe(true); // stored whole, so a phone can decrypt it straight into the engine's buffer
+    const back = unpackContainer(c);
+    expect(back[0].data.equals(table)).toBe(true);
+    expect(back[1].data.equals(weights)).toBe(true);
+  });
+
+  it('refuses a deflated blob that is damaged or would inflate past its size', () => {
+    const data = Buffer.from('abcabcabc'.repeat(1000));
+    const c = packContainer([{ name: 'words.rcwt', data }]);
+    const nameAt = c.indexOf('words.rcwt');
+    const sizeAt = nameAt + 'words.rcwt'.length + 1 + 8 + 8; // name, codec, offset, stored
+    const smaller = Buffer.from(c);
+    smaller.writeBigUInt64LE(BigInt(data.length - 1), sizeAt);
+    expect(() => unpackContainer(smaller)).toThrow(PackFormatError);
+    const damaged = Buffer.from(c);
+    damaged[damaged.length - 2] ^= 0xff;
+    expect(() => unpackContainer(damaged)).toThrow(PackFormatError);
+  });
+
+  it('keeps the room a blob needs on the phone, and refuses less than its data', () => {
+    const data = randomBytes(1000);
+    const [back] = unpackContainer(packContainer([{ name: 'v7.weights.f16', data, room: 2020 }]));
+    expect(back.room).toBe(2020);
+    expect(back.data.equals(data)).toBe(true);
+    expect(unpackContainer(packContainer([{ name: 'x', data }]))[0].room).toBe(1000);
+    expect(() => packContainer([{ name: 'x', data, room: 999 }])).toThrow('room');
+  });
+
+  it('refuses a container of another version or an unknown codec', () => {
+    const c = packContainer([{ name: 'a', data: Buffer.from('x') }]);
+    const version = Buffer.from(c);
+    version.writeUInt32LE(1, 4);
+    expect(() => unpackContainer(version)).toThrow('version');
+    const codec = Buffer.from(c);
+    codec[c.indexOf('a', 12) + 1] = 9;
+    expect(() => unpackContainer(codec)).toThrow('codec');
   });
 
   it('refuses repeated or empty blob names and bad pack ids', () => {

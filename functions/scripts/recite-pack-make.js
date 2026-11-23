@@ -10,8 +10,11 @@
  * From the functions/ directory, after `npm run build`:
  *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-dev-admin.json node scripts/recite-pack-make.js \
  *     --id v7m-1 \
- *     --core v7-live=/path/model.ort,words.rcwt=/path/words.rcwt,ayahs.bin=/path/ayahs.bin,config.json=/path/config.json \
- *     --strict v5=/path/v5.ort \
+ *     --core v7.graph.onnx=/models/v7m-any.graph.onnx,v7.weights.f16=/models/v7m-any.weights.f16,\
+ *            v7.weights.json=/models/v7m-any.weights.json,words.rcwt=/pack/words.rcwt,ayahs.bin=/pack/ayahs.bin,\
+ *            norms.bin=/pack/norms.bin,stops.bin=/pack/stops.bin,lexicon.bin=/pack/lexicon.bin,\
+ *            letters.bin=/pack/letters.bin,mel.bin=/pack/mel.bin,config.json=/pack/config.json \
+ *     --strict v5.onnx=/models/v5.onnx,strict.bin=/pack-strict/strict.bin \
  *     --apps 1:433792838929:ios:…,1:433792838929:android:… \
  *     --claim onDeviceBench
  *
@@ -23,8 +26,10 @@ const fs = require('fs');
 const { PACK_ID, RCPK_FORMAT, KEY_BYTES, open, packContainer, seal, unpackContainer } = require('../lib/recitePack/format');
 
 /** The names recite-core's rc_open takes (recite_core.h). */
-const BLOB_NAMES = new Set(['v7-live', 'v7-any', 'words.rcwt', 'ayahs.bin', 'config.json', 'v5']);
-const CORE_NEEDS = ['v7-live', 'words.rcwt', 'ayahs.bin', 'config.json'];
+const CORE_NEEDS = ['v7.graph.onnx', 'v7.weights.f16', 'v7.weights.json', 'words.rcwt', 'ayahs.bin', 'norms.bin',
+  'stops.bin', 'lexicon.bin', 'letters.bin', 'mel.bin', 'config.json'];
+const STRICT_NEEDS = ['v5.onnx', 'strict.bin'];
+const BLOB_NAMES = new Set([...CORE_NEEDS, ...STRICT_NEEDS]);
 
 function fail(message) {
   console.error(`ERROR: ${message}`);
@@ -63,6 +68,13 @@ const sha256 = (b) => crypto.createHash('sha256').update(b).digest('hex');
 /** One part sealed, and opened again with the key before anything leaves this machine. */
 function makePart(packId, part, list, key) {
   const blobs = list.map(({ name, path }) => ({ name, data: fs.readFileSync(path) }));
+  const weights = blobs.find((b) => b.name === 'v7.weights.f16');
+  if (weights) {
+    // the engine widens them in place: the phone's buffer for them is the fp32 size (recite_core.h)
+    const layout = JSON.parse(blobs.find((b) => b.name === 'v7.weights.json').data.toString('utf8'));
+    if (!Number.isSafeInteger(layout.fp32_bytes) || layout.fp32_bytes < weights.data.length) fail('v7.weights.json: fp32_bytes');
+    weights.room = layout.fp32_bytes;
+  }
   const sealed = seal(packContainer(blobs), key, { packId, part });
   const back = unpackContainer(open(sealed, key, { packId, part }));
   if (back.length !== blobs.length || back.some((b, i) => b.name !== blobs[i].name || !b.data.equals(blobs[i].data))) {
@@ -81,6 +93,8 @@ async function main() {
   const missing = CORE_NEEDS.filter((n) => !core.some((b) => b.name === n));
   if (missing.length) fail(`--core is missing ${missing.join(', ')}`);
   const strict = o.strict ? blobList(o.strict) : null;
+  const strictMissing = strict ? STRICT_NEEDS.filter((n) => !strict.some((b) => b.name === n)) : [];
+  if (strictMissing.length) fail(`--strict is missing ${strictMissing.join(', ')}`);
   const apps = (o.apps ?? '').split(',').filter(Boolean);
   if (!o.dry && apps.length === 0) fail('--apps: the App Check app ids that may fetch it');
 
