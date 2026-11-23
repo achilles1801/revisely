@@ -120,18 +120,19 @@ export function PagesSheet({
         </Tap>
       </View>
       <ScrollView ref={list} style={styles.list} contentContainerStyle={styles.listContent} bounces={false}>
-        {pages.map((page) => {
+        {pages.map((page, i) => {
           const here = page === current;
           const checked = done.has(page);
+          // The last row has no line: the actions' own rule follows it.
+          const ruled = !here && i < pages.length - 1;
           return (
             <View
               key={page}
               onLayout={here ? (e) => placeHere(e.nativeEvent.layout.y) : undefined}
               style={[
                 styles.row,
-                here
-                  ? [styles.rowHere, { backgroundColor: palette.accentSubtle }]
-                  : { borderBottomColor: palette.separator, borderBottomWidth: layoutV2.hairline },
+                here && [styles.rowHere, { backgroundColor: palette.accentSubtle }],
+                ruled && { borderBottomColor: palette.separator, borderBottomWidth: layoutV2.hairline },
               ]}
               testID={here ? 'session-pages-here' : `session-pages-row-${page}`}
             >
