@@ -1,0 +1,21 @@
+// Recite on the phone (Revisely Dev only: plugins/withDevModules links modules-dev/ into Dev's builds alone).
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'app.revisely.reciteengine'
+version = '0.1.0'
+
+android {
+  namespace "app.revisely.reciteengine"
+  defaultConfig {
+    versionCode 1
+    versionName '0.1.0'
+  }
+}
+
+dependencies {
+  // One version, the checker's (onnxruntime==1.31.1), from Maven Central: CPU, XNNPACK and NNAPI providers.
+  implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.31.1'
+}

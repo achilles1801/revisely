@@ -491,6 +491,18 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- With it off, Activity opens from the pulse icon at the top of Home, as described in the main guide.',
     ),
   },
+  {
+    // Nov 23 2026: the first step to Recite checking on the phone instead of the server (Majd: "get the model on phone").
+    title: 'On-device model (Settings → Testing)',
+    covers: ['ONDEV-1'],
+    routes: ['Settings', 'OnDeviceBench'],
+    text: lines(
+      '- Settings → Testing → “On-device model” times Recite’s model on this phone, for the Revisely team: the first step to checking recitation on the phone instead of Revisely’s server. Recite itself still checks on the server.',
+      '- It lists runs (a model, the CPU or Core ML / NNAPI / XNNPACK, a thread count), downloads what they need once (a few hundred MB on Wi‑Fi the first time), checks each model against the checker’s own output, then times it and shows the time per 4-second window (under 150 ms at p95 is the mark), memory and heat.',
+      '- “Long run” (5 or 20 minutes) runs the first chosen run as a live take would, a window every half second, and notes the battery and the phone’s heat each minute. Unplugged, at the usual brightness, on that screen.',
+      '- The results go to the Revisely team (the phone’s model and the timings, never their account or any audio) and “Share results” sends them anywhere. A build without it says to update Revisely Dev; an account the team hasn’t given bench access is told so.',
+    ),
+  },
 ];
 
 /**

@@ -210,8 +210,9 @@ export default {
           locationWhenInUsePermission: "Revisely uses your location to work out prayer times, the Qibla direction and the Fajr time that starts your revision day. Only the Fajr setting saves it to your account; it is never shared or used for tracking."
         }
       ],
-      // Revisely Dev only: its widget reads its own App Group and opens revisely-dev:// links.
-      ...(DEV ? ["./plugins/withDevVariant"] : [])
+      // Revisely Dev only: its widget reads its own App Group and opens revisely-dev:// links, and the native modules
+      // in modules-dev/ (Recite on the phone) are linked into its builds alone.
+      ...(DEV ? ["./plugins/withDevVariant", "./plugins/withDevModules"] : [])
     ],
     extra: {
       firebase: {

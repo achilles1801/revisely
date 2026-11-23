@@ -1379,6 +1379,16 @@ export default function SettingsScreen() {
                 {isDevVariant() ? <ScheduledRemindersRow /> : null}
                 {/* Revisely Dev only: which model its checker runs for each level (Majd, Nov 18 2026). */}
                 {reciteCheck && isDevVariant() ? <CheckerModelRow /> : null}
+                {/* Revisely Dev only: Recite's model timed on this phone (ONDEV-1). */}
+                {isDevVariant() ? (
+                  <Row
+                    icon="speedometer-outline"
+                    label={t('settings.testing.bench')}
+                    subtitle={t('settings.testing.benchSub')}
+                    onPress={() => navigation.navigate('OnDeviceBench')}
+                    testID="settings-on-device-bench"
+                  />
+                ) : null}
                 {reciteCheck ? (
                   <Row
                     icon="sparkles-outline"
