@@ -1,7 +1,9 @@
 import { JournalEntry, JournalKind, JournalNote, User } from '../types';
 import { getSurahsForPage } from './quranData';
+import { surahNameIn } from './passages';
 import { getRevisionDayForUser, revisionDayOf } from './fajrBoundary';
-import { formatDate, formatTime, weekdayName } from '../i18n';
+import { formatDate, formatTime, t, weekdayName } from '../i18n';
+import { westernDigits } from '../i18n/digits';
 
 // Limits mirrored in firestore.rules — keep them in sync.
 export const JOURNAL_TEXT_MAX = 200;
@@ -19,9 +21,15 @@ export const JOURNAL_ENTRIES_PER_DAY = 50;
 export const LEGACY_NOTE_ID = 'legacy';
 
 export const JOURNAL_KIND_LABELS: Record<JournalKind, string> = {
-  memorization: 'Memorization',
-  revision: 'Revision',
-  note: 'Note',
+  get memorization() {
+    return t('lib.journal.memorization');
+  },
+  get revision() {
+    return t('lib.journal.revision');
+  },
+  get note() {
+    return t('lib.journal.note');
+  },
 };
 
 /** The longest text a note of this kind may hold. */
@@ -97,7 +105,7 @@ export function legacyJournalNotes(
   } else if (!memorization && !revision) {
     text = notes;
   } else {
-    text = [memorization && `Memorized: ${memorization}`, revision && `Revised: ${revision}`, notes]
+    text = [memorization && t('lib.journal.memorized', { text: memorization }), revision && t('lib.journal.revised', { text: revision }), notes]
       .filter(Boolean)
       .join('\n');
   }
@@ -161,7 +169,7 @@ export function formatMinutes(minutes: number): string {
  * "not recorded" (null), and values are capped at a full day.
  */
 export function parseMinutesInput(text: string): number | null {
-  const digits = text.replace(/[^0-9]/g, '');
+  const digits = westernDigits(text).replace(/[^0-9]/g, '');
   if (digits === '') return null;
   return Math.min(parseInt(digits, 10), JOURNAL_MINUTES_MAX);
 }
@@ -194,8 +202,8 @@ export function formatJournalDay(date: string): string {
 
 /** "Today" / "Yesterday" relative to `today`, otherwise "Wed 9/23". */
 export function formatJournalDayRelative(date: string, today: string): string {
-  if (date === today) return 'Today';
-  if (date === shiftDay(today, -1)) return 'Yesterday';
+  if (date === today) return t('lib.journal.today');
+  if (date === shiftDay(today, -1)) return t('lib.journal.yesterday');
   return formatJournalDay(date);
 }
 
@@ -284,14 +292,17 @@ export function summarizeRevisedPages(pages: number[]): string {
   const surahs: string[] = [];
   for (const pn of unique) {
     for (const s of getSurahsForPage(pn)) {
-      if (!surahs.includes(s.name)) surahs.push(s.name);
+      const name = surahNameIn(s.number);
+      if (!surahs.includes(name)) surahs.push(name);
     }
   }
 
-  const count = unique.length === 1 ? '1 page' : `${unique.length} pages`;
+  const count = t('lib.journal.pages', { count: unique.length });
   if (surahs.length === 0) return count;
-  if (surahs.length <= 2) return `${count}, ${surahs.join(' and ')}`;
-  return `${count}, ${surahs[0]} to ${surahs[surahs.length - 1]}`;
+  if (surahs.length <= 2) {
+    return t('lib.journal.withSurahs', { pages: count, surahs: surahs.length === 2 ? t('lib.journal.surahsAnd', { a: surahs[0], b: surahs[1] }) : surahs[0] });
+  }
+  return t('lib.journal.withSurahs', { pages: count, surahs: t('lib.journal.surahsTo', { a: surahs[0], b: surahs[surahs.length - 1] }) });
 }
 
 // ---------------------------------------------------------------------------
@@ -301,19 +312,27 @@ export function summarizeRevisedPages(pages: number[]): string {
 export type JournalSort = 'newest' | 'oldest' | 'recentlyLogged' | 'mostTime';
 
 export const JOURNAL_SORT_LABELS: Record<JournalSort, string> = {
-  newest: 'Newest first',
-  oldest: 'Oldest first',
-  recentlyLogged: 'Recently logged',
-  mostTime: 'Most time spent',
+  get newest() {
+    return t('lib.sorts.newest');
+  },
+  get oldest() {
+    return t('lib.sorts.oldest');
+  },
+  get recentlyLogged() {
+    return t('lib.sorts.recentlyLogged');
+  },
+  get mostTime() {
+    return t('lib.sorts.mostTime');
+  },
 };
 
 /** 'all' | 'last7' | 'last30' | a month key like '2026-09'. */
 export type JournalFilter = 'all' | 'last7' | 'last30' | string;
 
 export function journalFilterLabel(filter: JournalFilter): string {
-  if (filter === 'all') return 'All dates';
-  if (filter === 'last7') return 'Last 7 days';
-  if (filter === 'last30') return 'Last 30 days';
+  if (filter === 'all') return t('lib.journal.allDates');
+  if (filter === 'last7') return t('lib.journal.last7');
+  if (filter === 'last30') return t('lib.journal.last30');
   return formatJournalMonth(filter);
 }
 

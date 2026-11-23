@@ -79,6 +79,19 @@ export interface RevoContext {
    * an account that recites with Mark mistakes (lib/revo/recitation). The server adds its recitation rules with it.
    */
   recitation?: RevoRecitation;
+  /** 'dev' from Revisely Dev (lib/variant): the server then adds the Dev guide to the question. Never from the store app. */
+  app?: 'dev';
+  /**
+   * 'ar' when the app is in Arabic (Revisely Dev's language picker, src/i18n/choice): the server asks for the answer in
+   * Arabic. Never sent in English, so those requests are as before.
+   */
+  language?: 'ar';
+  /**
+   * Insights' Gaps and Last revised (ACT-28 and ACT-30): the figures the section and the screen show, from lib/revo/gaps,
+   * for an account that has them. A server from before the mistake detection release refuses them without `app: 'dev'`,
+   * so it is deployed with the release (before its Promote).
+   */
+  gaps?: RevoGaps;
   localTime: string | null;
 }
 
@@ -95,6 +108,25 @@ export interface RevoRecitedAyah {
   sura: number;
   ayah: number;
   name: string;
+}
+
+/** The server's shape (functions/src/revo/types.ts RevoGaps), checked there (validate.ts validateGaps). */
+export interface RevoGaps {
+  /** Whole days since the last revision day (0 = today). */
+  lastRevisedDaysAgo: number;
+  /**
+   * The longest gap in the last 30 days, in days without revising (2 or more; still open: the days since the last
+   * revision, today included); `endedDaysAgo` null while it is still open.
+   */
+  longestGap: { days: number; endedDaysAgo: number | null } | null;
+  /** The usual step between revision days (1 = every day), from at least two steps. */
+  usualStepDays: number | null;
+  /** Gaps (2 days or more without revising) in the last 30 days, the open one included. */
+  longGaps: number;
+  /** The full revision against the plan (lib/gapsCycle). */
+  fullRevision: { latePages: number; pushedBackDays: number; cycleDays: number } | null;
+  /** Memorized surahs, longest waiting first: days since revised (null: never; `notYet`: memorized under 30 days ago). */
+  surahs: { name: string; daysAgo: number | null; notYet?: true }[];
 }
 
 /** The server's shape (functions/src/revo/types.ts RevoRecitation), checked there to add up. */
@@ -116,6 +148,8 @@ export interface RevoRecitation {
   slipping: { passage: RevoRecitedPassage; words: number; wordMistakes: number; wrong: number; tries: number; daysAgo: number }[];
   similar: { from: RevoRecitedAyah; into: RevoRecitedAyah; ending: boolean; times: number; also: number; daysAgo: number }[];
   last: { daysAgo: number; passage: RevoRecitedPassage; score: number; mistakes: number; unclear: number; hidden: boolean; strict: boolean } | null;
+  /** The window's long takes (2 pages or more), their pages and mistakes (RECITE-24); left out with none. */
+  perPage?: { takes: number; pages: number; mistakes: number };
 }
 
 export interface RevoTakeMark {

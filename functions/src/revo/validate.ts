@@ -12,6 +12,7 @@ import {
   REVO_MARK_KINDS,
   REVO_MISTAKE_KINDS,
   REVO_PASSAGE_KEYS,
+  REVO_PER_PAGE_FROM,
   REVO_RECITATION_LIST,
   REVO_RECITATION_WEEKS,
   REVO_TAJWEED_RULES,
@@ -25,6 +26,7 @@ import {
   RevoPassageFacts,
   RevoPattern,
   RevoPlanTally,
+  RevoGaps,
   RevoRecitation,
   RevoRecitedAyah,
   RevoRecitedPassage,
@@ -181,7 +183,13 @@ export function validateContext(v: unknown): RevoContext {
   // `week[].done` come from apps after Nov 7 2026 (lib/todaySnapshot); older apps send without them.
   // `week[].caughtUp`, `week[].ahead`, `week[].started` and `patterns` come from apps after Nov 9 2026 (REVO-40).
   // `recitation` comes only from Revisely Dev apps whose account recites (Nov 2026).
-  keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'patterns', 'passages', 'pageNames', 'recitation', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
+  // `app` ('dev') comes only from Revisely Dev, from Nov 16 2026: its requests carry the Dev guide (guide.ts).
+  // `gaps` comes from Revisely Dev from Nov 16 2026, and from every app with the mistake detection release (Insights'
+  // Gaps, ACT-28). `recitation` likewise, for an account that recites.
+  // `language` ('ar') comes from apps in Arabic (Revisely Dev's picker), from Nov 22 2026: the answer is asked for in it.
+  keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'patterns', 'passages', 'pageNames', 'recitation', 'app', 'gaps', 'language', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
+  if (c.app !== undefined && c.app !== 'dev') fail('context.app');
+  if (c.language !== undefined && c.language !== 'ar') fail('context.language');
 
   const t = obj(c.totals, 'context.totals');
   keys(t, REVO_TOTALS, 'context.totals');
@@ -278,6 +286,9 @@ export function validateContext(v: unknown): RevoContext {
     ...(passages ? { passages } : {}),
     ...(pageNames ? { pageNames } : {}),
     ...(recitation ? { recitation } : {}),
+    ...(c.app === 'dev' ? { app: 'dev' as const } : {}),
+    ...(c.language === 'ar' ? { language: 'ar' as const } : {}),
+    ...(c.gaps !== undefined ? { gaps: validateGaps(c.gaps, 'context.gaps') } : {}),
     localTime: lt,
   };
 }
@@ -320,10 +331,52 @@ function recitedAyah(v: unknown, path: string): RevoRecitedAyah {
   };
 }
 
+const MAX_GAP_DAYS = 10_000;
+const SURAH_COUNT = 114;
+const MAX_SURAH_NAME = 40;
+
+/** Insights' Gaps (ACT-28, ACT-30), checked: bounded counts, a full revision late only with pages late, every surah named. */
+export function validateGaps(v: unknown, path: string): RevoGaps {
+  const g = obj(v, path);
+  keys(g, ['lastRevisedDaysAgo', 'longestGap', 'usualStepDays', 'longGaps', 'fullRevision', 'surahs'], path);
+  const lastRevisedDaysAgo = int(g.lastRevisedDaysAgo, 0, MAX_GAP_DAYS, `${path}.lastRevisedDaysAgo`);
+  let longestGap: RevoGaps['longestGap'] = null;
+  if (g.longestGap !== null) {
+    const l = obj(g.longestGap, `${path}.longestGap`);
+    keys(l, ['days', 'endedDaysAgo'], `${path}.longestGap`);
+    const days = int(l.days, 2, MAX_GAP_DAYS, `${path}.longestGap.days`);
+    const endedDaysAgo = l.endedDaysAgo === null ? null : int(l.endedDaysAgo, 0, MAX_GAP_DAYS, `${path}.longestGap.endedDaysAgo`);
+    longestGap = { days, endedDaysAgo };
+  }
+  const usualStepDays = g.usualStepDays === null ? null : num(g.usualStepDays, 1, MAX_GAP_DAYS, `${path}.usualStepDays`);
+  if (usualStepDays !== null && !Number.isInteger(usualStepDays * 2)) fail(`${path}.usualStepDays`);
+  const longGaps = int(g.longGaps, 0, 30, `${path}.longGaps`);
+  let fullRevision: RevoGaps['fullRevision'] = null;
+  if (g.fullRevision !== null) {
+    const f = obj(g.fullRevision, `${path}.fullRevision`);
+    keys(f, ['latePages', 'pushedBackDays', 'cycleDays'], `${path}.fullRevision`);
+    const latePages = int(f.latePages, 0, 604, `${path}.fullRevision.latePages`);
+    const pushedBackDays = int(f.pushedBackDays, 0, MAX_GAP_DAYS, `${path}.fullRevision.pushedBackDays`);
+    if ((latePages === 0) !== (pushedBackDays === 0)) fail(`${path}.fullRevision.pushedBackDays`);
+    fullRevision = { latePages, pushedBackDays, cycleDays: int(f.cycleDays, 1, MAX_GAP_DAYS, `${path}.fullRevision.cycleDays`) };
+  }
+  const surahs = list(g.surahs, SURAH_COUNT, `${path}.surahs`, (x, p) => {
+    const s = obj(x, p);
+    keys(s, ['name', 'daysAgo', 'notYet'], p, ['name', 'daysAgo']);
+    const name = passageText(s.name, MAX_SURAH_NAME, `${p}.name`);
+    const daysAgo = s.daysAgo === null ? null : int(s.daysAgo, 0, MAX_GAP_DAYS, `${p}.daysAgo`);
+    if (s.notYet !== undefined && (s.notYet !== true || daysAgo !== null)) fail(`${p}.notYet`);
+    return s.notYet === true ? { name, daysAgo, notYet: true as const } : { name, daysAgo };
+  });
+  return { lastRevisedDaysAgo, longestGap, usualStepDays, longGaps, fullRevision, surahs };
+}
+
 /** Their recitation over the window, checked to add up. */
 export function validateRecitation(v: unknown, path: string): RevoRecitation {
   const r = obj(v, path);
-  keys(r, ['days', 'takes', 'daysRecited', 'minutes', 'words', 'mistakes', 'kinds', 'unclear', 'tajweed', 'score', 'earlierScore', 'weeks', 'stillMarked', 'cleared', 'slipping', 'similar', 'last'], path);
+  const required = ['days', 'takes', 'daysRecited', 'minutes', 'words', 'mistakes', 'kinds', 'unclear', 'tajweed', 'score', 'earlierScore', 'weeks', 'stillMarked', 'cleared', 'slipping', 'similar', 'last'];
+  // `perPage` (RECITE-24) comes only when the window has long takes; apps from before it never send it.
+  keys(r, [...required, 'perPage'], path, required);
   const days = int(r.days, 7, 90, `${path}.days`);
   const takes = int(r.takes, 0, MAX_COUNT, `${path}.takes`);
   const daysRecited = int(r.daysRecited, 0, Math.min(days, takes), `${path}.daysRecited`);
@@ -335,7 +388,9 @@ export function validateRecitation(v: unknown, path: string): RevoRecitation {
   const mistakes = int(r.mistakes, 0, MAX_COUNT, `${path}.mistakes`);
   if (REVO_MISTAKE_KINDS.reduce((n, kind) => n + kinds[kind], 0) !== mistakes) fail(`${path}.mistakes`);
   const scored = maybe(r.score, (x) => score(x, `${path}.score`));
-  if ((scored === null) !== (takes === 0)) fail(`${path}.score`);
+  // No takes, no score. Takes and no score: every one ended without the checker's final answer (RECITE-11), and those
+  // never count in a score, so the summary still goes, without one.
+  if (takes === 0 && scored !== null) fail(`${path}.score`);
   const stillMarked = int(r.stillMarked, 0, MAX_COUNT, `${path}.stillMarked`);
   const slipping = list(r.slipping, REVO_RECITATION_LIST, `${path}.slipping`, (x, p) => {
     const o = obj(x, p);
@@ -382,6 +437,22 @@ export function validateRecitation(v: unknown, path: string): RevoRecitation {
   });
   // A take in the window is the latest take or later than it.
   if (takes > 0 && (!last || last.daysAgo >= days)) fail(`${path}.last`);
+  // The long takes are some of the window's takes, each of 2 pages or more, and their mistakes some of its mistakes.
+  const perPage =
+    r.perPage === undefined
+      ? undefined
+      : (() => {
+          const p = `${path}.perPage`;
+          const o = obj(r.perPage, p);
+          keys(o, ['takes', 'pages', 'mistakes'], p);
+          if (takes === 0) fail(p);
+          const long = int(o.takes, 1, takes, `${p}.takes`);
+          return {
+            takes: long,
+            pages: int(o.pages, long * REVO_PER_PAGE_FROM, MAX_COUNT, `${p}.pages`),
+            mistakes: int(o.mistakes, 0, mistakes, `${p}.mistakes`),
+          };
+        })();
   return {
     days,
     takes,
@@ -400,6 +471,7 @@ export function validateRecitation(v: unknown, path: string): RevoRecitation {
     slipping,
     similar,
     last,
+    ...(perPage ? { perPage } : {}),
   };
 }
 

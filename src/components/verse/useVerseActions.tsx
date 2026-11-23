@@ -34,6 +34,7 @@ import { copyText } from '../../lib/clipboard';
 import { verseShareText } from '../../lib/verseShare';
 import { everyTranslationOffered } from '../../lib/translationsOffered';
 import { spacing } from '../../theme/spacing';
+import { t } from '../../i18n';
 
 // The last To chosen by hand (Custom), for the next Play while it still fits.
 let lastCustomTo: VerseKey | null = null;
@@ -166,7 +167,7 @@ export function useVerseActions({ pages, onShowPage, currentPage, focused = true
       // It would play into the microphone.
       setMenuPoint(null);
       setSelected(null);
-      Alert.alert('Recording in progress', 'Pause the recording to play the recitation.');
+      Alert.alert(t('recordings.inProgress.title'), t('verse.actions.recordingBody'));
       return;
     }
     start(rangeFrom(selected));
@@ -182,7 +183,7 @@ export function useVerseActions({ pages, onShowPage, currentPage, focused = true
       const first = verses.find((v) => pageOfVerse(v) === page) ?? verses[0];
       if (!first || !allowed.has(page)) return;
       if (isRecordingActive()) {
-        Alert.alert('Recording in progress', 'Pause the recording to play the recitation.');
+        Alert.alert(t('recordings.inProgress.title'), t('verse.actions.recordingBody'));
         return;
       }
       start(rangeFrom(first));
@@ -214,11 +215,11 @@ export function useVerseActions({ pages, onShowPage, currentPage, focused = true
       .then((text) => {
         copyText(text);
         haptics.light();
-        showNote('Copied');
+        showNote(t('verse.actions.copied'));
       })
       .catch((err) => {
         logger.warn('Could not copy the verse', err);
-        showNote('Couldn’t copy. Check your connection.');
+        showNote(t('verse.actions.copyFailed'));
       });
   }, [selected, haptics, showNote]);
 
@@ -231,7 +232,7 @@ export function useVerseActions({ pages, onShowPage, currentPage, focused = true
       .then((message) => Share.share({ message }))
       .catch((err) => {
         logger.warn('Could not share the verse', err);
-        showNote('Couldn’t share. Check your connection.');
+        showNote(t('verse.actions.shareFailed'));
       });
   }, [selected, showNote]);
 
@@ -301,7 +302,7 @@ export function useVerseActions({ pages, onShowPage, currentPage, focused = true
       setOptionsOpen(false);
       if (audio.playUpTo === 'custom') lastCustomTo = r.to;
       if (isRecordingActive()) {
-        Alert.alert('Recording in progress', 'Pause the recording to play the recitation.');
+        Alert.alert(t('recordings.inProgress.title'), t('verse.actions.recordingBody'));
         return;
       }
       start(r);
@@ -362,7 +363,7 @@ export function useVerseActions({ pages, onShowPage, currentPage, focused = true
         onNavigate={navigateSheet}
         onClose={closeSheet}
       />
-      <Sheet visible={reciterPickerOpen} onClose={closeReciters} title="Reciter" testID="reciter-sheet">
+      <Sheet visible={reciterPickerOpen} onClose={closeReciters} title={t('verse.actions.reciter')} testID="reciter-sheet">
         {reciterList}
       </Sheet>
       <SpeedMenu
@@ -385,7 +386,7 @@ export function useVerseActions({ pages, onShowPage, currentPage, focused = true
         visible={note != null}
         message={note ?? ''}
         // "Copied" is a glance; a failure gets time to be read.
-        duration={note === 'Copied' ? 1500 : 3500}
+        duration={note === t('verse.actions.copied') ? 1500 : 3500}
         onDismiss={() => setNote(null)}
         // At the bottom of the room under the page, never over the text.
         bottomInset={insets.bottom - spacing.sm}
@@ -407,9 +408,9 @@ export function useVerseActions({ pages, onShowPage, currentPage, focused = true
 function playUpToPhrase(from: AyahRef | null, upTo: keyof typeof PLAY_UP_TO_LABELS): string {
   if (upTo === 'custom') {
     const to = from && lastCustomTo && compareVerses(lastCustomTo, from) >= 0 ? lastCustomTo : null;
-    return to ? `to ${verseLabel(to)}` : 'to the end of the surah';
+    return to ? t('verse.playTo.verse', { verse: verseLabel(to) }) : t('verse.playTo.surah');
   }
-  return `to the end of the ${upTo === 'juz' ? 'juz' : upTo}`;
+  return t(upTo === 'juz' ? 'verse.playTo.juz' : upTo === 'page' ? 'verse.playTo.page' : 'verse.playTo.surah');
 }
 
 function playerVisibleState(mine: boolean, playback: RecitationState): boolean {

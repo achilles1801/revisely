@@ -1,0 +1,175 @@
+# Recite in a revision session (Revisely Dev only; BEHAVIOUR.md RECITE-9; components/reciteLive/useReciteLayer), for a
+# previewTester account: the reader's mic in a session, and a take that marks no page revised. The session holds
+# An-Naml's pages 379 and 380 (a plan of their own, written by an admin), and the take is the one E2E builds record
+# (src/lib/e2e/reciteLive.ts: An-Naml 23–24 on page 379 with a wrong word and a haraka slip).
+# Screenshots for the mocks (~/Documents/revisely-today-mocks/recite-in-sessions/): the session with the eye and mic
+# (no eye at the top), the mic's menu (no Test me), the take's marks, its summary, the page after it (still not
+# marked revised) and "Recite your N mistakes here" on it.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-14T10:00
+      BOUNDARY: midnight
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: tester
+# Get Premium calls devGrantPremium: start its worker first (scripts/warm-premium.js), as flow 18 does.
+- runScript:
+    file: ../scripts/warm-premium.js
+# Pages 379 and 380 memorized, and today's session holding them: written by an admin, so a relaunch reads them, before
+# the Dev UI's link, which the app keeps in memory.
+- runScript:
+    file: ../scripts/server-memorized.js
+    env:
+      PAGES: '379,380'
+- runScript:
+    file: ../scripts/server-plan.js
+    env:
+      DAYS: '379,380'
+      START: '2026-11-14'
+- runFlow: ../subflows/relaunch.yaml
+- openLink:
+    link: revisely://e2e/recite-live?on=1
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+
+# Today's session: An-Naml's two pages, the first on screen.
+- runFlow:
+    file: ../subflows/open-session.yaml
+    env:
+      QUIET: ".*0/2"
+- runFlow: ../subflows/show-controls.yaml
+# The reader's eye and mic in the player, in the record button's place; the header has no eye any more.
+- extendedWaitUntil:
+    visible:
+      id: recite-mic
+    timeout: 10000
+- assertVisible:
+    id: reader-eye
+- assertNotVisible: "Record your recitation"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rs01-session
+
+# Hold the mic: Record and Recite, and no Test me (the reader's: it goes anywhere in what's memorized). A new account has
+# no Premium: Mark mistakes is locked; Get Premium (Revisely Dev's free grant) turns it on.
+- longPressOn:
+    id: recite-mic
+- extendedWaitUntil:
+    visible:
+      id: recite-mode-menu
+    timeout: 5000
+- assertNotVisible:
+    id: recite-mode-test
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rs02-menu
+- tapOn:
+    id: recite-mistakes
+- extendedWaitUntil:
+    visible:
+      id: check-intro
+    timeout: 5000
+- tapOn:
+    id: check-intro-get
+- extendedWaitUntil:
+    visible: "Turn on"
+    timeout: 5000
+- tapOn: "Turn on"
+- extendedWaitUntil:
+    notVisible:
+      id: check-intro
+    timeout: 30000
+
+# Mark mistakes on (the menu stays), then Recite; the AI notice once, then the take.
+- longPressOn:
+    id: recite-mic
+- extendedWaitUntil:
+    visible:
+      id: recite-mistakes-off
+    timeout: 10000
+- tapOn:
+    id: recite-mistakes
+- assertVisible:
+    id: recite-mistakes-on
+- tapOn:
+    id: recite-mode-recite
+- extendedWaitUntil:
+    visible:
+      id: recite-notice-agree
+    timeout: 5000
+- tapOn:
+    id: recite-notice-agree
+- extendedWaitUntil:
+    visible:
+      id: recite-words
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: live-mark-word
+    timeout: 15000
+- assertVisible:
+    id: recite-score
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rs03-marks
+
+# Stop: the summary; Done, then ✕ closes the take and the player is back.
+- tapOn:
+    id: recite-stop
+- extendedWaitUntil:
+    visible:
+      id: take-summary
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rs04-summary
+- tapOn:
+    id: take-summary-done
+- extendedWaitUntil:
+    visible:
+      id: recite-close
+    timeout: 5000
+- tapOn:
+    id: recite-close
+- extendedWaitUntil:
+    visible:
+      id: recite-mic
+    timeout: 5000
+# RECITE-9: the take marked no page revised. The title still counts 0 of the 2 pages.
+- assertVisible:
+    id: session-title
+    text: ".*0/2.*"
+# A take kept as a recording says "Recording saved", over the mic: a long press there would be its View (flow 18 waits
+# the same way). It goes by itself.
+- extendedWaitUntil:
+    notVisible: "Recording saved"
+    timeout: 12000
+
+# The take was kept in Recite's memory: its words stay marked on the page, and the held mic offers them as one take.
+- extendedWaitUntil:
+    visible:
+      id: past-mark-word
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rs05-after
+- runFlow: ../subflows/reader-controls.yaml
+- longPressOn:
+    id: recite-mic
+- extendedWaitUntil:
+    visible:
+      id: recite-mode-drill
+    timeout: 15000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rs06-drill

@@ -58,6 +58,21 @@ export interface RevoContext {
    * recitation rules (recitation.ts) as a second system block.
    */
   recitation?: RevoRecitation;
+  /**
+   * Insights' Gaps and Last revised (BEHAVIOUR.md ACT-28, ACT-30), from Revisely Dev only (with `app: 'dev'`), from
+   * Nov 16 2026: the app's lib/revo/gaps, checked in validate.ts and written out by gaps.ts.
+   */
+  gaps?: RevoGaps;
+  /**
+   * 'dev' from Revisely Dev (lib/variant's isDevVariant), from Nov 16 2026: the request then carries the Dev guide
+   * (guide.ts DEV_GUIDE_SECTIONS) as a system block of its own. The store app never sends it.
+   */
+  app?: 'dev';
+  /**
+   * 'ar' when the app is in Arabic (Revisely Dev's language picker, from Nov 22 2026): the answer is asked for in Arabic
+   * (prompt.ts ARABIC_SYSTEM, a system block of its own). English requests never carry it.
+   */
+  language?: 'ar';
   localTime: string | null;
 }
 
@@ -85,6 +100,26 @@ export const REVO_RECITATION_WEEKS = 8;
 export const REVO_RECITATION_LIST = 5;
 
 /** What the app's Insights shows of their recitation over the last `days` revision days (the app's lib/reciteInsights). */
+/** Insights' Gaps over the last 30 days, the full revision against the plan, and each memorized surah's last revision. */
+export interface RevoGaps {
+  /** Whole days since the last revision day (0 = today). */
+  lastRevisedDaysAgo: number;
+  /**
+   * The longest gap, in days without revising (2 or more; still open: the days since the last revision, today
+   * included); `endedDaysAgo` null while it is still open. Apps before Nov 20 2026 sent the days from one revision day
+   * to the next, one more for a closed gap.
+   */
+  longestGap: { days: number; endedDaysAgo: number | null } | null;
+  /** The usual step between revision days (1 = every day, 1.5 = every 1–2 days). */
+  usualStepDays: number | null;
+  /** Gaps (2 days or more without revising), the open one included. */
+  longGaps: number;
+  /** Pages the plan brings round later than their spacing, how far that pushed the full revision back, the plan's cycle. */
+  fullRevision: { latePages: number; pushedBackDays: number; cycleDays: number } | null;
+  /** Memorized surahs, longest since revised first: days since (null: never; `notYet`: memorized under 30 days ago). */
+  surahs: { name: string; daysAgo: number | null; notYet?: true }[];
+}
+
 export interface RevoRecitation {
   /** The window, in revision days (28). */
   days: number;
@@ -99,7 +134,10 @@ export interface RevoRecitation {
   unclear: number;
   /** Tajweed notes; null when no take in the window was at the Strict level. */
   tajweed: number | null;
-  /** The score by the page (0–1), each take weighted by the words it recited; null with no takes in the window. */
+  /**
+   * The score by the page (0–1), each take weighted by the words it recited; null with no takes in the window, or when
+   * every one ended without the checker's final answer (RECITE-11: those never count in a score).
+   */
   score: number | null;
   /** The same for the `days` before. */
   earlierScore: number | null;
@@ -114,7 +152,15 @@ export interface RevoRecitation {
   similar: { from: RevoRecitedAyah; into: RevoRecitedAyah; ending: boolean; times: number; also: number; daysAgo: number }[];
   /** The latest take, any time. */
   last: { daysAgo: number; passage: RevoRecitedPassage; score: number; mistakes: number; unclear: number; hidden: boolean; strict: boolean } | null;
+  /**
+   * The window's finished takes of REVO_PER_PAGE_FROM pages or more, their pages and mistakes (RECITE-24: the mistakes a
+   * page Insights shows). Only when there are some: a summary without long takes is as before.
+   */
+  perPage?: { takes: number; pages: number; mistakes: number };
 }
+
+/** A take this many pages or longer says its mistakes a page (the app's PER_PAGE_FROM, lib/reciteLive/score). */
+export const REVO_PER_PAGE_FROM = 2;
 
 /** A mark's kind, finer detail and tajweed rule, as the checker names them (recite-contract.md). */
 export const REVO_MARK_KINDS = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'] as const;

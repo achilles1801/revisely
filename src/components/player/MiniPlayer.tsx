@@ -8,6 +8,7 @@ import { getRecitation, resolveVoice, shortVoiceLabel, verseTitle } from '../../
 import type { VerseKey } from '../../lib/verses';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 export const MINI_PLAYER_HEIGHT = 52;
 /** Between the mini player and the tab bar. */
@@ -96,7 +97,7 @@ export function MiniPlayer({ bottom, onOpen }: { bottom: number; onOpen: (verse:
           accessibilityLabel={t('player.open')}
           testID="mini-open"
         >
-          <Ionicons name="chevron-forward" size={20} color={palette.secondary} />
+          <Ionicons name={forwardIcon()} size={20} color={palette.secondary} />
         </Pressable>
       </View>
     </Animated.View>

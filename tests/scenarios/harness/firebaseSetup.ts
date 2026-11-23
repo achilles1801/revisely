@@ -59,23 +59,9 @@ jest.mock('../../../src/lib/pageCache', () => ({
 
 // The phone's disk (harness/fileSystem): a folder per Phone.
 jest.mock('expo-file-system', () => require('./fileSystem'));
-// Notifications: nothing is shown or scheduled; permission is not given.
-jest.mock('expo-notifications', () => {
-  const base: Record<string, unknown> = {
-    __esModule: true,
-    SchedulableTriggerInputTypes: { DAILY: 'daily', DATE: 'date', WEEKLY: 'weekly', TIME_INTERVAL: 'timeInterval' },
-    AndroidImportance: { DEFAULT: 3, HIGH: 4, MAX: 5 },
-    getPermissionsAsync: async () => ({ status: 'denied', granted: false, canAskAgain: false }),
-    requestPermissionsAsync: async () => ({ status: 'denied', granted: false, canAskAgain: false }),
-    getAllScheduledNotificationsAsync: async () => [],
-    getPresentedNotificationsAsync: async () => [],
-    getExpoPushTokenAsync: async () => ({ data: 'scenario' }),
-  };
-  return new Proxy(base, {
-    get: (t, k: string) =>
-      k in t ? t[k] : k.startsWith('add') && k.endsWith('Listener') ? () => ({ remove: () => undefined }) : async () => undefined,
-  });
-});
+// Notifications (harness/notifications): permission refused and nothing pending, unless a
+// scenario allows them; then what the app schedules stays pending until its time.
+jest.mock('expo-notifications', () => require('./notifications'));
 
 // Modal with iOS's onShow and onDismiss (harness/modal).
 jest.mock('react-native/Libraries/Modal/Modal', () => require('./modal'));

@@ -11,7 +11,7 @@ import { newAccount, pagesRange } from '../harness/account';
 import { markPreviewTester, watchFunction } from '../harness/admin';
 import { withAuthRetry } from '../harness/authRetry';
 import { getServerDoc, listServerDocs, setServerDoc } from '../harness/serverDocs';
-import { Home } from '../harness/screens';
+import { Home, homeStack } from '../harness/screens';
 import { Phone, type Booted, type OpenApp, revoMomentSeen } from '../harness/phone';
 import { plainText } from '../../../src/lib/passages';
 
@@ -531,5 +531,65 @@ it('[REVO-34] [REVO-35] [REVO-9] [REVO-20] every open starts on a greeting writt
     await app.close();
   } finally {
     reviews.restore();
+  }
+});
+
+it('[ACT-28] [ACT-30] [REVO-23] Revisely Dev tells Revo what Insights’ Gaps and Last revised show, once Home has read the items, and the real revoAsk takes it', async () => {
+  setZone(ZONES.amman);
+  setNow('2026-11-02 10:00');
+  const phone = new Phone('phone');
+  let app = await newAccount(phone, { memorized: pagesRange(1, 20), user: { dailyPageCapacity: 5 } });
+  const uid = app.uid;
+  await app.untilSynced();
+  await app.close();
+  // Monday 2 and Tuesday 3 November, five pages each, then nothing until Monday 9.
+  for (const at of ['2026-11-02 10:30', '2026-11-03 10:30']) {
+    setNow(at);
+    app = await phone.open(homeStack);
+    const home = new Home(app);
+    await home.ready();
+    const session = await home.startSession();
+    await session.swipeThrough(5);
+    await session.back();
+    await app.untilSynced();
+    await app.close();
+  }
+  setNow('2026-11-09 10:00');
+  await markPreviewTester(uid);
+  revoMomentSeen(phone, uid);
+
+  const asks = watchFunction('revoAsk');
+  try {
+    app = await phone.open((mods) => {
+      mods.require<{ default: { expoConfig: { extra: Record<string, unknown> } } }>('expo-constants').default.expoConfig.extra.variant = 'dev';
+      return revoStack(mods);
+    });
+    await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
+    await new Home(app).ready();
+    // What Revo reads: the items Home read. Without them it sends no Gaps at all, rather than figures from none.
+    const history = app.mods.require<typeof import('../../../src/lib/activityHistory')>('src/lib/activityHistory');
+    await app.until(() => history.sharedActivityHistory(uid, '2026-11-09') != null, 'Home’s items');
+    await tap(app, 'revo-button');
+    await tap(app, 'revo-turn-on');
+    await app.until(() => app.screen.queryByTestId('revo-greeting') != null, 'the greeting');
+
+    await modelSays(uid, reply('Your last revision was 6 days ago.'));
+    await app.act(async () => {
+      app.mods.rtl.fireEvent.changeText(app.screen.getByTestId('revo-input'), 'How are my gaps?');
+    });
+    await tap(app, 'revo-send');
+    await app.until(() => app.screen.queryByText('Your last revision was 6 days ago.') != null, 'the answer');
+    expect(asks.sent[asks.sent.length - 1]).toMatchObject({ context: { app: 'dev', gaps: { lastRevisedDaysAgo: 6, longGaps: 1 } } });
+
+    // The figures Gaps shows, in the words the server writes for the model: the gap still open is the longest, and
+    // Al-Fatihah (page 1, revised on the 2nd) has waited a week.
+    const asked = (await modelRequests(uid)).pop()!;
+    const text = asked.messages[0].content;
+    expect(text).toContain('last revised 6 days ago; 1 gap, the longest 6 days without revising (still going).');
+    expect(text).toContain('Full revision: ');
+    expect(text).toMatch(/Last revised, each memorized surah, the longest since first [^\n]*Al-Fatihah 7 days ago/);
+    await app.close();
+  } finally {
+    asks.restore();
   }
 });

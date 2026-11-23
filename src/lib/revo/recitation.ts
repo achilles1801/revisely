@@ -15,6 +15,7 @@ import { liveTakes, mistakeKindOf, recitationInsights, WINDOW_DAYS, wordsOf } fr
 import { dayLabel } from './attachments';
 import type { RevoAttachment, RevoRecitation, RevoRecitedAyah, RevoRecitedPassage, RevoTakeFacts, RevoTakeMark } from './types';
 import { passageWords, shortWords } from './words';
+import { t } from '../../i18n';
 
 /** Lists the server takes at most (functions/src/revo/types.ts). */
 const LIST = 5;
@@ -77,7 +78,7 @@ export function takePassage(words: QuranWords, take: Pick<TakeRecord, 'from' | '
 export function recitationForRevo(records: readonly MemoryRecord[], today: string, words: QuranWords | null): RevoRecitation | null {
   const takes = liveTakes(records);
   if (takes.length === 0 || !words) return null;
-  const ins = recitationInsights(records, today);
+  const ins = recitationInsights(records, today, WINDOW_DAYS, words);
   const latest = ins.last as TakeRecord;
   const lastPassage = takePassage(words, latest);
   if (!lastPassage) return null;
@@ -120,6 +121,8 @@ export function recitationForRevo(records: readonly MemoryRecord[], today: strin
       hidden: latest.hidden,
       strict: latest.level === 'strict',
     },
+    // The mistakes a page Insights shows for long takes (RECITE-24), only when there are some: without, as before.
+    ...(ins.perPage ? { perPage: ins.perPage } : {}),
   };
 }
 
@@ -192,6 +195,6 @@ export function takeAttachment(records: readonly MemoryRecord[], take: TakeRecor
     cleared: clearedBy(records, take).length,
     before: takeBefore(records, take)?.accuracy ?? null,
   };
-  const short = shortWords(describeAyahs(takeKeys(words, take), { form: 'short', juz: false })) ?? 'A take';
+  const short = shortWords(describeAyahs(takeKeys(words, take), { form: 'short', juz: false })) ?? t('revo.attach.take');
   return { kind: 'reciteTake', label: `${short} · ${dayLabel(take.day, today, shiftDay(today, -1))}`.slice(0, 60), day: take.day, facts };
 }

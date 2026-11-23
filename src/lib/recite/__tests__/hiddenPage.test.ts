@@ -1,12 +1,4 @@
-import {
-  hiddenPageLayout,
-  hidePageAgain,
-  NOTHING_REVEALED,
-  nextHiddenVerse,
-  revealedOn,
-  revealVerse,
-  verseKey,
-} from '../hiddenPage';
+import { hiddenPageLayout, verseKey } from '../hiddenPage';
 import { pageLines, subtractSpans } from '../pageLines';
 import { ayahRects, versesOnPage } from '../../ayahBounds';
 
@@ -117,20 +109,10 @@ describe('hidden page', () => {
     expect(lines.every((l) => l.covers.length === 0 && !l.current)).toBe(true);
   });
 
-  it('the reveal state: per page, once each, in order; covered again', () => {
-    let s = revealVerse(NOTHING_REVEALED, 1, { sura: 1, ayah: 2 });
-    s = revealVerse(s, 1, { sura: 1, ayah: 1 });
-    expect(revealVerse(s, 1, { sura: 1, ayah: 1 })).toBe(s);
-    expect(s[1].verses).toEqual(['1:2', '1:1']);
-    expect([...revealedOn(s, 2)]).toEqual([]);
-    expect(nextHiddenVerse(s, 1) && verseKey(nextHiddenVerse(s, 1)!)).toBe('1:3');
-    expect(hidePageAgain(s, 1)).toEqual({});
-  });
-
   it('a page whose first verse began on the page before starts with it', () => {
     // Page 3 begins mid-verse (2:6 starts on page 3? its first verse is 2:6).
     const first = versesOnPage(3)[0];
-    expect(nextHiddenVerse(NOTHING_REVEALED, 3)).toEqual(first);
+    expect(hiddenPageLayout(3, new Set()).next).toEqual(first);
   });
 });
 
@@ -219,5 +201,119 @@ describe('hidden page, word by word (following the reciter)', () => {
     }
     const r4 = words.rect(words.verseRange(1, 4)[0]);
     expect(covered(lines, words.lineOf(words.verseRange(1, 4)[0]), (r4.x0 + r4.x1) / 2)).toBe(true);
+  });
+
+  // Each word's ink across the rows a cover takes, measured on the page images by scripts/check-word-boxes.py (which
+  // checks every word on every page). Majd, Nov 21 2026: the word just recited was "partially cut off" by the next
+  // word's cover. The glyph data's boxes sat 2–12 units off the ink, and a hidden word's cover took 2 units more.
+  const WORDS: { why: string; page: number; line: number; ref: [number, number, number]; ink: [number, number] }[] = [
+    { why: 'its box reached 12 units into the ۱ marker', page: 2, line: 3, ref: [2, 2, 1], ink: [603.37, 664.02] },
+    { why: 'its ink began 2.3 units left of its box', page: 2, line: 3, ref: [2, 2, 2], ink: [453.71, 601.01] },
+    { why: 'page 3’s own rendering', page: 3, line: 7, ref: [2, 11, 1], ink: [187.08, 255.61] },
+    { why: 'a silah’s small yeh in the gap after it', page: 50, line: 12, ref: [3, 7, 37], ink: [422.6, 478.13] },
+    { why: 'under a sajdah’s overline', page: 416, line: 7, ref: [32, 15, 9], ink: [288.69, 388.73] },
+    { why: 'its box sat inside its neighbour’s', page: 450, line: 14, ref: [37, 124, 2], ink: [891.27, 948.38] },
+    { why: 'touching its verse marker', page: 577, line: 12, ref: [75, 10, 5], ink: [878.67, 950.74] },
+    { why: 'smaller print', page: 596, line: 14, ref: [94, 5, 1], ink: [356.82, 404.09] },
+    { why: 'its last letter touching the next word (ءامنتم بِهِۦ)', page: 21, line: 6, ref: [2, 137, 5], ink: [529.72, 643.94] },
+    { why: 'a low, short word (بِهِۦ after كذبوا)', page: 217, line: 9, ref: [10, 74, 15], ink: [523.03, 571.86] },
+    { why: 'a quarter’s sign (۞) touching it', page: 384, line: 5, ref: [27, 82, 1], ink: [52.38, 124.06] },
+  ];
+  const wordOf = (words: { verseFirstWord: (s: number, a: number) => number }, [s, a, p]: [number, number, number]) =>
+    words.verseFirstWord(s, a) + p - 1;
+  // Covers reaching into ink by more than a twentieth of a unit (the pins are to a hundredth, the boxes are 32-bit floats).
+  const cutWord = (lines: { covers: [number, number][]; line: number }[], line: number, [x0, x1]: [number, number]) =>
+    lines.find((l) => l.line === line)!.covers.filter(([a, b]) => Math.min(b, x1) - Math.max(a, x0) > 0.05);
+  /** What of [x0, x1] shows: outside every cover and in no marker's opening is open; this is the rest. */
+  const showing = (lines: { covers: [number, number][]; line: number }[], page: number, line: number, [x0, x1]: [number, number]) =>
+    subtractSpans(x0, x1, [...lines.find((l) => l.line === line)!.covers, ...pageLines(page).find((l) => l.line === line)!.markers]);
+
+  it('a word recited is whole beside the next word’s cover, and the next word wholly covered', () => {
+    const words = getQuranWords();
+    for (const m of WORDS) {
+      const w = wordOf(words, m.ref);
+      expect({ word: m.why, line: words.lineOf(w) }).toEqual({ word: m.why, line: m.line });
+      // Recited up to it, the next to say after it: none of its ink under a cover.
+      const recited = hiddenPageLayout(m.page, new Set(), { words, shown: (v: number) => v <= w, next: w + 1 }).lines;
+      expect({ word: m.why, cut: cutWord(recited, m.line, m.ink) }).toEqual({ word: m.why, cut: [] });
+      // It is next: all its ink covered (a unit at each end is its faint edge, and the next ink can be that close).
+      const next = hiddenPageLayout(m.page, new Set(), { words, shown: (v: number) => v < w, next: w }).lines;
+      expect({ word: m.why, shows: showing(next, m.page, m.line, [m.ink[0] + 1, m.ink[1] - 1]) }).toEqual({ word: m.why, shows: [] });
+    }
+  });
+
+  it('two words whose ink shares columns (a kaf’s top stroke over the word before): the one recited stays whole', () => {
+    // 12:6, page 236 line 4: كَمَآ’s kaf reaches over يَعْقُوبَ’s last letter and touches it. check-word-boxes.py splits
+    // the two at the junction; no straight edge keeps both whole, so the edge leaves the stroke’s tip (about 2 units)
+    // over يَعْقُوبَ rather than cut يَعْقُوبَ.
+    const words = getQuranWords();
+    const yaqub = wordOf(words, [12, 6, 13]);
+    const lines = hiddenPageLayout(236, new Set(), { words, shown: (v: number) => v <= yaqub, next: yaqub + 1 }).lines;
+    expect(cutWord(lines, 4, [697.9, 825.5])).toEqual([]);
+    const tip = total(showing(lines, 236, 4, [646.3, 700.26]));
+    expect(tip).toBeGreaterThan(0);
+    expect(tip).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('[RECITE-20] over and under a verse marker, as the words beside it (page 379’s ۲٤)', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const { setQuranWordsForTests, getQuranWords } = require('../quranWords');
+  const { hiddenInkPlan } = require('../../../components/reciteLive/HiddenInkLayer');
+  beforeAll(() => {
+    setQuranWordsForTests(JSON.parse(fs.readFileSync(path.join(__dirname, '../../../data/quranWords.dat'), 'utf8')));
+  });
+  afterAll(() => setQuranWordsForTests(null));
+
+  // Measured on the page image by scripts/check-page-markers.py's rows: the end of the sajdah's overline (over 27:25's
+  // first words) reaches 3.6 units into ۲٤'s opening, above the ring. Before the openings took the markers' own rows, it
+  // showed there on a hidden page (flow 18, Nov 22 2026), the rest of the overline covered.
+  const PAGE = 379;
+  const LINE = 4;
+  const OVERLINE = { x: [617.55, 621.1], y: [343.83, 347.37] };
+  type Cover = { x0: number; x1: number; y0: number; y1: number };
+  const coveredAt = (shown: (w: number) => boolean, x: number, y: number) =>
+    (hiddenInkPlan(getQuranWords(), PAGE, shown).lines.find((l: { line: number }) => l.line === LINE)!.covers as Cover[]).some(
+      (c) => c.x0 <= x && x <= c.x1 && c.y0 <= y && y <= c.y1,
+    );
+  const overline = (shown: (w: number) => boolean) => {
+    const pts: [number, number][] = [];
+    for (let x = OVERLINE.x[0]; x <= OVERLINE.x[1]; x += 0.5) for (let y = OVERLINE.y[0]; y <= OVERLINE.y[1]; y += 0.5) pts.push([x, y]);
+    return pts.every(([x, y]) => coveredAt(shown, x, y));
+  };
+
+  it('the marker opens in its own rows, and the overline over it stays covered while its words are hidden', () => {
+    const words = getQuranWords();
+    const l = pageLines(PAGE).find((p) => p.line === LINE)!;
+    expect(l.markers).toEqual([[617.5, 699.5]]);
+    const [top, bottom] = l.markerRows[0];
+    // Its rows hold the ring and are inside the cover's, the overline above them.
+    expect(top).toBeGreaterThan(OVERLINE.y[1]);
+    expect(top).toBeGreaterThan(l.coverTop);
+    expect(bottom).toBeLessThanOrEqual(l.coverBottom);
+    const firstOf25 = words.verseFirstWord(27, 25);
+    const lastOf24 = firstOf25 - 1;
+    expect([words.lineOf(lastOf24), words.lineOf(firstOf25)]).toEqual([LINE, LINE]);
+    // Nothing shown: covered. Verse 24 recited to its end (the word before ۲٤): still covered, the overline is 25's.
+    expect(overline(() => false)).toBe(true);
+    expect(overline((w) => w <= lastOf24)).toBe(true);
+    // 25's first word shown: the overline over it shows with it, in ۲٤'s left half.
+    expect(overline((w) => w <= firstOf25)).toBe(false);
+    // The marker itself is never covered.
+    for (const shown of [() => false, (w: number) => w <= lastOf24, (w: number) => w <= firstOf25]) {
+      for (const x of [620, 658.5, 697]) for (const y of [top + 1, (top + bottom) / 2, bottom - 1]) expect(coveredAt(shown, x, y)).toBe(false);
+    }
+  });
+
+  it('the right half goes with the word before the marker: covered while it is hidden, open once it is shown', () => {
+    const words = getQuranWords();
+    const lastOf24 = words.verseFirstWord(27, 25) - 1;
+    const l = pageLines(PAGE).find((p) => p.line === LINE)!;
+    const [top] = l.markerRows[0];
+    const right = (617.5 + 699.5) / 2 + 20;
+    const y = (l.coverTop + top) / 2;
+    expect(coveredAt(() => false, right, y)).toBe(true);
+    expect(coveredAt((w) => w === lastOf24, right, y)).toBe(false);
   });
 });

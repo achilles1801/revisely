@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { knownAction, onJumpSheetRequest, openScreen, requestJumpSheet, SCREEN_BUTTON, screenTarget } from '../screens';
+import { knownAction, onJumpSheetRequest, openScreen, requestJumpSheet, screenButton, screenTarget } from '../screens';
 import { REVO_SCREENS, type RevoAction, type RevoScreen } from '../types';
 
 const action = (screen: RevoScreen, more: Partial<Extract<RevoAction, { kind: 'openScreen' }>> = {}) =>
@@ -15,7 +15,7 @@ describe('Revo’s openScreen (REVO-31)', () => {
       const t = screenTarget(action(s));
       expect(screens.has(t.name)).toBe(true);
       expect(screens.has(t.params.screen)).toBe(true);
-      expect(SCREEN_BUTTON[s].length).toBeGreaterThan(0);
+      expect(screenButton(s).length).toBeGreaterThan(0);
     }
   });
 

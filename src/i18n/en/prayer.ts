@@ -57,6 +57,8 @@ export const prayer = {
     standard: 'Standard',
     /** VoiceOver's name for a time's bell: "Fajr notification". */
     bell: '{{name}} notification',
+    /** VoiceOver's name for a prayer's row, which opens its reminder and sound. */
+    soundLabel: '{{name}}: reminder and sound',
     permission: {
       title: 'Allow location for prayer times',
       body: 'Revisely works out the times for where you are. Your location stays on this phone.',
@@ -90,6 +92,11 @@ export const prayer = {
   },
   notifications: {
     title: 'Prayer notifications',
+    /** The notification at the time: "It’s time for Asr · 3:42 PM". */
+    atBody: 'It’s time for {{name}} · {{time}}',
+    /** The notification before it (5 minutes or more): "Asr in 10 minutes". */
+    soonTitle_one: '{{name}} in {{count}} minute',
+    soonTitle_other: '{{name}} in {{count}} minutes',
     prayers: 'Prayers',
     scheduled_one: 'Scheduled on this phone for the next {{count}} day. Opening Revisely keeps them going.',
     scheduled_other: 'Scheduled on this phone for the next {{count}} days. Opening Revisely keeps them going.',
@@ -104,6 +111,38 @@ export const prayer = {
     playsSound: 'Plays the sound',
     /** VoiceOver's name for a prayer's row: "Fajr: Standard tone · 10 min before. Change". */
     rowLabel: '{{name}}: {{summary}}. Change',
+    /** The athan as a prayer's sound (Revisely Dev, iPhone). */
+    athan: 'Athan',
+    athanDetail: 'At the prayer’s time. A reminder before it has the standard tone',
+    /** A prayer's sound with its voice: "Athan · Makkah". */
+    athanVoice: 'Athan · {{voice}}',
+    voice: 'Voice',
+    chooseVoice: 'Choose a voice',
+  },
+  /** Settings → Prayer → Athan voice (Revisely Dev, iPhone). */
+  athan: {
+    title: 'Athan voice',
+    /** The picker opened from one prayer: "Athan for Fajr". */
+    titleFor: 'Athan for {{name}}',
+    none: 'None',
+    loading: 'Loading voices…',
+    loadFailed: "Couldn't load the voices. Check your connection and try again.",
+    voices: 'Voices',
+    footer: 'A notification plays the first 30 seconds.',
+    downloading: 'Downloading {{percent}}%',
+    stopLabel: 'Stop {{name}}',
+    listenLabel: 'Listen to {{name}}',
+    moreLabel: 'More about {{name}}',
+    licence: 'Licence: {{licence}}',
+    source: 'Where it’s from',
+    stopDownloading: 'Stop downloading',
+    /** The sheet while the whole athan plays, after a tap on its notification. */
+    fullMessage: 'The whole athan',
+    fullStop: 'Stop',
+    remove: 'Remove download',
+    removeDetail: 'Prayers set to it play the standard tone until it downloads again',
+    notAClip: 'This voice can’t be used for notifications.',
+    downloadStopped: 'The download stopped. Check your connection and try again.',
   },
   notify: {
     ask: {

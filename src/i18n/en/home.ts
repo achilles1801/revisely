@@ -38,8 +38,11 @@ export const home = {
     readLabel: 'Read Surah Al-Kahf',
     markRead: 'Mark as read',
     markReadLabel: 'Mark Surah Al-Kahf as read',
-    readToday: 'Read today.',
+    /** Read inside the Islamic Friday (Thursday's maghrib to Friday's), Thursday evening included. */
+    doneFriday: 'Done for this Friday.',
     itsFriday: "It's Friday. Read Surah Al-Kahf.",
+    /** Thursday evening: the Islamic Friday begins at Thursday's maghrib. */
+    fridayBegan: 'Friday began at maghrib. Read Surah Al-Kahf.',
     /** Its pages: "pages 293–304". */
     range: 'pages {{from}}–{{to}}',
     saved: 'Saved as a reading session, {{range}}.',
@@ -56,5 +59,25 @@ export const home = {
     menuTitle: 'Session',
     edit: 'Edit session',
     delete: 'Delete session',
+  },
+  /** screens/main/DashboardScreen: Home itself. */
+  screen: {
+    loadFailed: "Couldn't load your data",
+    saveFailed: "Couldn't save",
+    carryFailed: "Couldn't update today's session",
+    jumpRefused: "Couldn't start there",
+    jumpRefusedBody: "That part isn't in your schedule.",
+    /** After Jump to: "Today now starts at Al-Mulk". */
+    todayStartsAt: 'Today now starts at {{where}}',
+    nextStartsAt: 'Your next revision starts at {{where}}',
+    jumpFailed: "Couldn't update your schedule",
+    undoFailed: "Couldn't undo",
+    qibla: 'Find the Qibla',
+    activity: 'Open activity',
+    /** The Activity tab's name for VoiceOver (Revisely Dev's Activity tab, TAB-2). */
+    activityTab: 'Activity',
+    settings: 'Open settings',
+    recent: 'Recent sessions',
+    noSessions: 'No sessions yet. Start your first revision above.',
   },
 } as const;

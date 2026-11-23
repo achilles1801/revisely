@@ -12,6 +12,7 @@ import { useTabBarFootprint } from '../../navigation/TabBar';
 import { useRevoFootprint } from '../../lib/revo/presence';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { layoutV2 } from '../../theme/v2';
+import { t } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'PagesByStrength'>;
 
@@ -31,7 +32,7 @@ export default function PagesByStrengthScreen() {
 
   return (
     <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
-      <TopBar title="Pages by strength" onBack={() => navigation.goBack()} separator />
+      <TopBar title={t('activity.strength.title')} onBack={() => navigation.goBack()} separator />
       {!user ? (
         <View style={styles.center}>
           <ActivityIndicator color={palette.secondary} />
@@ -44,10 +45,10 @@ export default function PagesByStrengthScreen() {
           testID="pages-by-strength"
         >
           {rows.length === 0 ? (
-            <QuietLine testID="pages-by-strength-empty">No revised pages yet</QuietLine>
+            <QuietLine testID="pages-by-strength-empty">{t('activity.strength.noPages')}</QuietLine>
           ) : (
             <>
-              <SectionHeader title={`${rows.length} revised page${rows.length === 1 ? '' : 's'}`} detail="Weakest first" />
+              <SectionHeader title={t('activity.strength.revisedPages', { count: rows.length })} detail={t('activity.strength.weakestFirst')} />
               <BrowseByStrength rows={rows} onOpenPage={setPreviewPage} collapsed={false} activityTabs />
             </>
           )}

@@ -7,7 +7,7 @@ import { calendarDaysBetween, getPagesForDay, juzModeCycle } from './algorithm';
 import { creditIndex } from './aheadCredit';
 import { dateToLocalISODay } from './schedulePlans';
 import { revisablePages } from './memorizedAyahs';
-import { dayMonth, weekdayName } from '../i18n';
+import { dayMonth, t, weekdayName } from '../i18n';
 
 const MAX_DAYS_AHEAD = 400;
 
@@ -129,8 +129,8 @@ export function aheadLead(
   /** The weekday in full ("Thursday"), as Revo words it. */
   opts: { long?: boolean } = {},
 ): string {
-  if (plan.day === revisionDayAfter(today)) return 'Tomorrow';
-  if (plan.pages.length > 0 && startsCycle(user, pages, plan.day, plan.pages[0])) return 'Next cycle';
+  if (plan.day === revisionDayAfter(today)) return t('lib.plan.tomorrow');
+  if (plan.pages.length > 0 && startsCycle(user, pages, plan.day, plan.pages[0])) return t('lib.plan.nextCycle');
   return aheadDayLabel(today, plan.day, opts);
 }
 

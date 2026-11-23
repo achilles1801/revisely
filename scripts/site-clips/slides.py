@@ -33,14 +33,11 @@ SCREENS = {
     'recite-dark': ('posters', 'session-dark.jpg'),
     'search-light': ('posters', 'search.jpg'),
     'search-dark': ('stills', 'search-dark.png'),
-    'translations-light': ('posters', 'translations.jpg'),
-    'translations-dark': ('captures', 'picker-favorites-dark.png'),
     'activity-light': ('posters', 'activity.jpg'),
     'activity-dark': ('captures', 'activity-month-dark.png'),
-    'prayer-light': ('stills', 'prayer-light.png'),
-    'prayer-dark': ('stills', 'prayer-dark.png'),
-    'qibla-light': ('stills', 'qibla-light.png'),
-    'qibla-dark': ('stills', 'qibla-dark.png'),
+    # Widgets: the Home Screen with Today, the next prayer and the Qibla (the 1.0.4 store capture), one picture for
+    # both schemes (a wallpaper reads in either).
+    'widgets': ('captures', 'widgets-light.png'),
     'offline-light': ('stills', 'page-light.png'),
     'offline-dark': ('stills', 'page-dark.png'),
 }

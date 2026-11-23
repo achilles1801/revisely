@@ -1,0 +1,33 @@
+# Starts a recording on the reader or a session page, as a user would. Where Recite runs (from 1.0.5: the 1405 print, a
+# phone with the microphone stream) the mic stands in for the record button while the recorder is idle (RECITE-9): hold
+# it and pick Record. Once picked, a tap on the mic records too (the mode is kept), so a retry taps either. Elsewhere
+# (the 1441 print) the record button shows.
+# While recording, the screen never settles (a live timer and waveform): no wait after these taps.
+appId: com.revisionbuddy.app
+---
+- extendedWaitUntil:
+    visible:
+      id: "record-start|recite-mic"
+    timeout: 10000
+- runFlow:
+    when:
+      visible:
+        id: record-start
+    commands:
+      - tapOn:
+          id: record-start
+          waitToSettleTimeoutMs: 500
+- runFlow:
+    when:
+      visible:
+        id: recite-mic
+    commands:
+      - longPressOn:
+          id: recite-mic
+      - extendedWaitUntil:
+          visible:
+            id: recite-mode-menu
+          timeout: 5000
+      - tapOn:
+          id: recite-mode-record
+          waitToSettleTimeoutMs: 500

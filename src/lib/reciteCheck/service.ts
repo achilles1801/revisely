@@ -4,9 +4,11 @@ import type { VerseKey } from '../verses';
 import { CheckResult, parseCheckResult } from './result';
 import type { ReciteCheckSettings } from './settings';
 import { pairAnswered, pairClosed } from '../reciteLive/pairService';
+import { checker } from './endpoints';
+import { t } from '../../i18n';
 
-/** The recitation check service on revisely-dev (Cloud Run, us-east1; scripts/recite-check). */
-export const RECITE_CHECK_URL = 'https://recite-check-433792838929.us-east1.run.app';
+/** The recitation check service in the app's own Firebase project (Cloud Run; revisely-internal's checker/; ./endpoints). */
+export const RECITE_CHECK_URL = checker().base;
 /** The service takes at most 4 minutes. */
 export const MAX_SECONDS = 240;
 
@@ -119,7 +121,7 @@ export async function sendLabel(
 }
 
 /** recite-check-pair: Recite and Words & harakat without letters, two takes an instance (lib/reciteLive/socket). */
-export const RECITE_CHECK_PAIR_URL = 'https://recite-check-pair-433792838929.us-east1.run.app';
+export const RECITE_CHECK_PAIR_URL = checker().pair;
 
 /**
  * Wake both services while the user gets ready (they sleep when unused; waking takes a few seconds). The pair service's
@@ -138,10 +140,22 @@ export function warmUpReciteCheck(deps: Pick<CheckDeps, 'fetch'> = defaults): vo
 }
 
 export const FAILURE_TEXT: Record<CheckFailure, string> = {
-  offline: 'Couldn’t reach the checker. Check your connection and try again.',
-  sign_in: 'Sign in again to check your recitation.',
-  testers_only: 'The recitation check is for testers.',
-  limit: 'That’s a lot of checks for one hour. Try again a little later.',
-  too_short: 'That was too short to check. Recite at least a few words.',
-  server: 'The checker couldn’t check this recording. Try again.',
+  get offline() {
+    return t('reciteCheck.failure.offline');
+  },
+  get sign_in() {
+    return t('reciteCheck.failure.signIn');
+  },
+  get testers_only() {
+    return t('reciteCheck.failure.testersOnly');
+  },
+  get limit() {
+    return t('reciteCheck.failure.limit');
+  },
+  get too_short() {
+    return t('reciteCheck.failure.tooShort');
+  },
+  get server() {
+    return t('reciteCheck.failure.server');
+  },
 };

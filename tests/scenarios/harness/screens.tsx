@@ -51,7 +51,18 @@ export function homeStackLive(mods: Booted): ReactElement {
 
 /** Home's stack with the Activity screen real (Overview and Insights), the rest of "elsewhere" empty. */
 export function activityStack(mods: Booted): ReactElement {
-  return homeStackWith(mods, { Activity: mods.require<any>('src/screens/activity/ActivityScreen').default });
+  return homeStackWith(mods, {
+    Activity: mods.require<any>('src/screens/activity/ActivityScreen').default,
+    LastRevised: mods.require<any>('src/screens/activity/LastRevisedScreen').default,
+  });
+}
+
+/** Home's stack with the reader and All activity real (the reader's pager is harness/pager), the rest of "elsewhere" empty. */
+export function readerStack(mods: Booted): ReactElement {
+  return homeStackWith(mods, {
+    QuranReader: mods.require<any>('src/screens/read/QuranReaderScreen').default,
+    ActivityAll: mods.require<any>('src/screens/activity/ActivityAllScreen').default,
+  });
 }
 
 function homeStackWith(mods: Booted, real: Record<string, unknown>, appRef = false): ReactElement {
@@ -88,7 +99,7 @@ function homeStackWith(mods: Booted, real: Record<string, unknown>, appRef = fal
       h(Stack.Screen, { name: 'JournalEntry', component: Journal }),
       h(Stack.Screen, { name: 'Memorization', component: Manager }),
       h(Stack.Screen, { name: 'ActivityDay', component: ActivityDayScreen }),
-      ...['Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'Insights', 'QuranReader'].map(
+      ...['Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'Insights', 'QuranReader', 'LastRevised'].map(
         (name) => h(Stack.Screen, { key: name, name, component: real[name] ?? Elsewhere }),
       ),
     ),
@@ -200,6 +211,11 @@ export class Home {
   /** The Today post's button: Start, Continue, Review session… */
   cta(): string | null {
     return this.text('today-cta');
+  }
+
+  /** Friday's Al-Kahf card as one line of text, or null when Home doesn't show it (KAHF-1). */
+  kahf(): string | null {
+    return this.text('kahf-post');
   }
 
   /** The memorized line under it: "3.4% of the Quran memorized" (MEM-2). */

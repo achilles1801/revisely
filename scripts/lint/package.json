@@ -1,0 +1,11 @@
+{
+  "name": "revisely-lint",
+  "private": true,
+  "description": "ESLint and Prettier for the app. Its own package, so the app's package.json (whose scripts are in the store fingerprint) never changes for them.",
+  "devDependencies": {
+    "eslint": "9.39.5",
+    "eslint-config-expo": "10.0.0",
+    "prettier": "3.9.10",
+    "typescript": "5.9.3"
+  }
+}

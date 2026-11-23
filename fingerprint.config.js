@@ -71,5 +71,16 @@ module.exports = {
   ...(process.env.APP_VARIANT === 'dev' ? { fileHookTransform: devWidgetAsCommitted } : {}),
 };
 
+// Revisely Dev only: plugins/withDevModules links the native modules in modules-dev/ (Recite on the phone) into its
+// builds through a search path autolinking's own resolve (which the fingerprint reads) doesn't know, so the folder
+// counts here, or a change to that native code would never build Dev again. The store app never links it, so its
+// fingerprints don't count it either.
+if (process.env.APP_VARIANT === 'dev') {
+  module.exports.extraSources = [
+    ...module.exports.extraSources,
+    { type: 'dir', filePath: 'modules-dev', reasons: ['devModules'] },
+  ];
+}
+
 module.exports.devWidgetAsCommitted = devWidgetAsCommitted;
 module.exports.storeWidgetText = storeWidgetText;

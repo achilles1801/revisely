@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- White, tinted by the widget: the next prayer's cell in the 4×1 row. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+  <solid android:color="#FFFFFF" />
+  <corners android:radius="14dp" />
+</shape>

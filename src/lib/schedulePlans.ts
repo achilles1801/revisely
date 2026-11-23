@@ -1,4 +1,5 @@
 import { CustomPlan, SavedPlan } from '../types';
+import { t } from '../i18n';
 
 type Direction = CustomPlan['direction'];
 
@@ -10,7 +11,7 @@ export function dateToLocalISODay(date: Date): string {
 
 /** What the Schedule screen calls a custom plan (SCHED-7): its name, else "Custom plan". */
 export function customPlanTitle(name: string | undefined): string {
-  return name?.trim() || 'Custom plan';
+  return name?.trim() || t('lib.plan.customPlan');
 }
 
 export function createCustomPlanFromDraft(

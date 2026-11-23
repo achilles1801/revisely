@@ -494,18 +494,7 @@ appId: com.revisionbuddy.app
 
 # Closed (a drag down halves a full sheet, a second closes it): the button on Home, its dot
 # for the Day in review not opened yet.
-- repeat:
-    while:
-      visible:
-        id: revo-sheet-handle
-    times: 3
-    commands:
-      - swipe:
-          from:
-            id: revo-sheet-handle
-          direction: DOWN
-      - waitForAnimationToEnd:
-          timeout: 1500
+- runFlow: ../subflows/revo-close.yaml
 - extendedWaitUntil:
     visible:
       id: revo-button-dot
@@ -621,18 +610,7 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: r5-conversation-dark
-- repeat:
-    while:
-      visible:
-        id: revo-sheet-handle
-    times: 3
-    commands:
-      - swipe:
-          from:
-            id: revo-sheet-handle
-          direction: DOWN
-      - waitForAnimationToEnd:
-          timeout: 1500
+- runFlow: ../subflows/revo-close.yaml
 - extendedWaitUntil:
     visible:
       id: revo-button
@@ -648,6 +626,7 @@ appId: com.revisionbuddy.app
 - runFlow:
     file: ../subflows/settings-row.yaml
     env:
+      PAGE: revo
       ROW: settings-revo-moment
 - tapOn:
     id: settings-revo-moment

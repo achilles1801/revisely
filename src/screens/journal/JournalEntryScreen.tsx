@@ -2,10 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  InputAccessoryView,
   Keyboard,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -31,8 +29,8 @@ import { autoId } from '../../lib/offline/apply';
 import { queueChange, withPendingJournalDay } from '../../lib/offline/queue';
 import { subscribeOutbox } from '../../lib/offline/outbox';
 import { onApplied } from '../../lib/offline/sync';
-import type { OutboxEntry, OutboxOp } from '../../lib/offline/ops';
-import { journalChangeShown, journalNoteIdOf, unshownChanges } from '../../lib/journalLocal';
+import type { OutboxEntry } from '../../lib/offline/ops';
+import { journalNoteIdOf, unshownChanges } from '../../lib/journalLocal';
 import { getRevisionDayForUser } from '../../lib/fajrBoundary';
 import {
   JOURNAL_ENTRIES_PER_DAY,
@@ -52,6 +50,7 @@ import { UndoToast } from '../../components/revision/UndoToast';
 import { parsePageRange } from '../../lib/memorizationLog';
 import { RangePickerSheet } from '../../components/memorization/RangePickerSheet';
 import { describePassage, plainText } from '../../lib/passages';
+import { revealAboveKeyboard } from '../../lib/revealAboveKeyboard';
 import { tagFor } from '../../lib/noteTags';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { useHaptics } from '../../design/haptics';
@@ -65,15 +64,16 @@ import { Tap } from '../../components/v2/Tap';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import type { JournalEntry, JournalKind, JournalNote } from '../../types';
 import { JOURNAL_KIND_ICONS } from './journalKinds';
-import { formatTime } from '../../i18n';
+import { t, formatTime } from '../../i18n';
+import { westernDigits } from '../../i18n/digits';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'JournalEntry'>;
 type ScreenRoute = RouteProp<HomeStackParamList, 'JournalEntry'>;
 
-const KIND_OPTIONS: { value: JournalKind; label: string }[] = [
-  { value: 'memorization', label: 'Memorized' },
-  { value: 'revision', label: 'Revised' },
-  { value: 'note', label: 'Note' },
+const kindOptions = (): { value: JournalKind; label: string }[] => [
+  { value: 'memorization', label: t('journal.kinds.memorization') },
+  { value: 'revision', label: t('journal.kinds.revision') },
+  { value: 'note', label: t('journal.kinds.note') },
 ];
 
 type Draft = { text: string; minutes: string; tag?: string | null; from?: string; to?: string };
@@ -84,11 +84,7 @@ const EMPTY_DRAFTS: Record<JournalKind, Draft> = {
   note: EMPTY_DRAFT,
 };
 
-const PLACEHOLDER: Record<JournalKind, string> = {
-  memorization: 'e.g. Al-Mulk, or pages 562–564',
-  revision: 'e.g. Maryam and Taha, or pages 305–321',
-  note: 'How did it go? Mistakes to watch, ayat to repeat…',
-};
+const placeholder = (kind: JournalKind): string => t(`journal.placeholder.${kind}`);
 
 /**
  * A day's log as a thread: each note is a row with its time and its ⋯ menu
@@ -141,6 +137,63 @@ export default function JournalEntryScreen() {
   const [editing, setEditing] = useState<{ note: JournalNote; draft: Draft } | null>(null);
   // The note whose ⋯ menu is open.
   const [menuNote, setMenuNote] = useState<JournalNote | null>(null);
+
+  // The keyboard. While it is up for the composer, the top bar has Done, which puts it away: the bar
+  // above the keyboard (InputAccessoryView) didn't show on iOS 26, and a tap outside the field doesn't
+  // blur it in this list, so nothing on screen closed the keyboard. As it opens, the list scrolls once
+  // so the composer's buttons sit above it: on an iPhone SE an edited note's Save was under it (E2E,
+  // Nov 16 2026). Android doesn't resize the window for the keyboard, so the list gets room under it.
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [typing, setTyping] = useState(false);
+  const typingRef = useRef(false);
+  const onFieldFocus = () => {
+    typingRef.current = true;
+    setTyping(true);
+  };
+  const onFieldBlur = () => {
+    typingRef.current = false;
+    setTyping(false);
+  };
+  const listRef = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const composerRef = useRef<View>(null);
+  const actionsRef = useRef<View>(null);
+  const scrollY = useRef(0);
+  const [reveal, setReveal] = useState<{ keyboardTop: number } | null>(null);
+  useEffect(() => {
+    const ios = Platform.OS === 'ios';
+    const subs = [
+      Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', (e) => setKeyboardHeight(e.endCoordinates.height)),
+      Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardHeight(0)),
+      // Once a keyboard has opened for a composer field: not on every keystroke.
+      Keyboard.addListener('keyboardDidShow', (e) => {
+        if (typingRef.current) setReveal({ keyboardTop: e.endCoordinates.screenY });
+      }),
+    ];
+    return () => subs.forEach((sub) => sub.remove());
+  }, []);
+  // After the render that gave Android its room: the composer's buttons above the keyboard.
+  useEffect(() => {
+    if (!reveal) return;
+    const list = listRef.current;
+    const listView = list?.getNativeScrollRef();
+    const composer = composerRef.current;
+    const actions = actionsRef.current;
+    if (!list || !listView || !composer || !actions) return;
+    actions.measureInWindow((_ax, actionsTop, _aw, actionsHeight) => {
+      composer.measureInWindow((_cx, composerTop) => {
+        listView.measureInWindow((_lx, listTop) => {
+          const y = revealAboveKeyboard({
+            offset: scrollY.current,
+            targetBottom: actionsTop + actionsHeight,
+            blockTop: composerTop,
+            listTop,
+            keyboardTop: reveal.keyboardTop,
+          });
+          if (y != null) list.scrollTo({ y, animated: true });
+        });
+      });
+    });
+  }, [reveal]);
 
   // Reads of the day can overlap (the first load, and one after each outbox
   // change) and answer out of order: a read started before a note reached the
@@ -280,10 +333,10 @@ export default function JournalEntryScreen() {
 
   // Guards the back button and (on native-stack) the swipe-back gesture.
   usePreventRemove(unsavedDraft && !saving, ({ data }) => {
-    Alert.alert('Discard changes?', "You haven't saved this note.", [
-      { text: 'Keep editing', style: 'cancel' },
+    Alert.alert(t('journal.discard.title'), t('journal.discard.body'), [
+      { text: t('journal.discard.keepEditing'), style: 'cancel' },
       {
-        text: 'Discard',
+        text: t('journal.discard.discard'),
         style: 'destructive',
         onPress: () => navigation.dispatch(data.action),
       },
@@ -314,9 +367,9 @@ export default function JournalEntryScreen() {
       .then((items) => {
         if (cancelled) return;
         setTagOptions([
-          ...(items.revisions.some((r) => r.countsFor === date) ? [{ tag: tagFor('revision', date), label: 'Revised' }] : []),
-          ...items.memorized.map((m) => ({ tag: tagFor('memorization', m.id), label: 'Memorized' })),
-          ...items.reads.map((r) => ({ tag: tagFor('read', r.id), label: 'Read' })),
+          ...(items.revisions.some((r) => r.countsFor === date) ? [{ tag: tagFor('revision', date), label: t('journal.tags.revised') }] : []),
+          ...items.memorized.map((m) => ({ tag: tagFor('memorization', m.id), label: t('journal.tags.memorized') })),
+          ...items.reads.map((r) => ({ tag: tagFor('read', r.id), label: t('journal.tags.read') })),
         ]);
       })
       .catch(() => undefined);
@@ -368,7 +421,7 @@ export default function JournalEntryScreen() {
     // A Memorized entry names pages (From and To): those pages are marked memorized today.
     const range = sendKind === 'memorization' && !editing ? parsePageRange(draft.from, draft.to) : null;
     if (sendKind === 'memorization' && !editing && (draft.from || draft.to) && !range) {
-      Alert.alert('Check the pages', 'Type the first and last page, as numbers from 1 to 604.');
+      Alert.alert(t('journal.checkPages.title'), t('journal.checkPages.body'));
       return;
     }
     // Named by surah and juz, not page numbers (lib/passages); stored as plain text.
@@ -393,7 +446,7 @@ export default function JournalEntryScreen() {
       } else {
         if (trimmed === '' && minutes == null && !range) return;
         if ((day?.entries.length ?? 0) >= JOURNAL_ENTRIES_PER_DAY) {
-          Alert.alert('This day is full', `A day holds up to ${JOURNAL_ENTRIES_PER_DAY} entries.`);
+          Alert.alert(t('journal.full.title'), t('journal.full.body', { count: JOURNAL_ENTRIES_PER_DAY }));
           setSaving(false);
           return;
         }
@@ -429,7 +482,7 @@ export default function JournalEntryScreen() {
       refreshDay();
     } catch (err) {
       logger.error('Failed to save journal note', err);
-      Alert.alert("Couldn't save", 'Please try again.');
+      Alert.alert(t('journal.saveFailed'), t('common.pleaseTryAgain'));
     } finally {
       setSaving(false);
     }
@@ -459,10 +512,10 @@ export default function JournalEntryScreen() {
   };
 
   const deleteDay = () => {
-    Alert.alert(`Delete ${formatJournalDay(date)}?`, 'This removes every entry for this day.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('journal.deleteDay.title', { day: formatJournalDay(date) }), t('journal.deleteDay.body'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           setSaving(true);
@@ -472,7 +525,7 @@ export default function JournalEntryScreen() {
             refreshDay();
           } catch (err) {
             logger.error('Failed to delete journal day', err);
-            Alert.alert("Couldn't delete", 'Please try again.');
+            Alert.alert(t('journal.deleteFailed'), t('common.pleaseTryAgain'));
           } finally {
             setSaving(false);
           }
@@ -501,12 +554,12 @@ export default function JournalEntryScreen() {
   };
   const menuActions = menuNote
     ? [
-        { key: 'edit', label: 'Edit', icon: 'create-outline' as const, onPress: () => startEdit(menuNote) },
+        { key: 'edit', label: t('common.edit'), icon: 'create-outline' as const, onPress: () => startEdit(menuNote) },
         ...(menuNote.text.trim() !== ''
           ? [
               {
                 key: 'copy',
-                label: 'Copy',
+                label: t('common.copy'),
                 icon: 'copy-outline' as const,
                 onPress: () => {
                   copyText(menuNote.text.trim());
@@ -533,9 +586,25 @@ export default function JournalEntryScreen() {
               {formatJournalDayRelative(date, today)}
             </Text>
             <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
-              {total != null ? `Total ${formatMinutes(total)}` : formatJournalDay(date)}
+              {total != null ? t('journal.total', { minutes: formatMinutes(total) }) : formatJournalDay(date)}
             </Text>
           </View>
+        }
+        right={
+          typing && keyboardHeight > 0 ? (
+            <Tap
+              onPress={() => Keyboard.dismiss()}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.done')}
+              accessibilityHint={t('journal.keyboardDoneHint')}
+              hitSlop={8}
+              testID="journal-keyboard-done"
+            >
+              <Text style={[typeV2.body, styles.done, { color: palette.accentText }]} maxFontSizeMultiplier={1.4}>
+                {t('common.done')}
+              </Text>
+            </Tap>
+          ) : null
         }
         separator
       />
@@ -547,13 +616,13 @@ export default function JournalEntryScreen() {
       ) : loadFailed ? (
         <View style={[styles.center, styles.failed]} testID="journal-offline">
           <Text style={[typeV2.name, { color: palette.text, textAlign: 'center' }]}>
-            {"Couldn't load this day's log"}
+            {t('journal.offline.title')}
           </Text>
           <Text style={[typeV2.body, { color: palette.secondary, textAlign: 'center' }]}>
-            Connect to the internet to see and add to it.
+            {t('journal.offline.body')}
           </Text>
           <PillButton
-            title="Try again"
+            title={t('common.tryAgain')}
             variant="outline"
             onPress={() => {
               setLoading(true);
@@ -565,12 +634,19 @@ export default function JournalEntryScreen() {
       ) : (
         // iOS would add the home indicator's inset again: the padding below is the only one.
       <ScrollView
+          ref={listRef}
           style={styles.scroll}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+          // iOS adds the keyboard's inset itself (automaticallyAdjustKeyboardInsets); Android, whose
+          // window keeps its size, gets the room here.
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24 + (Platform.OS === 'android' ? keyboardHeight : 0) }}
           contentInsetAdjustmentBehavior="never"
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           automaticallyAdjustKeyboardInsets
+          scrollEventThrottle={16}
+          onScroll={(e) => {
+            scrollY.current = e.nativeEvent.contentOffset.y;
+          }}
           testID="journal-v2"
         >
           {notes.map((n) => {
@@ -582,7 +658,7 @@ export default function JournalEntryScreen() {
                 key={n.id}
                 testID={`journal-note-${n.id}`}
                 accessibilityLabel={`${label}${body ? `, ${body}` : ''}, ${time}`}
-                actions={[{ name: 'options', label: 'Options', onPress: () => openMenu(n) }]}
+                actions={[{ name: 'options', label: t('journal.options'), onPress: () => openMenu(n) }]}
                 onHold={() => openMenu(n)}
                 onDelete={() => deleteNote(n)}
               >
@@ -600,9 +676,10 @@ export default function JournalEntryScreen() {
             );
           })}
 
+          <View ref={composerRef} collapsable={false} testID="journal-composer-frame">
           <ThreadRow
             mark={<Mark icon={editing ? 'create-outline' : 'add-outline'} />}
-            name={editing ? `Editing ${JOURNAL_KIND_LABELS[composingKind].toLowerCase()}` : 'New entry'}
+            name={editing ? t(`journal.editing.${composingKind}`) : t('journal.newEntry')}
             meta={editing ? formatEntryTime(editing.note.at, date, user) : undefined}
             lineAbove
             separator={false}
@@ -613,12 +690,12 @@ export default function JournalEntryScreen() {
                   onPress={fillFromSession}
                   style={[v2.suggestion, { borderColor: palette.outline }]}
                   accessibilityRole="button"
-                  accessibilityLabel="Fill from your session"
+                  accessibilityLabel={t('journal.fillFromSession')}
                   testID="journal-suggestion"
                 >
                   <Ionicons name="sparkles-outline" size={14} color={palette.text} />
                   <Text style={[typeV2.meta, v2.suggestionText, { color: palette.text }]} numberOfLines={1}>
-                    From your session: {sessionSuggestion.text}
+                    {t('journal.fromSession', { text: sessionSuggestion.text })}
                     {sessionSuggestion.minutes != null ? ` · ${formatMinutes(sessionSuggestion.minutes)}` : ''}
                   </Text>
                 </Tap>
@@ -627,17 +704,17 @@ export default function JournalEntryScreen() {
                   onPress={() => setDraft({ text: plainText(describePassage(memorizeSugg)) })}
                   style={[v2.suggestion, { borderColor: palette.outline }]}
                   accessibilityRole="button"
-                  accessibilityLabel="Fill with the pages you read today"
+                  accessibilityLabel={t('journal.fillRead')}
                   testID="journal-memorize-suggestion"
                 >
                   <Ionicons name="sparkles-outline" size={14} color={palette.text} />
                   <Text style={[typeV2.meta, v2.suggestionText, { color: palette.text }]} numberOfLines={1}>
-                    Read today, not memorized: {describePassage(memorizeSugg, { form: 'short' })}
+                    {t('journal.readNotMemorized', { what: describePassage(memorizeSugg, { form: 'short' }) })}
                   </Text>
                 </Tap>
               ) : composingKind === 'note' && tagOptions.length > 0 && !editing ? (
                 <View style={v2.tagRow} testID="journal-tag-picker">
-                  {[{ tag: null as string | null, label: 'Untagged' }, ...tagOptions].map((o) => {
+                  {[{ tag: null as string | null, label: t('journal.tags.untagged') }, ...tagOptions].map((o) => {
                     const chosen = noteTag === o.tag;
                     return (
                       <Tap
@@ -646,7 +723,7 @@ export default function JournalEntryScreen() {
                         style={[v2.suggestion, { borderColor: chosen ? palette.primary : palette.outline }]}
                         accessibilityRole="button"
                         accessibilityState={{ selected: chosen }}
-                        accessibilityLabel={`Tag: ${o.label}`}
+                        accessibilityLabel={t('journal.tags.label', { tag: o.label })}
                       >
                         <Text style={[typeV2.meta, { color: palette.text }]}>{o.label}</Text>
                       </Tap>
@@ -658,7 +735,7 @@ export default function JournalEntryScreen() {
           >
             <RangePickerSheet visible={pickerOpen} onClose={() => setPickerOpen(false)} onUse={(r) => setDraft({ from: String(r.from), to: String(r.to) })} />
             <PillTabs
-              options={KIND_OPTIONS}
+              options={kindOptions()}
               value={composingKind}
               onChange={setKind}
               disabled={editing != null}
@@ -669,28 +746,32 @@ export default function JournalEntryScreen() {
                 <PillButton
                   size="sm"
                   variant="outline"
-                  title="Surah or juz"
+                  title={t('journal.surahOrJuz')}
                   onPress={() => setPickerOpen(true)}
                   testID="memorize-pick"
                 />
                 <TextInput
                   value={draft.from ?? ''}
-                  onChangeText={(v) => setDraft({ from: v.replace(/[^0-9]/g, '') })}
-                  placeholder="From page"
+                  onChangeText={(v) => setDraft({ from: westernDigits(v).replace(/[^0-9]/g, '') })}
+                  placeholder={t('journal.fromPage')}
                   placeholderTextColor={palette.secondary}
                   keyboardType="number-pad"
+                  onFocus={onFieldFocus}
+                  onBlur={onFieldBlur}
                   style={[field, { flex: 1 }]}
-                  accessibilityLabel="From page"
+                  accessibilityLabel={t('journal.fromPage')}
                   testID="memorize-from"
                 />
                 <TextInput
                   value={draft.to ?? ''}
-                  onChangeText={(v) => setDraft({ to: v.replace(/[^0-9]/g, '') })}
-                  placeholder="To page"
+                  onChangeText={(v) => setDraft({ to: westernDigits(v).replace(/[^0-9]/g, '') })}
+                  placeholder={t('journal.toPage')}
                   placeholderTextColor={palette.secondary}
                   keyboardType="number-pad"
+                  onFocus={onFieldFocus}
+                  onBlur={onFieldBlur}
                   style={[field, { flex: 1 }]}
-                  accessibilityLabel="To page"
+                  accessibilityLabel={t('journal.toPage')}
                   testID="memorize-to"
                 />
               </View>
@@ -699,29 +780,38 @@ export default function JournalEntryScreen() {
               <TextInput
                 value={text}
                 onChangeText={setText}
-                placeholder={PLACEHOLDER[composingKind]}
+                placeholder={placeholder(composingKind)}
                 placeholderTextColor={palette.secondary}
                 selectionColor={palette.accentText}
                 multiline={composingKind === 'note'}
                 maxLength={journalTextMax(composingKind)}
                 textAlignVertical="top"
-                inputAccessoryViewID={KEYBOARD_DONE_ID}
+                onFocus={onFieldFocus}
+                onBlur={onFieldBlur}
                 style={[field, composingKind === 'note' && v2.notes]}
                 accessibilityLabel={
                   composingKind === 'note'
-                    ? 'Note'
-                    : `What you ${composingKind === 'memorization' ? 'memorized' : 'revised'}`
+                    ? t('journal.noteLabel')
+                    : composingKind === 'memorization'
+                      ? t('journal.whatMemorized')
+                      : t('journal.whatRevised')
                 }
                 testID="journal-text-input"
               />
               {composingKind !== 'note' && (
-                <MinutesFieldV2 value={minutesText} onChange={setMinutesText} label="Minutes" />
+                <MinutesFieldV2
+                  value={minutesText}
+                  onChange={setMinutesText}
+                  label={t('journal.minutes')}
+                  onFocus={onFieldFocus}
+                  onBlur={onFieldBlur}
+                />
               )}
             </View>
-            <View style={v2.actions}>
+            <View ref={actionsRef} collapsable={false} style={v2.actions} testID="journal-actions">
               {editing && (
                 <PillButton
-                  title="Cancel"
+                  title={t('common.cancel')}
                   size="sm"
                   variant="outline"
                   onPress={() => setEditing(null)}
@@ -729,16 +819,17 @@ export default function JournalEntryScreen() {
                 />
               )}
               <PillButton
-                title={editing ? 'Save' : 'Add'}
+                title={editing ? t('common.save') : t('journal.add')}
                 size="sm"
                 onPress={handleSend}
                 disabled={!canSend}
                 busy={saving}
-                accessibilityLabel={editing ? 'Save entry' : 'Add entry'}
+                accessibilityLabel={editing ? t('journal.saveEntry') : t('journal.addEntry')}
                 testID="journal-send"
               />
             </View>
           </ThreadRow>
+          </View>
 
           {notes.length > 0 && (
             <Tap
@@ -746,33 +837,16 @@ export default function JournalEntryScreen() {
               disabled={saving}
               style={[v2.deleteRow, { borderTopColor: palette.separator }]}
               accessibilityRole="button"
-              accessibilityLabel="Delete this day's log"
+              accessibilityLabel={t('journal.deleteLog')}
               testID="journal-delete"
             >
               <Ionicons name="trash-outline" size={24} color={palette.red} />
-              <Text style={[typeV2.body, { color: palette.red }]}>Delete this day's log</Text>
+              <Text style={[typeV2.body, { color: palette.red }]}>{t('journal.deleteLog')}</Text>
             </Tap>
           )}
         </ScrollView>
       )}
 
-      {Platform.OS === 'ios' && (
-        // The bar above the keyboard: one Done key puts the keyboard away for
-        // a note or the minutes, whichever is typing.
-        <InputAccessoryView nativeID={KEYBOARD_DONE_ID}>
-          <View style={[styles.doneBar, { backgroundColor: palette.bg, borderTopColor: palette.separator }]}>
-            <Pressable
-              onPress={() => Keyboard.dismiss()}
-              accessibilityRole="button"
-              accessibilityLabel="Done"
-              testID="journal-keyboard-done"
-              hitSlop={8}
-            >
-              <Text style={[typeV2.body, { color: palette.accentText, fontWeight: '600' }]}>Done</Text>
-            </Pressable>
-          </View>
-        </InputAccessoryView>
-      )}
 
       <ContextMenu
         visible={menuNote != null}
@@ -791,8 +865,8 @@ export default function JournalEntryScreen() {
     <RangePickerSheet visible={pickerOpen} onClose={() => setPickerOpen(false)} onUse={(r) => setDraft({ from: String(r.from), to: String(r.to) })} />
       <UndoToast
         visible={undoNote != null}
-        message="Note deleted"
-        actionLabel="Undo"
+        message={t('journal.noteDeleted')}
+        actionLabel={t('common.undo')}
         onUndo={undoDelete}
         onDismiss={() => setUndoNote(null)}
         duration={5000}
@@ -803,23 +877,36 @@ export default function JournalEntryScreen() {
 }
 
 /** Minutes beside a field (new design): a quiet chip that grows with its text. */
-function MinutesFieldV2({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
+function MinutesFieldV2({
+  value,
+  onChange,
+  label,
+  onFocus,
+  onBlur,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  label: string;
+  onFocus: () => void;
+  onBlur: () => void;
+}) {
   const { palette } = useTheme();
   return (
     <View style={[v2.minutes, { backgroundColor: palette.fill }]}>
       <TextInput
         value={value}
-        onChangeText={(t) => onChange(t.replace(/[^0-9]/g, ''))}
+        onChangeText={(v) => onChange(westernDigits(v).replace(/[^0-9]/g, ''))}
         placeholder="0"
         placeholderTextColor={palette.secondary}
         selectionColor={palette.accentText}
         keyboardType="number-pad"
-        inputAccessoryViewID={KEYBOARD_DONE_ID}
+        onFocus={onFocus}
+        onBlur={onBlur}
         maxLength={4}
         style={[typeV2.body, typeV2.numeral, v2.minutesInput, { color: palette.text }]}
         accessibilityLabel={label}
       />
-      <Text style={[typeV2.meta, { color: palette.secondary }]}>min</Text>
+      <Text style={[typeV2.meta, { color: palette.secondary }]}>{t('journal.min')}</Text>
     </View>
   );
 }
@@ -829,17 +916,8 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   failed: { gap: 12, paddingHorizontal: 32 },
   scroll: { flex: 1 },
-  doneBar: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingHorizontal: layoutV2.gutter,
-    paddingVertical: 8,
-    borderTopWidth: layoutV2.hairline,
-  },
+  done: { fontWeight: '600' },
 });
-
-/** The iOS keyboard bar with Done, shown above the note and minutes fields. */
-const KEYBOARD_DONE_ID = 'journal-keyboard-done';
 
 // The new design: rows on the ground, the fields borderless like a composer.
 const v2 = StyleSheet.create({

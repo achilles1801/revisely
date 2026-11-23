@@ -23,6 +23,10 @@ import { PillTabs } from '../v2/PillTabs';
 import { Hairline, InsightRow, QuietLine, ShowMore } from './InsightsV2';
 import { revisablePages } from '../../lib/memorizedAyahs';
 import { t } from '../../i18n';
+import { lastRevisedDay } from '../../lib/recency';
+
+// Moved to lib/recency (Insights' Gaps reads it too); kept here for this file's callers.
+export { lastRevisedDay };
 
 type BrowseMode = 'pages' | 'surahs' | 'juz';
 
@@ -63,17 +67,6 @@ interface JuzRow {
  */
 export function juzMeta(juz: number, pageCount: number, avgStrength: number): string {
   return t('insights.juzMeta', { count: pageCount, average: avgStrength.toFixed(1), name: getJuzName(juz) });
-}
-
-/**
- * The revision day a page was last revised on. A page holds either the moment of its last
- * revision (a session sets it) or the revision day itself, stored as that day's midnight UTC (the
- * self-heal from the logs, AppContext's syncPagesFromLogs). Read as a moment, the second fell on
- * the evening before in the Americas.
- */
-export function lastRevisedDay(user: Parameters<typeof getRevisionDayForUser>[0], iso: string): string {
-  if (/T00:00:00(\.000)?Z$/.test(iso)) return iso.slice(0, 10);
-  return getRevisionDayForUser(user, new Date(iso));
 }
 
 /**

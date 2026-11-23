@@ -78,7 +78,13 @@ describe('sheets in the new design', () => {
           onSelect={onSelect}
           onClose={jest.fn()}
           sections={[
-            { title: 'Kind', options: [{ value: 'a', label: 'All' }, { value: 'b', label: 'Revision' }] },
+            {
+              title: 'Kind',
+              options: [
+                { value: 'a', label: 'All' },
+                { value: 'b', label: 'Revision' },
+              ],
+            },
           ]}
         />,
       ),
@@ -207,7 +213,9 @@ describe('sheets in the new design', () => {
       ),
     );
     await act(async () => {});
-    expect(flat(screen.getByTestId('pill-stopwatch').props.style).backgroundColor).toBe(paletteV2(false, DEFAULT_ACCENT).primary);
+    expect(flat(screen.getByTestId('pill-stopwatch').props.style).backgroundColor).toBe(
+      paletteV2(false, DEFAULT_ACCENT).primary,
+    );
     expect(flat(screen.getByTestId('pill-timer').props.style).borderWidth).toBe(1);
     fireEvent.press(screen.getByTestId('pill-timer'));
     expect(onChange).toHaveBeenCalledWith('timer');

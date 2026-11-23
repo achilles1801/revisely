@@ -38,7 +38,7 @@ interface AccentTokens {
   onDone: string;
   /** "Done" as text (≥ 4.5:1 on every ground). */
   doneText: string;
-  /** Text in the accent: the active tab, highlighted words (≥ 4.5:1 on every ground). */
+  /** Text in the accent: the active tab, a chosen row's tick (≥ 4.5:1 on every ground; never a highlight on the page). */
   accentText: string;
   /** Text on an `accentText` fill (≥ 4.5:1). */
   onAccentText: string;
@@ -149,23 +149,35 @@ export interface PaletteV2 extends AccentTokens {
   warnSubtle: string;
   goodSubtle: string;
   /**
-   * Following a recitation (the reader's live take, the hidden pages): the line being recited (a soft band behind the
-   * page's ink; none on a hidden page) and the word being recited, or the newest one shown on a hidden page (a firmer
-   * box), both quiet greys like Tarteel's (Majd, Nov 15 2026: the blue ayah band read as running ahead); and `followInk`,
-   * the word being said in the bar, the one place blue is used. None of it follows the accent, so it never reads as a
-   * mistake (Majd, Nov 14 2026: Crimson's follow looked like mistakes). Ink reads at 4.5:1 on the band and the box;
-   * `followInk` as text at 4.5:1 on the ground.
+   * The one highlight on a mushaf page, a neutral grey for every accent (Majd, Nov 21 2026: "we should have one global
+   * highlite color that doesnt conflict with other colors, maybe gray?"): `highlight` for an ayah (held, playing, a
+   * search result, a similar ayah, "You continued with…", a passage opened from Insights) and the cover of the word being
+   * said on a hidden page; `highlightSoft`, its lighter shade, for Recite's band on the line being recited (none on a
+   * hidden page). Grey like Tarteel's (Majd, Nov 15 2026: the blue ayah band read as
+   * running ahead). It never follows the accent, so it never reads as a mistake (Nov 14: Crimson's follow looked like
+   * one), and it stays apart from the mistake highlights (`mark…`) and the peek veil. The page's ink reads at 4.5:1 on
+   * both. `followInk` is Recite's one following colour, a green of our own (Majd, Nov 22 2026, of Tarteel's hidden page:
+   * "i dont see the words being a different color as its recited with page hidden, why are we not taking that up?"):
+   * the newest word shown on a hidden page, in its own ink (components/reciteLive/FollowInk), and the word being said in
+   * the bar. Text at 4.5:1 on every ground and on the page; apart from the mistakes' red, amber and violet by hue.
    */
-  followBand: string;
-  followWord: string;
+  highlight: string;
+  highlightSoft: string;
+  /**
+   * Its firmer shade: the rectangle on the word being recited on a shown page, inside the ayah's band (Majd, Nov 22
+   * 2026, of Tarteel's: "follow along is clearly shading each word … a boxed rectangle kinda that moves side to side").
+   */
+  highlightFirm: string;
   followInk: string;
   /**
    * Recite's mistakes as highlights behind the word, three colours at most (Majd, Nov 15 2026: "only things we should
    * show are highlites for mistakes 3 colors max and each color can consists of diff types of mistake"): `markWord` a
    * wrong, skipped or extra word (on the word before it), `markSlip` a haraka or letter slip and "Not clear",
-   * `markTajweed` a tajweed note (Strict). Each `…Firm` is the mark a card is open for. On the page, in the bar, the
-   * card's and the summary's swatches. The ink reads at 4.5:1 on each; the three tell apart by hue and by lightness
-   * (colour blindness); the card and the summary always name the kind in words. None follows the accent.
+   * `markTajweed` a tajweed note (Strict). Each `…Firm` is the mark a card is open for. On the page (as soft washes,
+   * components/reciteLive/Wash), in the bar, the card's and the summary's swatches. Pastel (Majd, Nov 21 2026: "I also
+   * like their color shades its like more pastel which is what we should aim for as well"): light and soft on a light
+   * page, muted on a dark one. The ink reads at 4.5:1 on each; the three tell apart by hue and by lightness (colour
+   * blindness); the card and the summary always name the kind in words. None follows the accent.
    */
   markWord: string;
   markWordFirm: string;
@@ -208,15 +220,16 @@ const BASE_LIGHT: Base = {
   onRedSubtle: '#B91C1C',
   warnSubtle: '#FDF2E2',
   goodSubtle: '#E6F2EF',
-  followBand: '#F2F2F4',
-  followWord: '#DEDEE3',
-  followInk: '#1D4ED8',
-  markWord: '#F49A9A',
-  markWordFirm: '#EC7A7A',
-  markSlip: '#FBD38D',
-  markSlipFirm: '#F5B94D',
-  markTajweed: '#C9B6F2',
-  markTajweedFirm: '#A98EEB',
+  highlight: '#DEDEE3',
+  highlightSoft: '#F2F2F4',
+  highlightFirm: '#C8C8CC',
+  followInk: '#1A7A44',
+  markWord: '#F6B9BC',
+  markWordFirm: '#EF9CA1',
+  markSlip: '#FADDA0',
+  markSlipFirm: '#F4C878',
+  markTajweed: '#D6C8F5',
+  markTajweedFirm: '#BFA9EF',
   premium: ['#7C3AED', '#DB2777'],
   onPremium: '#FFFFFF',
 };
@@ -246,15 +259,16 @@ const BASE_DARK: Base = {
   onRedSubtle: '#F87171',
   warnSubtle: '#2A2008',
   goodSubtle: '#0D2721',
-  followBand: '#121214',
-  followWord: '#26262B',
-  followInk: '#7DB3F5',
-  markWord: '#7A2424',
-  markWordFirm: '#A33434',
-  markSlip: '#6E4C0C',
-  markSlipFirm: '#94660E',
-  markTajweed: '#4B3A86',
-  markTajweedFirm: '#6450B5',
+  highlight: '#26262B',
+  highlightSoft: '#121214',
+  highlightFirm: '#444446',
+  followInk: '#86E0B0',
+  markWord: '#7A3D48',
+  markWordFirm: '#94505E',
+  markSlip: '#7A5D2C',
+  markSlipFirm: '#937035',
+  markTajweed: '#55487F',
+  markTajweedFirm: '#6B5C9E',
   premium: ['#A78BFA', '#F472B6'],
   onPremium: '#000000',
 };
@@ -308,7 +322,14 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       ring: ['#0E6B5A', '#0E6B5A'],
       heat: ['#EBEDF0', '#79C2AA', '#3FA084', '#1A7D66', '#0B5A4A'],
       heatInk: ['#1A1A1A', '#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF'],
-      revo: { r: ['#3FA084', '#79C2AA'], disc: '#0B3A30', ring: '#4DBA9F', glow: '#3FA084', shadow: '#06231D', sheetGlow: { color: '#3FA084', opacity: 0.12 } },
+      revo: {
+        r: ['#3FA084', '#79C2AA'],
+        disc: '#0B3A30',
+        ring: '#4DBA9F',
+        glow: '#3FA084',
+        shadow: '#06231D',
+        sheetGlow: { color: '#3FA084', opacity: 0.12 },
+      },
     },
     dark: {
       primary: '#FFFFFF',
@@ -326,7 +347,14 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       ring: ['#4DBA9F', '#4DBA9F'],
       heat: ['#1C1C1E', '#0F4A3B', '#18735C', '#2A9C7F', '#5CD1B2'],
       heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000', '#000000'],
-      revo: { r: ['#3FA084', '#79C2AA'], disc: '#0B3A30', ring: '#4DBA9F', glow: '#3FA084', shadow: '#06231D', sheetGlow: null },
+      revo: {
+        r: ['#3FA084', '#79C2AA'],
+        disc: '#0B3A30',
+        ring: '#4DBA9F',
+        glow: '#3FA084',
+        shadow: '#06231D',
+        sheetGlow: null,
+      },
     },
   },
   // RedotPay, from colours sampled off its screens: #DC1433 for the action,
@@ -350,7 +378,14 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       ring: ['#3E0812', '#DC1433'],
       heat: ['#EBEDF0', '#F29AA7', '#E9637A', '#DC1433', '#7A0B1D'],
       heatInk: ['#1A1A1A', '#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF'],
-      revo: { r: ['#DC1433', '#F5455E'], disc: '#3E0812', ring: '#F03C56', glow: '#DC1433', shadow: '#2A0509', sheetGlow: { color: '#DC1433', opacity: 0.08 } },
+      revo: {
+        r: ['#DC1433', '#F5455E'],
+        disc: '#3E0812',
+        ring: '#F03C56',
+        glow: '#DC1433',
+        shadow: '#2A0509',
+        sheetGlow: { color: '#DC1433', opacity: 0.08 },
+      },
     },
     dark: {
       primary: '#DC1433',
@@ -374,7 +409,14 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       ring: ['#DC1433', '#F03C56'],
       heat: ['#2E0E15', '#8A0E26', '#B3112C', '#DC1433', '#F5455E'],
       heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000'],
-      revo: { r: ['#DC1433', '#F5455E'], disc: '#3E0812', ring: '#F03C56', glow: '#DC1433', shadow: '#2A0509', sheetGlow: { color: '#DC1433', opacity: 0.22 } },
+      revo: {
+        r: ['#DC1433', '#F5455E'],
+        disc: '#3E0812',
+        ring: '#F03C56',
+        glow: '#DC1433',
+        shadow: '#2A0509',
+        sheetGlow: { color: '#DC1433', opacity: 0.22 },
+      },
     },
   },
   // The real-estate app, from sampled colours: #624BD5 for the action (white
@@ -397,7 +439,14 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       ring: ['#2E0EC6', '#9789DA'],
       heat: ['#EBEDF0', '#9789DA', '#624BD5', '#2E0EC6', '#1F1170'],
       heatInk: ['#1A1A1A', '#1A1A1A', '#FFFFFF', '#FFFFFF', '#FFFFFF'],
-      revo: { r: ['#624BD5', '#9789DA'], disc: '#2B2352', ring: '#9789DA', glow: '#624BD5', shadow: '#14103C', sheetGlow: { color: '#624BD5', opacity: 0.1 } },
+      revo: {
+        r: ['#624BD5', '#9789DA'],
+        disc: '#2B2352',
+        ring: '#9789DA',
+        glow: '#624BD5',
+        shadow: '#14103C',
+        sheetGlow: { color: '#624BD5', opacity: 0.1 },
+      },
     },
     dark: {
       primary: '#624BD5',
@@ -421,7 +470,14 @@ const ACCENT_TOKENS: Record<AccentName, { light: AccentTokens; dark: AccentToken
       ring: ['#624BD5', '#9789DA'],
       heat: ['#1C1C1E', '#3F2AA2', '#624BD5', '#7E6CD8', '#9789DA'],
       heatInk: ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000', '#000000'],
-      revo: { r: ['#624BD5', '#9789DA'], disc: '#2B2352', ring: '#9789DA', glow: '#624BD5', shadow: '#14103C', sheetGlow: { color: '#624BD5', opacity: 0.22 } },
+      revo: {
+        r: ['#624BD5', '#9789DA'],
+        disc: '#2B2352',
+        ring: '#9789DA',
+        glow: '#624BD5',
+        shadow: '#14103C',
+        sheetGlow: { color: '#624BD5', opacity: 0.22 },
+      },
     },
   },
 };
@@ -542,9 +598,91 @@ export const typeV2 = t({
   numeral: { fontVariant: ['tabular-nums'] },
 });
 
-/** Arabic text in Amiri: a little larger than the Latin beside it, with room for its marks. */
+/**
+ * Amiri's own line, as fractions of the font size: the ascender and descender of its hhea table (unitsPerEm 1000),
+ * which both platforms build a line from. arabicLines.test reads them from assets/fonts/Amiri-Regular.ttf.
+ */
+export const AMIRI_LINE = { ascent: 1.124, descent: 0.634 } as const;
+
+/**
+ * How far unvoweled Amiri reaches, as fractions of the font size: the highest and lowest of the 114 surah names
+ * (scripts/measure-amiri-ink.swift, Nov 22 2026: the hamza of الأنبياء reaches 1.001 above, the meem's tail of القلم
+ * 0.651 below). The salam, the prayer names and الكهف stay inside it.
+ */
+export const AMIRI_NAME_INK = { above: 1.001, below: 0.651 } as const;
+
+/**
+ * How far voweled Amiri's ink reaches from the baseline, as fractions of the font size: the highest and the lowest of
+ * every word of the Qur'an, shaped by CoreText (`swift scripts/measure-amiri-ink.swift`, Nov 22 2026: ظَمَأٌۭ reaches
+ * 1.481 above, عَظِيمٌۭ 0.950 below). Half of all words reach past the font's own ascent: stacked marks (a shadda and
+ * its haraka over a lam, dammatan on a hamza over an alif) sit higher than the line the font declares.
+ */
+export const AMIRI_INK = { above: 1.481, below: 0.95 } as const;
+
+/** Room beyond the measured ink, for Android's shaping and pixel rounding (a fraction of the font size). */
+const INK_MARGIN = 0.02;
+
+/**
+ * A line taller than the font's own gets half the extra above the ascent and half below the descent, on iOS
+ * (RCTApplyBaselineOffset) and Android (CustomLineHeightSpan) alike, React Native 0.81. So the line that holds some ink
+ * adds twice its larger overshoot to the font's own line (none when it fits, but never a shorter line than the font's).
+ */
+function lineFor(ink: { above: number; below: number }): number {
+  const over = Math.max(ink.above - AMIRI_LINE.ascent, ink.below - AMIRI_LINE.descent, 0);
+  return AMIRI_LINE.ascent + AMIRI_LINE.descent + 2 * (over + INK_MARGIN);
+}
+
+/** The line voweled Amiri needs: 2.51× the font size. */
+export const ARABIC_FULL_LINE = lineFor(AMIRI_INK);
+
+/** The line unvoweled Amiri needs: 1.83× the font size. */
+export const ARABIC_NAME_LINE = lineFor(AMIRI_NAME_INK);
+
+/**
+ * Unvoweled Arabic in Amiri (a surah's name, the salam, a prayer's name): a little larger than the Latin beside it,
+ * on a line that holds every letter and hamza (ARABIC_NAME_LINE). Until Nov 22 2026 it was 1.6×, shorter than the
+ * font's own line: iOS cut the line's top (a hamza over an alif) and Android its bottom (a meem's tail). Anything with
+ * harakat uses arabicFullV2.
+ */
 export function arabicV2(size: number): TextStyle {
-  return { fontFamily: fontsV2.arabic, fontSize: size, lineHeight: Math.round(size * 1.6) };
+  return { fontFamily: fontsV2.arabic, fontSize: size, lineHeight: Math.ceil(size * ARABIC_NAME_LINE) };
+}
+
+/**
+ * Voweled Arabic in Amiri that never clips (Majd, Nov 22 2026: on a mistake's card "u cant even see if theres a dumma
+ * or fatha on the top"): every line tall enough for every haraka above and below, on iOS and Android. A highlight
+ * behind a word (a nested Text's background) fills the line, so it covers the marks too. The line grows with the text
+ * size, as the font does. Use it for Qur'an words, phrases and anything with harakat.
+ */
+export function arabicFullV2(size: number): TextStyle {
+  return { fontFamily: fontsV2.arabic, fontSize: size, lineHeight: Math.ceil(size * ARABIC_FULL_LINE) };
+}
+
+/** Harakat, tanween, the dagger alif and the Qur'an's small signs. */
+const HARAKAT = /[ً-ٰٟۖ-ۭ]/;
+
+/** Whether Arabic text carries harakat (so it needs arabicFullV2's line). */
+export const hasHarakat = (text: string): boolean => HARAKAT.test(text);
+
+/**
+ * The line a given Arabic text needs, where one place shows both kinds (a picker's surah name and a juz's voweled
+ * opening words, a typed search and a heard one): arabicFullV2 when it carries harakat, arabicV2 when it doesn't.
+ */
+export function arabicForV2(text: string | null | undefined, size: number): TextStyle {
+  return text && hasHarakat(text) ? arabicFullV2(size) : arabicV2(size);
+}
+
+/**
+ * Room above and below the baseline in a line of Amiri `lineHeight` tall, as React Native 0.81 lays it out: a taller
+ * line than the font's own is centred on both platforms; a shorter one loses its top on iOS (TextKit keeps the
+ * descent) and half from each end on Android, so the smaller of the two.
+ */
+export function amiriRoom(fontSize: number, lineHeight: number): { above: number; below: number } {
+  const ascent = AMIRI_LINE.ascent * fontSize;
+  const descent = AMIRI_LINE.descent * fontSize;
+  const half = (lineHeight - ascent - descent) / 2;
+  if (half >= 0) return { above: ascent + half, below: descent + half };
+  return { above: Math.min(lineHeight - descent, ascent + half), below: descent + half };
 }
 
 /** Avatar-size marks: a top-level row, a reply, a nested reply. */
@@ -593,3 +731,66 @@ export const revoV2 = {
   /** The pen's lit tip while the R writes itself (What's new's Revo moment): white on any accent. */
   penTip: '#FFFFFF',
 } as const;
+
+/**
+ * The Ramadan theme's colours (Revisely Dev, Settings → Appearance → Ramadan theme; lib/ramadanTheme): decorations
+ * only, never text. Warm gold for the lanterns, the crescent and the falling light, the same for every accent; one
+ * string-light bulb in three takes the accent. The site's Ramadan theme uses the same values (shared notes,
+ * ramadan-theme.md).
+ */
+export interface RamadanTokens {
+  /** Lantern metal, the crescent, sparkles, the rope the lanterns hang from. */
+  gold: string;
+  /** Lantern glass and its halo, drawn at `glassOpacity`. */
+  glass: string;
+  glassOpacity: number;
+  /** The flame inside a lantern. */
+  flame: string;
+  /** The falling light over Home's glow, at most `moteOpacity`. */
+  mote: string;
+  moteOpacity: number;
+  /** The string lights' wire and the lanterns' strings. */
+  wire: string;
+  /** The string lights' bulbs, in turn. */
+  bulbs: readonly [string, string, string];
+}
+
+const RAMADAN_BASE = {
+  light: {
+    gold: '#B07D1E',
+    glass: '#F7C561',
+    glassOpacity: 0.4,
+    flame: '#FFE7A8',
+    mote: '#C99532',
+    moteOpacity: 0.7,
+    wire: '#CBBFA6',
+    amber: '#E3A72F',
+    third: '#D9774A',
+  },
+  dark: {
+    gold: '#E8B65A',
+    glass: '#FFCF73',
+    glassOpacity: 0.55,
+    flame: '#FFF1CC',
+    mote: '#FFE2A0',
+    moteOpacity: 0.9,
+    wire: '#5A4F3C',
+    amber: '#FFC857',
+    third: '#FFE9B8',
+  },
+} as const;
+
+export function ramadanV2(isDark: boolean, accent: AccentName = DEFAULT_ACCENT): RamadanTokens {
+  const b = RAMADAN_BASE[isDark ? 'dark' : 'light'];
+  return {
+    gold: b.gold,
+    glass: b.glass,
+    glassOpacity: b.glassOpacity,
+    flame: b.flame,
+    mote: b.mote,
+    moteOpacity: b.moteOpacity,
+    wire: b.wire,
+    // doneText: the accent itself for every accent (Jade's accentText is ink).
+    bulbs: [b.amber, paletteV2(isDark, accent).doneText, b.third],
+  };
+}

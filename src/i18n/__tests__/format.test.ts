@@ -2,7 +2,8 @@
 // in another language Intl writes them in that language's order.
 import fs from 'fs';
 import path from 'path';
-import { dateLocale, dayMonth, formatDate, formatNumber, formatTime, monthName, weekdayName } from '..';
+import { dateLocale, dayMonth, formatDate, formatDay, formatNumber, formatTime, monthName, weekdayName } from '..';
+import { localDigits } from '../digits';
 
 const SRC = path.resolve(__dirname, '../..');
 
@@ -13,6 +14,23 @@ const FORMATTED = [''];
 const days = Array.from({ length: 400 }, (_, i) => new Date(2025, 11, 1 + i));
 
 describe('in English, exactly as before', () => {
+  it('names a calendar day as formatDate did its local midnight, in any time zone (Activity’s search words)', () => {
+    const zone = process.env.TZ;
+    const options: Intl.DateTimeFormatOptions[] = [{ weekday: 'long' }, { month: 'long', day: 'numeric' }, { month: 'short', day: 'numeric' }];
+    try {
+      for (const tz of [zone, 'Pacific/Kiritimati', 'America/Adak', 'Asia/Kathmandu']) {
+        process.env.TZ = tz;
+        for (const d of days) {
+          const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          const local = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+          for (const o of options) expect(formatDay(day, o)).toBe(formatDate(local, o));
+        }
+      }
+    } finally {
+      process.env.TZ = zone;
+    }
+  });
+
   it('names weekdays and months as en-US did', () => {
     for (const d of days) {
       expect(weekdayName(d)).toBe(d.toLocaleDateString('en-US', { weekday: 'long' }));
@@ -55,9 +73,11 @@ describe('in another language', () => {
       const ar = require('../format') as typeof import('../format');
       const d = new Date(2026, 9, 28);
       expect(ar.dateLocale('device')).toBe('ar');
+      // In Arabic-Indic digits whatever Intl gives (digits.ts): Node's 'ar' writes Western ones.
       expect(ar.dayMonth(d, { weekday: 'long' })).toBe(
-        d.toLocaleDateString('ar', { weekday: 'long', day: 'numeric', month: 'long' }),
+        localDigits(d.toLocaleDateString('ar', { weekday: 'long', day: 'numeric', month: 'long' }), 'ar'),
       );
+      expect(ar.dayMonth(d, { weekday: 'long' })).toContain('٢٨');
       expect(ar.weekdayName(d)).toMatch(/[؀-ۿ]/);
     });
   });

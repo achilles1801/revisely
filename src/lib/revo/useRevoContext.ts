@@ -4,6 +4,8 @@ import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { useSharedActivityHistory } from '../activityHistory';
 import { aheadLead, nextRevisionDayPlan } from '../aheadPlan';
 import { generateDailyAssignment } from '../algorithm';
+import { gapsInsightsEnabled } from '../insightsGaps';
+import { journalFirstDay } from '../journal';
 import { getQuranData } from '../quranData';
 import { todaySnapshot } from '../todaySnapshot';
 import { getQuranWords, loadQuranWords, type QuranWords } from '../recite/quranWords';
@@ -11,8 +13,9 @@ import { reciteLiveForAccount } from '../reciteLive/availability';
 import { useMemoryRecords } from '../reciteMemory/store';
 import { logger } from '../logger';
 import { buildRevoContext } from './context';
+import { revoGaps } from './gaps';
 import { recitationForRevo } from './recitation';
-import { revoPatternsOn } from './release';
+import { revoPatternsOn, revoReciteOn } from './release';
 import type { FactSources } from './facts';
 import type { GreetingExtras } from './greeting';
 import type { RevoContext } from './types';
@@ -40,6 +43,15 @@ export function useRevoContext(): {
   const words = useWordsFor(reciteOn && records.length > 0);
   const recitation = useCallback(() => (reciteOn ? recitationForRevo(records, day, words) : null), [reciteOn, records, day, words]);
   const history = useSharedActivityHistory(user?.id, day);
+  // Revisely Dev (ACT-28, ACT-30): Insights' Gaps and Last revised go with each question, from the items Home read.
+  // Not before they load: from none, the figures would say no day was revised (as the section once flashed).
+  const gaps = useMemo(
+    () =>
+      user && history && gapsInsightsEnabled(user)
+        ? revoGaps({ user, pages, history, today: day, firstDay: journalFirstDay(user, history.map((h) => ({ date: h.day }))) })
+        : null,
+    [user, pages, history, day],
+  );
   const assignment = useMemo(() => (user ? generateDailyAssignment(pages, getQuranData(), user, date).pages : []), [user, pages, date]);
   const sources = useCallback((): FactSources | null => {
     if (!user) return null;
@@ -50,9 +62,9 @@ export function useRevoContext(): {
   const build = useCallback(() => {
     const src = sources();
     return src
-      ? buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot: src.snapshot, history: src.history, patterns: revoPatternsOn(), recitation: recitation() })
+      ? buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot: src.snapshot, history: src.history, patterns: revoPatternsOn(), recite: revoReciteOn(), recitation: recitation(), gaps })
       : null;
-  }, [sources, recitation]);
+  }, [sources, recitation, gaps]);
   const { context, extras } = useMemo(() => {
     const src = sources();
     if (!src) return { context: null, extras: {} };
@@ -66,11 +78,11 @@ export function useRevoContext(): {
       }
     }
     return {
-      context: buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot, history: src.history, patterns: revoPatternsOn(), recitation: recitation() }),
+      context: buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot, history: src.history, patterns: revoPatternsOn(), recite: revoReciteOn(), recitation: recitation(), gaps }),
       // Smart Tracking unset is off, as Activity reads it.
       extras: { doneCount: snapshot.done.size, next, strength: src.user.smartTrackingEnabled === true },
     };
-  }, [sources, assignment, day, recitation]);
+  }, [sources, assignment, day, recitation, gaps]);
   return { day, context, extras, build, sources };
 }
 

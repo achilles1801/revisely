@@ -7,24 +7,27 @@
  * users' requests (and their prompt cache, and the recorded replies the tests use) are exactly as before.
  *
  * Majd's rules (Nov 14–16 2026): only marks that exist; "Not clear" is never "wrong"; words and similar ayat before
- * harakat; going back to restart is never a mistake; surahs and ayat first, never pages.
+ * harakat; going back to restart is never a mistake; surahs and ayat first, never pages. Nov 22 2026: two tiers, a wrong
+ * haraka or letter is a mistake like a wrong word (never a "slip"), and tajweed notes are Beta.
  */
 import type { RevoRecitation, RevoTakeFacts, RevoTakeMark } from './types';
+import { REVO_PER_PAGE_FROM } from './types';
 
 export const RECITATION_SYSTEM = [
   'Their recitation (Revisely Dev only):',
-  'Recite is the microphone on the reader’s bar in Revisely Dev, the test app. With “Mark mistakes” on, a checker on the server follows them as they recite and marks words on the page: red for a wrong, skipped or extra word; amber for a haraka or letter slip, and for “Not clear”; violet for a tajweed note, only at the Strict level (Settings → Recite → Mistakes to mark). After a take, its summary gives the score by the page, lists each mark, names any similar ayah they went on with, and offers “Recite the mistakes again”. A mark can be taken off with “Not a mistake” (and put back). Each take is kept on their account as text; its recording stays on their phone. Words missed stay marked on the page, toned down, until said right in 2 takes in a row on 2 different revision days; “Clear now” on a word’s card clears it at once. “Your progress” shows a passage’s takes and score over time. In Activity, a day’s “Recited” block lists its takes, and “Show on the page” reopens one with its marks.',
+  'Recite is the microphone on the reader’s bar in Revisely Dev, the test app. With “Mark mistakes” on, a checker on the server marks words as they recite: red for a wrong, skipped or extra word; amber for a wrong haraka or letter, and for “Not clear”; violet for a tajweed note (Strict only, Beta). Where everything is (a take’s summary, the takes kept, past mistakes on the page, Activity and Insights) is in the Dev guide.',
   '',
   'How to talk about it:',
   '- You only know what the context’s recitation part and an attached take say. Never invent a mistake, a word, an ayah, a take or a score. If they ask about a take or a passage you weren’t given, say you can’t see it from here, and suggest attaching the take (hold it in Activity, then “Ask Revo about this take”) or opening it in Activity.',
   '- You never hear their recitation; you only know what the checker marked.',
   '- “Not clear” means the checker couldn’t hear a haraka or letter clearly enough to judge. It is never a mistake and never counts in the score: say it wasn’t clear enough to check, never that it was wrong.',
-  '- What matters most for keeping the Qur’an comes first: wrong, skipped and extra words, and going on with a similar ayah. Harakat and letter slips come after, briefly. Tajweed notes come only from Strict takes; mention them when asked, or when there is nothing else.',
+  '- A wrong haraka or a wrong letter is a mistake, as a wrong word is: call it a wrong haraka or a wrong letter, never a slip. Tajweed notes are the second tier, still in Beta: they come only from Strict takes and never count; mention them when asked, or when there is nothing else.',
+  '- What matters most for keeping the Qur’an comes first: wrong, skipped and extra words, and going on with a similar ayah. Wrong harakat and letters come after, briefly.',
   '- Going back a few words to restart an ayah is proper recitation, never a mistake. The checker doesn’t mark it, and you never call it one.',
   '- For a slip into a similar ayah, name both places, surah first (“from Al-Baqarah 48 into Al-Baqarah 123”), and suggest reciting the two one after the other to tell them apart. Don’t explain the ayat beyond the words you were given: no tafsir.',
   '- Name passages by surah and ayahs (“Al-Kahf, ayahs 22–23”), never by page.',
   '- The checker can be wrong. If they say a mark is wrong, tell them to tap it and choose “Not a mistake”.',
-  '- Steps that fit: reciting the passage again today and once more on another day (that clears its marks), “Recite the mistakes again” after a take, opening the reader at the surah (openScreen with screen "reader" and the surah), where the marks show, or reciting a similar pair one after the other.',
+  '- Steps that fit: reciting the passage again today and once more on another day (that clears its marks), “Recite the mistakes again” after a take, "Recite your mistakes here" from the held mic on a page with words still marked (Premium), opening the reader at the surah (openScreen with screen "reader" and the surah), where the marks show, or reciting a similar pair one after the other.',
   '- With Smart Tracking off they don’t rate pages: talk about the mistakes heard and when they last recited, never ratings or strength. With it on, you may say a passage rated strong still slips when recited, but never guess or change a rating.',
   '- Never give a tajweed or fiqh ruling beyond what a mark says.',
 ].join('\n');
@@ -47,10 +50,22 @@ function kindsText(r: Pick<RevoRecitation, 'kinds'>): string {
     k.wrong ? count(k.wrong, 'wrong word') : '',
     k.skipped ? `${k.skipped} skipped` : '',
     k.added ? count(k.added, 'extra word') : '',
-    k.harakat ? count(k.harakat, 'haraka slip') : '',
-    k.letter ? count(k.letter, 'letter slip') : '',
+    k.harakat ? count(k.harakat, 'wrong haraka', 'wrong harakat') : '',
+    k.letter ? count(k.letter, 'wrong letter') : '',
   ].filter(Boolean);
   return parts.join(', ');
+}
+
+/**
+ * The long takes' mistakes a page, as Insights and the take's summary show it (RECITE-24): "In their takes of 2 pages or
+ * more (3 takes, 8 pages): 1.4 mistakes a page." To a tenth; a mistake over many pages is "under 0.1", never none.
+ */
+export function perPageText(p: NonNullable<RevoRecitation['perPage']>): string {
+  const lead = `In their takes of ${REVO_PER_PAGE_FROM} pages or more (${count(p.takes, 'take')}, ${count(p.pages, 'page')})`;
+  if (p.mistakes === 0) return `${lead}: no mistakes.`;
+  const tenths = Math.round((p.mistakes / p.pages) * 10) / 10;
+  if (tenths === 0) return `${lead}: under 0.1 mistakes a page.`;
+  return `${lead}: ${tenths} ${tenths === 1 ? 'mistake' : 'mistakes'} a page.`;
 }
 
 /** The context's recitation part, as the model reads it. */
@@ -59,20 +74,24 @@ export function recitationText(r: RevoRecitation): string {
   if (r.takes === 0) lines.push(`- No takes in the last ${r.days} days.`);
   else {
     const before = r.earlierScore === null ? '' : ` (the ${r.days} days before: ${percent(r.earlierScore)})`;
-    lines.push(
-      `- ${count(r.takes, 'take')} on ${count(r.daysRecited, 'day')}, ${r.minutes} min, ${count(r.words, 'word')} recited. Score by the page: ${percent(r.score ?? 1)}${before}.`,
-    );
+    // Takes kept without the checker's final answer never count in a score (RECITE-11): with only those, there is none.
+    const score =
+      r.score === null
+        ? 'No score: none of these takes got the checker’s final answer (the connection ended first), so none was scored'
+        : `Score by the page: ${percent(r.score)}${before}`;
+    lines.push(`- ${count(r.takes, 'take')} on ${count(r.daysRecited, 'day')}, ${r.minutes} min, ${count(r.words, 'word')} recited. ${score}.`);
     const mistakes = r.mistakes === 0 ? 'none' : `${r.mistakes}: ${kindsText(r)}`;
-    const tajweed = r.tajweed === null ? '' : ` Tajweed notes (Strict takes): ${r.tajweed}.`;
+    const tajweed = r.tajweed === null ? '' : ` Tajweed notes (Strict takes, Beta, never counted): ${r.tajweed}.`;
     lines.push(`- Mistakes: ${mistakes}. Not clear (never counted): ${r.unclear}.${tajweed}`);
+    if (r.perPage) lines.push(`- ${perPageText(r.perPage)}`);
     if (r.weeks.length > 1) lines.push(`- Score week by week, oldest first, this week last: ${r.weeks.map((w) => (w === null ? 'no takes' : percent(w))).join(', ')}.`);
   }
   lines.push(`- Words still marked on the page: ${r.stillMarked}. Cleared in these ${r.days} days: ${r.cleared}.`);
   if (r.slipping.length > 0) {
     lines.push('- Keeps slipping (words still marked, the most slipped first):');
     for (const s of r.slipping) {
-      const slips = s.words - s.wordMistakes;
-      const what = [s.wordMistakes ? count(s.wordMistakes, 'wrong, skipped or extra word') : '', slips ? count(slips, 'haraka or letter slip') : '']
+      const parts = s.words - s.wordMistakes;
+      const what = [s.wordMistakes ? count(s.wordMistakes, 'wrong, skipped or extra word') : '', parts ? count(parts, 'wrong haraka or letter', 'wrong harakat or letters') : '']
         .filter(Boolean)
         .join(', ');
       lines.push(`  - ${s.passage.name}: ${count(s.words, 'word')} still marked (${what}); wrong in ${s.wrong} of ${count(s.tries, 'take')}; last recited ${ago(s.daysAgo)}.`);
@@ -88,7 +107,7 @@ export function recitationText(r: RevoRecitation): string {
   }
   if (r.last) {
     const l = r.last;
-    const extra = [l.unclear ? `${l.unclear} not clear` : '', l.hidden ? 'page hidden' : '', l.strict ? 'Strict' : 'Words & harakat'].filter(Boolean).join(', ');
+    const extra = [l.unclear ? `${l.unclear} not clear` : '', l.hidden ? 'page hidden' : '', l.strict ? 'Strict' : 'mistakes only'].filter(Boolean).join(', ');
     lines.push(`- Their latest take: ${ago(l.daysAgo)}, ${l.passage.name}, ${percent(l.score)}, ${l.mistakes === 0 ? 'no mistakes' : count(l.mistakes, 'mistake')}, ${extra}.`);
   }
   return lines.join('\n');
@@ -98,8 +117,8 @@ const KIND_WORDS: Record<RevoTakeMark['kind'], string> = {
   word: 'wrong word',
   skipped: 'skipped word',
   added: 'extra word',
-  harakat: 'haraka slip',
-  letter: 'letter slip',
+  harakat: 'wrong haraka',
+  letter: 'wrong letter',
   tajweed: 'tajweed note',
 };
 
@@ -141,7 +160,7 @@ function markText(m: RevoTakeMark): string {
 /** An attached take, as the model reads it. */
 export function takeText(label: string, f: RevoTakeFacts): string {
   const lines = [`Attached: a take (${label}), ${ago(f.daysAgo)}. What the app shows for it:`];
-  const level = f.level === 'strict' ? 'Strict (tajweed checked too)' : 'Words & harakat';
+  const level = f.level === 'strict' ? 'Strict (tajweed checked too, Beta)' : 'mistakes only (no tajweed)';
   lines.push(`- ${f.passage.name}, ${count(f.words, 'word')} in ${Math.max(1, Math.round(f.secs / 60))} min, ${level}${f.hidden ? ', recited with the page hidden' : ''}.`);
   const before = f.before === null ? '' : ` (their take before of this passage: ${percent(f.before)})`;
   lines.push(`- Score by the page: ${percent(f.score)}${before}. Mistakes: ${f.mistakes}. Not clear (never counted): ${f.unclear}.${f.level === 'strict' ? ` Tajweed notes: ${f.tajweed}.` : ''}`);

@@ -11,7 +11,7 @@ import { SafeAreaView } from '../../components/SafeAreaView';
 import { RouteProp, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { HomeStackParamList } from '../../navigation/MainNavigator';
+import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { PillButton } from '../../components/v2/PillButton';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
 import { useHaptics } from '../../design/haptics';
@@ -25,24 +25,10 @@ import { UndoToast } from '../../components/revision/UndoToast';
 import { HELP_ICON, useHelpSheet } from '../../components/help/HelpButton';
 import { HelpToast } from '../../components/help/HelpToast';
 import { SessionEndCard } from '../../components/revision/SessionEndCard';
-import { HiddenPageOverlay } from '../../components/recite/HiddenPageOverlay';
-import { RecitePanel } from '../../components/recite/RecitePanel';
-import { usePauseListener } from '../../components/recite/usePauseListener';
-import { canFollowWords, useReciteFollow } from '../../components/recite/useReciteFollow';
-import { reciteModeEnabled } from '../../lib/recite/availability';
-import { mushafEdition, useMushafEdition } from '../../lib/mushafEdition';
-import { SpeechModelSheet } from '../../components/recite/SpeechModelSheet';
-import { followLabel, WordByWordChip } from '../../components/recite/RecitePanel';
-import { useSpeechModelState } from '../../lib/recite/speechModelStore';
-import {
-  NOTHING_REVEALED,
-  nextHiddenVerse,
-  RevealState,
-  revealedOn,
-  revealVerse,
-} from '../../lib/recite/hiddenPage';
+import { ElsewherePlace, useReciteLayer } from '../../components/reciteLive/useReciteLayer';
+import { AyahRef, ayahRects } from '../../lib/ayahBounds';
 import { useVerseActions } from '../../components/verse/useVerseActions';
-import { navigateToActivityDay, navigationRef } from '../../navigation/navigationRef';
+import { navigationRef } from '../../navigation/navigationRef';
 import { RecordButton, recorderTakesCapsule } from '../../components/recordings/RecordButton';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { listRecordings, onRecordingsChanged } from '../../lib/recordings';
@@ -66,17 +52,21 @@ import { ThemeColors } from '../../theme/v2';
 import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
 import { catchUpDayOf, duePagesOf, insightsPagesOn } from '../../lib/carryOver';
 import { revisablePages } from '../../lib/memorizedAyahs';
-import { aheadCreditFor, creditedOnDay, doneOnDay, sessionCredit } from '../../lib/aheadCredit';
+import { creditedOnDay, doneOnDay, sessionCredit } from '../../lib/aheadCredit';
 import { aheadDayLabel, nextRevisionDayPlan, revisionDayPlan, startsCycle, type RevisionDayPlan } from '../../lib/aheadPlan';
-import { describePageRange, describePassage } from '../../lib/passages';
+import { describePageRange, describePassage, passageRunCount } from '../../lib/passages';
 import {
   getHizbForPage,
   getQuranData,
   getSurahsForPage,
 } from '../../lib/quranData';
 import { logger } from '../../lib/logger';
+import { maybeAskForRating, openRatingPage, rateAskEnabled, stopRatingAsks } from '../../lib/rateAsk';
+import { streakDetailFromLogs } from '../../lib/streak';
 import { pagesToUnrevise, removeRevisedPages, removeRoundPages } from '../../lib/revisionSession';
 import { dismissPresentedRevisionReminders } from '../../lib/reminders/sync';
+import { t, formatNumber } from '../../i18n';
+import { backIcon } from '../../i18n/direction';
 
 const NO_PAGES: number[] = [];
 
@@ -96,7 +86,7 @@ export default function ActiveRevisionScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProp<HomeStackParamList, 'ActiveRevision'>>();
   const { user, pages, logs, updatePages, addLog, updateLog, loadData, error } = useApp();
-  const { theme, isDark, palette: v2Palette } = useTheme();
+  const { theme, isDark } = useTheme();
   const haptics = useHaptics();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
@@ -259,111 +249,12 @@ export default function ActiveRevisionScreen() {
   const isScreenFocused = useIsFocused();
   useKeepScreenOn(isScreenFocused);
 
-  // ===== Hidden pages: recite from memory (testers) =====
-  // The eye in the header covers the page line by line (verse markers open);
-  // a verse shows again when tapped, with Next verse, or when the reciter
-  // pauses after it (usePauseListener). Each hide starts covered again; what
-  // was shown on a page stays shown while it lasts.
-  // Hidden recite mode needs the lines and words of the print shown (lib/mushafEdition):
-  // the 1405 pages only, for now.
-  const edition = useMushafEdition();
-  const reciteAvailable = reciteModeEnabled(user) && mushafEdition(edition).reciteData;
-  // The session's help (HELP-1): a row of ⋯, since the header already holds four round buttons.
-  const help = useHelpSheet('session', { recite: reciteAvailable });
-  const [hidden, setHidden] = useState(false);
-  const [reveal, setReveal] = useState<RevealState>(NOTHING_REVEALED);
-  const [listenOn, setListenOn] = useState(true);
-  const pageOnScreen =
-    currentPageNumber ??
-    assignment?.pages.find((p) => !alreadyRevisedToday.has(p)) ??
-    assignment?.pages[0] ??
-    null;
-  const pageOnScreenRef = useRef(pageOnScreen);
-  pageOnScreenRef.current = pageOnScreen;
-  const revealNext = useCallback(() => {
-    const page = pageOnScreenRef.current;
-    if (page == null) return;
-    setReveal((s) => {
-      const verse = nextHiddenVerse(s, page);
-      return verse ? revealVerse(s, page, verse) : s;
-    });
-  }, []);
-  // Word by word (phase 2): with the speech model on the phone, the reciter is
-  // followed on the device and each word shows as it is recited; the page
-  // turns when they reach the next, and a page recited through counts as
-  // revised. Without the model (or on a binary without the module), the pause
-  // listener below; also while recording (it listens through the recording).
-  const speechModel = useSpeechModelState();
-  const followable = canFollowWords();
-  const wordMode = hidden && followable && speechModel.status === 'ready';
-  const [modelSheet, setModelSheet] = useState(false);
-  // Each hide is a new round: what was followed before is covered again.
-  const [hideRound, setHideRound] = useState(0);
-  const markRevisedRef = useRef<(page: number) => void>(() => undefined);
-  const followPages = shownPages;
-  const follow = useReciteFollow({
-    active: wordMode && listenOn && isScreenFocused && !recorder.recording,
-    round: hideRound,
-    pages: followPages,
-    currentPage: pageOnScreen ?? followPages[0] ?? 1,
-    onShowPage: (page) => pagerRef.current?.scrollToPage(page),
-    onPageDone: (page) => markRevisedRef.current(page),
-  });
-  const listener = usePauseListener({
-    active: hidden && listenOn && isScreenFocused && (!wordMode || recorder.recording),
-    externalLevel: recorder.level,
-    onPause: revealNext,
-  });
-  // Recording takes the microphone: the listener steps aside first, and then
-  // listens through the recording.
-  const yieldMic = listener.yieldMic;
-  const recordButtonRecorder = {
-    ...recorder,
-    start: async () => {
-      await yieldMic();
-      await recorder.start();
-    },
-    resume: async () => {
-      await yieldMic();
-      await recorder.resume();
-    },
-  };
-  const coverColors = useMemo(() => {
-    const read = getReadPalette(isDark);
-    return { cover: read.pageBg, guide: read.textSecondary, band: v2Palette.followInk };
-  }, [isDark, v2Palette]);
-  const pageOverlay = useMemo(
-    () =>
-      hidden
-        ? (page: number, scale: number) => (
-            <HiddenPageOverlay
-              page={page}
-              scale={scale}
-              revealed={revealedOn(reveal, page)}
-              follow={wordMode ? follow.follow : null}
-              colors={coverColors}
-            />
-          )
-        : undefined,
-    [hidden, reveal, coverColors, wordMode, follow.follow],
-  );
-
   const verseActions = useVerseActions({
     pages: shownPages,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
     currentPage: currentPageNumber ?? undefined,
     focused: isScreenFocused,
   });
-  const stopPlayback = verseActions.player.onStop;
-  const toggleHidden = useCallback(() => {
-    if (!hidden) {
-      // Covered again from the start; recitation would read it out.
-      setReveal(NOTHING_REVEALED);
-      setHideRound((r) => r + 1);
-      if (verseActions.player.state.status !== 'idle') stopPlayback();
-    }
-    setHidden(!hidden);
-  }, [hidden, stopPlayback, verseActions.player.state.status]);
   // Reading: nothing but the page (its number, the juz and surah). A tap on
   // the page brings the controls (beside the page, never over it); another
   // tap, or turning the page, puts them away.
@@ -379,6 +270,51 @@ export default function ActiveRevisionScreen() {
     dismissHint();
     toggleChrome();
   }, [dismissHint, toggleChrome]);
+
+  // ===== Recite: the reader's mic, on the day's pages (Revisely Dev; components/reciteLive/useReciteLayer) =====
+  // The same mic, menu, take bar, marks, hidden view, cards and summary as the reader (Majd, Nov 17 2026). A take never
+  // marks a page revised (RECITE-9): it turns pages with the pager's scrollToPage, which never reports an advance, so
+  // only a swipe or ✓ marks one (SESS-1). Its page turns stay on the day's pages; a place the session doesn't hold (a
+  // similar ayah, a past take) opens in the reader over it, and Back comes back here.
+  const pageOnScreen =
+    currentPageNumber ??
+    assignment?.pages.find((p) => !alreadyRevisedToday.has(p)) ??
+    assignment?.pages[0] ??
+    null;
+  const recitePage = pageOnScreen ?? shownPages[0] ?? 1;
+  // An ayah a take slipped into (the summary's "You continued with …"), on one of the day's pages: highlighted once
+  // its page is shown, until the page is turned, as in the reader.
+  const [intoTarget, setIntoTarget] = useState<AyahRef | null>(null);
+  const [intoShown, setIntoShown] = useState<AyahRef | null>(null);
+  useEffect(() => {
+    if (!intoTarget || intoTarget.page !== recitePage) return;
+    setIntoShown(intoTarget);
+    setIntoTarget(null);
+  }, [intoTarget, recitePage]);
+  useEffect(() => {
+    if (intoShown && intoShown.page !== recitePage && ayahRects(recitePage, intoShown.sura, intoShown.ayah).length === 0) setIntoShown(null);
+  }, [intoShown, recitePage]);
+  const openElsewhere = useCallback(
+    ({ page, highlight, showTake }: ElsewherePlace) => navigation.push('QuranReader', { pageNumber: page, highlight, showTake }),
+    [navigation],
+  );
+  const recite = useReciteLayer({
+    currentPage: recitePage,
+    showPage: (page: number) => pagerRef.current?.scrollToPage(page) ?? false,
+    openElsewhere,
+    day: sessionDay,
+    focused: isScreenFocused,
+    recorder,
+    chromeVisible: chrome.visible,
+    onTapPage,
+    dismissHint,
+    onInto: setIntoTarget,
+    // Test me jumps to places anywhere in what's memorized: the reader's, not a day's session.
+    testMe: false,
+  });
+  // The session's help (HELP-1): a row of ⋯, since the header already holds three round buttons. While a take is open:
+  // how Recite works, as in the reader.
+  const help = useHelpSheet(recite.active ? 'recite' : 'session', { liveRecite: recite.liveOn, hideAs: 'session' });
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   // Arriving on a page marks nothing; swiping off it does (the last page: onto
@@ -556,11 +492,12 @@ export default function ActiveRevisionScreen() {
           .filter((j): j is number => typeof j === 'number'),
       ),
     ].sort((a, b) => a - b);
-    if (juzes.length === 1) return `Juz ${juzes[0]}`;
-    if (juzes.length === 2 && juzes[1] === juzes[0] + 1) return `Juz ${juzes[0]}–${juzes[1]}`;
+    if (juzes.length === 1) return t('common.juzN', { n: juzes[0] });
+    if (juzes.length === 2 && juzes[1] === juzes[0] + 1) return t('common.juzRange', { from: juzes[0], to: juzes[1] });
     const words = describePassage(shownPages, { form: 'short', order: 'given', max: 1 });
-    if (words && words.length <= 16 && !words.includes(' more')) return words;
-    return `${shownPages.length} pages`;
+    // One run of pages (two or more would read "N more" at max 1): a value, never the English word.
+    if (words && words.length <= 16 && passageRunCount(shownPages, 'given') <= 1) return words;
+    return t('common.pages', { count: shownPages.length });
   }, [shownPages, quranData]);
 
   // ===== Mark / unmark =====
@@ -579,7 +516,6 @@ export default function ActiveRevisionScreen() {
     },
     [haptics],
   );
-  markRevisedRef.current = markRevised;
 
   const unmarkRevised = useCallback((pageNumber: number) => {
     setCompletedPages((prev) => {
@@ -600,7 +536,7 @@ export default function ActiveRevisionScreen() {
       if (undoTimer.current) clearTimeout(undoTimer.current);
       setUndoState({
         page: leftPage,
-        message: `${describePageRange(leftPage, leftPage, { form: 'compact' })} marked as revised`,
+        message: t('revision.session.markedRevised', { what: describePageRange(leftPage, leftPage, { form: 'compact' }) }),
       });
     },
     [assignedPages, completedPages, markRevised],
@@ -654,7 +590,7 @@ export default function ActiveRevisionScreen() {
       haptics.success();
       setCelebrate((c) => c + 1);
       AccessibilityInfo.announceForAccessibility(
-        `Revision complete. ${dayPages.length} ${dayPages.length === 1 ? 'page' : 'pages'} revised.`,
+        t('revision.session.complete', { count: dayPages.length }),
       );
     },
     [assignedPages, completedPages, handleAdvance, haptics, sections],
@@ -734,96 +670,24 @@ export default function ActiveRevisionScreen() {
     // Only when a swipe finishes the session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [celebrate]);
-
-  // ===== End session =====
-
-  const finishRecording = recorder.finish;
-  const submittingRef = useRef(false);
-  const submitSession = useCallback(async () => {
-    // Once: a second tap while this runs would log twice and go back twice.
-    if (submittingRef.current) return;
-    submittingRef.current = true;
-    try {
-      // Ending the session ends its recording (leaving without ending keeps it,
-      // paused, for when the session is reopened).
-      await finishRecording();
-      await commitPendingPages();
-      const pagesRevised = Array.from(completedPages).filter(
-        (p) => !silentlySavedRef.current.has(p),
-      );
-      // Only today's pages can be skipped; ahead pages not done are simply not revised. A new round
-      // holds none of today's.
-      const pagesSkipped = (round ? [] : assignment?.pages ?? []).filter(
-        (p) => !completedPages.has(p) && !silentlySavedRef.current.has(p),
-      );
-      const changedPageNumbers = [...pagesRevised, ...pagesSkipped];
-
-      const updatedPages = pages.map((p) => {
-        if (pagesRevised.includes(p.pageNumber)) {
-          return {
-            ...p,
-            lastRevisedDate: new Date().toISOString(),
-            totalRevisionCount: p.totalRevisionCount + 1,
-            skipCount: 0,
-          };
-        }
-        if (pagesSkipped.includes(p.pageNumber)) {
-          return { ...p, skipCount: p.skipCount + 1 };
-        }
-        return p;
-      });
-
-      if (changedPageNumbers.length > 0) {
-        await updatePages(updatedPages, changedPageNumbers);
-      }
-
-      if (pagesRevised.length > 0) {
-        const durationDelta = Math.max(
-          0,
-          Math.round((Date.now() - lastSaveTimeRef.current) / 60_000),
-        );
-        const weaknessUpdatesArray = Array.from(localRatings.entries()).map(
-          ([page, rating]) => ({ page, rating }),
-        );
-        const revisionDay = sessionDay ?? getCurrentRevisionDay(user!);
-        await addLog({
-          date: revisionDay,
-          assignedPages: duePagesOf(assignment?.pages ?? [], user!, revisionDay, revisablePages(pages)),
-          pagesRevised: sessionCredit(pagesRevised, pageDays, revisionDay).pagesRevised,
-          pagesSkipped,
-          weaknessUpdates: weaknessUpdatesArray,
-          durationMinutes: durationDelta,
-          ahead: sessionCredit(pagesRevised, pageDays, revisionDay).ahead,
-          checked: heldAsRevised(revisionDay),
-          assignedExact: true,
-        });
-        pagesRevised.forEach((p) => silentlySavedRef.current.add(p));
-        lastSaveTimeRef.current = Date.now();
-        haptics.success();
-      }
-
-      navigation.goBack();
-    } finally {
-      submittingRef.current = false;
-    }
-  }, [
-    commitPendingPages,
-    completedPages,
-    assignedPages,
-    assignment,
-    pageDays,
-    sessionDay,
-    pages,
-    updatePages,
-    localRatings,
-    addLog,
-    user,
-    navigation,
-    finishRecording,
-    haptics,
-    heldAsRevised,
-    round,
-  ]);
+  // A good moment to ask for a rating (SESS-8, lib/rateAsk): the swipe that finished a day, with a streak of 7 days or
+  // more. The day just finished may not be in the logs yet: one finished today counts toward the streak.
+  const [rateAsk, setRateAsk] = useState(false);
+  useEffect(() => {
+    if (celebrate <= 0 || !user || !rateAskEnabled()) return;
+    const today = getCurrentRevisionDay(user);
+    const detail = streakDetailFromLogs({ user, pages, logs, today });
+    const streak = lastSectionDay === today && !detail.done.has(today) ? detail.reading.streak + 1 : detail.reading.streak;
+    let live = true;
+    void maybeAskForRating({ streak, accountCreatedAt: user.createdAt, now: Date.now() }).then((ask) => {
+      if (live && ask) setRateAsk(true);
+    });
+    return () => {
+      live = false;
+    };
+    // Only when a swipe finishes the session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [celebrate]);
 
   const viewerPages = shownPages;
 
@@ -842,16 +706,16 @@ export default function ActiveRevisionScreen() {
         <View style={styles.loadingContainer}>
           {error ? (
             <>
-              <Text style={styles.errorTitle}>Couldn't load your session</Text>
+              <Text style={styles.errorTitle}>{t('revision.session.loadFailed')}</Text>
               <Text style={styles.errorMessage}>{error}</Text>
               <PillButton
-                title="Try again"
+                title={t('common.tryAgain')}
                 onPress={loadData}
                 style={styles.retryButton}
               />
             </>
           ) : (
-            <Text style={styles.loadingText}>Loading…</Text>
+            <Text style={styles.loadingText}>{t('revision.session.loading')}</Text>
           )}
         </View>
       </SafeAreaView>
@@ -937,7 +801,7 @@ export default function ActiveRevisionScreen() {
       ? [
           {
             key: 'rate',
-            label: 'Rate page strength',
+            label: t('revision.session.ratePageStrength'),
             icon: 'fitness-outline' as const,
             onPress: () => setShowRating(true),
           },
@@ -945,11 +809,11 @@ export default function ActiveRevisionScreen() {
       : []),
     {
       key: 'bulk',
-      label: 'Jump or mark in bulk',
+      label: t('revision.session.bulk'),
       icon: 'list-outline',
       onPress: () => setShowBulkActions(true),
     },
-    ...(help.shown ? [{ key: 'help', label: 'How a session works', icon: HELP_ICON, onPress: help.open }] : []),
+    ...(help.shown ? [{ key: 'help', label: t('revision.session.help'), icon: HELP_ICON, onPress: help.open }] : []),
   ];
 
   const palette = getReadPalette(isDark);
@@ -957,7 +821,7 @@ export default function ActiveRevisionScreen() {
   // Recording: the recorder is the whole capsule, the timer beside it (compact).
   const recordingLive = recorderTakesCapsule(recorder);
   const compact = (width < 430 && crowded) || (recordingLive && timer != null);
-  const recordButton = <RecordButton recorder={recordButtonRecorder} crowded={timer != null} />;
+  const recordButton = <RecordButton recorder={recorder} crowded={timer != null} />;
   const timerChip = (
     <TimerChip
       compact={compact}
@@ -974,9 +838,10 @@ export default function ActiveRevisionScreen() {
   return (
     <View style={[styles.container, { backgroundColor: palette.pageBg }]}>
       <ReaderFrame
-        chromeVisible={chrome.visible}
+        chromeVisible={recite.chromeVisible}
+        keepStatusBar={recite.keepStatusBar}
         active={isScreenFocused}
-        onBackgroundPress={onTapPage}
+        onBackgroundPress={recite.onTap}
         background={palette.pageBg}
         isDark={isDark}
         quietHeader={
@@ -987,7 +852,7 @@ export default function ActiveRevisionScreen() {
               maxFontSizeMultiplier={1.3}
               testID="session-quiet-count"
             >
-              {hidden ? 'Hidden' : `Juz ${currentJuz}`} · {viewDone}/{totalPages}
+              {t('common.juzN', { n: currentJuz })} · {formatNumber(viewDone)}/{formatNumber(totalPages)}
             </Text>
             {fromInsights ? (
               <Text
@@ -996,23 +861,10 @@ export default function ActiveRevisionScreen() {
                 maxFontSizeMultiplier={1.3}
                 testID="session-from-insights"
               >
-                {`From Insights: ${describePassage(insightsFirst, { form: 'short' })}`}
+                {t('revision.session.fromInsights', { what: describePassage(insightsFirst, { form: 'short' }) })}
               </Text>
             ) : null}
-            {hidden ? (
-              <Text
-                style={[styles.quietText, { color: palette.textSecondary }]}
-                numberOfLines={1}
-                maxFontSizeMultiplier={1.3}
-                testID="recite-hint"
-              >
-                {wordMode && listenOn
-                  ? 'Recite: each word shows as you say it'
-                  : listener.status === 'listening'
-                    ? 'Pause after a verse to see it'
-                    : 'Tap a verse to see it'}
-              </Text>
-            ) : firstSurahOnPage ? (
+            {firstSurahOnPage ? (
               <View style={styles.crumbRight}>
                 <Text style={[styles.quietText, { color: palette.textSecondary }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
                   {firstSurahOnPage.name}
@@ -1028,7 +880,7 @@ export default function ActiveRevisionScreen() {
         }
         header={
           <View style={styles.header}>
-            <RoundButton icon="chevron-back" label="Back" onPress={handleSaveAndBack} palette={palette} />
+            <RoundButton icon={backIcon()} label={t('common.back')} onPress={handleSaveAndBack} palette={palette} />
             <View style={styles.titleCol}>
               <Text
                 style={[styles.title, typeV2.name, { color: palette.textPrimary }]}
@@ -1036,9 +888,11 @@ export default function ActiveRevisionScreen() {
                 maxFontSizeMultiplier={1.3}
                 testID="session-title"
               >
-                {aheadView ? `Revising ahead · ${aheadDayLabel(sessionDay ?? viewDay, viewDay)}` : `Revising ${scopeLabel}`}{' '}
+                {aheadView
+                  ? t('revision.session.revisingAhead', { day: aheadDayLabel(sessionDay ?? viewDay, viewDay) })
+                  : t('revision.session.revising', { scope: scopeLabel })}{' '}
                 <Text style={{ color: palette.textSecondary, fontWeight: '400' }}>
-                  · {viewDone}/{totalPages}
+                  · {formatNumber(viewDone)}/{formatNumber(totalPages)}
                 </Text>
               </Text>
               <Text
@@ -1048,72 +902,33 @@ export default function ActiveRevisionScreen() {
                 testID="session-page"
               >
                 {/* What the page holds, by surah; the printed page number is under the page. */}
-                {describePageRange(displayPageNumber, displayPageNumber, { form: 'compact' })} · Juz {currentJuz} · Hizb {currentHizb}
+                {t('revision.session.where', {
+                  what: describePageRange(displayPageNumber, displayPageNumber, { form: 'compact' }),
+                  juz: currentJuz,
+                  hizb: currentHizb,
+                })}
               </Text>
             </View>
-            {reciteAvailable ? (
-              <RoundButton
-                icon={hidden ? 'eye-outline' : 'eye-off-outline'}
-                label={hidden ? 'Show the page' : 'Hide the page'}
-                onPress={toggleHidden}
-                palette={palette}
-                active={hidden}
-              />
-            ) : null}
             <RoundButton
               icon={isCurrentRevised ? 'checkmark' : 'checkmark-outline'}
-              label={isCurrentRevised ? 'Unmark current page' : 'Mark current page as revised'}
+              label={isCurrentRevised ? t('revision.edit.unmarkCurrent') : t('revision.edit.markCurrent')}
               onPress={handleToggleCurrent}
               palette={palette}
               active={isCurrentRevised}
             />
-            <RoundButton icon="ellipsis-horizontal" label="Session menu" onPress={() => setMenuOpen(true)} palette={palette} />
+            <RoundButton icon="ellipsis-horizontal" label={t('revision.edit.menu')} onPress={() => setMenuOpen(true)} palette={palette} />
           </View>
         }
         footer={
           <View style={styles.footer}>
-            {hidden ? (
-              <RecitePanel
-                status={listener.status}
-                hearing={wordMode && !recorder.recording ? follow.status === 'following' : listener.hearing}
-                {...(wordMode && !recorder.recording
-                  ? {
-                      label: listenOn ? followLabel(follow.status) : 'Mic off',
-                      on: listenOn && ['starting', 'finding', 'following'].includes(follow.status),
-                    }
-                  : {})}
-                accessory={
-                  followable && speechModel.status !== 'ready' ? (
-                    <WordByWordChip
-                      progress={speechModel.status === 'downloading' ? speechModel.progress : null}
-                      onPress={() => setModelSheet(true)}
-                    />
-                  ) : null
-                }
-                onToggleListening={() => {
-                  const paused = wordMode ? follow.status === 'paused' : listener.status === 'paused';
-                  if (listenOn && !paused) setListenOn(false);
-                  else {
-                    setListenOn(true);
-                    listener.resume();
-                    follow.resume();
-                  }
-                }}
-                onNextVerse={revealNext}
-                nextDisabled={nextHiddenVerse(reveal, displayPageNumber) == null}
-                compact={compact}
-                surface={{ background: palette.control, border: palette.divider }}
-                record={<RecordButton recorder={recordButtonRecorder} layout="inline" />}
-                timer={timerChip}
-              />
-            ) : (
+            {recite.bar ?? (
               <PlayerCapsule
                 recording={recordingLive}
                 player={verseActions.player}
                 page={displayPageNumber}
                 compact={compact}
                 surface={{ background: palette.control, border: palette.divider }}
-                record={recordButton}
+                record={recite.controls ?? recordButton}
                 timer={timerChip}
               />
             )}
@@ -1129,12 +944,12 @@ export default function ActiveRevisionScreen() {
           </View>
         }
         activity={
-          <ReaderActivity recorder={recorder} playback={verseActions.player.state} onPress={chrome.show} />
+          recite.activity ?? <ReaderActivity recorder={recorder} playback={verseActions.player.state} onPress={chrome.show} />
         }
         hint={
           tapHint.shown ? (
             <Text style={[styles.quietText, { color: palette.textSecondary }]} maxFontSizeMultiplier={1.3}>
-              Tap the page for the controls
+              {t('revision.session.tapHint')}
             </Text>
           ) : null
         }
@@ -1148,11 +963,15 @@ export default function ActiveRevisionScreen() {
           onPageChange={handlePageChange}
           onAdvance={handleSwipeAdvance}
           onLongPressAyah={verseActions.onLongPressAyah}
-          highlightedAyah={verseActions.highlightedAyah}
-          onTap={onTapPage}
+          // While a take runs the page shows only Recite's own colours.
+          highlightedAyah={verseActions.highlightedAyah ?? (recite.busy ? null : intoShown)}
+          onTap={recite.onTap}
           onUserSwipe={chrome.hide}
-          extraData={extraData}
-          pageOverlay={pageOverlay}
+          extraData={recite.pager.extraData ? `${extraData}|${recite.pager.extraData}` : extraData}
+          pageUnderlay={recite.pager.pageUnderlay}
+          pageOverlay={recite.pager.pageOverlay}
+          pageAccessories={recite.pager.pageAccessories}
+          onTapPoint={recite.pager.onTapPoint}
           endCard={
             <SessionEndCard
               total={lastSectionPages.length}
@@ -1175,16 +994,28 @@ export default function ActiveRevisionScreen() {
               onListenBack={
                 listenBackId ? () => navigation.navigate('ListenBack', { recordingId: listenBackId }) : undefined
               }
+              onRate={
+                rateAsk
+                  ? () => {
+                      setRateAsk(false);
+                      void openRatingPage();
+                    }
+                  : undefined
+              }
+              onDismissRate={() => {
+                setRateAsk(false);
+                void stopRatingAsks();
+              }}
             />
           }
           onReachEnd={handleReachEnd}
         />
       </ReaderFrame>
 
-      <SpeechModelSheet visible={modelSheet} onClose={() => setModelSheet(false)} onReady={() => setModelSheet(false)} />
       <RecordingSavedToast
         saved={savedRecording}
         onClose={() => setSavedRecording(null)}
+        quiet={recite.micOn}
         bottomInset={insets.bottom - spacing.sm}
       />
 
@@ -1221,6 +1052,7 @@ export default function ActiveRevisionScreen() {
       />
 
       {verseActions.overlay}
+      {recite.sheets}
 
       {smartTrackingEnabled && showRating && (
         <WeaknessModal

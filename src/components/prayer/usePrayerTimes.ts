@@ -2,14 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { AppState } from 'react-native';
 import type { User } from '../../types';
 import { Place, usePrayerPrefs } from '../../lib/prayer/prefs';
-import {
-  CalcSettings,
-  currentPrayer,
-  dayTimes,
-  DayTimes,
-  DEFAULT_METHOD,
-  nextPrayer,
-} from '../../lib/prayer/times';
+import { CalcSettings, currentPrayer, dayTimes, DayTimes, nextPrayer } from '../../lib/prayer/times';
+import { prayerPlace, prayerSettings } from '../../lib/prayer/place';
 import { placeName } from '../../lib/qibla';
 import type { PrayerName } from '../../lib/prayer/prefs';
 
@@ -35,20 +29,8 @@ export function useMinuteClock(): Date {
   return now;
 }
 
-/** The method, the phone's settings: what the times are worked out with. */
-export function prayerSettings(user: User | null | undefined, prefs: ReturnType<typeof usePrayerPrefs>): CalcSettings {
-  return {
-    method: user?.fajrCalculationMethod || DEFAULT_METHOD,
-    highLatitude: prefs.highLatitude,
-    madhab: prefs.madhab,
-    adjustments: prefs.adjustments,
-  };
-}
-
-/** Where times are worked out: the phone's last position, else the Fajr location. On the phone only. */
-export function prayerPlace(user: User | null | undefined, prefs: ReturnType<typeof usePrayerPrefs>): Place | null {
-  return prefs.place ?? user?.locationCoords ?? null;
-}
+// They live in lib/prayer/place (Friday's Al-Kahf card uses them too); kept here for their callers.
+export { prayerPlace, prayerSettings };
 
 export interface PrayerTimesNow {
   place: Place | null;

@@ -3,7 +3,9 @@
 import { ACCENTS, paletteV2, revoV2 } from '../../theme/v2';
 
 const lum = (hex: string) => {
-  const [r, g, b] = [0, 1, 2].map((i) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  const [r, g, b] = [0, 1, 2]
+    .map((i) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / 255)
+    .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
 const contrast = (a: string, b: string) => {
@@ -18,7 +20,9 @@ const over = (color: string, alpha: number, ground: string) =>
     .map((v) => v.toString(16).padStart(2, '0'))
     .join('');
 
-const combos = ACCENTS.flatMap((accent) => [false, true].map((isDark) => [`${accent} ${isDark ? 'dark' : 'light'}`, accent, isDark] as const));
+const combos = ACCENTS.flatMap((accent) =>
+  [false, true].map((isDark) => [`${accent} ${isDark ? 'dark' : 'light'}`, accent, isDark] as const),
+);
 
 describe('Revo’s colours follow the accent', () => {
   it.each(combos)('%s: the R reads on its disc (3:1, both ends of its gradient)', (_n, accent, isDark) => {

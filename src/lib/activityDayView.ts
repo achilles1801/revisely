@@ -4,6 +4,7 @@
 // those days, not this one). Empty blocks are hidden.
 
 import { getPagesForJuz } from './quranData';
+import { t } from '../i18n';
 
 export interface RevisedItemView {
   id: string;
@@ -72,7 +73,7 @@ export function juzLabelFor(assigned: number[], memorized: Set<number>): string 
   for (let juz = 1; juz <= 30; juz++) {
     const pages = getPagesForJuz(juz).filter((p) => memorized.has(p));
     if (pages.length === 0) continue;
-    if (pages.every((p) => assignedSet.has(p))) return `Juz ${juz}`;
+    if (pages.every((p) => assignedSet.has(p))) return t('lib.activity.juz', { n: juz });
   }
   return null;
 }

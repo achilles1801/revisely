@@ -57,6 +57,10 @@ describe('Premium and the support program', () => {
     await assertFails(updateDoc(doc(alice, 'entitlements/alice'), { 'premium.until': null }));
     await assertFails(deleteDoc(doc(alice, 'entitlements/alice')));
     await assertFails(setDoc(doc(alice, 'entitlements/carol'), { premium: forever }));
+    // Early access (PREM-1) is given by the functions only: a phone can't add or keep its own early grant.
+    const early = { source: 'early', grantedAt: new Date(), until: null };
+    await assertFails(setDoc(doc(alice, 'entitlements/alice'), { premium: early, grants: { early } }));
+    await assertFails(updateDoc(doc(alice, 'entitlements/alice'), { 'grants.early': early }));
     await assertFails(updateDoc(doc(alice, 'supportApplications/alice'), { status: 'approved' }));
     await assertFails(setDoc(doc(alice, 'supportApplications/dave'), { uid: 'dave', status: 'pending' }));
     await assertFails(deleteDoc(doc(alice, 'supportApplications/alice')));

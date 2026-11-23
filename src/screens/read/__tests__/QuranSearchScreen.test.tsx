@@ -13,10 +13,13 @@ jest.mock('@react-navigation/native', () => ({
   useNavigation: () => mockNavigation,
   useRoute: () => ({ params: mockParams }),
 }));
-let mockUser: { id: string; previewTester?: boolean } = { id: 'u1', previewTester: true };
+let mockUser: { id: string; previewTester?: boolean; translationId?: string } = { id: 'u1', previewTester: true };
 jest.mock('../../../context/AppContext', () => ({ useApp: () => ({ user: mockUser }) }));
 // Whether the binary can listen; who may is the real gate (lib/search/availability).
 jest.mock('../../../lib/recite/micSource', () => ({ isMicStreamAvailable: () => true }));
+// Revisely Dev or the store app (the live check is Dev's: lib/reciteLive/availability).
+let mockDev = false;
+jest.mock('../../../lib/variant', () => ({ ...jest.requireActual('../../../lib/variant'), isDevVariant: () => mockDev }));
 // The model sheet: shown or not, and a way to finish its download.
 jest.mock('../../../components/recite/SpeechModelSheet', () => ({
   SpeechModelSheet: ({ visible, title, onReady }: { visible: boolean; title: string; onReady: () => void }) => {
@@ -37,6 +40,7 @@ const mockVoice = {
   listen: jest.fn(async () => undefined),
   stop: jest.fn(),
   heard: null as ((text: string) => void) | null,
+  levels: { subscribe: () => () => undefined, recent: () => [0.2, 0.5, 0.3] },
 };
 jest.mock('../../../components/search/useVoiceSearch', () => ({
   useVoiceSearch: (onHeard: (text: string) => void, enabled: boolean) => {
@@ -45,13 +49,35 @@ jest.mock('../../../components/search/useVoiceSearch', () => ({
   },
 }));
 
+// The chosen translation (lib/translation's own tests cover its sources): one verse, a footnote, a version.
+const mockTranslation = { calls: [] as unknown[][] };
+jest.mock('../../../lib/translation', () => {
+  const actual = jest.requireActual('../../../lib/translation');
+  return {
+    ...actual,
+    peekVerseTranslation: () => null,
+    getVerseTranslation: async (sura: number, ayah: number, id?: string | null) => {
+      mockTranslation.calls.push([sura, ayah, id]);
+      return { translation: actual.resolveTranslation(id), text: `Say, “Had Allah willed…”[1] (${sura}:${ayah})`, footnotes: '[1] A note on it.', version: '1.1.2' };
+    },
+  };
+});
+const mockClipboard = { copied: [] as string[] };
+jest.mock('../../../lib/clipboard', () => ({ copyText: (t: string) => mockClipboard.copied.push(t) }));
+
 import QuranSearchScreen from '../QuranSearchScreen';
+import { onlyVerseFound } from '../../../lib/search/voiceOpens';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { setQuranWordsForTests } from '../../../lib/recite/quranWords';
 import { wordsData } from '../../../lib/recite/__fixtures__/quranWords';
 import { pageOfVerse } from '../../../lib/verses';
 import { plainText } from '../../../lib/passages';
+import { setMistakeDetectionReleasedForTests } from '../../../lib/release/mistakeDetection';
+import { arabicLines, clippedArabic } from '../../../../jest/arabicLines';
+
+// The release's switch is the kill switch: these tests run with it as each says, and back to as it ships.
+afterEach(() => setMistakeDetectionReleasedForTests(undefined));
 
 beforeAll(() => setQuranWordsForTests(wordsData()));
 afterAll(() => setQuranWordsForTests(null));
@@ -59,6 +85,9 @@ afterAll(() => setQuranWordsForTests(null));
 beforeEach(async () => {
   jest.clearAllMocks();
   mockParams = undefined;
+  mockDev = false;
+  mockTranslation.calls = [];
+  mockClipboard.copied = [];
   mockUser = { id: 'u1', previewTester: true };
   Object.assign(mockVoice, { available: true, status: 'idle', partial: '', needsModel: false });
   await AsyncStorage.clear();
@@ -83,6 +112,16 @@ async function search(text: string) {
   });
 }
 
+/** The results list reports every row as on screen, as it does once laid out (Jest lays nothing out). */
+async function rowsOnScreen() {
+  const list = screen.UNSAFE_getAllByProps({ testID: 'search-results' }).find((n) => typeof n.props.onViewableItemsChanged === 'function');
+  if (!list) throw new Error('No results list');
+  const items = (list.props.data as { key: string }[]).map((item, index) => ({ item, key: item.key, index, isViewable: true }));
+  await act(async () => {
+    list.props.onViewableItemsChanged({ viewableItems: items, changed: items });
+  });
+}
+
 describe('searching the Quran', () => {
   it('finds the ayah for words typed in Arabic and opens it highlighted', async () => {
     await open();
@@ -90,7 +129,7 @@ describe('searching the Quran', () => {
     expect(screen.getByTestId('search-count')).toHaveTextContent('1 result');
     const row = screen.getByTestId('search-verse-10-16');
     expect(within(row).getByText('Yunus, ayah 16')).toBeTruthy();
-    fireEvent.press(row);
+    fireEvent.press(within(row).getByTestId('search-verse-open'));
     expect(mockNavigation.push).toHaveBeenCalledWith('QuranReader', {
       pageNumber: pageOfVerse({ sura: 10, ayah: 16 }),
       source: 'search',
@@ -106,7 +145,7 @@ describe('searching the Quran', () => {
     expect(within(row).getByText('Al-Hajj, ayahs 49–50', { normalizer: (t) => plainText(t).trim() })).toBeTruthy();
     expect(within(row).getByText(/﴿ ٤٩ ﴾/)).toBeTruthy();
     expect(within(row).getByText(/﴿ ٥٠ ﴾/)).toBeTruthy();
-    fireEvent.press(row);
+    fireEvent.press(within(row).getByTestId('search-verse-open'));
     expect(mockNavigation.push).toHaveBeenCalledWith('QuranReader', {
       pageNumber: pageOfVerse({ sura: 22, ayah: 49 }),
       source: 'search',
@@ -203,4 +242,156 @@ describe('searching the Quran', () => {
       expect(screen.getByTestId('search-verse-10-16')).toBeTruthy();
     },
   );
+});
+
+describe('a voice search with one result opens the reader at the ayah, highlighted, nothing listening (SEARCH-4)', () => {
+  const YUNUS_16 = { pageNumber: pageOfVerse({ sura: 10, ayah: 16 }), source: 'search', highlight: { sura: 10, ayah: 16, last: { sura: 10, ayah: 16 } } };
+
+  it('one place found by voice: the reader opens there highlighted, with no take, and the result stays listed behind it', async () => {
+    mockDev = true;
+    await open();
+    await act(async () => mockVoice.heard?.('قل لو شاء الله ما تلوتو عليكم'));
+    expect(mockNavigation.push).toHaveBeenCalledTimes(1);
+    expect(mockNavigation.push).toHaveBeenCalledWith('QuranReader', YUNUS_16);
+    expect(screen.getByTestId('search-count')).toHaveTextContent('1 result');
+    // Back on the search: its Open in the reader opens the same.
+    fireEvent.press(within(screen.getByTestId('search-verse-10-16')).getByTestId('search-verse-open'));
+    expect(mockNavigation.push).toHaveBeenLastCalledWith('QuranReader', YUNUS_16);
+  });
+
+  it('E2E flow 18’s words (An-Naml 25’s opening) find its one place, on page 379', async () => {
+    mockDev = true;
+    await open();
+    await act(async () => mockVoice.heard?.('ألا يسجدوا لله الذي يخرج الخبء'));
+    expect(mockNavigation.push).toHaveBeenCalledWith('QuranReader', {
+      pageNumber: 379,
+      source: 'search',
+      highlight: { sura: 27, ayah: 25, last: { sura: 27, ayah: 25 } },
+    });
+  });
+
+  it('never after a typed search: the microphone starts on its own only after the person spoke to the app', async () => {
+    mockDev = true;
+    await open();
+    await search('قل لو شاء الله');
+    expect(screen.getByTestId('search-count')).toHaveTextContent('1 result');
+    expect(mockNavigation.push).not.toHaveBeenCalled();
+  });
+
+  it('several places stay a list', async () => {
+    mockDev = true;
+    await open();
+    await act(async () => mockVoice.heard?.('فبأي آلاء ربكما تكذبان'));
+    expect(screen.getAllByTestId(/^search-verse-55-/).length).toBeGreaterThan(1);
+    expect(mockNavigation.push).not.toHaveBeenCalled();
+  });
+
+  it('with the release switched off: only for accounts with the live check: not in the store app, nor for an account that isn’t a tester', async () => {
+    setMistakeDetectionReleasedForTests(false);
+    await open();
+    await act(async () => mockVoice.heard?.('قل لو شاء الله ما تلوتو عليكم'));
+    expect(screen.getByTestId('search-verse-10-16')).toBeTruthy();
+    expect(mockNavigation.push).not.toHaveBeenCalled();
+    screen.unmount();
+    mockDev = true;
+    mockUser = { id: 'u2', previewTester: false };
+    await open();
+    await act(async () => mockVoice.heard?.('قل لو شاء الله ما تلوتو عليكم'));
+    expect(screen.getByTestId('search-verse-10-16')).toBeTruthy();
+    expect(mockNavigation.push).not.toHaveBeenCalled();
+  });
+
+  it('one place, exactly: not a place named by reference, not the closest there is, not one of several cut to one', () => {
+    const hit = { sura: 10, ayah: 16, last: { sura: 10, ayah: 16 }, from: 1, to: 5, score: 1 };
+    const verse = { kind: 'verse' as const, key: 'v1', hit, matched: new Set<number>() };
+    expect(onlyVerseFound({ rows: [verse], total: 1, closest: false })).toBe(hit);
+    expect(onlyVerseFound({ rows: [verse], total: 1, closest: true })).toBeNull();
+    expect(onlyVerseFound({ rows: [verse], total: 3, closest: false })).toBeNull();
+    expect(onlyVerseFound({ rows: [{ kind: 'target' }], total: 0, closest: false })).toBeNull();
+    expect(onlyVerseFound({ rows: [], total: 0, closest: false })).toBeNull();
+  });
+});
+
+describe('the redesign (Majd, Nov 16 2026: the mic in reach of a thumb, clearer results)', () => {
+  it('the field and the mic are in one bar at the bottom, under the results; the keyboard pushes it up', async () => {
+    await open();
+    const bar = screen.getByTestId('search-bar');
+    expect(within(bar).getByTestId('search-input')).toBeTruthy();
+    expect(within(bar).getByTestId('search-mic')).toBeTruthy();
+    const { KeyboardAvoidingView } = require('react-native');
+    expect(screen.UNSAFE_getByType(KeyboardAvoidingView).props.behavior).toBe('padding');
+    // The bar comes after the body: the bottom of the screen.
+    const kav = screen.UNSAFE_getByType(KeyboardAvoidingView);
+    const kids = React.Children.toArray(kav.props.children).filter(Boolean) as React.ReactElement<{ testID?: string }>[];
+    expect(kids[kids.length - 1].props.testID).toBe('search-bar');
+  });
+
+  it('the header clears the status bar from the first frame: the top inset from the provider, not a native view', async () => {
+    await open();
+    const { SafeAreaView } = require('react-native-safe-area-context');
+    expect(screen.UNSAFE_queryAllByType(SafeAreaView)).toHaveLength(0);
+  });
+
+  it('listening: what is heard so far, large, and the voice’s level; one tap on the same button stops it', async () => {
+    mockVoice.status = 'listening';
+    mockVoice.partial = 'قل لو شاء';
+    await open();
+    expect(screen.getByTestId('search-partial')).toHaveTextContent('قل لو شاء');
+    expect(screen.getByTestId('search-wave')).toBeTruthy();
+    expect(screen.getByLabelText('Stop listening')).toBeTruthy();
+    // Every haraka of what's heard shows (arabicFullV2): the speech model writes harakat.
+    expect(clippedArabic(screen.UNSAFE_root as never)).toEqual([]);
+    fireEvent.press(within(screen.getByTestId('search-bar')).getByTestId('search-mic'));
+    expect(mockVoice.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('a result: where it is, the ayah large, the chosen translation as given with its footnote and credit', async () => {
+    mockUser = { id: 'u1', previewTester: true, translationId: 'en.sahih' };
+    await open();
+    await search('قل لو شاء الله');
+    await rowsOnScreen();
+    await act(async () => {});
+    const card = screen.getByTestId('search-verse-10-16');
+    expect(within(card).getByText('Yunus, ayah 16', { normalizer: (t) => plainText(t).trim() })).toBeTruthy();
+    expect(within(card).getByTestId('search-verse-arabic')).toBeTruthy();
+    // The ayah's every haraka, and the query's line above the results (arabicFullV2).
+    expect(arabicLines(screen.UNSAFE_root as never).length).toBeGreaterThanOrEqual(2);
+    expect(clippedArabic(screen.UNSAFE_root as never)).toEqual([]);
+    expect(within(card).getByTestId('search-verse-translation')).toHaveTextContent(/Had Allah willed/);
+    expect(within(card).getByText('A note on it.', { exact: false })).toBeTruthy();
+    expect(within(card).getByTestId('search-verse-credit')).toHaveTextContent(/Saheeh International.*v1\.1\.2.*QuranEnc\.com/);
+    expect(mockTranslation.calls).toEqual([[10, 16, 'en.sahih']]);
+  });
+
+  it('a card fetches its translation only once it has been on screen, and only once (each Clear Quran block spends a budget)', async () => {
+    mockUser = { id: 'u1', previewTester: true, translationId: 'en.sahih' };
+    await open();
+    await search('قل لو شاء الله');
+    await act(async () => {});
+    expect(mockTranslation.calls).toEqual([]);
+    expect(within(screen.getByTestId('search-verse-10-16')).queryByTestId('search-verse-translation')).toBeNull();
+    await rowsOnScreen();
+    await act(async () => {});
+    expect(mockTranslation.calls).toEqual([[10, 16, 'en.sahih']]);
+    expect(within(screen.getByTestId('search-verse-10-16')).getByTestId('search-verse-translation')).toBeTruthy();
+    await rowsOnScreen();
+    await act(async () => {});
+    expect(mockTranslation.calls).toHaveLength(1);
+  });
+
+  it('Copy puts the ayah and where it is on the clipboard, and says “Copied”; Share hands the same to the share sheet', async () => {
+    const { Share } = require('react-native');
+    const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+    await open();
+    await search('قل لو شاء الله');
+    const card = screen.getByTestId('search-verse-10-16');
+    fireEvent.press(within(card).getByTestId('search-verse-copy'));
+    expect(mockClipboard.copied).toHaveLength(1);
+    expect(mockClipboard.copied[0]).toMatch(/تَعْقِلُونَ﴿ ١٦ ﴾/);
+    expect(mockClipboard.copied[0]).toMatch(/Yūnus, Ayah 16$/);
+    expect(screen.getByText('Copied')).toBeTruthy();
+    fireEvent.press(within(card).getByTestId('search-verse-share'));
+    expect(share).toHaveBeenCalledWith({ message: mockClipboard.copied[0] });
+    share.mockRestore();
+  });
 });

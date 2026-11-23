@@ -55,5 +55,13 @@ export function assignedOn(u: User, date: Date): number[] {
 }
 
 export function logFor(date: string, pagesRevised: number[]): RevisionLog {
-  return { id: `${date}-log`, date, assignedPages: pagesRevised, pagesRevised, pagesSkipped: [], weaknessUpdates: [], durationMinutes: 5 };
+  return {
+    id: `${date}-log`,
+    date,
+    assignedPages: pagesRevised,
+    pagesRevised,
+    pagesSkipped: [],
+    weaknessUpdates: [],
+    durationMinutes: 5,
+  };
 }

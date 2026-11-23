@@ -44,6 +44,7 @@ import AuthScreen from '../AuthScreen';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { PillButton } from '../../../components/v2/PillButton';
+import { arabicLines, clippedArabic } from '../../../../jest/arabicLines';
 import { DEFAULT_ACCENT, paletteV2 } from '../../../theme/v2';
 
 // A new user hasn't chosen an accent: Indigo.
@@ -85,6 +86,9 @@ describe('<AuthScreen /> in the new design: sign in', () => {
     await showV2();
     expect(styleOf('auth').backgroundColor).toBe(light.bg);
     expect(screen.getByTestId('auth-title').props.children).toBe('Welcome back');
+    // The bismillah's every haraka (arabicFullV2).
+    expect(arabicLines(screen.UNSAFE_root as never)).toHaveLength(1);
+    expect(clippedArabic(screen.UNSAFE_root as never)).toEqual([]);
     expect(screen.queryByTestId('auth-name')).toBeNull();
     expect(screen.queryByTestId('auth-confirm-password')).toBeNull();
 

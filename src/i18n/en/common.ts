@@ -25,7 +25,10 @@ export const common = {
   pageShort: 'p. {{n}}',
   page: 'Page',
   today: 'Today',
+  yesterday: 'Yesterday',
   tomorrow: 'Tomorrow',
+  /** The week's day letters, Sunday first, as the calendars head their columns (format.ts weekdayLetters). */
+  weekdayLetters: 'S M T W T F S',
   edit: 'Edit',
   search: 'Search',
   apply: 'Apply',
@@ -38,8 +41,33 @@ export const common = {
   juzRange: 'Juz {{from}}–{{to}}',
   /** "Juz 3, 7": the numbers already joined. */
   juzList: 'Juz {{list}}',
+  /** A count of days: "1 day", "14 days". */
+  days_one: '{{count}} day',
+  days_other: '{{count}} days',
   juzCount_one: '{{count}} juz',
   juzCount_other: '{{count}} juz',
   tryAgain: 'Try again',
   signOut: 'Sign out',
+  /** A progress bar of steps: "Step 2 of 4". */
+  stepNOfTotal: 'Step {{n}} of {{total}}',
+  error: 'Error',
+  save: 'Save',
+  ok: 'OK',
+  copy: 'Copy',
+  loading: 'Loading…',
+  /** "Try again." as a sentence after an error. */
+  tryAgainSentence: 'Try again.',
+  /** A link that opened nowhere (lib/openWebPage): its address follows, with Copy. */
+  pageDidNotOpen: 'Couldn’t open the page',
+  pageDidNotOpenBody: 'Copy its address to open it in a browser.\n\n{{address}}',
+  /** An email address no email app took (Settings → Contact support). */
+  emailDidNotOpen: 'Couldn’t open an email app',
+  emailDidNotOpenBody: 'Copy our address to write to us from any email app.\n\n{{address}}',
+  /** A size, kept on one line: "247 MB". */
+  megabytesTight: '{{n}}\u00a0MB',
+  gigabytes: '{{n}} GB',
+  /** The greeting at the top of Home. */
+  salam: 'Assalamu Alaikum',
+  /** A request that ran out of time. */
+  tookTooLong: 'This took too long.',
 } as const;

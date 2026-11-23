@@ -11,6 +11,18 @@ export const timer = {
     body: '{{duration}} logged. You can add the pages you read in Activity.',
     addPages: 'Add pages',
   },
+  /** The note after a sitting in the reader (REC-1): "Saved to today: Al-Mulk, ayahs 1–26, 41 min · Undo · View". */
+  sittingSaved: {
+    view: 'View',
+    /** Said by VoiceOver as the note appears ({{note}}: "Saved to today: Al-Mulk, ayahs 1–26, 41 min"). */
+    announce: '{{note}}. Undo and View are at the bottom of the screen.',
+    deleted: 'Sitting deleted',
+    deletedWithRecording: 'Sitting and its recording deleted',
+    recordingStaysTitle: 'The sitting is deleted',
+    recordingStays: 'Part of its recording is backed up already, so it stays. You can delete it from its day in Activity.',
+    undoFailed: "Couldn't undo",
+    undoRetry: 'Please try again from its day in Activity.',
+  },
   card: { close: 'Close timer', closeHint: 'Closes the timer' },
   chip: {
     running: 'Timer running, {{clock}}. Open timer controls',

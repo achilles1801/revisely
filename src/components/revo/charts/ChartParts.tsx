@@ -5,6 +5,7 @@ import { useTheme } from '../../../context/ThemeContext';
 import type { RatingBand } from '../../../lib/revo/charts';
 import { PillButton } from '../../v2/PillButton';
 import { CHART_TEXT_MAX } from './ChartFrame';
+import { t } from '../../../i18n';
 
 export function useBandColor(): (band: RatingBand | null) => string {
   const { palette } = useTheme();
@@ -120,12 +121,12 @@ export function ChartButtons({
           <View style={styles.added} testID={`${testID}-revise-added`}>
             <Ionicons name="checkmark-circle" size={18} color={palette.doneText} />
             <Text style={[styles.line, { color: palette.text }]} maxFontSizeMultiplier={CHART_TEXT_MAX}>
-              First in tomorrow’s revision
+              {t('revo.chart.firstTomorrow')}
             </Text>
           </View>
         ) : (
           <PillButton
-            title="Revise first tomorrow"
+            title={t('revo.chart.reviseFirst')}
             size="sm"
             busy={busy}
             onPress={async () => {
@@ -142,8 +143,8 @@ export function ChartButtons({
           />
         )
       ) : null}
-      {openPage ? <PillButton title="Open in the reader" size="sm" variant="outline" onPress={openPage} style={styles.button} testID={`${testID}-reader`} /> : null}
-      {openDay ? <PillButton title="Open in Activity" size="sm" variant="outline" onPress={openDay} style={styles.button} testID={`${testID}-day`} /> : null}
+      {openPage ? <PillButton title={t('revo.card.openPage')} size="sm" variant="outline" onPress={openPage} style={styles.button} testID={`${testID}-reader`} /> : null}
+      {openDay ? <PillButton title={t('revo.chart.openActivity')} size="sm" variant="outline" onPress={openDay} style={styles.button} testID={`${testID}-day`} /> : null}
     </View>
   );
 }

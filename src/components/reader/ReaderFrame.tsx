@@ -9,6 +9,8 @@ export const READER_HEADER_HEIGHT = 48;
 interface ReaderFrameProps {
   /** The controls are showing (otherwise: reading, nothing but the page). */
   chromeVisible: boolean;
+  /** The status bar stays while the controls are put away (an immersive page during a take: the time and battery). */
+  keepStatusBar?: boolean;
   /** The screen is the focused one. Only then does it set the status bar,
    *  which is app-wide: hidden here must not stay hidden on the next screen. */
   active?: boolean;
@@ -60,6 +62,7 @@ function useStableInset(value: number): number {
  */
 export function ReaderFrame({
   chromeVisible,
+  keepStatusBar = false,
   active = true,
   onBackgroundPress,
   background,
@@ -97,7 +100,7 @@ export function ReaderFrame({
     <View style={[styles.root, { backgroundColor: background }]}>
       {active && (
         <StatusBar
-          hidden={!chromeVisible}
+          hidden={!chromeVisible && !keepStatusBar}
           animated
           showHideTransition="fade"
           barStyle={isDark ? 'light-content' : 'dark-content'}

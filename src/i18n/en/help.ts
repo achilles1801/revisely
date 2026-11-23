@@ -4,5 +4,5 @@ export const help = {
   button: 'Help: {{title}}',
   askRevo: 'Ask Revo',
   hide: 'Hide help buttons',
-  hidden: 'Help buttons hidden. Settings → Support brings them back.',
+  hidden: 'Help buttons hidden. Settings → Help and support brings them back.',
 } as const;

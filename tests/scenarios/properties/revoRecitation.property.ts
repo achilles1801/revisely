@@ -108,9 +108,10 @@ describe('Revo knows the user’s recitation (Revisely Dev) [RINS-1]', () => {
   it('refuses one that doesn’t add up [RINS-1]', () => {
     // The kinds are the mistakes.
     refused(() => validateContext(context({ recitation: recitation({ mistakes: 13 }) })));
-    // No takes in the window, no score; takes, a score.
+    // No takes in the window, no score. (Takes with no score are taken: every one ended without the checker's final
+    // answer, RECITE-11.)
     refused(() => validateContext(context({ recitation: recitation({ takes: 0, daysRecited: 0 }) })));
-    refused(() => validateContext(context({ recitation: recitation({ score: null }) })));
+    expect(validateContext(context({ recitation: recitation({ score: null }) })).recitation?.score).toBeNull();
     // Passages can't hold more words still marked than there are.
     refused(() => validateContext(context({ recitation: recitation({ stillMarked: 2 }) })));
     // A word still marked was wrong at least once, and in no more takes than reached it.
@@ -145,7 +146,7 @@ describe('Revo knows the user’s recitation (Revisely Dev) [RINS-1]', () => {
 
   it('writes it out in words: surahs and ayahs, Not clear never counted, no field names or dates [RINS-1]', () => {
     const text = recitationText(recitation());
-    expect(text).toContain('Al-Kahf, ayahs 22–23: 3 words still marked (2 wrong, skipped or extra words, 1 haraka or letter slip); wrong in 3 of 4 takes; last recited 2 days ago.');
+    expect(text).toContain('Al-Kahf, ayahs 22–23: 3 words still marked (2 wrong, skipped or extra words, 1 wrong haraka or letter); wrong in 3 of 4 takes; last recited 2 days ago.');
     expect(text).toContain('From Al-Baqarah 48 into Al-Baqarah 123, twice, last 2 days ago.');
     expect(text).toContain('Al-Falaq 3 ended as Al-Falaq 5 ends, once, last yesterday.');
     expect(text).toContain('Not clear (never counted): 4.');
@@ -155,7 +156,7 @@ describe('Revo knows the user’s recitation (Revisely Dev) [RINS-1]', () => {
     expect(text).not.toMatch(/stillMarked|wordMistakes|earlierScore|daysAgo/);
     // No Strict takes: nothing said about tajweed.
     expect(text).not.toContain('Tajweed');
-    expect(recitationText(recitation({ tajweed: 2 }))).toContain('Tajweed notes (Strict takes): 2.');
+    expect(recitationText(recitation({ tajweed: 2 }))).toContain('Tajweed notes (Strict takes, Beta, never counted): 2.');
     // In the context, after everything else.
     expect(contextText(DAY, context({ recitation: recitation() }), [])).toContain('Their recitation, the last 28 days');
     expect(contextText(DAY, context(), [])).not.toContain('recitation');
@@ -202,7 +203,7 @@ describe('An attached take [RINS-1]', () => {
     expect(a).toEqual(attachment());
     const text = attachedText(a!)!;
     expect(text).toBe(takeText('Al-Baqarah 40–48', take()));
-    expect(text).toContain('Al-Baqarah, ayahs 40–48, 160 words in 5 min, Words & harakat, recited with the page hidden.');
+    expect(text).toContain('Al-Baqarah, ayahs 40–48, 160 words in 5 min, mistakes only (no tajweed), recited with the page hidden.');
     expect(text).toContain('Score by the page: 97.9% (their take before of this passage: 96.8%). Mistakes: 2. Not clear (never counted): 1.');
     expect(text).toContain('Al-Baqarah 44: not clear (a haraka the checker couldn’t hear clearly; never counted), in «أَتَأْمُرُونَ»');
     expect(text).toContain('Al-Baqarah 48: wrong word, expected «شَفَـٰعَةٌۭ», heard «عَدْلٌۭ», went on with Al-Baqarah 123, a similar ayah');
@@ -237,7 +238,7 @@ describe('An attached take [RINS-1]', () => {
       marks: [...take().marks, { sura: 2, ayah: 45, name: 'Al-Baqarah 45', kind: 'tajweed', unclear: false, rule: 'madd_munfasil', got: 2, set: 4, expected: 'وَإِنَّهَا' }],
     });
     const text = attachedText(validateAttachment(attachment(t), DAY)!)!;
-    expect(text).toContain('Strict (tajweed checked too)');
+    expect(text).toContain('Strict (tajweed checked too, Beta)');
     expect(text).toContain('Tajweed notes: 1.');
     expect(text).toContain('Al-Baqarah 45: tajweed note, madd munfasil length (held about 2 counts, their setting 4), in «وَإِنَّهَا»');
   });

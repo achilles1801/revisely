@@ -14,7 +14,8 @@ import {
   getFajrTimeFor,
   DEFAULT_FAJR_METHOD,
 } from '../lib/fajrBoundary';
-import { formatTime } from '../i18n';
+import { t, formatTime } from '../i18n';
+import { forwardIcon } from '../i18n/direction';
 
 /**
  * Settings card for the fajr-based day boundary (`compact`: the toggle alone,
@@ -34,8 +35,8 @@ export function FajrBoundaryCard({ compact = false }: { compact?: boolean } = {}
   }, [user]);
 
   const resetsAt = todaysFajr
-    ? formatTime(todaysFajr)
-    : 'midnight';
+    ? t('settings.fajr.resetsAt', { time: formatTime(todaysFajr) })
+    : t('settings.fajr.resetsAtMidnight');
 
   if (!user) return null;
 
@@ -44,14 +45,14 @@ export function FajrBoundaryCard({ compact = false }: { compact?: boolean } = {}
   const currentMethodLabel =
     FAJR_CALCULATION_METHODS.find(
       (m) => m.id === (user.fajrCalculationMethod || DEFAULT_FAJR_METHOD),
-    )?.label ?? 'ISNA (North America)';
+    )?.label ?? t('prayer.methods.NorthAmerica.label');
 
   const requestLocation = async (): Promise<{ latitude: number; longitude: number } | null> => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert(
-        'Location needed',
-        'Fajr times depend on where you are. You can enable location later from Settings.',
+        t('settings.fajr.locationNeeded'),
+        t('settings.fajr.locationNeededBody'),
       );
       return null;
     }
@@ -59,7 +60,7 @@ export function FajrBoundaryCard({ compact = false }: { compact?: boolean } = {}
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       return { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
     } catch (e) {
-      Alert.alert('Couldn\'t get your location', e instanceof Error ? e.message : 'Try again later.');
+      Alert.alert(t('settings.fajr.noLocation'), e instanceof Error ? e.message : t('settings.fajr.tryLater'));
       return null;
     }
   };
@@ -113,16 +114,16 @@ export function FajrBoundaryCard({ compact = false }: { compact?: boolean } = {}
       <View style={v2.row}>
         <SettingIcon name="moon-outline" />
         <View style={v2.text}>
-          <Text style={[typeV2.body, { color: palette.text }]}>Start day at fajr</Text>
+          <Text style={[typeV2.body, { color: palette.text }]}>{t('settings.fajr.label')}</Text>
           <Text style={[typeV2.meta, { color: palette.secondary }]} testID="fajr-resets-at">
-            Resets at {resetsAt}
+            {resetsAt}
           </Text>
         </View>
         <SettingSwitch
           value={enabled}
           onValueChange={handleToggle}
           disabled={busy}
-          accessibilityLabel="Start day at fajr"
+          accessibilityLabel={t('settings.fajr.label')}
           testID="fajr-boundary-switch"
         />
       </View>
@@ -131,23 +132,23 @@ export function FajrBoundaryCard({ compact = false }: { compact?: boolean } = {}
         <Tap
           onPress={() => setMethodOpen(true)}
           accessibilityRole="button"
-          accessibilityLabel={`Method, ${currentMethodLabel}`}
+          accessibilityLabel={t('settings.fajr.methodLabel', { method: currentMethodLabel })}
           testID="fajr-method"
         >
           <View style={v2.row}>
             <SettingIcon name="calculator-outline" />
-            <Text style={[typeV2.body, v2.label, { color: palette.text }]}>Method</Text>
+            <Text style={[typeV2.body, v2.label, { color: palette.text }]}>{t('settings.fajr.method')}</Text>
             <Text style={[typeV2.body, v2.value, { color: palette.secondary }]} numberOfLines={1}>
               {currentMethodLabel}
             </Text>
-            <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+            <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
           </View>
         </Tap>
       )}
       <ActionSheet
         visible={methodOpen}
         onClose={() => setMethodOpen(false)}
-        title="Calculation method"
+        title={t('settings.fajr.methodTitle')}
         actions={[
           ...FAJR_CALCULATION_METHODS.map((m) => ({
             key: m.id,
@@ -157,9 +158,9 @@ export function FajrBoundaryCard({ compact = false }: { compact?: boolean } = {}
           })),
           {
             key: 'location',
-            label: hasCoords ? 'Update location' : 'Set location',
+            label: hasCoords ? t('settings.fajr.updateLocation') : t('settings.fajr.setLocation'),
             icon: 'location-outline' as const,
-            section: 'Location',
+            section: t('settings.fajr.location'),
             onPress: handleRefreshLocation,
           },
         ]}

@@ -1026,7 +1026,9 @@ describe('how the app works: the guide (REVO-30)', () => {
     expect(REVO_SYSTEM_PROMPT).toContain('When that way changes more than they asked for (the whole plan, for one juz), say so in a few words.');
     // "Will I keep my streak if I revise yesterday's stuff?"
     const streak = GUIDE_SECTIONS.find((s) => s.covers.includes('SESS-6'))!.text;
-    expect(streak).toMatch(/Revising yesterday’s missed pages before today ends brings it back at once/);
+    // "What's this ring for?" (Majd, Nov 16 2026): the ring beside Home's ? and what filling it does.
+    expect(streak).toMatch(/ring beside Home’s \? that fills as yesterday’s missed pages are revised/);
+    expect(streak).toMatch(/Filled before today ends, it brings the streak back at once/);
     expect(streak).toMatch(/Two missed days in a row break the streak/);
     expect(REVO_GUIDE).toMatch(/### Not possible \(yet\), and the closest way/);
   });

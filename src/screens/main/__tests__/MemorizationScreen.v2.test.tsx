@@ -37,6 +37,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   jest.restoreAllMocks();
+  jest.useRealTimers();
 });
 
 const palette = paletteV2(false, DEFAULT_ACCENT);
@@ -73,14 +74,6 @@ async function renderScreen() {
   render(v2(<MemorizationScreen />));
   await act(async () => {});
 }
-
-const dismissSheets = () => {
-  // A sheet's onHidden runs once it has gone (iOS: onDismiss).
-  const { Modal } = jest.requireActual('react-native');
-  act(() => {
-    screen.UNSAFE_getAllByType(Modal).forEach((m: { props: { onDismiss?: () => void } }) => m.props.onDismiss?.());
-  });
-};
 
 describe('Memorization in the new design', () => {
   it('a top bar, how much is memorized with its bar, flat rows; no glass, no help', async () => {
@@ -200,6 +193,9 @@ describe('Memorization in the new design', () => {
   });
 
   it('with a custom schedule, "Schedule needs review" follows once the save sheet has gone', async () => {
+    // On the test's own clock: the save sheet's close (its animation, then the modal reporting it has gone) ran on real
+    // timers, and a runner that stalled inside the save's act could finish it before "not yet" was checked (CI, Nov 22).
+    jest.useFakeTimers();
     mockApp.user = {
       id: 'u1',
       memorizedSurahs: [1],
@@ -214,8 +210,10 @@ describe('Memorization in the new design', () => {
       fireEvent.press(screen.getByTestId('confirm-save'));
     });
     expect(mockApp.saveUser).toHaveBeenCalled();
+    // The save sheet is still going: the review waits for it.
     expect(screen.queryByText('Schedule needs review')).toBeNull();
-    dismissSheets();
+    // It goes (its animation ends, then the modal reports it has gone, as iOS does), and the review follows.
+    for (let i = 0; i < 3; i++) act(() => jest.advanceTimersByTime(200));
     expect(screen.getByText('Schedule needs review')).toBeTruthy();
     fireEvent.press(screen.getByTestId('review-now'));
     expect(mockNavigation.navigate).toHaveBeenCalledWith('PlanEdit');

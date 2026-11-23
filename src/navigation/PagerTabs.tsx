@@ -13,12 +13,16 @@
 //   mounted ahead), so a tab never reloads or blanks while swiping.
 // - Everything moves on the UI thread (Reanimated); a swipe or a tab press can
 //   take over an animation in flight.
+// - Nothing renders in React while the pager moves: a swipe changes the tab
+//   once the pager is still, and Android's page textures are switched from the
+//   UI thread. A render mid-swipe froze the pager on Android until it was drawn.
 
-import React, { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { I18nManager, StyleSheet, useWindowDimensions, View } from 'react-native';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { I18nManager, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import {
   createNavigatorFactory,
   DefaultNavigatorOptions,
+  EventArg,
   NavigationHelpers,
   NavigationProp,
   ParamListBase,
@@ -30,11 +34,12 @@ import {
   useNavigationBuilder,
 } from '@react-navigation/native';
 import type { StyleProp, ViewStyle } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, type PanGesture } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
   runOnJS,
   SharedValue,
+  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -50,6 +55,14 @@ const DIR = I18nManager.isRTL ? -1 : 1;
 export function rubberBand(overPages: number): number {
   'worklet';
   return 1 - 1 / (overPages * 0.55 + 1);
+}
+
+/** The pager's position for a finger at `raw` pages: as it is inside [lo, hi], rubber-banded past either end. */
+export function pagerAt(raw: number, lo: number, hi: number): number {
+  'worklet';
+  if (raw < lo) return lo - rubberBand(lo - raw);
+  if (raw > hi) return hi + rubberBand(raw - hi);
+  return raw;
 }
 
 /** A swipe faster than this (pt/s) goes on to the next page whatever the distance. */
@@ -96,6 +109,15 @@ export function pagerRoutes<R>(routes: readonly R[], swipeableCount: number, foc
 }
 
 const SPRING = { damping: 32, stiffness: 320, mass: 1, overshootClamping: true } as const;
+
+// The pager's own pan, for a gesture inside a tab that must win over it (`blocksExternalGesture`): Activity's calendar
+// grid swipes between months and weeks when Activity is a tab (Revisely Dev, TAB-2). Null outside the pager.
+const PagerGestureContext = createContext<PanGesture | null>(null);
+
+/** The tab pager's pan gesture, or null outside it. */
+export function usePagerGesture(): PanGesture | null {
+  return useContext(PagerGestureContext);
+}
 
 export type PagerTabOptions = {
   /** `{ display: 'none' }` hides the tab bar on this tab. */
@@ -147,13 +169,30 @@ function PagerTabs({
   swipeableCount,
   onSwipePastEnd,
 }: PagerTabsProps) {
+  // Every tab press goes through the pager first (settleTabPress, below), then to the navigator's own listeners.
+  const settleTabPress = useRef<(e: EventArg<'tabPress', true>) => void>(() => undefined);
+  const listeners = useMemo(() => {
+    const own = (e: EventArg<'tabPress', true>) => settleTabPress.current(e);
+    type Listeners = { tabPress?: (e: EventArg<'tabPress', true>) => void };
+    if (!screenListeners) return { tabPress: own };
+    return (props: Parameters<Extract<typeof screenListeners, (...args: never[]) => unknown>>[0]) => {
+      const theirs = (typeof screenListeners === 'function' ? screenListeners(props) : screenListeners) as Listeners;
+      return {
+        ...theirs,
+        tabPress: (e: EventArg<'tabPress', true>) => {
+          own(e);
+          theirs.tabPress?.(e);
+        },
+      };
+    };
+  }, [screenListeners]) as typeof screenListeners;
   const { state, descriptors, navigation, NavigationContent } = useNavigationBuilder<
     TabNavigationState<ParamListBase>,
     TabRouterOptions,
     TabActionHelpers<ParamListBase>,
     PagerTabOptions,
     PagerTabEvents
-  >(TabRouter, { id, initialRouteName, backBehavior, children, screenListeners, screenOptions });
+  >(TabRouter, { id, initialRouteName, backBehavior, children, screenListeners: listeners, screenOptions });
 
   const { width } = useWindowDimensions();
   const index = state.index;
@@ -198,13 +237,21 @@ function PagerTabs({
     pastEndOn.value = onSwipePastEnd != null;
   }, [width, min, max, canSwipe, onSwipePastEnd, pageWidth, lo, hi, swipeOn, pastEndOn]);
 
+  // 1 while the pager moves (a finger on it, or settling): Android draws the pages into textures then.
+  const moving = useSharedValue(0);
+
   // A tab press (or navigate() from anywhere) slides to that tab, from
-  // wherever the pager is, even mid-animation.
+  // wherever the pager is, even mid-animation. A swipe that is settling on that
+  // tab already is left to finish: restarting it from rest dropped the fling's
+  // speed (the tab changes once the pager is still, below).
   useEffect(() => {
-    if (target.value === index && Math.abs(position.value - index) < 0.001) return;
+    if (target.value === index) return;
     target.value = index;
-    position.value = withSpring(index, SPRING);
-  }, [index, position, target]);
+    moving.value = 1;
+    position.value = withSpring(index, SPRING, (finished) => {
+      if (finished) moving.value = 0;
+    });
+  }, [index, position, target, moving]);
 
   // The gesture is made once; what changes (the tabs, the range, whether a
   // swipe is allowed) is read when it runs.
@@ -215,6 +262,20 @@ function PagerTabs({
     const route = routes[page];
     if (route && page !== now) nav.navigate(route.name);
   }, []);
+
+  // A tap on the tab still focused while a swipe settles on another one (the
+  // tab hasn't changed yet): the pager goes back to it, and the tap does
+  // nothing else (no scroll to the top, which is for a tab already shown).
+  settleTabPress.current = (e) => {
+    const { routes, index: now } = latest.current;
+    if (e.target !== routes[now]?.key || target.value === now) return;
+    e.preventDefault();
+    target.value = now;
+    moving.value = 1;
+    position.value = withSpring(now, SPRING, (finished) => {
+      if (finished) moving.value = 0;
+    });
+  };
 
   // A light tick when a swipe lands on another tab (taps don't buzz).
   const haptics = useHaptics();
@@ -239,28 +300,40 @@ function PagerTabs({
           // Take over whatever is moving, from where it is.
           cancelAnimation(position);
           start.value = position.value;
+          moving.value = 1;
         })
         .onUpdate((e) => {
           if (!swipeOn.value) return;
-          const raw = start.value - (DIR * e.translationX) / pageWidth.value;
-          if (raw < lo.value) position.value = lo.value - rubberBand(lo.value - raw);
-          else if (raw > hi.value) position.value = hi.value + rubberBand(raw - hi.value);
-          else position.value = raw;
+          position.value = pagerAt(start.value - (DIR * e.translationX) / pageWidth.value, lo.value, hi.value);
         })
         .onEnd((e) => {
-          if (!swipeOn.value) return;
+          if (!swipeOn.value) {
+            moving.value = 0;
+            return;
+          }
           const velocity = (-DIR * e.velocityX) / pageWidth.value;
-          const page = snapPage(start.value, position.value, velocity, FLING_VELOCITY / pageWidth.value, lo.value, hi.value);
+          // Where the finger let go, not where the last update left the pager:
+          // on a busy frame Android hands the last moves over with the release.
+          const raw = start.value - (DIR * e.translationX) / pageWidth.value;
+          const released = pagerAt(raw, lo.value, hi.value);
+          const page = snapPage(start.value, released, velocity, FLING_VELOCITY / pageWidth.value, lo.value, hi.value);
           target.value = page;
-          position.value = withSpring(page, { ...SPRING, velocity });
+          // The tab changes once the pager is still: a render while it moves
+          // holds back its frames until Android has drawn that render (Reanimated
+          // pauses its own updates for it), and changing tabs sets off several
+          // (the tab bar, focus, the screens' own refreshes). A swipe that takes
+          // over first decides instead.
+          position.value = withSpring(page, { ...SPRING, velocity }, (finished) => {
+            if (!finished) return;
+            moving.value = 0;
+            runOnJS(go)(page);
+          });
           if (page !== Math.round(start.value)) {
             runOnJS(tick)();
-            runOnJS(go)(page);
           } else if (pastEndOn.value && Math.round(start.value) === hi.value) {
             // Past the last page toward a tab that isn't one (yet): judged as a
             // swipe to a next page would be, on the distance before the rubber
             // band shortened it. The pager springs back; the tab's tap runs.
-            const raw = start.value - (DIR * e.translationX) / pageWidth.value;
             const beyond = snapPage(start.value, raw, velocity, FLING_VELOCITY / pageWidth.value, lo.value, hi.value + 1);
             if (beyond === hi.value + 1) {
               runOnJS(tick)();
@@ -269,41 +342,71 @@ function PagerTabs({
           }
         })
         .withTestId('tab-pager'),
-    [go, tick, swipedPastEnd, position, start, target, pageWidth, lo, hi, swipeOn, pastEndOn],
+    [go, tick, swipedPastEnd, position, start, target, moving, pageWidth, lo, hi, swipeOn, pastEndOn],
   );
 
   const row = useAnimatedStyle(() => ({ transform: [{ translateX: -DIR * position.value * pageWidth.value }] }));
 
   return (
     <NavigationContent>
-      <View style={styles.fill}>
-        <GestureDetector gesture={pan}>
-          <Animated.View style={[styles.row, { width: width * count }, row]} testID="tab-pager-row">
-            {pages.map((route, i) => {
-              const focused = i === index;
-              return (
-                <View
-                  key={route.key}
-                  style={[styles.page, { width }]}
-                  // Only the focused tab is read by VoiceOver.
-                  accessibilityElementsHidden={!focused}
-                  importantForAccessibility={focused ? 'auto' : 'no-hide-descendants'}
-                  testID={`tab-page-${route.name}`}
-                >
+      <PagerGestureContext.Provider value={pan}>
+        <View style={styles.fill}>
+          <GestureDetector gesture={pan}>
+            <Animated.View style={[styles.row, { width: width * count }, row]} testID="tab-pager-row">
+              {pages.map((route, i) => (
+                <PagerPage key={route.key} name={route.name} width={width} focused={i === index} moving={moving}>
                   {mounted.has(route.key) ? descriptors[route.key].render() : null}
-                </View>
-              );
-            })}
-          </Animated.View>
-        </GestureDetector>
-        {tabBar({
-          state,
-          descriptors,
-          navigation,
-          position,
-        })}
-      </View>
+                </PagerPage>
+              ))}
+            </Animated.View>
+          </GestureDetector>
+          {tabBar({
+            state,
+            descriptors,
+            navigation,
+            position,
+          })}
+        </View>
+      </PagerGestureContext.Provider>
     </NavigationContent>
+  );
+}
+
+const ANDROID = Platform.OS === 'android';
+
+/**
+ * A tab's page. While the pager moves, Android draws it once into a texture and
+ * slides that (renderToHardwareTextureAndroid): a moving view's content is
+ * otherwise drawn again every frame, both tabs at once mid-swipe, where iOS
+ * slides layers it has already drawn. Off as soon as the pager is still, so
+ * scrolling inside a tab never redraws a whole-page texture. Set from the UI
+ * thread (animated props), so it renders nothing in React.
+ */
+function PagerPage({
+  name,
+  width,
+  focused,
+  moving,
+  children,
+}: {
+  name: string;
+  width: number;
+  focused: boolean;
+  moving: SharedValue<number>;
+  children: ReactNode;
+}) {
+  const layer = useAnimatedProps(() => (ANDROID ? { renderToHardwareTextureAndroid: moving.value === 1 } : {}));
+  return (
+    <Animated.View
+      animatedProps={layer}
+      style={[styles.page, { width }]}
+      // Only the focused tab is read by VoiceOver.
+      accessibilityElementsHidden={!focused}
+      importantForAccessibility={focused ? 'auto' : 'no-hide-descendants'}
+      testID={`tab-page-${name}`}
+    >
+      {children}
+    </Animated.View>
   );
 }
 

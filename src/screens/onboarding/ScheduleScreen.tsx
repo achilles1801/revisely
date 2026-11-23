@@ -5,7 +5,7 @@ import Slider from '@react-native-community/slider';
 import * as Location from 'expo-location';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
+import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { Stepper } from '../../components/Stepper';
 import { PillButton } from '../../components/v2/PillButton';
 import { PillTabs } from '../../components/v2/PillTabs';

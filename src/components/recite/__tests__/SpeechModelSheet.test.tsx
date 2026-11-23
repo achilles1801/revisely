@@ -32,7 +32,7 @@ describe('<SpeechModelSheet />', () => {
   it('what it does, on the phone (the voice never recorded or sent), and its size', async () => {
     render(<SpeechModelSheet visible onClose={jest.fn()} onReady={jest.fn()} />);
     await act(async () => {});
-    expect(screen.getByText(/show each word as you say it/)).toBeTruthy();
+    expect(screen.getByText('Recite a few words and Revisely finds the ayah.')).toBeTruthy();
     expect(screen.getByTestId('speech-model-privacy')).toHaveTextContent('It works on this iPhone: your voice isn’t recorded or sent anywhere.');
     expect(screen.getByTestId('speech-model-note')).toHaveTextContent('A one-time download of 57 MB.');
     fireEvent.press(screen.getByTestId('speech-model-download'));

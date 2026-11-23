@@ -7,15 +7,19 @@
 //   recencyLine(41, 0)       "Last revised 41 days ago · not in the last 30 days"
 //   recencyLine(null, 0)     "Never revised"
 
+import { getRevisionDayForUser } from './fajrBoundary';
+import { t } from '../i18n';
+
 /** "once", "twice", "3 times". */
-export const timesWord = (n: number): string => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`);
+export const timesWord = (n: number): string =>
+  n === 1 ? t('lib.recency.once') : n === 2 ? t('lib.recency.twice') : t('lib.recency.times', { count: n });
 
 /** "Last revised today", "Last revised yesterday", "Last revised 4 days ago", "Never revised". */
 export function lastRevisedWords(daysAgo: number | null): string {
-  if (daysAgo == null) return 'Never revised';
-  if (daysAgo <= 0) return 'Last revised today';
-  if (daysAgo === 1) return 'Last revised yesterday';
-  return `Last revised ${daysAgo} days ago`;
+  if (daysAgo == null) return t('lib.recency.never');
+  if (daysAgo <= 0) return t('lib.recency.today');
+  if (daysAgo === 1) return t('lib.recency.yesterday');
+  return t('lib.recency.daysAgo', { count: daysAgo });
 }
 
 /**
@@ -25,11 +29,23 @@ export function lastRevisedWords(daysAgo: number | null): string {
  */
 export function recencyLine(daysAgo: number | null, timesInWindow: number, windowDays = 30): string {
   if (daysAgo == null) return lastRevisedWords(null);
-  const often = timesInWindow > 0 ? `${timesWord(timesInWindow)} in ${windowDays} days` : `not in the last ${windowDays} days`;
-  return `${lastRevisedWords(daysAgo)} · ${often}`;
+  const often =
+    timesInWindow > 0 ? t('lib.recency.inDays', { times: timesWord(timesInWindow), days: windowDays }) : t('lib.recency.notInDays', { days: windowDays });
+  return t('lib.recency.line', { last: lastRevisedWords(daysAgo), often });
 }
 
 const DAY_MS = 86_400_000;
+
+/**
+ * The revision day a page was last revised on. A page holds either the moment of its last
+ * revision (a session sets it) or the revision day itself, stored as that day's midnight UTC (the
+ * self-heal from the logs, AppContext's syncPagesFromLogs). Read as a moment, the second fell on
+ * the evening before in the Americas.
+ */
+export function lastRevisedDay(user: Parameters<typeof getRevisionDayForUser>[0], iso: string): string {
+  if (/T00:00:00(\.000)?Z$/.test(iso)) return iso.slice(0, 10);
+  return getRevisionDayForUser(user, new Date(iso));
+}
 
 /**
  * Whole days from `day` to `today`. Either may be a timestamp ("2026-11-02T09:00:00.000Z", as a

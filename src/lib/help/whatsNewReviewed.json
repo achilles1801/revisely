@@ -13,12 +13,12 @@
     "MEM-1": "c433d43bc16e7ffb",
     "MEM-2": "fa6bccea850e23b7",
     "MEM-5": "2b610dd93d4012d9",
-    "REC-1": "971b7fa368411aaa",
+    "REC-1": "dec0b6f83b53c68a",
     "REC-2": "06be0811d7eedf49"
   },
   "2026-11/revo": {
     "REVO-1": "d594baab4a320cd1",
-    "REVO-30": "95241035142afa83"
+    "REVO-30": "fb8155cdb572992a"
   },
   "2026-11/more.help": {
     "HELP-1": "7e48d56eedfa411b"
@@ -29,5 +29,36 @@
   "2026-11/more.offline": {
     "SYNC-1": "3aa465bb16dd8ce1",
     "SYNC-2": "bd1eb7381947a8a7"
+  },
+  "1.0.5/recite": {
+    "RECITE-1": "c93d694c7ccaddb2",
+    "RECITE-2": "2207cdfc1662d2da"
+  },
+  "1.0.5/marks": {
+    "RECITE-3": "b634371d6a67ec19",
+    "RECITE-4": "513d0ce716bbf002"
+  },
+  "1.0.5/again": {
+    "RECITE-7": "f7ca3a916a566009",
+    "RMEM-2": "d099ae1a78157e30",
+    "RMEM-3": "0acdad49f616daa5"
+  },
+  "1.0.5/gaps": {
+    "ACT-28": "6603ea8892be0ab0",
+    "ACT-30": "7aaf2461baca35ac"
+  },
+  "1.0.5/more.test": {
+    "RECITE-8": "55d683320bb0e707"
+  },
+  "1.0.5/more.recitation": {
+    "RINS-2": "827aac3517cdb95d",
+    "RINS-1": "804db16c46a96b4d",
+    "RINS-3": "2072221743aa2f49"
+  },
+  "1.0.5/more.premium": {
+    "PREM-1": "8e984624d6757299"
+  },
+  "1.0.5/more.search": {
+    "SEARCH-1": "25d3ce6d14ad81fe"
   }
 }

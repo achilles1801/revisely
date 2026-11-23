@@ -7,10 +7,16 @@ import { navigationRef } from '../../navigation/navigationRef';
 import { getRecitation } from '../recitation';
 import { isActive } from '../nowPlaying';
 import { hasRecordingSession, onRecordingSessionChange } from '../recordings';
+import { activityTabOn } from '../activityTab';
 
 /** The tabs' own screens: Home, Read's index, Insights. */
 // i18n-ignore (route names)
 export const MAIN_SCREENS: ReadonlySet<string> = new Set(['Dashboard', 'ReadIndex', 'Insights']);
+
+/** A tab's own screen: one of MAIN_SCREENS, or Activity while it is a tab of its own (Revisely Dev's switch, TAB-2). */
+export function isMainScreen(name: string): boolean {
+  return MAIN_SCREENS.has(name) || (name === 'Activity' && activityTabOn()); // i18n-ignore (route names)
+}
 
 export type BusyReason = 'recording' | 'recitation' | 'timer' | 'screen';
 
@@ -41,7 +47,7 @@ export function busyReasons(): BusyReason[] {
   if (isActive(getRecitation().getState())) reasons.push('recitation');
   flags.forEach((f) => reasons.push(f));
   const screen = currentScreen();
-  if (!screen || !MAIN_SCREENS.has(screen)) reasons.push('screen');
+  if (!screen || !isMainScreen(screen)) reasons.push('screen');
   return reasons;
 }
 

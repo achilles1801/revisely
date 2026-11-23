@@ -26,12 +26,12 @@ function importsNativeSafeArea(code: string): boolean {
   return /\b(?:require\(['"]react-native['"]\)|ReactNative|RN)\.SafeAreaView\b/.test(code);
 }
 
-describe("screens pad by the system bars on Android too (components/SafeAreaView)", () => {
+describe('screens pad by the system bars on Android too (components/SafeAreaView)', () => {
   it('recognises every way of taking React Native’s SafeAreaView', () => {
     expect(importsNativeSafeArea("import { View, SafeAreaView } from 'react-native';")).toBe(true);
     expect(importsNativeSafeArea("import {\n  Text,\n  SafeAreaView,\n} from 'react-native';")).toBe(true);
-    expect(importsNativeSafeArea("import { SafeAreaView as Safe } from \"react-native\";")).toBe(true);
-    expect(importsNativeSafeArea("const S = RN.SafeAreaView;")).toBe(true);
+    expect(importsNativeSafeArea('import { SafeAreaView as Safe } from "react-native";')).toBe(true);
+    expect(importsNativeSafeArea('const S = RN.SafeAreaView;')).toBe(true);
     expect(importsNativeSafeArea("import type { SafeAreaView } from 'react-native';")).toBe(false);
     expect(importsNativeSafeArea("import { type SafeAreaView, View } from 'react-native';")).toBe(false);
     expect(importsNativeSafeArea("import { SafeAreaView } from '../../components/SafeAreaView';")).toBe(false);

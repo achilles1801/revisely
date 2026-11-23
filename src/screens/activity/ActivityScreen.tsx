@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { pageOfVerse } from '../../lib/verses';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -8,7 +9,8 @@ import {
   View,
 } from 'react-native';
 import { TopSafeAreaView } from '../../components/SafeAreaView';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, useScrollToTop } from '@react-navigation/native';
+import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useTabBarFootprint } from '../../navigation/TabBar';
@@ -18,6 +20,7 @@ import { useActivitySources } from '../../components/activity/useActivitySources
 import { ActivityCalendar } from '../../components/activity/ActivityCalendar';
 import { ActivityBlocksViews, type ViewKind } from '../../components/activity/ActivityBlocksViews';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
+import { useReduceMotion } from '../../design/motion';
 import { HelpButton } from '../../components/help/HelpButton';
 import { HelpToast } from '../../components/help/HelpToast';
 import type { PreviewBlock } from '../../components/activity/CalendarMonth';
@@ -38,6 +41,7 @@ import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { Tap } from '../../components/v2/Tap';
 import { layoutV2, typeV2 } from '../../theme/v2';
+import { t } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Activity'>;
 
@@ -53,6 +57,11 @@ const RECENT_ITEMS = 3;
  */
 export default function ActivityScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute();
+  // Activity as a tab of its own (Revisely Dev's switch, TAB-2): this screen is the bottom of its tab's stack. Opened from
+  // Home (or from anywhere in the store app) it is pushed over Dashboard, as it always was. A screen's place in its
+  // stack never changes, so this is read once.
+  const isTabRoot = useMemo(() => navigation.getState?.()?.routes[0]?.key === route.key, [navigation, route.key]);
   const { user, logs, pages, saveUser } = useApp();
   const { palette } = useTheme();
   // Room for the tab bar (and the mini player) and for Revo's button.
@@ -74,7 +83,7 @@ export default function ActivityScreen() {
       )
       .catch((err) => {
         logger.warn('Could not put pages first tomorrow', err);
-        setCarryToast({ text: "Couldn't put them first tomorrow. Try again." });
+        setCarryToast({ text: t('activity.screen.couldntPutFirst') });
       });
   };
 
@@ -92,6 +101,13 @@ export default function ActivityScreen() {
   const blocksRefresh = useRef<(() => Promise<unknown>) | null>(null);
   const refreshAll = useCallback(() => Promise.all([load(), blocksRefresh.current?.()]), [load]);
   const { refreshing, onRefresh } = usePullToRefresh(refreshAll);
+  // Insights opening Overview's calendar (the longest gap, a month's bar) starts it at the top: the two views share
+  // this scroll, so from deep in Insights the calendar's title was left under the header (ACT-28).
+  const scrollRef = useRef<ScrollView>(null);
+  // A press on the Activity tab while it shows scrolls to the top, as Home's and Read's do (only as the tab's own screen).
+  useScrollToTop(scrollRef);
+  const reduceMotion = useReduceMotion();
+  const showTop = useCallback(() => scrollRef.current?.scrollTo({ y: 0, animated: !reduceMotion }), [reduceMotion]);
   const recordingDays = useMemo(() => recordings.map((rec) => rec.day), [recordings]);
 
   const days = useMemo(
@@ -120,6 +136,10 @@ export default function ActivityScreen() {
     return () => setRevoActivityView('calendar');
   }, [view]);
 
+  // As a tab, the tab pager's swipe must be able to start on the screen: Gesture Handler's scroll view lets it (over
+  // React Native's own, the pager's pan never started; CLAUDE.md, UI traps). Opened from Home, React Native's, as before.
+  const Scroll = isTabRoot ? GestureScrollView : ScrollView;
+
   const recentItems = items.slice(0, RECENT_ITEMS);
   const openItem = (it: ActivityItem) =>
     navigation.navigate('ActivityDay', { date: it.day, ...(it.recordingId ? { focusRecordingId: it.recordingId } : {}) });
@@ -127,17 +147,18 @@ export default function ActivityScreen() {
   return (
     <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <TopBar
-        title="Activity"
-        onBack={() => navigation.goBack()}
+        title={t('activity.screen.title')}
+        // As a tab it has no back arrow: it is where its tab starts.
+        onBack={isTabRoot ? undefined : () => navigation.goBack()}
         right={
           blocks ? (
             <>
               {/* Its help (HELP-1) explains the tab on show. */}
               <HelpButton screen={view === 'insights' ? 'insights' : 'activity'} />
-              <IconButton icon="search" label="Search" onPress={() => navigation.navigate('ActivityAll')} size={22} />
+              <IconButton icon="search" label={t('common.search')} onPress={() => navigation.navigate('ActivityAll')} size={22} />
             </>
           ) : (
-            <IconButton icon="add" label="Log today" onPress={logToday} size={28} />
+            <IconButton icon="add" label={t('activity.screen.logToday')} onPress={logToday} size={28} />
           )
         }
         separator
@@ -147,7 +168,8 @@ export default function ActivityScreen() {
           <ActivityIndicator color={palette.secondary} />
         </View>
       ) : (
-        <ScrollView
+        <Scroll
+          ref={scrollRef}
           style={styles.scroll}
           contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
           refreshControl={
@@ -159,21 +181,33 @@ export default function ActivityScreen() {
           {loadError && (
             <Tap onPress={load} style={[v2.banner, { borderBottomColor: palette.separator }]} accessibilityRole="button">
               <Ionicons name="cloud-offline-outline" size={18} color={palette.secondary} />
-              <Text style={[typeV2.body, { color: palette.text, flex: 1 }]}>Couldn't load all of your activity. Tap to retry.</Text>
+              <Text style={[typeV2.body, { color: palette.text, flex: 1 }]}>{t('activity.screen.couldntLoad')}</Text>
             </Tap>
           )}
           {blocks ? (
             <ActivityBlocksViews
               today={today}
+              // As a tab, a sideways swipe moves between the tabs, but on the calendar's days it still steps the month
+              // or week (TAB-2).
+              inTabPager={isTabRoot}
               noteDays={noteDays}
               onOpenDay={openDay}
               onReviseTomorrow={reviseTomorrow}
               firstTomorrow={firstTomorrow}
               // The reader over Activity, so back returns here (as a day's strip does, ACT-20).
               onOpenPage={(pageNumber) => navigation.navigate('QuranReader', { pageNumber })}
+              // Insights' Recitation rows (RINS-2): those ayahs, highlighted until the page is turned.
+              onOpenAyahs={(sura, from, to) =>
+                navigation.navigate('QuranReader', {
+                  pageNumber: pageOfVerse({ sura, ayah: from }),
+                  highlight: { sura, ayah: from, ...(to > from ? { last: { sura, ayah: to } } : {}) },
+                })
+              }
               onSeeAllPages={() => navigation.navigate('PagesByStrength')}
+              onOpenLastRevised={(sort) => navigation.navigate('LastRevised', sort ? { sort } : undefined)}
               onTurnOnSmartTracking={() => navigation.navigate('Settings', { section: 'revision' })}
               onViewChange={setView}
+              onShowTop={showTop}
               refreshRef={blocksRefresh}
               // First tomorrow on every plan, for that day only (Majd, Nov 8 2026: a custom plan's day
               // used to open, and saving it replaced that day in every cycle).
@@ -197,7 +231,7 @@ export default function ActivityScreen() {
           <View style={{ height: layoutV2.hairline, backgroundColor: palette.separator }} />
           <RecentSection
             count={recentItems.length}
-            emptyText="No sessions yet. Start your first revision from Home."
+            emptyText={t('activity.all.noSessions')}
             onSeeAll={() => navigation.navigate('ActivityAll')}
             testID="activity-recent"
           >
@@ -213,7 +247,7 @@ export default function ActivityScreen() {
           </RecentSection>
           </>
           ) : null}
-        </ScrollView>
+        </Scroll>
       )}
       <UndoToast
         visible={carryToast != null}
@@ -223,7 +257,7 @@ export default function ActivityScreen() {
           setCarryToast(null);
           undo?.();
         } : undefined}
-        actionLabel="Undo"
+        actionLabel={t('common.undo')}
         duration={6000}
         onDismiss={() => setCarryToast(null)}
         bottomInset={tabFootprint}

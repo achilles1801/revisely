@@ -3,24 +3,14 @@
 
 import { getJuzRange, getSurah } from '../quranData';
 import { requestPrayerSheet } from '../widgets/links';
+import { activityTabOn } from '../activityTab';
 import { REVO_SCREENS, REVO_SETTINGS_SECTIONS, type RevoAction, type RevoScreen } from './types';
+import { t } from '../../i18n';
 
 type OpenScreen = Extract<RevoAction, { kind: 'openScreen' }>;
 
 /** The card's button for each screen. */
-export const SCREEN_BUTTON: Record<RevoScreen, string> = {
-  jumpTo: 'Open Jump to',
-  planEditor: 'Edit schedule',
-  memorized: 'Open memorized pages',
-  activity: 'Open Activity',
-  // Testers' Insights are a tab at the top of Activity.
-  insights: 'Open Activity',
-  dailyLog: 'Open the daily log',
-  settings: 'Open Settings',
-  prayerTimes: 'Show prayer times',
-  qibla: 'Find the Qibla',
-  reader: 'Open in the reader',
-};
+export const screenButton = (screen: RevoScreen): string => t(`revo.screens.${screen}`);
 
 /**
  * An action this app knows how to show: one of the kinds it has, and for `openScreen` a screen
@@ -36,8 +26,8 @@ export function knownAction(a: RevoAction | null | undefined): a is RevoAction {
 
 /** What opening a screen does: a navigation, and a sheet over Home afterwards. */
 export interface ScreenTarget {
-  /** navigation.navigate(name, params) */
-  name: 'Home' | 'Read';
+  /** navigation.navigate(name, params); ActivityTab is Activity's own tab (Revisely Dev, TAB-2). */
+  name: 'Home' | 'ActivityTab' | 'Read';
   params: { screen: string; params?: object; initial?: false };
   /** Opened over Home once it shows. */
   sheet?: 'jumpTo' | 'prayerTimes' | 'qibla';
@@ -50,7 +40,8 @@ function readerPage(a: OpenScreen): number | null {
   return null;
 }
 
-export function screenTarget(a: OpenScreen): ScreenTarget {
+// i18n-ignore-start (route names)
+export function screenTarget(a: OpenScreen, activityTab = activityTabOn()): ScreenTarget {
   // `initial: false` keeps Home beneath, so Back comes home.
   const home = (screen: string, params?: object): ScreenTarget => ({ name: 'Home', params: { screen, ...(params ? { params } : {}), initial: false } });
   switch (a.screen) {
@@ -66,7 +57,8 @@ export function screenTarget(a: OpenScreen): ScreenTarget {
       return home('Memorization', { edit: true });
     case 'activity':
     case 'insights':
-      return home('Activity');
+      // Activity's own tab while it is one (Revisely Dev's switch, TAB-2), else on top of Home.
+      return activityTab ? { name: 'ActivityTab', params: { screen: 'Activity' } } : home('Activity');
     case 'dailyLog':
       // No date: today's revision day.
       return home('JournalEntry', {});
@@ -78,14 +70,15 @@ export function screenTarget(a: OpenScreen): ScreenTarget {
     }
   }
 }
+// i18n-ignore-end
 
 /** Opens the screen: navigates, then opens its sheet over Home. */
 export function openScreen(navigate: (name: string, params: object) => void, a: OpenScreen): void {
-  const t = screenTarget(a);
-  navigate(t.name, t.params);
-  if (t.sheet === 'jumpTo') requestJumpSheet();
-  else if (t.sheet === 'prayerTimes') requestPrayerSheet('times');
-  else if (t.sheet === 'qibla') requestPrayerSheet('qibla');
+  const target = screenTarget(a);
+  navigate(target.name, target.params);
+  if (target.sheet === 'jumpTo') requestJumpSheet();
+  else if (target.sheet === 'prayerTimes') requestPrayerSheet('times');
+  else if (target.sheet === 'qibla') requestPrayerSheet('qibla');
 }
 
 // Home's Jump to… sheet, opened from elsewhere (Revo): Home listens with onJumpSheetRequest. A

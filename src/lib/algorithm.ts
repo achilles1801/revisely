@@ -9,7 +9,20 @@ import { isRevisable, revisablePages } from './memorizedAyahs';
 // otherwise a memorized surah would split across two awkward half-days. Long
 // surahs that span 3+ juz (Al-Baqarah, An-Nisa) are kept on page-juz so a "1
 // juz" day doesn't accidentally become a 48-page Baqarah marathon.
+//
+// The key depends only on the mushaf's page tables (quranData, the same for both prints), so it is worked out once
+// for every page. The juz plan asks for it for every memorized page of every day it reads: Insights' Gaps read 92
+// days of a 450-page juz plan in about 2 s before (Nov 17 2026).
+const MUSHAF_PAGES = 604;
+let juzKeyTable: number[] | null = null;
 export function juzKeyForPage(pageNumber: number): number {
+  if (Number.isInteger(pageNumber) && pageNumber >= 1 && pageNumber <= MUSHAF_PAGES) {
+    return (juzKeyTable ??= Array.from({ length: MUSHAF_PAGES + 1 }, (_, p) => juzKeyOf(p)))[pageNumber];
+  }
+  return juzKeyOf(pageNumber);
+}
+
+function juzKeyOf(pageNumber: number): number {
   const surah = getSurahForPage(pageNumber);
   const startJuz = getJuzForPage(surah.startPage);
   const endJuz = getJuzForPage(surah.endPage);
@@ -41,11 +54,18 @@ export interface HandAddedRevision {
  * count in each page's last revised day and number of revisions, so Pages by strength, Coverage and
  * weakest-first plans see revision done elsewhere. They carry no rating, so a page keeps the one its
  * sessions gave it. On their day they come after the day's session.
+ *
+ * `completeSince`: the logs hold every session from that day on but not the ones before it (the app
+ * reads the latest 100 days of sessions; SYNC-6). A page then keeps what the logs can't speak for: its
+ * last revised day when that is before the window, its rating when no session in the window rated it,
+ * and a count and skips never lower than it had. Before Nov 17 2026 a page last revised before the
+ * window lost its day, its count and its rating on every launch once an account passed 100 days.
  */
 export function recomputePagesFromLogs(
   pages: UserPage[],
   logs: RevisionLog[],
   handAdds: readonly HandAddedRevision[] = [],
+  completeSince: string | null = null,
 ): UserPage[] {
   const asLogs: RevisionLog[] = handAdds.map((h, i) => ({
     id: `hand-${i}`,
@@ -65,6 +85,7 @@ export function recomputePagesFromLogs(
     let lastRevisedDate: string | null = null;
     let totalRevisionCount = 0;
     let weaknessRating = DEFAULT_WEAKNESS_RATING;
+    let rated = false;
 
     for (const log of sortedLogs) {
       if (log.pagesRevised.includes(page.pageNumber)) {
@@ -72,7 +93,10 @@ export function recomputePagesFromLogs(
         lastRevisedDate = log.date;
       }
       const wu = log.weaknessUpdates.find((w) => w.page === page.pageNumber);
-      if (wu) weaknessRating = wu.rating;
+      if (wu) {
+        weaknessRating = wu.rating;
+        rated = true;
+      }
     }
 
     // skipCount = consecutive skips since the most recent revision.
@@ -80,6 +104,29 @@ export function recomputePagesFromLogs(
     for (const log of sortedLogs) {
       if (lastRevisedDate && log.date <= lastRevisedDate) continue;
       if (log.pagesSkipped.includes(page.pageNumber)) skipCount++;
+    }
+
+    if (completeSince != null && !(lastRevisedDate && lastRevisedDate >= completeSince)) {
+      // Last revised before the window (or never, as far as it shows): the page's own state is the
+      // only record of the sessions before it.
+      const before = page.lastRevisedDate ? page.lastRevisedDate.slice(0, 10) : null;
+      return {
+        ...page,
+        lastRevisedDate: before && (!lastRevisedDate || before >= lastRevisedDate) ? page.lastRevisedDate : lastRevisedDate,
+        totalRevisionCount: Math.max(page.totalRevisionCount ?? 0, totalRevisionCount),
+        skipCount: Math.max(page.skipCount ?? 0, skipCount),
+        weaknessRating: rated ? weaknessRating : page.weaknessRating ?? DEFAULT_WEAKNESS_RATING,
+      };
+    }
+    if (completeSince != null) {
+      // Revised in the window: its day and skips are exact, but revisions before the window still count.
+      return {
+        ...page,
+        lastRevisedDate,
+        totalRevisionCount: Math.max(page.totalRevisionCount ?? 0, totalRevisionCount),
+        skipCount,
+        weaknessRating: rated ? weaknessRating : page.weaknessRating ?? DEFAULT_WEAKNESS_RATING,
+      };
     }
 
     return {
@@ -282,21 +329,23 @@ export function juzModeCycle(
   user: User,
   memorizedPages: UserPage[],
 ): { juzList: number[]; juzPerDay: number; cycle: number[][] } | null {
-  const memorizedPageNumbers = memorizedPages.map((p) => p.pageNumber);
-  const juzSet = new Set<number>();
-  for (const p of memorizedPageNumbers) juzSet.add(juzKeyForPage(p));
-  const juzList = Array.from(juzSet).sort((a, b) => a - b);
+  // Each juz's memorized pages, in page order, grouped once (not filtered again for every day of the cycle).
+  const byJuz = new Map<number, number[]>();
+  for (const p of memorizedPages) {
+    const juz = juzKeyForPage(p.pageNumber);
+    const pages = byJuz.get(juz);
+    if (pages) pages.push(p.pageNumber);
+    else byJuz.set(juz, [p.pageNumber]);
+  }
+  for (const pages of byJuz.values()) pages.sort((a, b) => a - b);
+  const juzList = Array.from(byJuz.keys()).sort((a, b) => a - b);
   if (juzList.length === 0) return null;
   const juzPerDay = Math.max(1, Math.min(user.dailyJuzCount, juzList.length));
   const pagesForDay = (dayNumber: number): number[] => {
     const juzOffset = (dayNumber * juzPerDay) % juzList.length;
     const result: number[] = [];
     for (let i = 0; i < juzPerDay; i++) {
-      const juz = juzList[(juzOffset + i) % juzList.length];
-      const pagesInJuz = memorizedPageNumbers
-        .filter((p) => juzKeyForPage(p) === juz)
-        .sort((a, b) => a - b);
-      result.push(...pagesInJuz);
+      result.push(...(byJuz.get(juzList[(juzOffset + i) % juzList.length]) as number[]));
     }
     return result;
   };

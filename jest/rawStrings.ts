@@ -48,7 +48,7 @@ const ID_CALLS = new RegExp(
   [
     '^(console|logger|log|Sentry|crashlytics|jest|expect|describe|it|test)\\b',
     '\\.(warn|error|debug|info|log|trace|addBreadcrumb|captureException|captureMessage|setTag|setTags|setExtra|setContext)$',
-    '^(t|i18n\\.t|require|navigate|push|replace|reset|reportError|report|warn|debug|trace)$',
+    '^(t|i18n\\.t|require|navigate|push|replace|reset|reportError|report|warn|debug|trace|e2eSay)$',
     '\\.(navigate|push|replace|reset|setParams|getItem|setItem|removeItem|multiGet|multiRemove|addEventListener|addListener|emit)$',
     '\\.(includes|has|indexOf|lastIndexOf|startsWith|endsWith)$',
     '^(doc|collection|query|where|orderBy|ref|httpsCallable|callFunction|getFunctions|storageRef|fetch)$',
@@ -86,6 +86,15 @@ function calleeText(call: ts.CallExpression | ts.NewExpression, sf: ts.SourceFil
   return ts.isNewExpression(call) ? `new ${text}` : text;
 }
 
+/** A prop that holds an id, a style or a name (an icon's, a screen's), never text. */
+function isIdProp(attr: ts.JsxAttribute, sf: ts.SourceFile): boolean {
+  const prop = attr.name.getText(sf);
+  // A thread row's name is the title it shows.
+  const element = attr.parent.parent;
+  if (prop === 'name' && element.tagName.getText(sf) === 'ThreadRow') return false;
+  return ID_PROPS.has(prop);
+}
+
 /** True when this string sits somewhere that only ever holds identifiers or developer text. */
 function inIdPlace(node: ts.Node, sf: ts.SourceFile): boolean {
   let child: ts.Node = node;
@@ -109,10 +118,14 @@ function inIdPlace(node: ts.Node, sf: ts.SourceFile): boolean {
     }
     if ((ts.isPropertyAssignment(p) || ts.isPropertyDeclaration(p)) && child === p.name) return true;
     if (ts.isPropertyAssignment(p) && ID_KEYS.has(p.name.getText(sf).replace(/['"]/g, ''))) return true;
-    if (ts.isJsxAttribute(p)) return ID_PROPS.has(p.name.getText(sf));
+    if (ts.isJsxAttribute(p)) return isIdProp(p, sf);
     if (ts.isCallExpression(p) || ts.isNewExpression(p)) {
       if (child === p.expression) continue;
       const callee = calleeText(p, sf);
+      // A list's push and a string's replace share their names with navigation's: only a string
+      // passed straight in is an id there (a route, a pattern). An object pushed onto a list of
+      // menu actions holds UI text.
+      if (/(^|\.)(push|replace)$/.test(callee) && child !== node) continue;
       if (ID_CALLS.test(callee) || isErrorName(callee.replace(/^new /, ''))) return true;
     }
     if (ts.isThrowStatement(p)) return true;
@@ -161,7 +174,7 @@ export function rawStringsIn(file: string, text: string): RawString[] {
       if (/[A-Za-z]{2,}/.test(node.text)) add(node, node.text);
       return;
     }
-    if (ts.isJsxAttribute(node) && ID_PROPS.has(node.name.getText(sf))) return;
+    if (ts.isJsxAttribute(node) && isIdProp(node, sf)) return;
     const value = stringText(node);
     if (value != null) {
       if (readsAsText(value) && !inIdPlace(node, sf)) add(node, value);
@@ -190,7 +203,13 @@ export function appSourceFiles(src: string): string[] {
 
 /** The raw UI text of every file under the given folders or files (relative to src/). */
 export function rawStringsUnder(src: string, scopes: string[]): RawString[] {
-  const inScope = (rel: string) => scopes.some((s) => rel === s || rel.startsWith(s.endsWith('/') ? s : `${s}/`));
+  // 'components' is the folder and everything in it; 'components/*' only the files directly in it.
+  const inScope = (rel: string) =>
+    scopes.some((s) =>
+      s.endsWith('/*')
+        ? path.posix.dirname(rel) === s.slice(0, -2)
+        : rel === s || rel.startsWith(s.endsWith('/') ? s : `${s}/`),
+    );
   return appSourceFiles(src)
     .filter(inScope)
     .flatMap((rel) => rawStringsIn(rel, fs.readFileSync(path.join(src, rel), 'utf8')));

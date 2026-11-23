@@ -17,10 +17,18 @@ appId: com.revisionbuddy.app
     file: ../scripts/server-revo.js
     env:
       MODE: tester
-# Get Premium (and Settings' Premium switch later) call devGrantPremium and devRevokePremium: start their workers first,
-# as a throwaway account (scripts/warm-premium.js), or the app's first call can pass its 20 s on a CI runner.
+# Get Premium (and Settings' Premium switch later) call devGrantPremium and devRevokePremium, and Apply for support calls
+# supportLink: start their workers first, as a throwaway account (scripts/warm-premium.js), or the app's first call can
+# pass its 20 s (or the flow's wait) on a CI runner.
 - runScript:
     file: ../scripts/warm-premium.js
+# Page 379 (An-Naml, juz 19) memorized beside the onboarding's Juz 30, for Test me below. Written by an admin, so a
+# relaunch reads it (as other flows' seeds do), before the Dev UI's link, which the app keeps in memory.
+- runScript:
+    file: ../scripts/server-memorized.js
+    env:
+      PAGES: '379'
+- runFlow: ../subflows/relaunch.yaml
 
 # The Dev UI, then the reader at An-Naml 23.
 - openLink:
@@ -52,17 +60,30 @@ appId: com.revisionbuddy.app
                 optional: true
 
 # The controls: one mic (no record button) and the eye.
-- tapOn:
-    id: reader-background
-- extendedWaitUntil:
-    visible:
-      id: recite-mic
-    timeout: 10000
+- runFlow: ../subflows/reader-controls.yaml
 - assertNotVisible: "Record your recitation"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
       NAME: rl01-reader
+
+# The reader's help, with Recite: its recording topic tells of holding the mic for Recite (lib/help/topics).
+- tapOn:
+    id: help-button-reader
+- extendedWaitUntil:
+    visible:
+      id: help-sheet-reader
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl01b-help-reader
+- tapOn:
+    id: help-done
+- extendedWaitUntil:
+    notVisible:
+      id: help-sheet
+    timeout: 5000
 
 # Hold the mic: Record and Recite. A new account has no Premium: Mark mistakes is locked, and a tap opens the
 # Premium page. Get Premium (Revisely Dev's free grant, devGrantPremium in the functions emulator) turns it on.
@@ -185,6 +206,24 @@ appId: com.revisionbuddy.app
 - tapOn:
     id: recite-eye
 
+# While a take is open, the reader's ? tells how Recite works (Majd, Nov 15 2026: the help in line with Dev's Recite).
+- tapOn:
+    id: help-button-reader
+- extendedWaitUntil:
+    visible:
+      id: help-sheet-recite
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl05b-help-recite
+- tapOn:
+    id: help-done
+- extendedWaitUntil:
+    notVisible:
+      id: help-sheet
+    timeout: 5000
+
 # Stop: the final answer and its summary; then the page with its marks, and ✕.
 - tapOn:
     id: recite-stop
@@ -210,15 +249,107 @@ appId: com.revisionbuddy.app
     id: recite-close
 - assertVisible:
     id: recite-mic
-# The take was kept as a recording (Save recordings, on by default; the E2E take records a tone). It stays on the
-# phone (never uploaded), so no backup notice comes.
+# The take kept its audio with the take (Save recordings, on by default; the E2E take records a tone), never as a
+# recording (RMEM-6): no "Recording saved" note follows it.
+- assertNotVisible: "Recording saved"
+
+# Recite's memory (RMEM-3): with the take closed, its word mistake stays on the page, lighter. A tap on it shows its
+# history: this take, wrong, and the clear rule. Clear now takes it off; Undo puts it back.
 - extendedWaitUntil:
-    visible: "Recording saved"
-    timeout: 8000
+    visible:
+      id: past-mark-word
+    timeout: 10000
 - runFlow:
     file: ../subflows/shot.yaml
     env:
-      NAME: rl07b-recording-saved
+      NAME: rm01-past-marks
+- tapOn:
+    id: past-mark-word
+- extendedWaitUntil:
+    visible:
+      id: past-card
+    timeout: 5000
+- assertVisible:
+    id: past-try-wrong
+- assertVisible: "2 more right takes, on 2 different days, clear it."
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rm02-past-card
+- tapOn:
+    id: past-card-clear
+- extendedWaitUntil:
+    notVisible:
+      id: past-mark-word
+    timeout: 5000
+- tapOn: "Undo"
+- extendedWaitUntil:
+    visible:
+      id: past-mark-word
+    timeout: 5000
+
+# Test me (Majd, Nov 15 2026): random places in what's memorized, or in one juz of it. Page 379 (An-Naml, juz 19) was
+# marked memorized at the start, beside the onboarding's Juz 30, and the test is given Juz 19, so its places are on the
+# one page E2E has. At each place the page is hidden but for its ayah's first two words; the E2E take (lib/e2e/
+# reciteLive's placeTake) carries on from there to the place's end, where it stops by itself: "Clean · 1 of N" and
+# Next. ✕ after the second place ends the test: its summary.
+- runFlow: ../subflows/reader-controls.yaml
+- longPressOn:
+    id: recite-mic
+- extendedWaitUntil:
+    visible:
+      id: recite-mode-test
+    timeout: 5000
+- tapOn:
+    id: recite-mode-test
+- extendedWaitUntil:
+    visible:
+      id: test-me-juz-19
+    timeout: 15000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl08a-test-me-where
+- tapOn:
+    id: test-me-juz-19
+- extendedWaitUntil:
+    visible:
+      id: recite-eye-group
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl08b-test-me-place
+- extendedWaitUntil:
+    visible:
+      id: recite-next
+    timeout: 45000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl08c-test-me-clean
+- tapOn:
+    id: recite-next
+- extendedWaitUntil:
+    visible:
+      id: recite-next
+    timeout: 45000
+- tapOn:
+    id: recite-close
+- extendedWaitUntil:
+    visible:
+      id: test-summary
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl08d-test-me-summary
+- tapOn:
+    id: test-summary-done
+- extendedWaitUntil:
+    visible:
+      id: recite-mic
+    timeout: 8000
 
 # In dark: a take marking mistakes again (Mark mistakes stays on). Back from the reader is the Read tab.
 - tapOn:
@@ -237,8 +368,7 @@ appId: com.revisionbuddy.app
     visible:
       id: reader-background
     timeout: 10000
-- tapOn:
-    id: reader-background
+- runFlow: ../subflows/reader-controls.yaml
 - tapOn:
     id: recite-mic
 - extendedWaitUntil:
@@ -267,23 +397,42 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: rl10-summary-dark
+# Recite's memory (RMEM-4): the passage's second take, so its summary has Your progress here; it opens the passage's
+# progress, and Done comes back to the summary.
+- extendedWaitUntil:
+    visible:
+      id: take-summary-progress
+    timeout: 5000
+- tapOn:
+    id: take-summary-progress
+- extendedWaitUntil:
+    visible:
+      id: progress-sheet
+    timeout: 8000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rm03-progress-dark
+- tapOn: "Done"
+- extendedWaitUntil:
+    visible:
+      id: take-summary-drill
+    timeout: 8000
 
 # Recite the mistakes again (Majd, Nov 15 2026): one take over the stretch from the first mistake to the last, from the
 # ayah before (An-Naml 22–23). It stops by itself once the checker has decided the stretch's last word, and its summary
 # says what the take before found there.
 - tapOn:
     id: take-summary-drill
-- extendedWaitUntil:
-    visible:
-      id: recite-bar
-    timeout: 10000
+# No wait for the bar between: the drill is short and stops by itself, so on Android its summary can be up before
+# Maestro has seen the bar (#632's run 43770950205). Only the drill's summary has "Before:".
 - extendedWaitUntil:
     visible:
       id: take-summary-before
     timeout: 30000
 - assertVisible:
     id: take-summary-before
-    text: "Before: 1 wrong word, 1 harakat slip"
+    text: "Before: 1 wrong word, 1 wrong haraka"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
@@ -304,6 +453,7 @@ appId: com.revisionbuddy.app
 - runFlow:
     file: ../subflows/settings-row.yaml
     env:
+      PAGE: testing
       ROW: settings-premium
 - tapOn:
     id: settings-premium
@@ -313,8 +463,18 @@ appId: com.revisionbuddy.app
       checked: false
       enabled: true
     timeout: 30000
-- tapOn:
-    id: back
+# Back to Settings' first level, then Home (SET-1): Settings left open stays on Home's stack, and the tab-Home tap after
+# the takes below would show it instead of Home's open-activity.
+- runFlow:
+    file: ../subflows/tap-to-open.yaml
+    env:
+      ID: back
+      OPENS: settings-page-testing
+- runFlow:
+    file: ../subflows/tap-to-open.yaml
+    env:
+      ID: back
+      OPENS: today-post
 - openLink:
     link: revisely://read?page=379
     optional: true
@@ -323,8 +483,7 @@ appId: com.revisionbuddy.app
     visible:
       id: reader-background
     timeout: 10000
-- tapOn:
-    id: reader-background
+- runFlow: ../subflows/reader-controls.yaml
 - longPressOn:
     id: recite-mic
 - assertVisible:
@@ -362,13 +521,7 @@ appId: com.revisionbuddy.app
 # mistakes is locked now, so the mic starts Recite, whose recorded take begins there: "Listening…" until the checker
 # has found where (`locked`), then the cursor at An-Naml 25, and the summary names what was recited from there, not
 # from the page's top.
-- runFlow:
-    when:
-      notVisible:
-        id: recite-mic
-    commands:
-      - tapOn:
-          id: reader-background
+- runFlow: ../subflows/reader-controls.yaml
 - tapOn:
     id: recite-mic
 - extendedWaitUntil:
@@ -379,6 +532,24 @@ appId: com.revisionbuddy.app
     file: ../subflows/shot.yaml
     env:
       NAME: rl13-started-mid-page-dark
+# An immersive page (Majd, Nov 15 2026): a tap during the take puts the header and the bar away (the status bar stays,
+# the take's time by the page number); another tap brings them back.
+- tapOn:
+    id: reader-background
+- extendedWaitUntil:
+    visible:
+      id: reader-take-activity
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl13b-immersive-dark
+- tapOn:
+    id: reader-take-activity
+- extendedWaitUntil:
+    visible:
+      id: recite-stop
+    timeout: 5000
 - tapOn:
     id: recite-stop
 - extendedWaitUntil:
@@ -412,3 +583,184 @@ appId: com.revisionbuddy.app
     visible:
       id: recite-mic
     timeout: 5000
+
+# Recite's memory (RMEM-5, RMEM-6): the day's takes in one Recited row that opens them, and Show on the page (a take on its
+# page with its marks).
+- tapOn:
+    id: reader-back
+- tapOn:
+    id: tab-Home
+- tapOn:
+    id: open-activity
+- extendedWaitUntil:
+    visible:
+      id: activity-blocks-views
+    timeout: 15000
+- tapOn:
+    id: calendar-day-2026-11-14
+# The preview lists the day's takes (RMEM-5); its Recited row opens the day at them.
+- extendedWaitUntil:
+    visible:
+      id: preview-row-recited
+    timeout: 10000
+- tapOn:
+    id: preview-row-recited
+# The day lists its takes (by now Test me's too), newest first, each a row with ▶ its audio.
+- scrollUntilVisible:
+    element:
+      id: activity-take-head
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: activity-take-play
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rm04-day-recited-dark
+- tapOn:
+    id: activity-take-head
+- extendedWaitUntil:
+    visible:
+      id: shown-take-bar
+    timeout: 10000
+# ▶ for the take's audio, which is on the phone (its row in the day has it).
+- extendedWaitUntil:
+    visible:
+      id: shown-take-play
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rm05-shown-take-dark
+- tapOn:
+    id: shown-take-done
+- extendedWaitUntil:
+    notVisible:
+      id: shown-take-bar
+    timeout: 5000
+
+# A voice search with one result opens the reader on that ayah, highlighted, with nothing listening (SEARCH-4; Majd, Nov
+# 17 2026, replacing Nov 15's take that started by itself). E2E builds have no microphone or speech model: the search
+# hears An-Naml 25's opening words (lib/e2e/voiceSearch), and its one result opens page 379 with no take.
+- openLink:
+    link: revisely://e2e/voice-search?heard=%D8%A3%D9%84%D8%A7%20%D9%8A%D8%B3%D8%AC%D8%AF%D9%88%D8%A7%20%D9%84%D9%84%D9%87%20%D8%A7%D9%84%D8%B0%D9%8A%20%D9%8A%D8%AE%D8%B1%D8%AC%20%D8%A7%D9%84%D8%AE%D8%A8%D8%A1
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+# From the take shown on its page (Home's stack, above): its controls, back to the day, then Read's search.
+- runFlow: ../subflows/reader-controls.yaml
+- tapOn:
+    id: reader-back
+- tapOn:
+    id: tab-Read
+- tapOn:
+    id: read-search
+- extendedWaitUntil:
+    visible:
+      id: search-mic
+    timeout: 10000
+# The waveform moves for as long as it listens: a tap that waits for the screen to settle returned only once the
+# scripted listening had ended (Android, Nov 16 2026).
+- tapOn:
+    id: search-mic
+    waitToSettleTimeoutMs: 300
+- extendedWaitUntil:
+    visible:
+      id: search-listening
+    timeout: 5000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl15-voice-search-listening-dark
+- extendedWaitUntil:
+    visible:
+      id: reader-background
+    timeout: 15000
+# Nothing listening: no take's bar; with the controls up, the reader's mic waits for a tap.
+- assertNotVisible:
+    id: recite-bar
+- runFlow: ../subflows/reader-controls.yaml
+- extendedWaitUntil:
+    visible:
+      id: recite-mic
+    timeout: 5000
+- assertNotVisible:
+    id: recite-bar
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl16-voice-search-reader-dark
+# The search's results (Majd, Nov 16 2026: the field and the mic at the bottom, clearer results), as SEARCH-4 has them with
+# Recite on (every account since 1.0.5, so `e2e/recite-live?on=0` no longer turns it off): a voice search that finds one
+# place, Al-Ikhlas 1, opens the reader there with nothing listening, and Back returns to the search with that result
+# still there. E2E builds carry its Saheeh International (lib/e2e/demoTranslations), so its card shows the ayah, the
+# translation and its credit, Share, Copy and Open.
+- openLink:
+    link: revisely://e2e/voice-search?heard=%D9%82%D9%84%20%D9%87%D9%88%20%D8%A7%D9%84%D9%84%D9%87%20%D8%A3%D8%AD%D8%AF
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+- runFlow:
+    when:
+      notVisible:
+        id: reader-back
+    commands:
+      - tapOn:
+          id: reader-background
+# Back from a reader the voice search opened is the search screen itself; from any other, the Read tab.
+- tapOn:
+    id: reader-back
+- runFlow:
+    when:
+      notVisible:
+        id: search-bar
+    commands:
+      - tapOn:
+          id: read-search
+- extendedWaitUntil:
+    visible:
+      id: search-bar
+    timeout: 10000
+- runFlow:
+    when:
+      visible:
+        id: search-clear
+    commands:
+      - tapOn:
+          id: search-clear
+      - runFlow: ../subflows/keyboard-away.yaml
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl18-search-dark
+- tapOn:
+    id: search-mic
+    waitToSettleTimeoutMs: 300
+- extendedWaitUntil:
+    visible:
+      id: reader-background
+    timeout: 15000
+- assertNotVisible:
+    id: recite-bar
+- runFlow: ../subflows/reader-controls.yaml
+- tapOn:
+    id: reader-back
+- extendedWaitUntil:
+    visible:
+      id: search-verse-112-1
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: search-verse-translation
+    timeout: 10000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: rl19-search-result-dark
+- tapOn:
+    id: search-back
+- openLink:
+    link: revisely://e2e/voice-search?off=1
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml

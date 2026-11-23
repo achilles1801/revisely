@@ -4,6 +4,7 @@
 import type { ViewStyle } from 'react-native';
 import type { PaletteV2 } from '../../theme/v2';
 import type { JuzState } from '../../lib/insightsView';
+import { t } from '../../i18n';
 
 export interface CoverageLook {
   box: ViewStyle;
@@ -30,11 +31,21 @@ export function coverageLook(state: JuzState, palette: PaletteV2): CoverageLook 
 
 /** The legend's words for each state shown. */
 export const COVERAGE_LABELS: Record<JuzState, string> = {
-  week: 'This week',
-  month: 'This month',
-  new: 'Not revised yet',
-  stale: '30+ days',
-  none: 'Not memorized',
+  get week() {
+    return t('activity.coverage.week');
+  },
+  get month() {
+    return t('activity.coverage.month');
+  },
+  get new() {
+    return t('activity.coverage.new');
+  },
+  get stale() {
+    return t('activity.coverage.stale');
+  },
+  get none() {
+    return t('activity.coverage.none');
+  },
 };
 
 /**

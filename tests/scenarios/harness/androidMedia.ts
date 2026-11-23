@@ -10,6 +10,16 @@
 //   its paused notification lands after the system took the service's away, and
 //   stays (no session, can't be swiped away) until the app dismisses it.
 // - expo-notifications lists them as notifications the app posted elsewhere.
+//
+// A binary with Revisely's expo-audio patch (1.0.4 on; androidMedia.fixedBuild())
+// behaves as the patched service did on the same emulator (Nov 6 2026):
+// - swiping the app away pauses the player and ends the session with nothing
+//   left on show; the player's reviselyIsActiveForLockScreen turns false;
+// - clearing the lock screen with the service gone does nothing;
+// - a paused notification can be put away (dismiss(), hide()); its session stays, and
+//   playing again shows it again;
+// - previous and next on it go to the app (reviselyRemoteCommand);
+// - expo-audio's native module says reviselyMediaControls: 2.
 
 type Status = Record<string, unknown>;
 type Listener = (status: Status) => void;
@@ -23,6 +33,12 @@ export interface ShownMedia {
 
 const shade = new Map<number, ShownMedia>();
 let crashes: string[] = [];
+/** The binary carries the expo-audio patch. */
+let fixed = false;
+/** Notifications the app itself dismissed. */
+let appDismissals = 0;
+/** The app's listeners for previous and next (the patched module's event). */
+let trackListeners: Array<(e: { command: string }) => void> = [];
 /** The player the service is showing, while it runs. */
 let service: FakePlayer | null = null;
 let nextId = 31172694;
@@ -40,6 +56,10 @@ class FakePlayer {
   replace(_source: unknown) {}
   setPlaybackRate(_rate: number, _quality?: string) {}
   play() {
+    // The patched service shows a swiped-away notification again.
+    if (fixed && service === this && !shade.has(this.id)) {
+      shade.set(this.id, { id: this.id, title: this.title, session: true });
+    }
     this.emit({ playing: true });
   }
   pause() {
@@ -59,8 +79,10 @@ class FakePlayer {
     }
     if (!this.onLockScreen) return;
     if (service !== this) {
-      // startForegroundService with nothing to show.
-      crashes.push('ForegroundServiceDidNotStartInTimeException');
+      // startForegroundService with nothing to show (the patched service is
+      // never started only to be cleared).
+      if (fixed) this.onLockScreen = false;
+      else crashes.push('ForegroundServiceDidNotStartInTimeException');
       return;
     }
     this.onLockScreen = false;
@@ -71,6 +93,14 @@ class FakePlayer {
     if (service !== this) return;
     this.title = metadata.title ?? this.title;
     shade.set(this.id, { id: this.id, title: this.title, session: true });
+  }
+  /** The patched module's say on whether its controls are still on. */
+  get reviselyIsActiveForLockScreen(): boolean | undefined {
+    return fixed ? this.onLockScreen : undefined;
+  }
+  /** The swipe-away ended its controls. */
+  lostLockScreen() {
+    this.onLockScreen = false;
   }
   /** Android: only lets go of it. */
   remove() {}
@@ -90,6 +120,16 @@ class FakePlayer {
 /** Stands in for expo-audio. */
 export const expoAudio = {
   __esModule: true,
+  get AudioModule() {
+    if (!fixed) return {};
+    return {
+      reviselyMediaControls: 2,
+      addListener: (event: string, listener: (e: { command: string }) => void) => {
+        if (event === 'reviselyRemoteCommand') trackListeners.push(listener);
+        return { remove: () => undefined };
+      },
+    };
+  },
   createAudioPlayer: () => new FakePlayer(),
   setAudioModeAsync: async () => undefined,
   setIsAudioActiveAsync: async () => undefined,
@@ -110,7 +150,7 @@ export const notifications = {
     })),
   dismissNotificationAsync: async (id: string) => {
     const m = /[?&]id=(-?\d+)/.exec(id);
-    if (m) shade.delete(Number(m[1]));
+    if (m && shade.delete(Number(m[1]))) appDismissals++;
   },
 };
 
@@ -120,7 +160,16 @@ export const androidMedia = {
     shade.clear();
     crashes = [];
     service = null;
+    fixed = false;
+    appDismissals = 0;
+    trackListeners = [];
   },
+  /** The phone runs a binary with the expo-audio patch (1.0.4 on). */
+  fixedBuild() {
+    fixed = true;
+  },
+  /** How many notifications the app had to dismiss itself. */
+  appDismissals: () => appDismissals,
   shown: (): ShownMedia[] => [...shade.values()],
   crashes: () => crashes,
   /** The player the notification controls, if its service runs. */
@@ -131,10 +180,35 @@ export const androidMedia = {
     if (!p) return;
     p.emit({ playing: false });
     service = null;
+    if (fixed) {
+      p.lostLockScreen();
+      shade.delete(p.id);
+      return;
+    }
     shade.set(p.id, { ...(shade.get(p.id) as ShownMedia), session: false });
   },
-  /** Pause or ▶ on the notification. */
-  press(button: 'pause' | 'play') {
+  /** The user swipes the (paused) notification away: only the patched service lets them. */
+  dismiss() {
+    if (!fixed || !service) return;
+    shade.delete(service.id);
+  },
+  /**
+   * "Hide" on Android's media control (13+): it sends stop. The patched service
+   * pauses instead, keeping the verse loaded; before, the player was stopped (idle).
+   */
+  hide() {
+    const p = service;
+    if (!p) return;
+    shade.delete(p.id);
+    if (fixed) p.emit({ playing: false, playbackState: 'ready' });
+    else p.emit({ playing: false, playbackState: 'idle' });
+  },
+  /** Pause or ▶ on the notification; previous and next only on the patched service. */
+  press(button: 'pause' | 'play' | 'previous' | 'next') {
+    if (button === 'previous' || button === 'next') {
+      if (fixed && service) for (const l of [...trackListeners]) l({ command: button });
+      return;
+    }
     service?.emit({ playing: button === 'play' });
   },
   /** A notification left by an earlier run of the app. */

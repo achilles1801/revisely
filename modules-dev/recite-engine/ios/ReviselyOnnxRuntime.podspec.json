@@ -1,0 +1,22 @@
+{
+  "name": "ReviselyOnnxRuntime",
+  "version": "1.31.1",
+  "summary": "ONNX Runtime 1.31.1's iOS xcframework, from Microsoft's signed NuGet package, pinned by SHA-256",
+  "description": "ONNX Runtime's own pod (onnxruntime-c) downloads from download.onnxruntime.ai, which serves a certificate for another name (Nov 23 2026), and its CocoaPods releases stop at 1.30.0. The same xcframework ships inside Microsoft.ML.OnnxRuntime on nuget.org, signed by Microsoft: that package, at one version, checked by its SHA-256. 1.31.1 is the version Revisely's checker runs.",
+  "homepage": "https://www.nuget.org/packages/Microsoft.ML.OnnxRuntime/1.31.1",
+  "license": { "type": "MIT", "file": "LICENSE" },
+  "authors": { "ONNX Runtime": "onnxruntime@microsoft.com" },
+  "source": {
+    "http": "https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/1.31.1/microsoft.ml.onnxruntime.1.31.1.nupkg",
+    "type": "zip",
+    "sha256": "6871ccbc97f3d5bdb4095a1dcec33aa78d56f6ed8de5980ef5fa1d9f2e7c679a"
+  },
+  "prepare_command": "unzip -q -o runtimes/ios/native/onnxruntime.xcframework.zip && rm -rf runtimes build buildTransitive",
+  "platforms": { "ios": "15.1" },
+  "vendored_frameworks": "onnxruntime.xcframework",
+  "static_framework": true,
+  "weak_frameworks": ["CoreML"],
+  "frameworks": ["CoreFoundation", "Foundation", "Network", "Security", "SystemConfiguration", "UIKit"],
+  "libraries": "c++",
+  "preserve_paths": ["LICENSE", "ThirdPartyNotices.txt"]
+}

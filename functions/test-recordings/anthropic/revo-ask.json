@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-11-10T02:34:05.365Z",
+  "recordedAt": "2026-11-22T14:26:12.880Z",
   "how": "functions/scripts/record-anthropic.js",
   "request": {
     "model": "claude-sonnet-5-5",
@@ -7,19 +7,19 @@
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "617c5a68f5ea543d75c823a16ba54f438a61b7c94a5b75be68a42075006825e6",
+    "systemSha256": "eccdeee8f79820a849e668180f233ec51bf6cee1f60fa15618d73bac86408c3c",
     "outputSchemaSha256": "ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e"
   },
   "status": 200,
   "body": {
     "model": "claude-sonnet-5-5",
-    "id": "msg_011CgtTz1sVfpUDYtNk8GKdS",
+    "id": "msg_011ChJ7zfh6YJp9tAX2sJFnU",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "{\"text\":\"You've kept a steady week: whole plan done on four days, with Saturday missed and Thursday nearly there, and today is already under way with 4 of 10 pages. Finishing today's pages carries your 2-day streak on.\",\"chart\":{\"kind\":\"weeks\",\"title\":\"Your last weeks, day by day\",\"weeks\":4},\"textAfter\":\"Six pages are left today, starting at Al-Infitar.\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"Six pages left, from Al-Infitar to Al-Ghashiyah\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which days do I miss?\",\"What are my weak pages?\",\"How was this month?\"]}"
+        "text": "{\"text\":\"Your week was steady: you finished the whole plan on four of the last six days, and missed only Saturday. Yesterday was complete, and today you've already done 4 of 10 pages.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised, last 7 days\",\"days\":7},\"textAfter\":\"Six pages are left today, starting at Al-Infitar. Shall we continue?\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"Six pages left, from Al-Infitar to Al-Ghashiyah\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which days do I miss?\",\"Which pages are weak?\"]}"
       }
     ],
     "container": null,
@@ -28,13 +28,13 @@
     "stop_details": null,
     "usage": {
       "input_tokens": 551,
-      "cache_creation_input_tokens": 17637,
+      "cache_creation_input_tokens": 19815,
       "cache_read_input_tokens": 0,
       "cache_creation": {
-        "ephemeral_5m_input_tokens": 17637,
+        "ephemeral_5m_input_tokens": 19815,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 238,
+      "output_tokens": 226,
       "output_tokens_details": {
         "thinking_tokens": 0
       },

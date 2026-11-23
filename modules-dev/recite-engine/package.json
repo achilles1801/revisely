@@ -1,0 +1,7 @@
+{
+  "name": "recite-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Recite on the phone (Revisely Dev only until the native release): ONNX Runtime and the on-device bench",
+  "main": "index.ts"
+}

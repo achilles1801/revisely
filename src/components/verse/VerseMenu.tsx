@@ -22,7 +22,9 @@ import { useTheme } from '../../context/ThemeContext';
 import { useReduceMotion } from '../../design/motion';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { Box, placeMenu } from './menuPlacement';
+import { fromLeftEdge } from '../../i18n/direction';
 import { shareIcon } from '../../lib/platformUi';
+import { t } from '../../i18n';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -142,10 +144,10 @@ export function VerseMenu({
     progress.value = 0;
     progress.value = withSpring(1, SPRING);
     // VoiceOver moves into the menu.
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       if (firstRow.current) AccessibilityInfo.sendAccessibilityEvent(firstRow.current, 'focus');
     }, 50);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [visible, placed, point, progress]);
 
   const card = useAnimatedStyle(() => ({
@@ -155,23 +157,23 @@ export function VerseMenu({
 
   if (!mounted) return null;
 
-  const of = shown.verseLabel ? ` ${shown.verseLabel}` : '';
+  const verse = shown.verseLabel;
   const groups: Row[][] = [
     [
-      { key: 'play', label: 'Play', icon: 'play', subtitle: shown.playSubtitle ?? 'to the end of the juz', onPress: onPlay },
-      { key: 'translation', label: 'Translation', icon: 'language-outline', onPress: onTranslation },
+      { key: 'play', label: t('verse.menu.play'), icon: 'play', subtitle: shown.playSubtitle ?? t('verse.playTo.juz'), onPress: onPlay },
+      { key: 'translation', label: t('verse.menu.translation'), icon: 'language-outline', onPress: onTranslation },
     ],
     [
-      { key: 'copy', label: 'Copy', icon: 'copy-outline', onPress: onCopy },
-      { key: 'share', label: 'Share', icon: shareIcon, onPress: onShare },
+      { key: 'copy', label: t('verse.menu.copy'), icon: 'copy-outline', onPress: onCopy },
+      { key: 'share', label: t('verse.menu.share'), icon: shareIcon, onPress: onShare },
     ],
   ];
   // VoiceOver hears which verse: there is no title.
   const spoken: Record<string, string> = {
-    play: `Play${of}`,
-    translation: of ? `Translation of${of}` : 'Translation',
-    copy: `Copy${of}`,
-    share: `Share${of}`,
+    play: verse ? t('verse.menu.playOf', { verse }) : t('verse.menu.play'),
+    translation: verse ? t('verse.menu.translationOf', { verse }) : t('verse.menu.translation'),
+    copy: verse ? t('verse.menu.copyOf', { verse }) : t('verse.menu.copy'),
+    share: verse ? t('verse.menu.shareOf', { verse }) : t('verse.menu.share'),
   };
 
   return (
@@ -206,7 +208,8 @@ export function VerseMenu({
             borderColor: palette.outline,
             shadowColor: palette.shadow,
             shadowOpacity: isDark ? 0 : 0.14,
-            left: placement?.left ?? 0,
+            // From the screen's left edge in either direction (the verse's place on the page; LANG-2).
+            ...fromLeftEdge(placement?.left ?? 0),
             top: placement?.top ?? 0,
           },
           placement ? { transformOrigin: [placement.origin.x, placement.origin.y, 0] } : styles.unplaced,

@@ -7,7 +7,9 @@
 // (Majd, Nov 14 2026: those are what memorizers slip on), so a passage's wrong words rank it before its harakat slips.
 
 import { shiftDay } from '../journal';
+import type { QuranWords } from '../recite/quranWords';
 import { countsAsMistake, GROUP_RANK, isUnclear, Mark, MarkGroup, MarkKind } from '../reciteLive/contract';
+import { pagesReached, PER_PAGE_FROM } from '../reciteLive/score';
 import { CLEAR_AFTER, wordMemories, WordMemory } from '../reciteMemory/memory';
 import type { ClearRecord, MemoryRecord, TakeRecord } from '../reciteMemory/record';
 
@@ -62,15 +64,51 @@ export const wordsOf = (t: Pick<TakeRecord, 'from' | 'to'>): number => Math.max(
  * The takes' score: each take's own score (by the page, as its row shows it) weighted by the words it recited, so a long
  * take counts for more than a line and the figure always lies between the scores the rows show. Null with no takes.
  */
-export function meanScore(takes: readonly Pick<TakeRecord, 'from' | 'to' | 'accuracy'>[]): number | null {
+export function meanScore(takes: readonly (Pick<TakeRecord, 'from' | 'to' | 'accuracy'> & { unfinished?: boolean })[]): number | null {
   let words = 0;
   let sum = 0;
   for (const t of takes) {
+    // A take kept without its final answer (RECITE-11) never counts in a score: its end wasn't checked.
+    if (t.unfinished) continue;
     const n = wordsOf(t);
     words += n;
     sum += n * t.accuracy;
   }
   return words > 0 ? sum / words : null;
+}
+
+/**
+ * The mistakes a page in long takes (RECITE-24): the finished takes of PER_PAGE_FROM pages or more, their mistakes (as
+ * the summary counts them: never Not clear or tajweed) over their pages, pooled, so a long take counts for its length.
+ */
+export interface PerPage {
+  takes: number;
+  /** Their pages added up, each take's from its first word's page to its last's (as the summary counts them). */
+  pages: number;
+  mistakes: number;
+}
+
+/** A take's mistakes as its summary counts them: the marks that are mistakes (never Not clear, never a tajweed note). */
+export const takeMistakes = (t: Pick<TakeRecord, 'marks'>): number => t.marks.filter((m) => mistakeKindOf(m) !== null).length;
+
+/**
+ * The long takes' mistakes a page, or null with none. Pages come from each take's first and furthest word, which every
+ * record has kept from the start, so takes kept before this count too. A take kept without its final answer
+ * (RECITE-11) never counts: its end wasn't checked.
+ */
+export function perPage(takes: readonly TakeRecord[], words: QuranWords): PerPage | null {
+  let n = 0;
+  let pages = 0;
+  let mistakes = 0;
+  for (const t of takes) {
+    if (t.unfinished) continue;
+    const p = pagesReached(words, t.from, t.to);
+    if (p < PER_PAGE_FROM) continue;
+    n += 1;
+    pages += p;
+    mistakes += takeMistakes(t);
+  }
+  return n > 0 ? { takes: n, pages, mistakes } : null;
 }
 
 export interface WeekScore {
@@ -98,6 +136,8 @@ export interface MarkedWord {
   w: number;
   group: MarkGroup;
   kind: MarkKind;
+  /** Its latest wrong try's: "likely" for a Not clear haraka or letter (its colour, once colours follow the tiers). */
+  sure: Mark['sure'];
   ayah: [number, number];
 }
 
@@ -114,7 +154,7 @@ export interface SlippingPassage {
   /** Takes that got any of them wrong, and takes that reached any of them (all time, as the word's card counts). */
   wrong: number;
   tries: number;
-  /** The revision day of the latest take that reached any of them. */
+  /** The revision day of the latest take that recited any of them (whether or not it was a try at them). */
   lastDay: string;
 }
 
@@ -174,6 +214,8 @@ export interface RecitationInsights {
   similar: SimilarSlip[];
   /** The latest take (any time), null with none. */
   last: TakeRecord | null;
+  /** The window's long takes and their mistakes a page (RECITE-24); null with none, or before the word data has loaded. */
+  perPage: PerPage | null;
 }
 
 const latest = (a: string, b: string) => (a > b ? a : b);
@@ -209,9 +251,14 @@ function markedWords(memories: Map<string, WordMemory>): { words: MarkedWord[]; 
     byWord.set(m.w, [...(byWord.get(m.w) ?? []), m]);
   }
   const words = [...best.values()]
-    .map((m) => ({ w: m.w, group: m.group, kind: (m.lastMark as Mark).kind, ayah: (m.lastMark as Mark).ayah }))
+    .map((m) => ({ w: m.w, group: m.group, kind: (m.lastMark as Mark).kind, sure: (m.lastMark as Mark).sure, ayah: (m.lastMark as Mark).ayah }))
     .sort((a, b) => a.w - b.w);
   return { words, byWord };
+}
+
+/** Every word still marked on the page (wrong words and slips; tajweed apart), in mushaf order. */
+export function stillMarkedWords(records: readonly MemoryRecord[]): MarkedWord[] {
+  return markedWords(wordMemories(records)).words;
 }
 
 /** Words still marked, gathered into runs of neighbouring ayat of one surah, the most slipped first. */
@@ -302,8 +349,16 @@ export function countMarks(takes: readonly TakeRecord[]): { kinds: MistakeKinds;
   return { kinds, mistakes, unclear, tajweed };
 }
 
-/** Everything Insights' Recitation section and Revo's summary show, over the window ending `today`. */
-export function recitationInsights(records: readonly MemoryRecord[], today: string, windowDays = WINDOW_DAYS): RecitationInsights {
+/**
+ * Everything Insights' Recitation section and Revo's summary show, over the window ending `today`. The word data gives
+ * the long takes' pages (`perPage`); without it that one figure is null.
+ */
+export function recitationInsights(
+  records: readonly MemoryRecord[],
+  today: string,
+  windowDays = WINDOW_DAYS,
+  words: QuranWords | null = null,
+): RecitationInsights {
   const takes = liveTakes(records);
   const from = shiftDay(today, -(windowDays - 1));
   const before = shiftDay(from, -windowDays);
@@ -325,7 +380,12 @@ export function recitationInsights(records: readonly MemoryRecord[], today: stri
     }
   }
   cleared.sort((a, b) => b.day.localeCompare(a.day) || a.w - b.w);
-  const slipping = slippingPassages(memories);
+  // "Last recited": the latest take over any of a passage's words, a take that heard them only as Not clear included.
+  const slipping = slippingPassages(memories).map((p) => {
+    let lastDay = p.lastDay;
+    for (const t of takes) if (t.day > lastDay && p.words.some((w) => t.from <= w.w && w.w <= t.to)) lastDay = t.day;
+    return lastDay === p.lastDay ? p : { ...p, lastDay };
+  });
   return {
     from,
     today,
@@ -344,6 +404,7 @@ export function recitationInsights(records: readonly MemoryRecord[], today: stri
     slipping,
     similar: similarSlips(these),
     last: takes[takes.length - 1] ?? null,
+    perPage: words ? perPage(these, words) : null,
   };
 }
 

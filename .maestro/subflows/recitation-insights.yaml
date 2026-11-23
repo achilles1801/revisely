@@ -1,0 +1,48 @@
+# From Home: Activity → Insights at 30 days, scrolled to the Recitation section (RINS-2). Screenshots <NAME> (its top)
+# and <NAME>-end (its last line). Stays on Insights.
+#   env NAME
+appId: com.revisionbuddy.app
+---
+- tapOn:
+    id: open-activity
+- extendedWaitUntil:
+    visible:
+      id: activity-blocks-views
+    timeout: 20000
+- tapOn:
+    id: pill-insights
+- extendedWaitUntil:
+    visible:
+      id: insights-range
+    timeout: 15000
+- tapOn:
+    id: insights-range
+- extendedWaitUntil:
+    visible:
+      id: sheet-action-range-30
+    timeout: 10000
+- tapOn:
+    id: sheet-action-range-30
+# The takes are read from the account once the screen asks for them: give the section time to come.
+- scrollUntilVisible:
+    element:
+      id: insights-recitation-figure
+    direction: DOWN
+    centerElement: true
+    timeout: 45000
+- assertVisible:
+    id: insights-recitation-slip-78-9
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: ${NAME}
+- scrollUntilVisible:
+    element:
+      id: insights-recitation-quiet
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: ${NAME}-end

@@ -1,4 +1,5 @@
 import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
+import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { setGlobalOptions, logger } from 'firebase-functions/v2';
 import { failure } from './failure';
 import { initializeApp, getApps } from 'firebase-admin/app';
@@ -53,6 +54,9 @@ import { AccountInfo, consoleErrorOf, handleAdminConsole } from './console/handl
 import { Role, StaffCaller, roleOf } from './console/roles';
 import { RoleActor, setRole, staff as consoleStaff } from './console/staff';
 import { AUDIO_PREFIX as LABEL_AUDIO_PREFIX, LABEL_PROJECTS } from './console/labels';
+import { earlyAccessOn, grantEarlyAccess } from './support/early';
+import { PackError, handleRecitePack } from './recitePack/handler';
+import { adminPackDeps } from './recitePack/admin';
 
 setGlobalOptions({ region: 'us-central1', maxInstances: 3 });
 
@@ -706,7 +710,7 @@ export const devGrantPremium = onCall({ enforceAppCheck: true, maxInstances: 2, 
   supportCall('devGrantPremium', () => handleDevPremium(request, supportStore(), DEV_PROJECT || testing, true)),
 );
 
-/** Takes the "dev" grant back, so a tester can see Check locked again. revisely-dev only. */
+/** Takes the "dev" grant (and early access's) back, so a tester can see Check locked again. revisely-dev only. */
 export const devRevokePremium = onCall({ enforceAppCheck: true, maxInstances: 2, timeoutSeconds: 20 }, (request) =>
   supportCall('devRevokePremium', () => handleDevPremium(request, supportStore(), DEV_PROJECT || testing, false)),
 );
@@ -792,5 +796,54 @@ export const adminConsole = onCall({ cors: CONSOLE_ORIGINS, timeoutSeconds: 60, 
     // Never the request's data: it may hold a note. The reason goes in the message (#645: a field named `message` is lost).
     logger.error(failure('adminConsole', err));
     throw new HttpsError('internal', 'The console could not do that. Try again.');
+  }
+});
+
+/**
+ * Premium early access (support/early.ts): an account set up while config/app.earlyAccess is on gets Premium with no
+ * end date, kept for good. The user document is created once, when the app sets the account up; a grant already there
+ * is never changed. With the switch off (production until Majd turns it on) this reads config/app and stops.
+ */
+export const earlyAccessOnSignUp = onDocumentCreated({ document: 'users/{uid}', maxInstances: 5, timeoutSeconds: 30 }, async (event) => {
+  const uid = event.params.uid;
+  const config = (await adminDb.doc('config/app').get()).data();
+  if (!earlyAccessOn(config)) return;
+  try {
+    await grantEarlyAccess(adminDb, uid);
+  } catch (err) {
+    logger.error('early access: grant failed', { uid, err: String((err as Error)?.message ?? err) });
+    throw err;
+  }
+});
+
+/**
+ * Premium for the caller now, while early access is on (PREM-1): marking mistakes' intro, for an account the sign-up
+ * grant or the script hasn't reached. Off: refused, and nothing is written.
+ */
+export const claimEarlyAccess = onCall({ enforceAppCheck: true, maxInstances: 3, timeoutSeconds: 20 }, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
+  if (!earlyAccessOn((await adminDb.doc('config/app').get()).data())) {
+    throw new HttpsError('failed-precondition', 'Premium isn’t in early access now.');
+  }
+  await grantEarlyAccess(adminDb, uid);
+  return { premium: true };
+});
+
+/**
+ * Recite's pack for the phone (Revisely Dev, BEHAVIOUR.md ONDEV-2): short-lived signed URLs for its sealed parts and
+ * its key wrapped to the caller's device key. Who may and how often: recitePack/handler.ts. App Check is required.
+ * Production has no pack (recitePacks/current), so it refuses there.
+ */
+export const recitePack = onCall({ enforceAppCheck: true, maxInstances: 5, timeoutSeconds: 30 }, async (request) => {
+  try {
+    return await handleRecitePack(
+      { auth: request.auth ?? null, app: request.app ? { appId: request.app.appId } : null, data: request.data },
+      adminPackDeps(adminDb, getStorage()),
+    );
+  } catch (err) {
+    if (err instanceof PackError) throw new HttpsError(err.code, err.message);
+    logger.error(failure('recitePack', err));
+    throw new HttpsError('internal', 'The pack couldn’t be prepared. Try again later.');
   }
 });

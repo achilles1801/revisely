@@ -236,15 +236,35 @@ type Times = Record<TimeName, Date | null>;
 const MINUTE_MS = 60_000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
 
+/**
+ * To the minute, as shown. adhan rounds a time by adding whole seconds, so a
+ * time worked out from a fraction of the night keeps its milliseconds: a Fajr
+ * shown as 01:44 was 01:44:00.857, after a sunrise of 01:44:00.000.
+ */
+const toMinute = (d: Date | null) => (d ? new Date(Math.floor(d.getTime() / MINUTE_MS) * MINUTE_MS) : null);
+
 function timesOf(t: PrayerTimes): Times {
-  return {
-    fajr: valid(t.fajr),
-    sunrise: valid(t.sunrise),
-    dhuhr: valid(t.dhuhr),
-    asr: valid(t.asr),
-    maghrib: valid(t.maghrib),
-    isha: valid(t.isha),
+  const times: Times = {
+    fajr: toMinute(valid(t.fajr)),
+    sunrise: toMinute(valid(t.sunrise)),
+    dhuhr: toMinute(valid(t.dhuhr)),
+    asr: toMinute(valid(t.asr)),
+    maghrib: toMinute(valid(t.maghrib)),
+    isha: toMinute(valid(t.isha)),
   };
+  // A method that moves sunrise earlier (Turkey's 7 minutes, Dubai's 3) can move
+  // it to or past a high-latitude Fajr, which adhan works out from the sunrise
+  // it hasn't moved (a seventh of a night of under 49 minutes, near the Arctic
+  // Circle around the June solstice). Fajr stays as adhan gives it: it starts
+  // the revision day and the athan. The move stops a minute after Fajr. A set
+  // whose Fajr is after even the unmoved sunrise (a noon "Fajr" near the date
+  // line) is left as it is, for dayTimes to set aside.
+  const moved = -(t.calculationParameters.methodAdjustments.sunrise ?? 0) * MINUTE_MS;
+  const { fajr, sunrise } = times;
+  if (fajr && sunrise && moved > 0 && sunrise.getTime() <= fajr.getTime() && fajr.getTime() < sunrise.getTime() + moved) {
+    times.sunrise = new Date(fajr.getTime() + MINUTE_MS);
+  }
+  return times;
 }
 
 /** The times in order, Fajr to Isha (a time adhan can't give is skipped). */

@@ -38,14 +38,12 @@ import {
   FIRST_JUZ,
   JUZ_SHADE,
   MOMENT_CHOICE_P,
-  MOMENT_HAPTICS,
   MOMENT_ORBIT,
   MOMENT_QUESTIONS,
   MOMENT_WEEK,
   MOMENT_WEEK_MAX,
   MOMENT_WORDS,
   QUESTION_TIMES_P,
-  WEEK_LETTERS,
   back,
   eio,
   eo,
@@ -67,7 +65,8 @@ import { Tap } from '../v2/Tap';
 import { Stepper } from '../Stepper';
 import { R_TRACE } from './rTrace';
 import { MOMENT_CAPTURE } from '../../lib/whatsNew/capture';
-import { t } from '../../i18n';
+import { t, weekdayLetters } from '../../i18n';
+import { chevron } from '../../i18n/direction';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -393,7 +392,7 @@ function Pictures({ p, L }: { p: P; L: MomentLayout }) {
       {JUZ_SHADE.map((_, i) => (
         <Cell key={i} p={p} i={i} L={L} color={palette.primary} />
       ))}
-      {WEEK_LETTERS.map((l, i) => (
+      {weekdayLetters().map((l, i) => (
         <Animated.Text
           key={i}
           style={[styles.weekLetter, { top: 572 + L.oy, left: L.cx - 140 + i * 40, color: palette.secondary }, letters]}
@@ -450,7 +449,8 @@ function Crumbs({ p, L }: { p: P; L: MomentLayout }) {
       </Text>
     </View>
   );
-  const sep = <Text style={[styles.sep, { color: palette.secondary }]}>›</Text>;
+  // Breadcrumbs: the › points the way the language reads.
+  const sep = <Text style={[styles.sep, { color: palette.secondary }]}>{chevron()}</Text>;
   return (
     <View style={[styles.row, styles.centerRow, styles.abs, { top: 410 + L.oy, width: L.width, gap: 8 }]}>
       <Pop p={p} at={8.3}>

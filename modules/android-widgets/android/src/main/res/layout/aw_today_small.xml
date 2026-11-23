@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Today, 2×2 (the default). Its texts are the picker's preview; the widget sets every one. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@android:id/background"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@drawable/aw_ground"
+  android:clipToOutline="true"
+  android:orientation="vertical"
+  android:padding="16dp">
+
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <FrameLayout
+      android:layout_width="28dp"
+      android:layout_height="28dp">
+      <ImageView
+        android:id="@+id/aw_mark_circle"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:src="@drawable/aw_circle"
+        android:tint="@color/aw_fill" />
+      <ImageView
+        android:id="@+id/aw_mark_r"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:padding="7dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/aw_r_mark" />
+      <ImageView
+        android:id="@+id/aw_mark_check"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:padding="6dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/aw_check"
+        android:visibility="gone" />
+    </FrameLayout>
+
+    <LinearLayout
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:layout_marginStart="8dp"
+      android:layout_weight="1"
+      android:orientation="vertical">
+      <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="sans-serif-medium"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:text="@string/aw_today"
+        android:textColor="@color/aw_text"
+        android:textSize="15sp" />
+      <TextView
+        android:id="@+id/aw_streak"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:text="@string/aw_sample_streak"
+        android:textColor="@color/aw_secondary"
+        android:textSize="12sp" />
+    </LinearLayout>
+  </LinearLayout>
+
+  <FrameLayout
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="1"
+    android:minHeight="6dp" />
+
+  <TextView
+    android:id="@+id/aw_title"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:ellipsize="end"
+    android:fontFamily="sans-serif-medium"
+    android:maxLines="2"
+    android:text="@string/aw_sample_title"
+    android:textColor="@color/aw_text"
+    android:textSize="16sp" />
+
+  <TextView
+    android:id="@+id/aw_place"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:ellipsize="end"
+    android:includeFontPadding="false"
+    android:maxLines="1"
+    android:text="@string/aw_sample_place"
+    android:textColor="@color/aw_secondary"
+    android:textSize="12sp" />
+
+  <TextView
+    android:id="@+id/aw_setup"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:ellipsize="end"
+    android:maxLines="3"
+    android:textColor="@color/aw_secondary"
+    android:textSize="13sp"
+    android:visibility="gone" />
+
+  <FrameLayout
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="1"
+    android:minHeight="6dp" />
+
+  <FrameLayout
+    android:id="@+id/aw_hairline"
+    android:layout_width="match_parent"
+    android:layout_height="0.5dp"
+    android:background="@color/aw_separator" />
+
+  <TextView
+    android:id="@+id/aw_status"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:ellipsize="end"
+    android:fontFamily="sans-serif-medium"
+    android:maxLines="1"
+    android:paddingTop="6dp"
+    android:text="@string/aw_sample_left"
+    android:textColor="@color/aw_text"
+    android:textSize="13sp" />
+</LinearLayout>

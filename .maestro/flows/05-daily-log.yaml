@@ -61,6 +61,7 @@ appId: com.revisionbuddy.app
     file: ../subflows/type-in-log.yaml
     env:
       TEXT: An-Naba needs another look
+# type-in-log.yaml ends with the top bar's Done (keyboard-done.yaml): the keyboard is away, and Save shows.
 - tapOn:
     id: journal-send
 - extendedWaitUntil:

@@ -19,6 +19,8 @@ import { PillButton } from '../v2/PillButton';
 import { PillTabs } from '../v2/PillTabs';
 import { Tap } from '../v2/Tap';
 import { t } from '../../i18n';
+import type { SittingEnded } from '../../lib/sitting';
+import { westernDigits } from '../../i18n/digits';
 
 type Kind = 'stopwatch' | 'timer';
 type Direction = 'countUp' | 'countDown';
@@ -51,7 +53,7 @@ interface TimerControlsProps {
   /** Close the surrounding sheet. */
   onClose: () => void;
   /** A session was saved: offer to open its day (to add pages). `pages`: those it held (REC-1). */
-  onSaved?: (date: string, seconds: number, ended: { pages: number[] }) => void;
+  onSaved?: (date: string, seconds: number, ended: SittingEnded) => void;
   /** Runs before the session ends, and is waited for: the reader stops its recording with it (REC-1). */
   beforeEnd?: () => Promise<void>;
   /** Shown while running, unless the reader is already open. */
@@ -140,11 +142,12 @@ function useTimerControls({ onClose, onSaved, beforeEnd, visible = true }: Timer
     const pages = pagesHeld(timer, now);
     // A recording running in the reader ends with it, and is saved first (REC-1).
     if (beforeEnd) await beforeEnd().catch(() => undefined);
-    if (!(await finish())) return;
+    const saved = await finish();
+    if (!saved) return;
     // The outcome is marked (taps don't buzz).
     haptics.success();
     onClose();
-    if (seconds >= MIN_SESSION_SECONDS) onSaved?.(date, seconds, { pages });
+    if (seconds >= MIN_SESSION_SECONDS) onSaved?.(date, seconds, { pages, sessionId: saved.sessionId ?? null });
   };
 
   const handleDiscard = () => {
@@ -272,7 +275,7 @@ export function TimerControls(props: TimerControlsProps) {
           <View style={v2.entry}>
             <TextInput
               value={draft}
-              onChangeText={(text) => setDraft(text.replace(/[^0-9]/g, '').slice(0, 3))}
+              onChangeText={(text) => setDraft(westernDigits(text).replace(/[^0-9]/g, '').slice(0, 3))}
               onBlur={endEdit}
               onSubmitEditing={() => commitEdit()}
               keyboardType="number-pad"

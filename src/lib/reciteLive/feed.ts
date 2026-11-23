@@ -22,11 +22,26 @@ export interface StartFrame {
   /** Carry on a take after a dropped connection. */
   resume?: string;
   /**
+   * The final answer at once, where the slips went after it (contract draft 8): `done` comes without `into`, and an
+   * `into` event follows. Check takes send it; a server that doesn't read it sends one `done` with the names.
+   */
+  namesAfter?: boolean;
+  /**
    * Start anywhere on the page (Majd, Nov 14 2026): the reciter starts at some word from s:a through the end of this
    * ayah (the page's last), and the checker finds where (`locked`). Absent: the take starts at s:a. A server that
    * doesn't read it starts at s:a, and its first `at` comes with no `locked` (lib/reciteLive/state).
    */
   startBy?: [number, number];
+  /**
+   * Recite anywhere in the Qur'an (protocol 7, Majd's step 2): beside `startBy`, the checker also looks in the whole
+   * Qur'an when the page doesn't match, and locks there only on a place it is sure is the one (`locked.where`). Sent
+   * for takes from the reader's mic only. A server before 7 ignores it.
+   */
+  startIn?: 'quran';
+  /** Protocol 9: send `guess` events before `locked` (older checkers ignore it). */
+  guess?: boolean;
+  /** Send the audio as IMA-ADPCM blocks if the checker's `ready` agrees (contract "ADPCM uplink"); raw PCM otherwise. */
+  audio?: 'adpcm';
 }
 
 export type ClientFrame =
@@ -38,7 +53,24 @@ export type ClientFrame =
   | { type: 'undismiss'; id: string }
   /** A word or an ayah shown by hand in the hidden view (information for the checker). */
   | { type: 'hint'; w: number; what: 'word' | 'ayah' }
-  | { type: 'end' };
+  | { type: 'end'; counts?: TakeCounts };
+
+/**
+ * What a take did on the phone, counts only, with its `end` (Recite due diligence, row 2; Revisely Dev until Majd's word
+ * for production): no audio, words or ids. The checker keeps them on its take line. A checker without them ignores the field.
+ */
+export interface TakeCounts {
+  /** Marks shown during the take (still shown, or taken off). */
+  shown: number;
+  /** "Not a mistake" taps. */
+  notMistake: number;
+  /** Undo or Put back. */
+  putBack: number;
+  /** Words or ayahs shown by hand on a hidden page (‹, ‹‹). */
+  peeks: number;
+  /** The connection resumed. */
+  resumes: number;
+}
 
 export interface LiveConnection {
   /** 16 kHz mono PCM, as the microphone gives it. */
@@ -46,6 +78,12 @@ export interface LiveConnection {
   send(frame: Exclude<ClientFrame, StartFrame>): void;
   /** Hang up (nothing more comes). */
   close(): void;
+  /**
+   * Paused (the microphone off, the take open): `true` keeps the checker from letting the take go while nothing is
+   * sent, `false` when the audio comes again. A long pause may let the connection go and connect again on `false` (or
+   * the end), the take kept (contract draft 12). Optional: a recorded take has nothing to keep open.
+   */
+  hold?(on: boolean): void;
   /** The connection's state in a word or two, for the Stop trace (lib/reciteLive/stopTrace): "live", "retry 2", … */
   status?(): string;
   /** The take's audio from `from` to `to` seconds (16 kHz mono), as held on the phone; null outside what was heard. */
@@ -90,10 +128,12 @@ export function replayFeed(log: ReplayLog, opts: { speed?: number; timers?: Time
     let next = 0;
     let closed = false;
     const handles = new Set<unknown>();
+    // A recorded take whose names came after `done` (contract draft 8) ends with its `into`.
+    const namesAfter = events.some((x) => x.e.type === 'into');
     const emit = (e: LiveEvent) => {
       if (closed) return;
       handlers.onEvent(e);
-      if (e.type === 'done' || e.type === 'error') close();
+      if (e.type === 'error' || e.type === 'into' || (e.type === 'done' && !namesAfter)) close();
     };
     const close = () => {
       if (closed) return;

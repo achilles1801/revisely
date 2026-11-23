@@ -8,8 +8,11 @@ import type { Mark, MarkKind } from '../../../src/lib/reciteLive/contract';
 import { isUnclear } from '../../../src/lib/reciteLive/contract';
 import { wordMemories } from '../../../src/lib/reciteMemory/memory';
 import type { ClearRecord, MemoryRecord, TakeRecord } from '../../../src/lib/reciteMemory/record';
-import { liveTakes, recitationInsights } from '../../../src/lib/reciteInsights/insights';
+import { liveTakes, recitationInsights, takeMistakes } from '../../../src/lib/reciteInsights/insights';
+import { pagesReached, perPageLabel, PER_PAGE_FROM } from '../../../src/lib/reciteLive/score';
 import { recitationForRevo, takeAttachment } from '../../../src/lib/revo/recitation';
+import { kindsLine, passageName, perPageLine, perPageTenths, scoreLine, similarNote, similarTitle, slipNote } from '../../../src/lib/reciteInsights/describe';
+import { plainText } from '../../../src/lib/passages';
 import { recitationText } from '../../../functions/src/revo/recitation';
 import { attachedText } from '../../../functions/src/revo/attachText';
 import { validateAttachment, validateContext } from '../../../functions/src/revo/validate';
@@ -226,11 +229,182 @@ describe('Recite insights over generated takes [RINS-1]', () => {
     for (const k of Object.keys(seen) as (keyof typeof seen)[]) expect(seen[k]).toBeGreaterThan(0);
   });
 
+  it('a window whose takes all ended without the checker’s final answer has no score: the server still takes it, and says none was scored [RINS-1] [RECITE-11]', () => {
+    const [a, b] = PASSAGES[0];
+    const recs = records([{ from: a, to: b, offset: -1, strict: false, hidden: false, deleted: false, accuracy: 0.97, secs: 60, marks: [] }], []).map((r) =>
+      r.kind === 'take' ? { ...r, unfinished: true } : r,
+    );
+    const r = recitationForRevo(recs, TODAY, words)!;
+    expect(r.takes).toBe(1);
+    expect(r.score).toBeNull();
+    // Refused before: a score had to come with every window that had takes.
+    const c = validateContext({ ...baseContext, recitation: r });
+    expect(c.recitation).toEqual(r);
+    const text = recitationText(c.recitation!);
+    expect(text).toContain('No score: none of these takes got the checker’s final answer');
+    expect(text).not.toMatch(/Score by the page: \d/);
+    // A window with no takes still never carries a score.
+    expect(() => validateContext({ ...baseContext, recitation: { ...r, takes: 0, daysRecited: 0, score: 0.98 } })).toThrow();
+  });
+
+  it('the server takes the summary whichever takes ended without a final answer, and names a score only when one was checked [RINS-1] [RECITE-11]', () => {
+    fc.assert(
+      fc.property(accountArb, fc.array(fc.boolean(), { minLength: 14, maxLength: 14 }), ({ takes, clears }, unfinished) => {
+        const recs = records(takes, clears).map((r, i) => (r.kind === 'take' && unfinished[i % 14] ? { ...r, unfinished: true } : r));
+        const r = recitationForRevo(recs, TODAY, words);
+        if (!r) return;
+        const c = validateContext({ ...baseContext, recitation: r });
+        expect(c.recitation).toEqual(r);
+        const text = recitationText(c.recitation!);
+        if (r.takes > 0) expect(text.includes('Score by the page:')).toBe(r.score !== null);
+      }),
+      { numRuns: 120 },
+    );
+  });
+
   it('tells Revo nothing of recitation without takes, or before the word data has loaded [RINS-1]', () => {
     expect(recitationForRevo([], TODAY, words)).toBeNull();
     const [a, b] = PASSAGES[0];
     const recs = records([{ from: a, to: b, offset: 0, strict: false, hidden: false, deleted: false, accuracy: 0.98, secs: 60, marks: [] }], []);
     expect(recitationForRevo(recs, TODAY, null)).toBeNull();
     expect(recitationForRevo(recs, TODAY, words)?.last?.passage.name).toBe('Al-Kahf, ayahs 17–26');
+  });
+});
+
+describe('Insights’ Recitation section in words [RINS-2]', () => {
+  it('names surahs and ayahs, never pages; counts words first and never Not clear; and says nothing of strength with Smart Tracking off [RINS-2]', () => {
+    fc.assert(
+      fc.property(accountArb, fc.constantFrom<7 | 30 | 90>(7, 30, 90), ({ takes, clears }, window) => {
+        const recs = records(takes, clears);
+        const ins = recitationInsights(recs, TODAY, window);
+        const lines = [
+          scoreLine(ins, `in ${window} days`),
+          kindsLine(ins),
+          ...ins.slipping.flatMap((p) => [passageName(p.sura, p.from, p.to), slipNote(p, false, TODAY)]),
+          ...ins.similar.flatMap((x) => [similarTitle(x), similarNote(x, TODAY)]),
+        ].map(plainText);
+        for (const line of lines) {
+          expect(line).not.toMatch(/\bp(?:ages?|p?\.)\s?\d/);
+          // Smart Tracking off: nothing about strength or how often a passage went wrong.
+          expect(line).not.toMatch(/strong|weak|rated|rating|wrong in/i);
+        }
+        // The kinds' numbers are the mistakes; Not clear is said apart, as not counted.
+        const kinds = kindsLine(ins);
+        if (ins.mistakes > 0) {
+          const listed = (kinds.split('.')[0].split(':')[1] ?? '').match(/\d+/g)?.map(Number) ?? [];
+          expect(listed.reduce((a, b) => a + b, 0)).toBe(ins.mistakes);
+          // Words before harakat and letters.
+          const list = kinds.split('.')[0].split(':')[1] ?? '';
+          const order = ['wrong', 'skipped', 'extra', 'harakat', 'letter'].map((k) => list.indexOf(` ${k}`)).filter((i) => i >= 0);
+          expect([...order].sort((a, b) => a - b)).toEqual(order);
+        }
+        if (ins.unclear > 0) expect(kinds).toContain('clear enough to check (not counted)');
+      }),
+      { numRuns: 120 },
+    );
+  });
+});
+
+describe('Mistakes a page in long takes: Insights and Revo [RECITE-24]', () => {
+  // Takes anywhere in the Qur'an, from a few words to about ten pages, some kept without their final answer.
+  const longArb = fc
+    .record({
+      start: fc.integer({ min: 0, max: words.count - 1600 }),
+      span: fc.integer({ min: 0, max: 1500 }),
+      offset: fc.integer({ min: -40, max: 0 }),
+      strict: fc.boolean(),
+      unfinished: fc.boolean(),
+      accuracy: fc.double({ min: 0.9, max: 1, noNaN: true }),
+    })
+    .chain((t) => fc.array(markArb(t.start, t.start + t.span), { maxLength: 10 }).map((marks) => ({ ...t, marks })));
+
+  const recordsOf = (gen: { start: number; span: number; offset: number; strict: boolean; unfinished: boolean; accuracy: number; marks: Mark[] }[]) =>
+    records(
+      gen.map((g) => ({ from: g.start, to: g.start + g.span, offset: g.offset, strict: g.strict, hidden: false, deleted: false, accuracy: g.accuracy, secs: 60, marks: g.marks })),
+      [],
+    ).map((r, i) => (r.kind === 'take' && gen[i].unfinished ? { ...r, unfinished: true } : r));
+
+  it('pools the window’s finished takes of 2 pages or more, each from its first word’s page to its last’s, between the takes’ own rates', () => {
+    fc.assert(
+      fc.property(fc.array(longArb, { minLength: 1, maxLength: 8 }), (gen) => {
+        const recs = recordsOf(gen);
+        const ins = recitationInsights(recs, TODAY, 30, words);
+        const long = liveTakes(recs).filter(
+          (t) => t.day >= ins.from && t.day <= TODAY && !t.unfinished && words.pageOf(t.to) - words.pageOf(t.from) + 1 >= PER_PAGE_FROM,
+        );
+        if (long.length === 0) {
+          expect(ins.perPage).toBeNull();
+          expect(perPageLine(ins.perPage)).toBeNull();
+          return;
+        }
+        const pagesOf = (t: TakeRecord) => pagesReached(words, t.from, t.to);
+        const mistakesOf = (t: TakeRecord) => t.marks.filter((m) => m.kind !== 'tajweed' && !isUnclear(m)).length;
+        expect(ins.perPage).toEqual({ takes: long.length, pages: long.reduce((n, t) => n + pagesOf(t), 0), mistakes: long.reduce((n, t) => n + mistakesOf(t), 0) });
+        const p = ins.perPage!;
+        const rates = long.map((t) => mistakesOf(t) / pagesOf(t));
+        const pooled = p.mistakes / p.pages;
+        expect(pooled).toBeGreaterThanOrEqual(Math.min(...rates) - 1e-9);
+        expect(pooled).toBeLessThanOrEqual(Math.max(...rates) + 1e-9);
+        // Its line: none, under a tenth, or the figure to a tenth; never a page number.
+        const line = perPageLine(p)!;
+        if (p.mistakes === 0) expect(line).toBe('Takes of 2 pages or more: no mistakes');
+        else if (perPageTenths(p) === 0) expect(line).toBe('Takes of 2 pages or more: under 0.1 mistakes a page');
+        else expect(line).toMatch(new RegExp(`: ${perPageTenths(p)} mistakes? a page$`));
+        expect(line).not.toMatch(/\bp(?:ages?|p?\.)\s?\d/);
+      }),
+      { numRuns: 150 },
+    );
+  });
+
+  it('a single long take reads in Insights as its summary does', () => {
+    fc.assert(
+      fc.property(longArb, (g) => {
+        const recs = recordsOf([{ ...g, offset: 0, unfinished: false }]);
+        const t = liveTakes(recs)[0];
+        const pages = pagesReached(words, t.from, t.to);
+        const p = recitationInsights(recs, TODAY, 30, words).perPage;
+        const summary = perPageLabel(takeMistakes(t), pages);
+        if (pages < PER_PAGE_FROM) {
+          expect(p).toBeNull();
+          expect(summary).toBeNull();
+          return;
+        }
+        expect(p).toEqual({ takes: 1, pages, mistakes: takeMistakes(t) });
+        expect(summary).toBe(`${perPageTenths(p!)} a page`);
+      }),
+      { numRuns: 150 },
+    );
+  });
+
+  it('Revo’s server takes the figure as the phone sends it and reads it out, and refuses one that doesn’t add up', () => {
+    let sent = 0;
+    fc.assert(
+      // Finished takes: a window of only unfinished ones sends no score, which the server refuses today (reported apart).
+      fc.property(fc.array(longArb.map((g) => ({ ...g, unfinished: false })), { minLength: 1, maxLength: 6 }), (gen) => {
+        const recs = recordsOf(gen);
+        const r = recitationForRevo(recs, TODAY, words);
+        if (!r) return;
+        const c = validateContext({ ...baseContext, recitation: r });
+        expect(c.recitation).toEqual(r);
+        const text = recitationText(c.recitation!);
+        if (!r.perPage) {
+          expect(text).not.toContain('pages or more');
+          return;
+        }
+        sent += 1;
+        expect(r.perPage).toEqual(recitationInsights(recs, TODAY, 28, words).perPage);
+        expect(text).toContain(`In their takes of 2 pages or more (`);
+        const bad = [
+          { ...r.perPage, pages: r.perPage.takes * PER_PAGE_FROM - 1 },
+          { ...r.perPage, mistakes: r.mistakes + 1 },
+          { ...r.perPage, takes: r.takes + 1, pages: (r.takes + 1) * PER_PAGE_FROM },
+          { ...r.perPage, takes: 0 },
+          { ...r.perPage, extra: 1 },
+        ];
+        for (const perPage of bad) expect(() => validateContext({ ...baseContext, recitation: { ...r, perPage } })).toThrow();
+      }),
+      { numRuns: 80 },
+    );
+    expect(sent).toBeGreaterThan(0);
   });
 });

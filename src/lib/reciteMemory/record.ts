@@ -50,6 +50,26 @@ export interface TakeRecord {
   recordingId: string | null;
   /** Forgotten: kept as a tombstone so every phone drops it. */
   deleted?: boolean;
+  /**
+   * No final answer came (late after Stop, the connection lost, or the screen left before it; long takes, Nov 20 2026):
+   * the marks and score are what the take found before its end.
+   */
+  unfinished?: boolean;
+  /**
+   * A recitation longer than the checker's cap is a chain of its takes (lib/reciteLive/chain, RECITE-22): each one's
+   * checker take and the first word it recited, in order. Absent for a single take (`take` is its id).
+   */
+  links?: Array<{ take: string | null; from: number }>;
+  /**
+   * The words shown by hand during the take (‹, ‹‹ on the hidden page), so its summary still lists them when opened again
+   * later (RMEM-8, Revisely Dev). Absent for none, and for takes kept before Nov 22 2026.
+   */
+  peeked?: number[];
+  /**
+   * The marks called Not a mistake, apart from `marks` (nothing else reads them: never remembered on the page, never in
+   * Insights or Revo), so the summary opened again later lists them with Put back (RMEM-8). Absent for none.
+   */
+  removed?: Mark[];
 }
 
 /** "Clear now" on a word: its remembered mistake of `group` goes, as if said right enough times. */
@@ -69,6 +89,17 @@ export type MemoryRecord = TakeRecord | ClearRecord;
 /** Firestore's limits a record must stay under (the rules check the same). */
 export const MAX_MARKS = 400;
 export const MAX_PASSED = 400;
+export const MAX_LINKS = 20;
+export const MAX_PEEKED = 300;
+export const MAX_REMOVED = 100;
+
+/** The checker take that judged word `w` of a take's record: its link's in a chain (the last to start at or before it). */
+export function takeOfWord(r: TakeRecord, w: number): string | null {
+  if (!r.links?.length) return r.take;
+  let take = r.links[0].take;
+  for (const l of r.links) if (l.from <= w) take = l.take;
+  return take;
+}
 
 /** A document id like Firestore's own (20 letters and digits), made on the phone. */
 export function memoryId(random: () => number = Math.random): string {
@@ -211,6 +242,13 @@ export function toStored(r: MemoryRecord): Record<string, unknown> {
     passed: r.passed.slice(0, MAX_PASSED),
     recordingId: r.recordingId,
     deleted: r.deleted === true,
+    // Only when true: a finished take's document is as it was (the rules allow the field, firestore.rules).
+    ...(r.unfinished ? { unfinished: true } : {}),
+    // Only for a chain of takes (RECITE-22).
+    ...(r.links && r.links.length > 1 ? { links: r.links.slice(0, MAX_LINKS).map((l) => ({ take: l.take, from: l.from })) } : {}),
+    // Only when there are some (RMEM-8), so a take without them is written as before.
+    ...(r.peeked?.length ? { peeked: r.peeked.slice(0, MAX_PEEKED) } : {}),
+    ...(r.removed?.length ? { removed: r.removed.slice(0, MAX_REMOVED).map(storedMark) } : {}),
   };
 }
 
@@ -259,7 +297,34 @@ export function fromStored(id: string, raw: unknown): MemoryRecord | null {
     passed,
     recordingId: str(d.recordingId),
     ...deleted,
+    ...(d.unfinished === true ? { unfinished: true } : {}),
+    ...linksFromStored(d.links),
+    ...peekedFromStored(d.peeked),
+    ...removedFromStored(d.removed),
   };
+}
+
+/** The words peeked, from the document (RMEM-8): whole numbers only, in order. */
+function peekedFromStored(raw: unknown): { peeked?: number[] } {
+  if (!Array.isArray(raw)) return {};
+  const peeked = raw.filter((w): w is number => num(w) != null && Number.isInteger(w)).sort((a, b) => a - b);
+  return peeked.length ? { peeked } : {};
+}
+
+/** The marks called Not a mistake, from the document (RMEM-8). */
+function removedFromStored(raw: unknown): { removed?: Mark[] } {
+  if (!Array.isArray(raw)) return {};
+  const removed = raw.map(markFromStored).filter((m): m is Mark => m != null);
+  return removed.length ? { removed } : {};
+}
+
+/** A chain's links from its document (dropped when damaged: the record stays, its labels go by `take`). */
+function linksFromStored(raw: unknown): { links?: TakeRecord['links'] } {
+  if (!Array.isArray(raw)) return {};
+  const links = raw
+    .map((l) => (l && typeof l === 'object' ? { take: str((l as { take?: unknown }).take), from: num((l as { from?: unknown }).from) } : null))
+    .filter((l): l is { take: string | null; from: number } => l != null && l.from != null);
+  return links.length > 1 ? { links } : {};
 }
 
 /** The newer of two copies of one record (a tie keeps the one already held). */

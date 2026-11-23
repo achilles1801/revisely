@@ -72,8 +72,27 @@ I18N_PROGRESS=1 I18N_FOLDER=components/home npx jest src/i18n/__tests__/noRawStr
 3. Add the folder to `EXTRACTED`. The folder's own tests, the scenarios and E2E must pass unchanged.
 4. One folder (or two small ones) per PR: other sessions edit these files all the time.
 
-## Not yet
+## Arabic
 
-- The `›` and `‹` in text from one helper that knows the direction (step 5).
-- The language picker, Arabic itself and right-to-left layout: they wait for the rest, and the native
-  part (declaring Arabic, iOS's RTL flag) for the next native release.
+Majd approved the app in Arabic on Nov 21 2026 (part 2; plan in the shared notes, `app-in-arabic-part2-plan.md`).
+The words and rules (one term per concept, plurals, digits, typography) are in `ar-glossary.md`.
+
+- **`ar/<folder>.ts`** mirrors `en/<folder>.ts`. A key not there yet shows in English. `ar/types.ts` gives each
+  plural Arabic's six forms (`_zero`, `_one`, `_two`, `_few`, `_many`, `_other`) and fails the typecheck on a key
+  English doesn't have. `__tests__/arabic.test.ts` checks all six forms, the `{{values}}`, Latin text in isolates
+  (⁨…⁩), and no › or tatweel. What's left: `I18N_PROGRESS=1 npx jest src/i18n/__tests__/arabic`.
+- **Digits** (`digits.ts`): Arabic-Indic, written by the app rather than Intl (Hermes' platforms disagree). A number
+  passed to `t()` and everything from `format.ts` comes out in them; English is untouched. `ARABIC_INDIC` is
+  Majd's choice 1, still open.
+- **The picker** (`choice.ts`): Settings → Appearance → Language, Revisely Dev only (`offeredLanguages`). It's kept on
+  the phone (`@revisely_language:v1`) and applied before the first screen (App.tsx waits for `loadLanguageChoice`).
+  A change restarts the app, since React Native lays out right to left only from a launch. The store app offers
+  `SHIPPED` (English) alone and reads nothing.
+- **Right to left** needs no native change: `I18nManager.forceRTL` is a flag React Native reads at launch on iOS
+  whatever languages the app declares, and Android's manifest already allows it. A launch that started the other way
+  (the first on a phone whose language reads the other way) restarts once in the splash (`loadLanguageChoice`,
+  `restartForDirection`; LANG-1), and not again if that restart didn't take. The native release adds the
+  system's side: Arabic in iOS Settings → Revisely → Language (`CFBundleLocalizations`), Arabic permission prompts,
+  Android 13's per-app language, and the widgets' Swift labels. All of them move the store fingerprints.
+- **"Phone's language"** follows the phone only once that release declares Arabic. Until then iOS gives the app
+  English, so pick العربية.

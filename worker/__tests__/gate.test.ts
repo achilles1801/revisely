@@ -27,23 +27,44 @@ const b64url = (s: string | Uint8Array) => Buffer.from(s).toString('base64url');
 async function token(claims: Record<string, unknown> = {}) {
   const header = b64url(JSON.stringify({ alg: 'RS256', kid: 'key-1', typ: 'JWT' }));
   const payload = b64url(
-    JSON.stringify({ aud: PROJECT, iss: `https://securetoken.google.com/${PROJECT}`, sub: 'majd', email: 'someone@example.com', iat: NOW - 60, exp: NOW + 3000, auth_time: NOW - 600, ...claims }),
+    JSON.stringify({
+      aud: PROJECT,
+      iss: `https://securetoken.google.com/${PROJECT}`,
+      sub: 'majd',
+      email: 'someone@example.com',
+      iat: NOW - 60,
+      exp: NOW + 3000,
+      auth_time: NOW - 600,
+      ...claims,
+    }),
   );
-  const sig = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', signer.privateKey, new TextEncoder().encode(`${header}.${payload}`)));
+  const sig = new Uint8Array(
+    await crypto.subtle.sign('RSASSA-PKCS1-v1_5', signer.privateKey, new TextEncoder().encode(`${header}.${payload}`)),
+  );
   return `${header}.${payload}.${b64url(sig)}`;
 }
 
 const keys = (async (input: RequestInfo | URL) => {
-  if (String(input) === JWKS_URL) return new Response(JSON.stringify({ keys: [{ ...jwk, kid: 'key-1', alg: 'RS256', use: 'sig' }] }), { headers: { 'Cache-Control': 'max-age=20000' } });
+  if (String(input) === JWKS_URL)
+    return new Response(JSON.stringify({ keys: [{ ...jwk, kid: 'key-1', alg: 'RS256', use: 'sig' }] }), {
+      headers: { 'Cache-Control': 'max-age=20000' },
+    });
   return new Response('not found', { status: 404 });
 }) as typeof fetch;
 
 const ENV = { DEV_GATE: '1', FIREBASE_PROJECT_ID: PROJECT };
 const deps = { now: NOW, fetch: keys };
 const page = (path: string, cookie?: string) =>
-  new Request(`https://dev.revisely.app${path}`, cookie ? { headers: { Cookie: `other=1; ${GATE_COOKIE}=${cookie}` } } : {});
+  new Request(
+    `https://dev.revisely.app${path}`,
+    cookie ? { headers: { Cookie: `other=1; ${GATE_COOKIE}=${cookie}` } } : {},
+  );
 const post = (path: string, body: unknown, origin = 'https://dev.revisely.app') =>
-  new Request(`https://dev.revisely.app${path}`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  new Request(`https://dev.revisely.app${path}`, {
+    method: 'POST',
+    headers: { Origin: origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 
 describe('the dev site gate', () => {
   it('shows the gate page to anyone without the cookie, on every page', async () => {
@@ -56,7 +77,14 @@ describe('the dev site gate', () => {
   });
 
   it('leaves the API, the web config, robots.txt and the gate page’s logo open', async () => {
-    for (const path of ['/api/tcq/policy', '/api/tcq/windows/2:255', '/__/firebase/init.json', '/robots.txt', '/favicon.svg', '/assets/img/logo-dark.svg']) {
+    for (const path of [
+      '/api/tcq/policy',
+      '/api/tcq/windows/2:255',
+      '/__/firebase/init.json',
+      '/robots.txt',
+      '/favicon.svg',
+      '/assets/img/logo-dark.svg',
+    ]) {
       expect(await gate(page(path), ENV, deps)).toBeNull();
     }
     expect(isOpen('/apiary/')).toBe(false);
@@ -72,7 +100,11 @@ describe('the dev site gate', () => {
       await token(),
       await token({ [GATE_CLAIM]: 'true' }),
       await token({ [GATE_CLAIM]: true, exp: NOW - 3600 }),
-      await token({ [GATE_CLAIM]: true, aud: 'revision-buddy-3a398', iss: 'https://securetoken.google.com/revision-buddy-3a398' }),
+      await token({
+        [GATE_CLAIM]: true,
+        aud: 'revision-buddy-3a398',
+        iss: 'https://securetoken.google.com/revision-buddy-3a398',
+      }),
       'not-a-token',
     ];
     for (const t of cases) expect((await gate(page('/', t), ENV, deps))?.status).toBe(401);
@@ -92,7 +124,15 @@ describe('the dev site gate', () => {
     expect(await no?.json()).toEqual({ error: 'not_allowed', email: 'someone@example.com' });
     expect(no?.headers.get('Set-Cookie')).toBeNull();
     expect((await gate(post('/__gate/session', { token: 'junk' }), ENV, deps))?.status).toBe(401);
-    expect((await gate(post('/__gate/session', { token: await token({ [GATE_CLAIM]: true }) }, 'https://evil.example'), ENV, deps))?.status).toBe(403);
+    expect(
+      (
+        await gate(
+          post('/__gate/session', { token: await token({ [GATE_CLAIM]: true }) }, 'https://evil.example'),
+          ENV,
+          deps,
+        )
+      )?.status,
+    ).toBe(403);
     expect((await gate(page('/__gate/session'), ENV, deps))?.status).toBe(405);
   });
 
@@ -104,7 +144,11 @@ describe('the dev site gate', () => {
       return keys(input);
     }) as typeof fetch;
     const t = await token({ [GATE_CLAIM]: true });
-    const results = await Promise.all(['/', '/assets/site.css', '/assets/site-i18n.js', '/assets/apply.js', '/premium/'].map((p) => gate(page(p, t), ENV, { now: NOW, fetch: slowKeys })));
+    const results = await Promise.all(
+      ['/', '/assets/site.css', '/assets/site-i18n.js', '/assets/apply.js', '/premium/'].map((p) =>
+        gate(page(p, t), ENV, { now: NOW, fetch: slowKeys }),
+      ),
+    );
     expect(results).toEqual([null, null, null, null, null]);
     expect(calls).toBe(1);
   });
@@ -118,7 +162,11 @@ describe('the dev site gate', () => {
   it('the worker gates only where DEV_GATE is set, and keeps noindex on the gate page', async () => {
     const assets = { fetch: jest.fn(async () => new Response('page')) };
     const ctx = { waitUntil() {}, passThroughOnException() {} };
-    const prod = await worker.fetch(page('/'), { FIREBASE_PROJECT_ID: 'revision-buddy-3a398', ASSETS: assets } as never, ctx);
+    const prod = await worker.fetch(
+      page('/'),
+      { FIREBASE_PROJECT_ID: 'revision-buddy-3a398', ASSETS: assets } as never,
+      ctx,
+    );
     expect(await prod.text()).toBe('page');
     const dev = await worker.fetch(page('/'), { ...ENV, NOINDEX: '1', ASSETS: assets } as never, ctx);
     expect(dev.status).toBe(401);

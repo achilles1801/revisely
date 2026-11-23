@@ -1,9 +1,10 @@
 // Where the live check draws on a page (pure), in bounds space (1024 wide, as ayahBounds): MushafPager scales by the
 // page's size. Only the 1405 print has word boxes (MushafEdition.reciteData), as for hidden recite mode.
 //
-// A word's box takes its x from the word data (src/data/quranWords.dat) and its y from the page's line band
-// (src/data/pageLines.json): the word data fits pages 1 and 2 a few units off develop's verse boxes, and the line
-// bands were moved onto them (scripts/build-page-lines.ts).
+// A word's box takes its x from the word data (src/data/quranWords.dat: its ink in the page images, with room beside
+// it, fitted by scripts/check-word-boxes.py) and its y from the page's line band (src/data/pageLines.json): the word
+// data fits pages 1 and 2 a few units off develop's verse boxes, and the line bands were moved onto them
+// (scripts/build-page-lines.ts).
 
 import { ayahRects, Rect } from '../ayahBounds';
 import { pageLines } from '../recite/pageLines';
