@@ -14,5 +14,11 @@ add_library(reciteengine SHARED
   ${RECITE_CORE_OUT}/glue/recite_host.c)
 target_include_directories(reciteengine PRIVATE ${RECITE_CORE_OUT}/glue)
 target_link_libraries(reciteengine PRIVATE recite_core)
+# These sources are C and the engine is C++: only a C++ link brings its runtime.
+set_target_properties(reciteengine PROPERTIES LINKER_LANGUAGE CXX)
+# The real engine calls ONNX Runtime; the stub doesn't.
+if(EXISTS "${RECITE_CORE_OUT}/lib/${ANDROID_ABI}/librecite_core.a")
+  target_link_libraries(reciteengine PRIVATE "${ONNXRUNTIME_JNI}/${ANDROID_ABI}/libonnxruntime.so")
+endif()
 # 16 KB pages (Android 15+; every native library in the app is aligned), and no symbol of a static library exported.
 target_link_options(reciteengine PRIVATE -Wl,-z,max-page-size=16384 -Wl,--exclude-libs,ALL)

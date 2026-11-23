@@ -16,8 +16,22 @@ def fetchReciteCore = tasks.register('fetchReciteCore', Exec) {
   standardOutput = new ByteArrayOutputStream()
   outputs.upToDateWhen { false }
 }
+
+// The real engine calls ONNX Runtime's C API. The library's only copy is inside its AAR, which has no prefab, so CMake
+// links against the file taken out here. The app still packages it once, from the AAR.
+configurations {
+  onnxRuntimeAar {
+    canBeConsumed = false
+    canBeResolved = true
+  }
+}
+def onnxRuntimeOut = layout.buildDirectory.dir('onnxruntime').get().asFile
+def extractOnnxRuntime = tasks.register('extractOnnxRuntime', Copy) {
+  from({ zipTree(configurations.onnxRuntimeAar.singleFile) }) { include 'jni/*/libonnxruntime.so' }
+  into onnxRuntimeOut
+}
 tasks.matching { it.name == 'preBuild' || it.name.startsWith('configureCMake') || it.name.startsWith('buildCMake') }
-  .configureEach { dependsOn fetchReciteCore }
+  .configureEach { dependsOn fetchReciteCore, extractOnnxRuntime }
 
 android {
   namespace "app.revisely.reciteengine"
@@ -30,7 +44,8 @@ android {
     }
     externalNativeBuild {
       cmake {
-        arguments "-DRECITE_CORE_OUT=${reciteCoreOut.absolutePath}", '-DANDROID_STL=c++_shared'
+        arguments "-DRECITE_CORE_OUT=${reciteCoreOut.absolutePath}", "-DONNXRUNTIME_JNI=${onnxRuntimeOut.absolutePath}/jni",
+          '-DANDROID_STL=c++_shared'
       }
     }
   }
@@ -41,8 +56,8 @@ android {
   }
   packagingOptions {
     jniLibs {
-      // React Native's own copy is the app's; a second one from this library would clash.
-      excludes += ['**/libc++_shared.so']
+      // React Native's copy and ONNX Runtime's AAR are the app's; a second one from this library would clash.
+      excludes += ['**/libc++_shared.so', '**/libonnxruntime.so']
     }
   }
 }
@@ -50,4 +65,5 @@ android {
 dependencies {
   // One version, the checker's (onnxruntime==1.31.1), from Maven Central: CPU, XNNPACK and NNAPI providers.
   implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.31.1'
+  onnxRuntimeAar 'com.microsoft.onnxruntime:onnxruntime-android:1.31.1@aar'
 }
