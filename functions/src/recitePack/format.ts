@@ -5,12 +5,17 @@
  * reaches a phone only wrapped to that phone's own key (handler.ts). The phone's module reads the same bytes
  * (modules-dev/recite-engine), and functions/scripts/recite-pack-make.js writes them with this file.
  *
- * A part holds named blobs, the names recite-core's rc_open takes ("v7-live", "words.rcwt", "ayahs.bin",
- * "config.json", "v5").
+ * A part holds named blobs, the names recite-core's rc_open takes (recite_core.h: "v7.graph.onnx", "v7.weights.f16",
+ * "v7.weights.json", "words.rcwt", "ayahs.bin", … ; "v5.onnx", "strict.bin").
  *
  * The container (plaintext, never written to disk on a phone):
- *   "RCPC" u32 version(1) u32 n, then n × (str name, u64 offset, u64 size, u8[32] sha256), then the blobs. Offsets
- *   count from the first blob's byte.
+ *   "RCPC" u32 version(2) u32 n, then n × (str name, u8 codec, u64 offset, u64 stored, u64 size, u64 room,
+ *   u8[32] sha256), then the blobs. Offsets count from the first blob's byte; `stored` is the bytes the blob takes
+ *   there, `size` its bytes once read, and the sha256 is of those. `room` is the buffer the phone gives the engine for
+ *   it, 64-byte aligned, the blob at its start: its size, except "v7.weights.f16", which the engine widens in place to
+ *   the fp32 size (fp32_bytes in v7.weights.json; rc_blob.size is `room`). codec 0: stored as it is. codec 1: raw
+ *   DEFLATE, for a blob it shrinks by at least a tenth (the word table, 30.6 → 6.2 MB). The model's weights stay stored:
+ *   they barely shrink, and a phone puts them straight into the buffer the engine runs them from.
  *
  * The file (.rcpk): a header, then the container sealed with AES-256-GCM in chunks.
  *   "RCPK" u32 format(1) str pack_id str part u32 chunk u64 plain_size u8[8] nonce_prefix
@@ -21,9 +26,12 @@
  * Integers are little-endian unless marked be; str is a u16 byte length, then UTF-8 (as checker/pack.py writes).
  */
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
+import { deflateRawSync, inflateRawSync } from 'zlib';
 
 export const RCPK_FORMAT = 1;
-export const RCPC_VERSION = 1;
+export const RCPC_VERSION = 2;
+export const CODEC_STORED = 0;
+export const CODEC_DEFLATE = 1;
 export const DEFAULT_CHUNK = 1 << 20;
 export const TAG_BYTES = 16;
 export const KEY_BYTES = 32;
@@ -39,6 +47,8 @@ export const PACK_ID = /^[a-z0-9][a-z0-9.-]{0,39}$/;
 export interface PackBlob {
   name: string;
   data: Buffer;
+  /** The buffer a phone gives the engine for it, when larger than the data. */
+  room?: number;
 }
 
 export interface RcpkHeader {
@@ -111,35 +121,66 @@ class Reader {
 
 const sha256 = (b: Buffer): Buffer => createHash('sha256').update(b).digest();
 
-/** The container: a table of the blobs (name, place, size, sha256), then the blobs. */
+/** A blob as the container holds it: deflated when that saves at least a tenth, else as it is. */
+function encodeBlob(data: Buffer): { codec: number; stored: Buffer } {
+  if (data.length === 0) return { codec: CODEC_STORED, stored: data };
+  const z = deflateRawSync(data, { level: 9 });
+  return z.length * 10 <= data.length * 9 ? { codec: CODEC_DEFLATE, stored: z } : { codec: CODEC_STORED, stored: data };
+}
+
+/** The container: a table of the blobs (name, codec, place, sizes, sha256), then the blobs. */
 export function packContainer(blobs: PackBlob[]): Buffer {
   const names = new Set<string>();
   let offset = 0;
   const table: Buffer[] = [Buffer.from('RCPC'), u32(RCPC_VERSION), u32(blobs.length)];
+  const body: Buffer[] = [];
   for (const b of blobs) {
     if (!b.name || names.has(b.name)) throw new PackFormatError(`blob name ${JSON.stringify(b.name)} empty or repeated`);
     names.add(b.name);
-    table.push(str(b.name), u64(offset), u64(b.data.length), sha256(b.data));
-    offset += b.data.length;
+    const room = b.room ?? b.data.length;
+    if (!Number.isSafeInteger(room) || room < b.data.length) throw new PackFormatError(`${b.name}: room smaller than its data`);
+    const { codec, stored } = encodeBlob(b.data);
+    table.push(str(b.name), Buffer.from([codec]), u64(offset), u64(stored.length), u64(b.data.length), u64(room), sha256(b.data));
+    body.push(stored);
+    offset += stored.length;
   }
-  return Buffer.concat([...table, ...blobs.map((b) => b.data)]);
+  return Buffer.concat([...table, ...body]);
 }
 
-/** The blobs back out of a container, each checked against its sha256. */
+/** The blobs back out of a container, each read to its size and checked against its sha256. */
 export function unpackContainer(buf: Buffer): PackBlob[] {
   const r = new Reader(buf);
   if (r.bytes(4).toString('latin1') !== 'RCPC') throw new PackFormatError('not a container');
   if (r.u32() !== RCPC_VERSION) throw new PackFormatError('container version');
   const n = r.u32();
-  const rows: { name: string; offset: number; size: number; hash: Buffer }[] = [];
-  for (let i = 0; i < n; i++) rows.push({ name: r.str(), offset: r.u64(), size: r.u64(), hash: Buffer.from(r.bytes(32)) });
+  const rows: { name: string; codec: number; offset: number; stored: number; size: number; room: number; hash: Buffer }[] = [];
+  for (let i = 0; i < n; i++) {
+    const name = r.str();
+    const codec = r.bytes(1)[0];
+    rows.push({ name, codec, offset: r.u64(), stored: r.u64(), size: r.u64(), room: r.u64(), hash: Buffer.from(r.bytes(32)) });
+  }
   const base = r.pos;
   return rows.map((row) => {
     const start = base + row.offset;
-    if (start + row.size > buf.length) throw new PackFormatError(`${row.name} runs past the end`);
-    const data = buf.subarray(start, start + row.size);
+    if (start + row.stored > buf.length) throw new PackFormatError(`${row.name} runs past the end`);
+    if (row.room < row.size) throw new PackFormatError(`${row.name}: room smaller than its data`);
+    const held = buf.subarray(start, start + row.stored);
+    let data: Buffer;
+    if (row.codec === CODEC_STORED) {
+      if (row.stored !== row.size) throw new PackFormatError(`${row.name}: stored and read sizes differ`);
+      data = held;
+    } else if (row.codec === CODEC_DEFLATE) {
+      try {
+        data = inflateRawSync(held, { maxOutputLength: Math.max(1, row.size) });
+      } catch {
+        throw new PackFormatError(`${row.name} doesn't inflate to its size`);
+      }
+    } else {
+      throw new PackFormatError(`${row.name}: unknown codec ${row.codec}`);
+    }
+    if (data.length !== row.size) throw new PackFormatError(`${row.name} doesn't inflate to its size`);
     if (!sha256(data).equals(row.hash)) throw new PackFormatError(`${row.name} doesn't match its sha256`);
-    return { name: row.name, data };
+    return { name: row.name, data, room: row.room };
   });
 }
 

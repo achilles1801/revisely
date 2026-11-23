@@ -480,3 +480,15 @@ owner's `on-device-release.md`).
   reads, so a new claim counts at once. Only the admin SDK writes the folder. Each finished bench sends
   one record to Firestore `onDeviceBench` (create only: the phone, the build, each run's numbers; no uid, no audio);
   read them with the dev admin key.
+- **Recite's pack on the phone** (Settings → Downloads and storage, BEHAVIOUR.md ONDEV-2, ONDEV-3; design in the shared
+  notes, `on-device-a3-pack.md`):
+  - **Server:** `functions/src/recitePack/` (the gated callable, the `.rcpk` format). `functions/scripts/recite-pack-make.js`
+    seals and uploads a pack to the dev backend; a pack id is one key and one set of files, for good.
+  - **Parts:** `core` (48.7 MB: `v7.graph.onnx`, `v7.weights.f16`, `v7.weights.json`, `v7.check`, the engine's load-time self-check, and the tables) and `strict` (17 MB:
+    `v5.onnx`, the marked `v5m-server-int8.onnx`, and `strict.bin`). Only marked models leave the Mac (hashes in the private
+    repo's `checker/marks.json`). The names are `rc_blob`'s (`recite_core.h`). Tables are deflated; the weights stay stored.
+  - **Phone:** `RecitePackReader` (Swift, Java) checks every chunk and blob; `RecitePackKey` holds the device key;
+    `src/lib/onDevice/packRun.ts` is the download. The transport opens it with `RecitePackStore.open`. `v7.weights.f16` gets
+    a 64-byte aligned buffer of its `room` (fp32 size), and `rc_blob.size` is `room`.
+  - **Check the readers** against the server's format, on a Mac with no simulator: `scripts/recite-pack-check/run.sh`.
+  - Android keeps it out of backups through `plugins/withDevModules` (Dev only), so the store fingerprints don't move.

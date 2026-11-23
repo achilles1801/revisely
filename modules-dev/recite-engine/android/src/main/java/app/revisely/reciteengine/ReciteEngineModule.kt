@@ -139,6 +139,43 @@ class ReciteEngineModule : Module() {
         )
       }
     }
+
+    // ---- The pack (BEHAVIOUR.md ONDEV-2, ONDEV-3). JS only ever holds the wrapped key; the key itself stays in here.
+
+    // This phone's public key, made on first use: the private half never leaves the Keystore.
+    AsyncFunction("packPublicKey") { promise: Promise ->
+      thread(name = "recite-pack") {
+        try {
+          promise.resolve(mapOf("publicKey" to RecitePackKey.publicKeyBase64(), "keyFormat" to "spki"))
+        } catch (e: Exception) {
+          promise.reject("ERR_PACK_KEY", e.message ?: "no device key", e)
+        }
+      }
+    }
+
+    // Keeps the pack's wrapped key beside its parts.
+    AsyncFunction("packSaveKey") { dir: String, wrappedKey: String, promise: Promise ->
+      thread(name = "recite-pack") {
+        try {
+          RecitePackStore.saveKey(plainPath(dir), wrappedKey)
+          promise.resolve(null)
+        } catch (e: Exception) {
+          promise.reject("ERR_PACK_KEY", e.message ?: "can't keep the key", e)
+        }
+      }
+    }
+
+    // Decrypts a downloaded part and checks everything in it, keeping none of it.
+    AsyncFunction("packVerify") { dir: String, packId: String, part: String, promise: Promise ->
+      thread(name = "recite-pack") {
+        try {
+          RecitePackStore.verify(plainPath(dir), packId, part)
+          promise.resolve(mapOf("ok" to true))
+        } catch (e: Exception) {
+          promise.resolve(mapOf("ok" to false, "error" to (e.message ?: e.toString())))
+        }
+      }
+    }
   }
 
   /** The battery (percent, charging, the current drawn in mA where the phone reports it), heat and memory now. */

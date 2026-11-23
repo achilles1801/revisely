@@ -104,6 +104,17 @@ export interface DeviceInfo {
   lowPower?: boolean;
 }
 
+/** This phone's public key, for the callable recitePack to wrap the pack's key to. */
+export interface PackPublicKey {
+  publicKey: string;
+  keyFormat: 'spki' | 'pkcs1';
+}
+
+export interface PackVerifyResult {
+  ok: boolean;
+  error?: string;
+}
+
 export type ReciteEngineEvents = {
   onBenchProgress: (event: { done: number; total: number }) => void;
 };
@@ -114,6 +125,9 @@ declare class ReciteEngineModule extends NativeModule<ReciteEngineEvents> {
   coreInfo?(): string;
   sha256(path: string): Promise<string>;
   bench(plan: BenchPlan): Promise<BenchResult>;
+  packPublicKey(): Promise<PackPublicKey>;
+  packSaveKey(dir: string, wrappedKey: string): Promise<void>;
+  packVerify(dir: string, packId: string, part: string): Promise<PackVerifyResult>;
 }
 
 export default requireOptionalNativeModule<ReciteEngineModule>('ReciteEngine');

@@ -10,7 +10,7 @@
 // The release-native change links the module into the store app and retires this plugin (the release owner's call).
 const fs = require('fs');
 const path = require('path');
-const { withDangerousMod, withSettingsGradle } = require('expo/config-plugins');
+const { withDangerousMod, withFinalizedMod, withSettingsGradle } = require('expo/config-plugins');
 
 const MARK = 'Revisely Dev: modules-dev (plugins/withDevModules)';
 
@@ -49,6 +49,17 @@ function devSettingsGradle(text) {
   );
 }
 
+/** Android's backup rules (written by withAndroidBackupRules) with Recite's pack left out too: it would pass the 25 MB quota. */
+function devBackupRules(xml) {
+  if (xml.includes('path="recite-pack/"')) return xml;
+  const at = xml.lastIndexOf('<exclude ');
+  if (at < 0) throw new Error('withDevModules: no <exclude> in the backup rules. Update plugins/withDevModules.js.');
+  const lineStart = xml.lastIndexOf('\n', at) + 1;
+  const lineEnd = xml.indexOf('\n', at);
+  const indent = xml.slice(lineStart, at);
+  return `${xml.slice(0, lineEnd + 1)}${indent}<exclude domain="file" path="recite-pack/" />\n${xml.slice(lineEnd + 1)}`;
+}
+
 function assertDev(bundleId) {
   if (!bundleId || !bundleId.endsWith('.dev')) {
     throw new Error(`withDevModules is for Revisely Dev only (bundle id ${bundleId}).`);
@@ -65,6 +76,20 @@ function withDevModules(config) {
       return cfg;
     },
   ]);
+  // After every other mod, so the backup rules' files are there (the store app's plugin writes them; its file stays as
+  // it is, so the store fingerprints don't move).
+  config = withFinalizedMod(config, [
+    'android',
+    async (cfg) => {
+      assertDev(cfg.android && cfg.android.package);
+      const dir = path.join(cfg.modRequest.platformProjectRoot, 'app', 'src', 'main', 'res', 'xml');
+      for (const name of ['revisely_backup_rules.xml', 'revisely_data_extraction_rules.xml']) {
+        const file = path.join(dir, name);
+        fs.writeFileSync(file, devBackupRules(fs.readFileSync(file, 'utf8')));
+      }
+      return cfg;
+    },
+  ]);
   return withSettingsGradle(config, (cfg) => {
     assertDev(cfg.android && cfg.android.package);
     if (cfg.modResults.language !== 'groovy') throw new Error('withDevModules: settings.gradle is not Groovy.');
@@ -76,3 +101,4 @@ function withDevModules(config) {
 module.exports = withDevModules;
 module.exports.devPodfile = devPodfile;
 module.exports.devSettingsGradle = devSettingsGradle;
+module.exports.devBackupRules = devBackupRules;
