@@ -124,6 +124,14 @@ main is strictly for production"):
      - The publishing half checks the tree's scenario artifact and that the commit is on the branch
        itself, so a run by hand can't skip the gate.
      - `dry_run` (by hand) tries both halves without building or publishing.
+     - With no native build the publishing half is one job on one machine (Nov 23 2026).
+     - **Revisely Dev doesn't wait for this** (Majd, Nov 23 2026: "yeah let's do it"): a merged PR whose own
+       `Required` passed goes to the `dev` channel at the merge (`dev-at-merge.yml`, its own workflow, so
+       it can't stop preview). The tests after the merge still run, and `preview` and production still
+       wait for them. Two PRs that clash can briefly put a broken update on Dev; a failure after the merge
+       opens the `develop-red` issue. A push with no such PR, or a native change, reaches Dev through
+       Preview after the tests. Dev's updates carry `[commit <sha>]`, so an older commit never replaces a
+       newer one (`.github/scripts/publish-update.sh`).
      - Before, every push waited for each older push's scenario run: 19–24 minutes from a merge to
        its update in a burst of merges.
   2. A tester's TestFlight install follows `preview`. The binary's channel is `production`; once the
@@ -299,8 +307,8 @@ hard-coded token was deleted from the console on 2026-10-27.
   the sets `plan` picks (see "Where the slow checks run" above): the smoke set is 02 session, 04 Fajr
   boundary, 05 daily log, 06 offline (two Android jobs side by side: 02 + 05, 04 + 06); every flow is
   two jobs a platform. The top of a stack tests the
-  stack's whole change. One run per PR (a push cancels the older one); a push to develop cancels the
-  run of the push before it, and never a full run started by hand. A red run on develop doesn't stop
+  stack's whole change. One run per PR (a push cancels the older one); a push to develop waits for the
+  run in progress (only the newest waits), and never cancels a full run started by hand. A red run on develop doesn't stop
   the preview (the scenario gate does that): fix it like any failure. iOS runners are the slow part
   (5 macOS jobs at once on this plan): don't start iOS runs you don't need.
   - **Screenshots:** the flows take one on key screens (`subflows/shot.yaml`: Home's states, a
@@ -373,8 +381,8 @@ hard-coded token was deleted from the console on 2026-10-27.
     It's conservative: only the website, store, `.maestro/`, the console, the worker, some of `scripts/` and
     plain `.md` files (not BEHAVIOUR.md, nor docs under `src/`, `tests/` or `functions/`); any other path runs
     the suite. All of these are in Preview's `paths-ignore`, and a skipped run uploads no
-    `scenarios-passed-<tree>`, so publishing still needs a run that passed. Pushes, merge groups and runs by hand
-    always run it. Branches needn't be up to date with develop (`strict` off: the Preview
+    `scenarios-passed-<tree>`, so publishing still needs a run that passed. Merge groups always run it. A push to develop or a run by hand reuses a pass on
+    the same tree: it waits for Preview's run of the commit, and runs the suite itself only if there is none or it failed. Branches needn't be up to date with develop (`strict` off: the Preview
   workflow's scenario gate still stops a broken develop from publishing). Admins can still bypass
   (`enforce_admins` off). `main` has no branch protection. "Bug fixes add a scenario" (`spec.yml`)
   runs on every PR on its own, so a label or a title edit re-runs it alone.
@@ -384,9 +392,8 @@ hard-coded token was deleted from the console on 2026-10-27.
   - the top of a stack into develop, a PR into `main`, a merge group: every E2E flow, iOS and Android;
   - a single PR into develop (and claude-fix's runs): the Android E2E smoke set (Linux, KVM), no iOS;
   - what lands on develop (each push): every Android flow, and the iOS native build alone (kept
-    where every PR can restore it); a newer push cancels the run of the one before, so a push's
-    E2E covers everything since the last push whose CI passed (a docs-only push after a cancelled
-    run still tests that run's change);
+    where every PR can restore it); a newer push waits for the run in progress, with at most one waiting
+    (Nov 23 2026), so a push's E2E covers everything since the run before it;
   - nightly (develop) and by hand: every flow on both, from e2e.yml itself. Runs by hand never cancel
     each other, and skip iOS jobs the same commit already has running.
 

@@ -27,7 +27,7 @@ name: E2E
 #     two jobs side by side (.maestro/README.md says why these four);
 #   - a push to develop (what just landed): every Android flow, and the iOS native
 #     build alone (kept where every PR into develop can restore it). A newer push
-#     cancels the run of the one before.
+#     waits for the run in progress; only the newest waits.
 # On its own: the nightly run (develop; every flow) and Run workflow (by hand).
 #
 # Its last job, `E2E`, passes when every platform job that had to run passed, or
@@ -107,15 +107,17 @@ permissions:
   contents: read
 
 # One run per PR: a push cancels the run of the commit before it. Elsewhere one
-# per branch and event: a push to develop cancels the run of the push before it
-# (a burst of merges is tested once, at its end), and never a full run started
-# by hand or on schedule there (a release's proof). Runs by hand never cancel
+# per branch and event. A push to develop never cancels a started run: the newest
+# push waits for it, and a newer one takes its place (Nov 23 2026; ci.yml's own
+# group does this for the whole run, and this says the same). Before, each merge
+# cancelled the run in progress, 57% of those hours. Never a full run started by
+# hand or on schedule there either (a release's proof). Runs by hand never cancel
 # each other (two runs of different flows on one branch did); a run by hand
 # skips its iOS jobs when the same commit's same iOS jobs are already running
 # (`changes`).
 concurrency:
   group: e2e-${{ github.event.pull_request.number || (github.event_name == 'workflow_dispatch' && github.run_id) || format('{0}-{1}', github.ref, github.event_name) }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/develop') }}
 
 env:
   MAESTRO_VERSION: '2.11.0'

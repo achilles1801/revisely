@@ -42,15 +42,18 @@ until its part is set up.
     `API_BASE=https://dev.revisely.app`, the Sentry DSN). The store app's `development` profile (a
     simulator dev client, built by hand; last built May 2026) reads it too, so such a client talks to
     revisely-dev, where Google sign-in won't work for the store bundle id. `production` is untouched.
-- **Updates and builds:** with the repository variable `DEV_APP` = `true`, Preview publishes each tested
-  develop commit to `preview` first, then the same commit to `dev` (`dev-update`).
+- **Updates and builds:** with the repository variable `DEV_APP` = `true`, a merged PR whose own `Required`
+  passed goes to `dev` at the merge (`dev-at-merge.yml`, Majd, Nov 23 2026). Preview publishes each tested develop
+  commit to `preview`, and to `dev` only what Dev doesn't have yet (`dev-update`: a push with no PR, a native change).
+  Every publish to `dev` holds the concurrency group `eas-dev`, and an older commit never replaces a newer one
+  (`[commit <sha>]` in the message, `.github/scripts/publish-update.sh`).
   - Revisely Dev's runtimes are its own (tags `ios-dev-fp/<hash>`, `android-dev-fp/<hash>`), and a
     missing one builds (`ios-build.yml` / `android-build.yml` with `variant: dev`; EAS Build by hand has
     a variant choice too).
   - Android builds there only once `DEV_ANDROID_SUBMIT` is on. Before that, the first bundle goes to
     Play Console by hand: EAS Build, variant dev, submit off, then upload the .aab.
-  - Nothing on the dev side stops preview: its fingerprint step can fail without failing the job, and
-    preview's update never waits for it. Promote reads only the preview branch.
+  - Nothing on the dev side stops preview: the at-merge publish is its own workflow, Preview's dev steps come after
+    preview's update and can fail without failing it, and Promote reads only the preview branch.
   - Each native change now builds twice (store and Dev).
   - **Native code in Revisely Dev only** (Nov 23 2026, for 1.0.5's on-device Recite; measured with local fingerprints
     before and after: the store app's unchanged, Revisely Dev's moving with the code):
