@@ -468,6 +468,9 @@ owner's `on-device-release.md`).
     it: GitHub → Settings → Developer settings → Fine-grained tokens → Regenerate; update the secret; set the repository
     variable `RECITE_CORE_EXPIRES` (YYYY-MM-DD) to the new date, which the daily health report reminds about from 30 days
     before.
+- **The engine's self-check per device** (ONDEV-1): the bench records it as a `runs` entry `{mode: 'selfCheck', …}` in
+  `onDeviceBench`, once per pack and app update (`recordSelfCheck`). Test Lab: `testLab.selfCheck` in the OBB's `bench.json`
+  (`packId`, `blobs: [{name, file, room}]`) opens plain watermarked blobs, and the results file gets a `selfCheck` key.
 - **The on-device bench** (Settings → Testing → On-device model, BEHAVIOUR.md ONDEV-1): its list of runs, the models,
   the clip (EveryAyah, Husary, page 7, 90 s) and M's vectors live on the dev bucket under `models/recite/`
   (`bench.json` is the manifest: files with sizes and SHA-256, runs per platform, M's pass marks). Changing the runs or

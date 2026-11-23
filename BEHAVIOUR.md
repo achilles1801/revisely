@@ -1614,7 +1614,10 @@ shows up once and they must go through it and complete it … just the main stuf
 - **ONDEV-1.** Settings → Testing → On-device model times Recite's model on this phone, the first step to checking
   recitation on the phone instead of the server (Majd, Nov 23 2026). Under the phone's name it says which Recite engine
   this build carries: its version, "stub (server path)" for a build without the private engine, or that its self-test
-  failed. It lists this platform's runs from the dev
+  failed. With Recite's pack on the phone it opens the engine once, shows the load-time self-check (for each of v7 and v5,
+  the largest difference and the frames with another top sound), closes the engine before any run so the runs' memory
+  doesn't carry it, and sends the result once per pack and app update, a failed check or a refused open included, with
+  the pack's id, the chip, ONNX Runtime's version and whether prepacking was on. It lists this platform's runs from the dev
   backend (each a model file, a processor (CPU, Core ML, XNNPACK or NNAPI) and a thread count; all chosen, any left
   out), downloads what the chosen runs need once (only for accounts the team has given bench access: Revisely Dev is open
   to anyone with its link; the models are the watermarked ones; each file checked by size and SHA-256, kept on the

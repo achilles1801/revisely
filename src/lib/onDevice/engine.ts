@@ -20,6 +20,7 @@ import { logger } from '../logger';
 import { knownOffline } from '../networkState';
 import { isDevVariant } from '../variant';
 import { coreLine } from './coreInfo';
+import { selfCheckFromOpen, type SelfCheck } from './selfCheck';
 
 type EngineModule = typeof import('../../../modules-dev/recite-engine');
 type Native = NonNullable<EngineModule['default']>;
@@ -58,7 +59,9 @@ export function openEngineInfo(): EngineInfo | null {
   return m?.engineInfo ? parseEngineInfo(m.engineInfo()) : null;
 }
 
-let opening = false;
+let opening: Promise<void> | null = null;
+/** What the last open of a pack came to: the bench records its self-check, a refused open included. */
+let lastPackOpen: { packId: string; opened: { ok: boolean; code: number; error?: string; info?: string } } | null = null;
 /** A pack that didn't open this run for another reason than its data (memory, a model): not decrypted again until the next. */
 let refusedPack: string | null = null;
 const RC_ERR_DATA = -2;
@@ -73,6 +76,7 @@ async function openFromPack(m: Native): Promise<boolean> {
   const pack = run.packForEngine();
   if (!pack || pack.packId === refusedPack) return false;
   const r = await m.enginePackOpen(pack.dir, pack.packId, pack.parts, engineOptions());
+  lastPackOpen = { packId: pack.packId, opened: r };
   if (r.ok) return true;
   logger.warn(`Recite engine: the pack didn't open (${r.code}): ${r.error ?? ''}`);
   if (r.code === RC_ERR_DATA) await run.dropBadPack(pack.packId);
@@ -94,24 +98,45 @@ async function openFromReplay(m: Native): Promise<void> {
   if (!r.ok) logger.warn(`Recite engine: didn't open (${r.code}): ${r.error ?? ''}`);
 }
 
-/** Opens the engine in the background if there is something to open it with. Never throws. */
-export function warmEngine(): void {
+/** Opens the engine if there is something to open it with; resolves once that is done. Never rejects. */
+function openNow(): Promise<void> {
+  if (opening) return opening;
   const m = native();
-  if (opening || !m || openEngineInfo()) return;
-  opening = true;
-  void (async () => {
+  if (!m || openEngineInfo()) return Promise.resolve();
+  opening = (async () => {
     try {
       if (!(await openFromPack(m))) await openFromReplay(m);
     } catch (err) {
       logger.warn('Recite engine: open failed', err);
     } finally {
-      opening = false;
+      opening = null;
     }
   })();
+  return opening;
+}
+
+/** Opens the engine in the background if there is something to open it with. Never throws. */
+export function warmEngine(): void {
+  void openNow();
+}
+
+/**
+ * The self-check of the pack on this phone, for the bench's record (ONDEV-1); null with no pack. An engine this opened
+ * is closed again, so the bench's memory figures don't carry it.
+ */
+export async function engineSelfCheck(): Promise<SelfCheck | null> {
+  const m = native();
+  if (!m) return null;
+  const wasOpen = !!openEngineInfo();
+  await openNow();
+  const last = lastPackOpen;
+  if (!wasOpen && openEngineInfo()) await m.engineRelease?.();
+  return last ? selfCheckFromOpen(last.opened, last.packId) : null;
 }
 
 export function __resetEngineForTests(): void {
-  opening = false;
+  opening = null;
+  lastPackOpen = null;
   refusedPack = null;
 }
 

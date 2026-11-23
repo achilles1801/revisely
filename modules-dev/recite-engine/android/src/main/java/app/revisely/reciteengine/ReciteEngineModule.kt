@@ -94,6 +94,44 @@ class ReciteEngineModule : Module() {
       }
     }
 
+    // Test Lab's self-check: the engine from plain, watermarked blobs in the OBB (no account there, so no pack key). Each
+    // goes in a direct buffer of its `room`, as a pack's do, since the engine widens the weights in place.
+    AsyncFunction("engineOpenRooms") { items: List<Map<String, Any>>, options: String, promise: Promise ->
+      thread(name = "recite-rooms") {
+        if (!ReciteCoreNative.available) {
+          promise.resolve(mapOf("ok" to false, "code" to -3, "error" to "the native library didn't load"))
+          return@thread
+        }
+        val names = ArrayList<String>(items.size)
+        val memory = ArrayList<ByteBuffer>(items.size)
+        try {
+          for (item in items) {
+            val name = item["name"] as String
+            val file = File(plainPath(item["path"] as String))
+            val size = file.length()
+            val room = (item["room"] as Number).toLong()
+            if (room < size || room > Int.MAX_VALUE) throw IllegalArgumentException("$name: room")
+            val buffer = ReciteCoreNative.allocBlob(room.toInt()) ?: throw IllegalStateException("no memory for $name")
+            memory.add(buffer)
+            names.add(name)
+            buffer.limit(size.toInt())
+            FileInputStream(file).channel.use { channel ->
+              while (buffer.hasRemaining()) {
+                if (channel.read(buffer) < 0) throw IllegalStateException("$name: cut short")
+              }
+            }
+            buffer.clear()
+          }
+        } catch (e: Exception) {
+          memory.forEach { ReciteCoreNative.freeBlob(it) }
+          val text = e.message ?: "the files didn't open"
+          promise.resolve(mapOf("ok" to false, "code" to if (text.startsWith("no memory")) -3 else -2, "error" to text))
+          return@thread
+        }
+        engine.openBlobs(names, memory, options, { memory.forEach { ReciteCoreNative.freeBlob(it) } }) { promise.resolve(it) }
+      }
+    }
+
     // rc_info's JSON while the engine is open.
     Function("engineInfo") { engine.info }
 

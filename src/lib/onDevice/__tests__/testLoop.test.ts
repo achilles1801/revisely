@@ -11,9 +11,11 @@ const mockState = {
   loop: null as { scenario: number; results: string | null } | null,
   obb: {} as Record<string, unknown>,
   shaWrong: null as string | null,
-  writes: [] as { status: string; error?: string; runs: string[] }[],
+  writes: [] as { status: string; error?: string; runs: string[]; selfCheck?: Record<string, unknown> }[],
   finished: 0,
   plans: [] as unknown[],
+  opened: [] as unknown[],
+  released: 0,
 };
 
 jest.mock('expo-file-system', () => ({
@@ -45,6 +47,13 @@ jest.mock('../benchRun', () => {
       mockState.finished++;
     },
     deviceInfo: () => ({ platform: 'android', model: 'samsung SM-A155F', cores: 8, memoryMb: 4096, thermal: 'none' }),
+    engineOpenRooms: jest.fn(async (items: unknown[]) => {
+      mockState.opened.push(...items);
+      return { ok: true, code: 0, info: JSON.stringify({ pack: 'k', self_check: { ran: true, ok: true, models: { v7: { ran: true, ok: true, max_diff: 0.00004, top_diff: 0, frames: 240 } } } }) };
+    }),
+    engineRelease: jest.fn(async () => {
+      mockState.released++;
+    }),
   };
   return {
     benchEngine: () => engine,
@@ -74,6 +83,8 @@ beforeEach(() => {
   mockState.writes = [];
   mockState.finished = 0;
   mockState.plans = [];
+  mockState.opened = [];
+  mockState.released = 0;
 });
 
 describe('[ONDEV-1] the bench on Test Lab’s phones (game loop)', () => {
@@ -110,6 +121,21 @@ describe('[ONDEV-1] the bench on Test Lab’s phones (game loop)', () => {
     await runTestLoopIfAsked();
     expect(mockState.writes[0].status).toBe('failed');
     expect(mockState.writes[0].error).toMatch(/testLab/);
+    expect(mockState.finished).toBe(1);
+  });
+
+  it('runs the engine’s self-check from the OBB, closes the engine, and writes the result', async () => {
+    mockState.obb = {
+      ...(manifestJson as object),
+      testLab: { plans: [], windows: 1, longSec: 0, selfCheck: { packId: 'v7m-1', blobs: [{ name: 'v7.weights.f16', file: 'f16pack', room: 82450624 }] } },
+    };
+    await runTestLoopIfAsked();
+    expect(mockState.opened).toEqual([{ name: 'v7.weights.f16', path: expect.stringMatching(/^file:\/\/\/cache\/recite-bench-obb\//), room: 82450624 }]);
+    expect(mockState.released).toBe(1);
+    expect(mockState.plans).toEqual([]);
+    const last = mockState.writes[mockState.writes.length - 1];
+    expect(last.status).toBe('done');
+    expect(last.selfCheck).toMatchObject({ ok: true, packId: 'v7m-1', v7: { maxDiff: 0.00004, topDiff: 0 } });
     expect(mockState.finished).toBe(1);
   });
 });

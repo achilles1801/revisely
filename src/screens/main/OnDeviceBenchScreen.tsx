@@ -19,10 +19,13 @@ import {
   platformPlans,
   readManifest,
   runPlan,
+  recordSelfCheck,
   sendBenchRecord,
+  type SelfCheckResult,
   type BenchRun,
 } from '../../lib/onDevice/benchRun';
 import { coreLine } from '../../lib/onDevice/coreInfo';
+import type { ModelCheck } from '../../lib/onDevice/selfCheck';
 import { logger } from '../../lib/logger';
 import { t } from '../../i18n';
 
@@ -66,6 +69,33 @@ type Status =
 const fixed = (v: number, digits = 0) => (Number.isFinite(v) ? v.toFixed(digits) : '–');
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
+const modelCheckLine = (model: string, m: ModelCheck) =>
+  m.ran
+    ? t('settings.bench.selfCheckModel', {
+        model,
+        diff: m.maxDiff === null ? '–' : m.maxDiff.toPrecision(2),
+        top: m.topDiff ?? '–',
+        frames: m.frames ?? '–',
+      })
+    : t('settings.bench.selfCheckNoModel', { model });
+
+function selfCheckText({ check, sendError }: SelfCheckResult): string {
+  const lines =
+    check.openCode !== null
+      ? [t('settings.bench.selfCheckNoOpen', { code: check.openCode, error: check.openError ?? '' })]
+      : [
+          check.ok === true
+            ? t('settings.bench.selfCheckPassed')
+            : check.ok === false
+              ? t('settings.bench.selfCheckFailed')
+              : t('settings.bench.selfCheckUnknown'),
+          modelCheckLine('v7', check.v7), // i18n-ignore (the model's name)
+          modelCheckLine('v5', check.v5), // i18n-ignore (the model's name)
+        ];
+  if (sendError) lines.push(t('settings.bench.selfCheckNotSent', { error: sendError }));
+  return lines.join('\n');
+}
+
 /**
  * Settings → Testing → On-device model (Revisely Dev; BEHAVIOUR.md ONDEV-1): times Recite's model on this phone, run by
  * run (a model, a provider, a thread count) from the dev backend's list, each checked on the checker's own output
@@ -89,8 +119,12 @@ export default function OnDeviceBenchScreen() {
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [runs, setRuns] = useState<BenchRun[]>([]);
   const [record, setRecord] = useState<ReturnType<typeof benchRecord> | null>(null);
+  // The engine's self-check runs as the screen opens; the runs wait for it, so their memory figures don't carry the engine.
+  const [checking, setChecking] = useState(!!engine && !!device);
+  const [selfCheck, setSelfCheck] = useState<SelfCheckResult | null>(null);
   const live = useRef(true);
   const busy = status.kind === 'downloading' || status.kind === 'running' || status.kind === 'sending';
+  const locked = busy || checking;
   useKeepScreenOn(busy);
 
   const load = useCallback(() => {
@@ -111,6 +145,18 @@ export default function OnDeviceBenchScreen() {
       live.current = false;
     };
   }, [engine, load]);
+
+  useEffect(() => {
+    if (!device) return;
+    let on = true;
+    recordSelfCheck(device)
+      .then((r) => on && setSelfCheck(r))
+      .catch((err) => logger.warn('Self-check failed', err))
+      .finally(() => on && setChecking(false));
+    return () => {
+      on = false;
+    };
+  }, [device]);
 
   const plans = manifest ? platformPlans(manifest) : [];
   const chosen = plans.filter((p) => !off.has(planKey(p)));
@@ -214,6 +260,11 @@ export default function OnDeviceBenchScreen() {
                     : t('settings.bench.engine', { version: engineLine.version })}
               </Text>
             ) : null}
+            {checking || selfCheck ? (
+              <Text style={[typeV2.meta, styles.note, { color: palette.secondary }]} testID="bench-self-check">
+                {selfCheck ? selfCheckText(selfCheck) : t('settings.bench.selfCheckRunning')}
+              </Text>
+            ) : null}
             {readError ? (
               <View style={styles.note}>
                 <Text style={[typeV2.body, { color: palette.text }]}>{t('settings.bench.readFailed', { error: readError })}</Text>
@@ -229,7 +280,7 @@ export default function OnDeviceBenchScreen() {
                       options={WINDOW_CHOICES.map((w) => ({ value: w, label: w }))}
                       value={windows}
                       onChange={setWindows}
-                      disabled={busy}
+                      disabled={locked}
                       testID="bench-windows"
                     />
                   </View>
@@ -249,7 +300,7 @@ export default function OnDeviceBenchScreen() {
                             return next;
                           })
                         }
-                        disabled={busy}
+                        disabled={locked}
                         accessibilityRole="checkbox"
                         accessibilityState={{ checked: on, disabled: busy }}
                         accessibilityLabel={planLabel(p)}
@@ -267,7 +318,7 @@ export default function OnDeviceBenchScreen() {
                     size="lg"
                     onPress={() => start(false)}
                     busy={busy && !longStarted}
-                    disabled={chosen.length === 0 || busy}
+                    disabled={chosen.length === 0 || locked}
                     testID="bench-run"
                   />
                   {longStarted ? null : statusText}
@@ -279,7 +330,7 @@ export default function OnDeviceBenchScreen() {
                       options={MINUTE_CHOICES.map((m) => ({ value: m, label: t('settings.bench.minutes', { count: Number(m) }) }))}
                       value={minutes}
                       onChange={setMinutes}
-                      disabled={busy}
+                      disabled={locked}
                       testID="bench-minutes"
                     />
                   </View>
@@ -289,7 +340,7 @@ export default function OnDeviceBenchScreen() {
                       options={HOP_CHOICES.map((h) => ({ value: h, label: t('settings.bench.hopChoice', { seconds: hopSeconds(Number(h)) }) }))}
                       value={hop}
                       onChange={setHop}
-                      disabled={busy}
+                      disabled={locked}
                       testID="bench-hop"
                     />
                   </View>
@@ -304,7 +355,7 @@ export default function OnDeviceBenchScreen() {
                     variant="outline"
                     onPress={() => start(true)}
                     busy={busy && longStarted}
-                    disabled={busy || chosen.length === 0}
+                    disabled={locked || chosen.length === 0}
                     testID="bench-long-run"
                   />
                   {chosen[0] ? (

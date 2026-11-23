@@ -145,6 +145,11 @@ declare class ReciteEngineModule extends NativeModule<ReciteEngineEvents> {
     parts: string[],
     options: string,
   ): Promise<{ ok: boolean; code: number; error?: string; info?: string }>;
+  /** Android, Test Lab's self-check: plain blobs from files, each in a buffer of its `room`, as a pack's would be. */
+  engineOpenRooms?(
+    items: { name: string; path: string; room: number }[],
+    options: string,
+  ): Promise<{ ok: boolean; code: number; error?: string; info?: string }>;
   /** rc_info's JSON while the engine is open. */
   engineInfo?(): string | null;
   /** Starts a take from the contract's start frame: its number, or why not. `hop`: the engine's, for the take's meter. */

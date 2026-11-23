@@ -48,7 +48,15 @@ export interface BenchManifest {
   /** M's pass marks (vectors/manifest.json). */
   tolerance: { mel: number; out: number; own: number };
   /** Firebase Test Lab's game loop (testLoop.ts): its runs, windows each, and a long run of the first (0: none). */
-  testLab?: { plans: PlanSpec[]; windows: number; longSec: number };
+  testLab?: { plans: PlanSpec[]; windows: number; longSec: number; selfCheck?: TestLabSelfCheck };
+}
+
+/** The engine's self-check on Test Lab: no account there, so no pack key, so its blobs come plain in the OBB. */
+export interface TestLabSelfCheck {
+  /** The pack these blobs are from. */
+  packId: string;
+  /** `file` is a key of `files`; `room` the buffer the engine gets (the fp16 weights widen in place). */
+  blobs: { name: string; file: string; room: number }[];
 }
 
 const SAFE_PATH = /^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/;
@@ -119,8 +127,22 @@ export function parseManifest(raw: unknown): BenchManifest | null {
     const tl = raw.testLab;
     if (!isRecord(tl) || !isPositiveInt(tl.windows) || typeof tl.longSec !== 'number' || tl.longSec < 0) return null;
     const list = planList(tl.plans);
-    if (!list || list.length === 0) return null;
-    testLab = { plans: list, windows: tl.windows, longSec: Math.floor(tl.longSec) };
+    let selfCheck: TestLabSelfCheck | undefined;
+    if (tl.selfCheck !== undefined) {
+      const sc = tl.selfCheck;
+      if (!isRecord(sc) || typeof sc.packId !== 'string' || !sc.packId || !Array.isArray(sc.blobs) || sc.blobs.length === 0) return null;
+      const blobs: TestLabSelfCheck['blobs'] = [];
+      for (const b of sc.blobs) {
+        if (!isRecord(b) || typeof b.name !== 'string' || !b.name || typeof b.file !== 'string') return null;
+        const file = files[b.file];
+        if (!file || !isPositiveInt(b.room) || b.room < file.bytes) return null;
+        blobs.push({ name: b.name, file: b.file, room: b.room });
+      }
+      selfCheck = { packId: sc.packId, blobs };
+    }
+    // Runs may be left out only for a self-check alone, and a long run needs a run to repeat.
+    if (!list || (list.length === 0 && (!selfCheck || tl.longSec > 0))) return null;
+    testLab = { plans: list, windows: tl.windows, longSec: Math.floor(tl.longSec), ...(selfCheck ? { selfCheck } : {}) };
   }
   return {
     files,

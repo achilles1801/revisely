@@ -10,6 +10,7 @@ import { File } from 'expo-file-system';
 import { logger } from '../logger';
 import { parseManifest } from './bench';
 import { benchEngine, benchRecord, runPlan, type BenchRun } from './benchRun';
+import { selfCheckFromOpen, type SelfCheck } from './selfCheck';
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
@@ -22,10 +23,11 @@ export async function runTestLoopIfAsked(): Promise<void> {
   const results = loop.results;
   const runs: BenchRun[] = [];
   let windows = 1;
+  let selfCheck: SelfCheck | null = null;
   const write = (status: string, error?: string) =>
     engine.writeTestLoopResult!(
       results,
-      JSON.stringify({ status, ...(error ? { error } : {}), ...benchRecord(engine.deviceInfo(), windows, runs) }),
+      JSON.stringify({ status, ...(error ? { error } : {}), ...(selfCheck ? { selfCheck } : {}), ...benchRecord(engine.deviceInfo(), windows, runs) }),
     );
   try {
     const dir = await engine.unpackObb();
@@ -39,6 +41,14 @@ export async function runTestLoopIfAsked(): Promise<void> {
       if (sha !== f.sha256) throw new Error(`${f.path}: checksum doesn't match`); // i18n-ignore (a log)
     }
     await write('running');
+    const wanted = manifest.testLab.selfCheck;
+    if (wanted) {
+      if (!engine.engineOpenRooms) throw new Error("This build can't open the engine from the OBB"); // i18n-ignore (a log)
+      const items = wanted.blobs.map((b) => ({ name: b.name, path: files[b.file], room: b.room }));
+      selfCheck = selfCheckFromOpen(await engine.engineOpenRooms(items, JSON.stringify({ threads: 2 })), wanted.packId);
+      await engine.engineRelease?.(); // before the runs, whose memory figures shouldn't carry it
+      await write('running');
+    }
     for (const plan of manifest.testLab.plans) {
       runs.push(await runPlan(engine, manifest, plan, files, { windows }, () => undefined));
       await write('running');

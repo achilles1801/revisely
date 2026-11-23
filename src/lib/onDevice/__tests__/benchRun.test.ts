@@ -15,8 +15,20 @@ jest.mock('../../recordingCloud', () => ({ authHeaders: jest.fn(), bucketName: j
 jest.mock('../../variant', () => ({ isDevVariant: () => true }));
 jest.mock('../../../../modules/recitation-audio', () => ({ __esModule: true, default: null }));
 jest.mock('../../../../modules-dev/recite-engine', () => ({ __esModule: true, default: null }));
+const mockSelfCheck = jest.fn();
+jest.mock('../engine', () => ({ engineSelfCheck: () => mockSelfCheck() }));
+const mockStored = new Map<string, string>();
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  __esModule: true,
+  default: {
+    getItem: async (k: string) => mockStored.get(k) ?? null,
+    setItem: async (k: string, v: string) => void mockStored.set(k, v),
+  },
+}));
 
-import { benchRecord, runPlan } from '../benchRun';
+import { addDoc } from 'firebase/firestore';
+import { benchRecord, recordSelfCheck, runPlan } from '../benchRun';
+import { selfCheckFromFailedOpen, selfCheckFromInfo } from '../selfCheck';
 
 const MANIFEST = parseManifest(manifestJson)!;
 const PLAN: PlanSpec = MANIFEST.plans.ios[0];
@@ -94,5 +106,43 @@ describe('[ONDEV-1] a run and the foreground', () => {
     expect(remove).toHaveBeenCalledTimes(1);
     const device = { platform: 'ios' as const, model: 'iPhone19,3', os: '26', cores: 6, memoryMb: 12000, thermal: 'nominal' };
     expect(benchRecord(device, 3, [run]).runs[0].interrupted).toEqual(run.interrupted);
+  });
+});
+
+describe('[ONDEV-1] the self-check’s record', () => {
+  const device = { platform: 'ios', model: 'iPhone19,3', os: '26.1', cores: 6, memoryMb: 8192, thermal: 'nominal' } as never;
+  const passed = selfCheckFromInfo({ pack: 'k', self_check: { ran: true, ok: true, models: { v7: { ran: true, ok: true, max_diff: 0.00004, top_diff: 0, frames: 240 } } } }, 'v7m-1');
+  const send = addDoc as unknown as jest.Mock;
+
+  beforeEach(() => {
+    mockStored.clear();
+    send.mockReset();
+    send.mockResolvedValue({ id: 'r' });
+    mockSelfCheck.mockResolvedValue(passed);
+  });
+
+  it('goes as one run of its own, once per pack and app update', async () => {
+    expect(await recordSelfCheck(device)).toEqual({ check: passed, sendError: null });
+    await recordSelfCheck(device);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][1]).toMatchObject({ windows: 1, runs: [{ mode: 'selfCheck', ok: true, packId: 'v7m-1' }] });
+    mockSelfCheck.mockResolvedValue({ ...passed, packId: 'v7m-2' });
+    await recordSelfCheck(device);
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends a failed check too, and tries again after a send that failed', async () => {
+    mockSelfCheck.mockResolvedValue(selfCheckFromFailedOpen(-3, 'v7 check', 'v7m-1'));
+    send.mockRejectedValueOnce(new Error('offline'));
+    expect((await recordSelfCheck(device))?.sendError).toBe('offline');
+    await recordSelfCheck(device);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls[1][1].runs[0]).toMatchObject({ mode: 'selfCheck', ok: false, openCode: -3 });
+  });
+
+  it('sends nothing with no pack on the phone', async () => {
+    mockSelfCheck.mockResolvedValue(null);
+    expect(await recordSelfCheck(device)).toBeNull();
+    expect(send).not.toHaveBeenCalled();
   });
 });

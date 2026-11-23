@@ -1,11 +1,12 @@
 // The engine opening from Recite's pack (ONDEV-3, ONDEV-4): only a real engine decrypts it, and a pack it refuses isn't
 // decrypted again. The native side (decrypting, aligned buffers, wiping after release) runs on a phone.
-import { __resetEngineForTests, warmEngine } from '../engine';
+import { __resetEngineForTests, engineSelfCheck, warmEngine } from '../engine';
 
 const mockModule = {
   coreInfo: jest.fn(() => JSON.stringify({ version: '0.2.0', abi: 1, headerAbi: 1, stub: false, selfTest: 'passed' })),
   engineInfo: jest.fn((): string | null => null),
-  enginePackOpen: jest.fn(async () => ({ ok: true, code: 0 }) as { ok: boolean; code: number; error?: string }),
+  enginePackOpen: jest.fn(async () => ({ ok: true, code: 0 }) as { ok: boolean; code: number; error?: string; info?: string }),
+  engineRelease: jest.fn(async () => undefined),
   engineOpenFiles: jest.fn(async () => ({ ok: true, code: 0 })),
 };
 jest.mock('../../../../modules-dev/recite-engine', () => ({
@@ -102,5 +103,42 @@ describe('warmEngine', () => {
     warmEngine();
     await settle();
     expect(mockModule.enginePackOpen).not.toHaveBeenCalled();
+  });
+});
+
+describe('[ONDEV-1] engineSelfCheck', () => {
+  const INFO = JSON.stringify({
+    pack: 'table-key',
+    self_check: { ran: true, ok: true, ort: '1.31.1', prepacking: false, models: { v7: { ran: true, ok: true, max_diff: 0.00004, top_diff: 0, frames: 240 }, v5: { ran: false } } },
+  });
+  const opensWithInfo = () =>
+    mockModule.enginePackOpen.mockImplementation(async () => {
+      mockModule.engineInfo.mockReturnValue(INFO);
+      return { ok: true, code: 0, info: INFO };
+    });
+
+  it('reads the pack’s check, and closes the engine it opened so the bench’s memory doesn’t carry it', async () => {
+    opensWithInfo();
+    expect(await engineSelfCheck()).toMatchObject({ ok: true, packId: 'v7m-1', pack: 'table-key', ort: '1.31.1', v7: { maxDiff: 0.00004, topDiff: 0 } });
+    expect(mockModule.engineRelease).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves open an engine that was already open', async () => {
+    opensWithInfo();
+    warmEngine();
+    await settle();
+    expect(await engineSelfCheck()).toMatchObject({ ok: true, packId: 'v7m-1' });
+    expect(mockModule.engineRelease).not.toHaveBeenCalled();
+  });
+
+  it('reports a refused open with its code and error', async () => {
+    mockModule.enginePackOpen.mockResolvedValue({ ok: false, code: -3, error: 'v7 check: largest difference 5.9' });
+    expect(await engineSelfCheck()).toMatchObject({ ok: false, packId: 'v7m-1', openCode: -3, openError: 'v7 check: largest difference 5.9' });
+    expect(mockModule.engineRelease).not.toHaveBeenCalled();
+  });
+
+  it('has nothing to report with no pack on the phone', async () => {
+    mockPack = null;
+    expect(await engineSelfCheck()).toBeNull();
   });
 });

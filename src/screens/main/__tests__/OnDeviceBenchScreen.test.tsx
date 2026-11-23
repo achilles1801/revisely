@@ -31,6 +31,7 @@ const mockBench = {
   engine: null as typeof mockEngine | null,
   sent: [] as unknown[],
   fail: null as string | null,
+  selfCheck: null as object | null,
 };
 
 function mockRun(plan: PlanSpec, ms: number, durationSec?: number, cadenceMs = 500): BenchRun {
@@ -85,6 +86,7 @@ jest.mock('../../../lib/onDevice/benchRun', () => {
     runPlan: jest.fn(async (_e: unknown, _m: unknown, plan: PlanSpec, _f: unknown, length: { windows?: number; durationSec?: number; cadenceMs?: number }) =>
       mockRun(plan, plan.provider === 'coreml' ? 4 : 180, length.durationSec, length.cadenceMs),
     ),
+    recordSelfCheck: jest.fn(async () => mockBench.selfCheck),
     benchRecord: (device: object, windows: number, runs: BenchRun[]) => ({ device, windows, runs: runs.map((r) => r.plan.model) }),
     sendBenchRecord: jest.fn(async (rec: unknown) => {
       mockBench.sent.push(rec);
@@ -104,6 +106,7 @@ beforeEach(() => {
   mockBench.engine = mockEngine;
   mockBench.sent = [];
   mockBench.fail = null;
+  mockBench.selfCheck = null;
 });
 
 describe('[ONDEV-1] Settings → Testing → On-device model', () => {
@@ -243,5 +246,21 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
     });
     expect(screen.getByTestId('bench-status').props.children).toBe('Failed: v7/v7m-live-r16.onnx: checksum doesn’t match');
     expect(mockBench.sent).toEqual([]);
+  });
+
+  it('shows the engine’s self-check for each model, and nothing with no pack on the phone', async () => {
+    await show();
+    expect(screen.queryByTestId('bench-self-check')).toBeNull();
+    screen.unmount();
+    const none = { ran: false, ok: null, maxDiff: null, topDiff: null, frames: null, notFinite: null, tol: null };
+    mockBench.selfCheck = {
+      check: { ran: true, ok: true, pack: 'k', packContent: null, packId: 'v7m-1', ort: '1.31.1', prepacking: false, openCode: null, openError: null, v5: none,
+        v7: { ran: true, ok: true, maxDiff: 0.000042, topDiff: 0, frames: 240, notFinite: 0, tol: 0.001 } },
+      sendError: null,
+    };
+    await show();
+    expect(screen.getByTestId('bench-self-check').props.children).toBe(
+      'Self-check passed\nv7: largest difference 0.000042, 0 of 240 frames with another top sound\nv5: no check in this pack',
+    );
   });
 });
