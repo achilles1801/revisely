@@ -72,7 +72,7 @@ it('[RMEM-3] [RMEM-4] a word missed before stays marked on the page; its card sh
   const box = app.mods.require('src/lib/reciteLive/geometry').wordBox(words, W);
   await app.act(() => tapPoint((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2));
   await app.until(() => app.screen.queryByTestId('past-card') != null, 'the word’s card');
-  expect(plain(app.screen.getByTestId('past-card-place').props.children)).toBe('Yusuf, ayah 88 · wrong in 1 of 2 takes');
+  expect(plain(app.screen.getByTestId('past-card-place').props.children)).toBe('Yusuf, 12th page · wrong in 1 of 2 takes');
   expect(app.screen.getAllByTestId('past-try-right')).toHaveLength(1);
   expect(app.screen.getAllByTestId('past-try-wrong')).toHaveLength(1);
   expect(app.screen.getByText('Right today. 1 more right take, on another day, clears it.')).toBeTruthy();

@@ -78,8 +78,9 @@ it('[RINS-3] a slip into a similar ayah says so under the take; a hold offers Sh
   app = await openDay(phone, today);
   expect(app.screen.getByTestId('activity-take-line').props.children).toBe('7:51 PM · 2 min · 1 mistake');
   const into = app.screen.getAllByTestId('activity-take-into');
-  expect(into.map((t) => plain(t.props.children))).toEqual(['You went on with Yusuf 90, a similar ayah']);
-  expect(plain(app.screen.getByTestId('activity-take-head').props.accessibilityLabel)).toContain('You went on with Yusuf 90, a similar ayah');
+  expect(into).toHaveLength(1);
+  expect(plain(into[0].props.children)).toMatch(/^You went on with «.+» in Yusuf \(90\), a similar ayah$/);
+  expect(plain(app.screen.getByTestId('activity-take-head').props.accessibilityLabel)).toMatch(/You went on with «.+» in Yusuf \(90\), a similar ayah/);
 
   // Revo off for the account: the menu has Show on the page alone.
   await hold(app);

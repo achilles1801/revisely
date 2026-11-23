@@ -115,7 +115,7 @@ describe('the juz sheet', () => {
     await flush();
     expect(screen.getByText('this week')).toBeTruthy();
     expect(screen.queryByText(/^(weak|moderate|strong)$/)).toBeNull();
-    expect(screen.queryByText(/Ayahs .* weak/)).toBeNull();
+    expect(screen.queryByText(/page weak$/)).toBeNull();
   });
 
   it('[ACT-19] with Smart Tracking the sheet shows strength', async () => {
@@ -123,7 +123,7 @@ describe('the juz sheet', () => {
     fireEvent.press(screen.getByTestId('juz-tile-28'));
     await flush();
     expect(screen.getByText('weak')).toBeTruthy();
-    expect(screen.getByText(/^Ayahs \d+–\d+ weak$/)).toBeTruthy();
+    expect(screen.getByText(/page weak$/)).toBeTruthy();
   });
 
   it('[ACT-21] a page, a surah and Open in the reader open the reader, once the sheet has gone', async () => {
@@ -183,7 +183,7 @@ describe('the juz sheet', () => {
     expect(screen.queryByTestId('juz-cell-part-564')).toBeNull();
     expect(screen.getByText('Part of a page')).toBeTruthy();
     // Its row, as VoiceOver reads it (ranges spoken: "1 to 20").
-    expect(plainText(String(screen.getByTestId('juz-surah-67').props.accessibilityLabel))).toBe('Al-Mulk, Ayahs 1 to 20 · 21 to 30 to go');
+    expect(plainText(String(screen.getByTestId('juz-surah-67').props.accessibilityLabel))).toBe('Al-Mulk, Part of the page · rest of the page to go');
     // Continue at the first ayah not memorized, once the sheet has gone.
     expect(screen.queryByTestId('juz-sheet-open')).toBeNull();
     fireEvent.press(screen.getByTestId('juz-sheet-continue'));
