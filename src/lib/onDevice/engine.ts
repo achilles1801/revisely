@@ -100,7 +100,6 @@ export function deviceConnect(server: LiveConnect): LiveConnect {
     fastEnough,
     settings: reciteWhere,
     warm: warmEngine,
-    onRouted: (answer, refused) =>
-      logger.log(`Recite: on the ${answer.on} (${answer.why}${refused ? `: ${refused}` : ''})`),
+    onRouted: (answer) => logger.log(`Recite: on the ${answer.on} (${answer.why}${answer.detail ? `: ${answer.detail}` : ''})`),
   });
 }

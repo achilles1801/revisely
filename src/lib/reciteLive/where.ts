@@ -90,21 +90,39 @@ export interface WhereInput {
   start: StartFrame;
 }
 
+/**
+ * Why a take ran where it did, so the share of takes on the server can be counted with its reasons (plan §12). Who
+ * chose (`forced`: this phone's Testing row; `pin`: the account; `config`: config/app, or nothing set), or what kept it
+ * off the phone. A closed list: firestore.rules holds the same one.
+ */
+export type WhereWhy = 'forced' | 'pin' | 'config' | 'no-pack' | 'self-check' | 'lacks' | 'slow' | 'no-speed' | 'refused' | 'replay';
+export const WHERE_WHYS: ReadonlySet<WhereWhy> = new Set<WhereWhy>([
+  'forced', 'pin', 'config', 'no-pack', 'self-check', 'lacks', 'slow', 'no-speed', 'refused', 'replay',
+]);
+
 export interface WhereAnswer {
   on: RunsOn;
-  /** Why, for the take's log: `asked`, or what kept it off the phone. */
-  why: string;
+  why: WhereWhy;
+  /** For the log only: what the engine lacks, or how it refused. */
+  detail?: string;
 }
 
 /** Where this take runs. With nothing set it stays on the server, until config/app says otherwise. */
 export function chooseWhere(i: WhereInput): WhereAnswer {
   const wanted: WhereSetting = i.testing ?? i.pin ?? i.config ?? 'server';
-  if (wanted === 'server') return { on: 'server', why: 'asked' };
-  if (!i.engine) return { on: 'server', why: 'no-engine' };
+  const chose: WhereWhy = i.testing ? 'forced' : i.pin ? 'pin' : 'config';
+  if (wanted === 'server') return { on: 'server', why: chose };
+  if (!i.engine) return { on: 'server', why: 'no-pack' };
   if (isReplayEngine(i.engine)) return i.testing === 'phone' ? { on: 'phone', why: 'replay' } : { on: 'server', why: 'replay' };
   if (i.engine.self_check?.ok !== true) return { on: 'server', why: 'self-check' };
   const lacks = engineLacks(i.start, i.engine);
-  if (lacks) return { on: 'server', why: lacks };
-  if (wanted === 'auto' && i.fastEnough !== true) return { on: 'server', why: 'speed' };
-  return { on: 'phone', why: 'asked' };
+  if (lacks) return { on: 'server', why: 'lacks', detail: lacks };
+  if (wanted === 'auto' && i.fastEnough !== true) return { on: 'server', why: i.fastEnough === false ? 'slow' : 'no-speed' };
+  return { on: 'phone', why: chose };
+}
+
+/** A recitation of several takes ran on the phone only if all did: the first that didn't says why. */
+export function joinWhere(sofar: WhereAnswer | null, next: WhereAnswer | null): WhereAnswer | null {
+  if (!sofar || !next) return next;
+  return sofar.on === 'server' ? sofar : next;
 }

@@ -28,6 +28,7 @@ import { createTakeStats } from '../../lib/reciteLive/takeStats';
 import { createMistakeCue, playCueSound, playCueTap } from '../../lib/reciteLive/mistakeCue';
 import { reportLongTake, reportUnfinishedTake } from '../../lib/reciteLive/takeReport';
 import { SavedTake, startTakeRecording, TakeRecording } from '../../lib/reciteLive/takeRecording';
+import { joinWhere, type WhereAnswer } from '../../lib/reciteLive/where';
 import { takeFile, type TakeFile } from '../../lib/reciteMemory/takeAudio';
 import {
   applyEvent,
@@ -509,8 +510,8 @@ export function useLiveRecitation({
   const closeCurrent = useRef<() => void>(() => undefined);
   /** How takes connect: the checker's socket, or E2E's stand-ins (kept for the links that follow). */
   const connectRef = useRef<LiveConnect>(connect);
-  /** The take ran on the phone's engine (null until a connection has said `ready`). */
-  const onPhone = useRef<boolean | null>(null);
+  /** Where the take ran and why (null until a connection has said `ready`, and where nothing routed it). */
+  const ranWhere = useRef<WhereAnswer | null>(null);
   /** A link's connection, its events to the link it was opened for. */
   const openLink = useCallback(
     (frame: StartFrame): LiveConnection => {
@@ -519,7 +520,7 @@ export function useLiveRecitation({
       const c = connectRef.current(frame, {
         onEvent: (e) => {
           // By `ready` a take is where it will stay; a recitation of several takes ran on the phone only if all did.
-          if (e.type === 'ready') onPhone.current = onPhone.current !== false && holder.c?.ranOn?.() === 'phone';
+          if (e.type === 'ready') ranWhere.current = joinWhere(ranWhere.current, holder.c?.ranWhere?.() ?? null);
           if (no === linkNo.current) onEvent(e);
           else onLinkEvent(no, e);
         },
@@ -885,7 +886,7 @@ export function useLiveRecitation({
         stats.start();
         connectRef.current = connect;
         closeCurrent.current = () => void stopMic();
-        onPhone.current = null;
+        ranWhere.current = null;
         const c = openLink(frame);
         recordingRef.current = keepsAudio(take, settings.saveRecording, recordingDay)
           ? startTakeRecording({ day: recordingDay as string, page })
@@ -1053,7 +1054,8 @@ export function useLiveRecitation({
       const link = linkOf(id);
       const s = link ? link.state : curRef.current;
       if (s.status === 'done') {
-        if (s.take && testDataRef.current) void sendLabel(what, s.take, id, Date.now());
+        // A take on the phone isn't stored on the checker (ONDEV-4), so it has nothing to label.
+        if (s.take && testDataRef.current && ranWhere.current?.on !== 'phone') void sendLabel(what, s.take, id, Date.now());
         return;
       }
       (link ? linkConns.current.get(link.no) : conn.current)?.send({ type: what, id });
@@ -1249,9 +1251,9 @@ export function useLiveRecitation({
     get seconds() {
       return clock.get();
     },
-    /** 'phone' when the take ran on the phone's engine, for its record; null on the server. */
-    get ranOn(): 'phone' | null {
-      return onPhone.current ? 'phone' : null;
+    /** Where the take ran and why, for its record (ONDEV-4). */
+    get ranWhere(): WhereAnswer | null {
+      return ranWhere.current;
     },
     clock,
     words,

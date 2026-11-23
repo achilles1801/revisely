@@ -3,6 +3,7 @@
 // event log (the model session's fixtures: the lab's live checker on public recitations with planted mistakes).
 
 import { LiveEvent, parseEvent } from './contract';
+import type { WhereAnswer, WhereWhy } from './where';
 
 export interface StartFrame {
   type: 'start';
@@ -42,6 +43,8 @@ export interface StartFrame {
   guess?: boolean;
   /** Send the audio as IMA-ADPCM blocks if the checker's `ready` agrees (contract "ADPCM uplink"); raw PCM otherwise. */
   audio?: 'adpcm';
+  /** Why this take came to the server and not the phone (ONDEV-4), for its take line. A checker without it ignores it. */
+  ranWhy?: WhereWhy;
 }
 
 export type ClientFrame =
@@ -88,8 +91,8 @@ export interface LiveConnection {
   status?(): string;
   /** The take's audio from `from` to `to` seconds (16 kHz mono), as held on the phone; null outside what was heard. */
   audioClip?(from: number, to: number): Int16Array | null;
-  /** Where the take ran (lib/reciteLive/where); absent: the server. */
-  ranOn?(): 'phone' | 'server';
+  /** Where the take ran and why (lib/reciteLive/where); absent: a connection nothing routed (the store app, E2E). */
+  ranWhere?(): WhereAnswer;
 }
 
 export interface LiveHandlers {

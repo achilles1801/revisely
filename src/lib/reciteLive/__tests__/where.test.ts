@@ -1,5 +1,5 @@
 import type { StartFrame } from '../feed';
-import { chooseWhere, EngineInfo, engineLacks, levelOf, parseEngineInfo, whereSetting, wherePin, WhereInput } from '../where';
+import { chooseWhere, joinWhere, EngineInfo, engineLacks, levelOf, parseEngineInfo, whereSetting, wherePin, WhereInput } from '../where';
 
 const MARK: StartFrame = {
   type: 'start', s: 2, a: 6, s2: null, a2: null, mon: 4, mot: 4, aar: 0, letters: true, tajweed: false, keep: false,
@@ -19,7 +19,7 @@ const input = (over: Partial<WhereInput> = {}): WhereInput => ({
 
 describe('chooseWhere', () => {
   it('stays on the server with nothing set', () => {
-    expect(chooseWhere(input())).toEqual({ on: 'server', why: 'asked' });
+    expect(chooseWhere(input())).toEqual({ on: 'server', why: 'config' });
   });
 
   it('config/app moves everyone', () => {
@@ -35,21 +35,29 @@ describe('chooseWhere', () => {
     expect(chooseWhere(input({ config: 'server', pin: 'server', testing: 'phone' })).on).toBe('phone');
   });
 
+  it('says who chose', () => {
+    expect(chooseWhere(input({ testing: 'phone' }))).toEqual({ on: 'phone', why: 'forced' });
+    expect(chooseWhere(input({ testing: 'server', config: 'phone' }))).toEqual({ on: 'server', why: 'forced' });
+    expect(chooseWhere(input({ pin: 'phone' }))).toEqual({ on: 'phone', why: 'pin' });
+    expect(chooseWhere(input({ pin: 'server', config: 'phone' }))).toEqual({ on: 'server', why: 'pin' });
+    expect(chooseWhere(input({ config: 'auto' }))).toEqual({ on: 'phone', why: 'config' });
+  });
+
   it.each([
-    ['no engine (a stub build, no pack)', { engine: null }, 'no-engine'],
-    ['a failed self-check', { engine: { ...ENGINE, self_check: { ok: false } } }, 'self-check'],
-    ['no self-check at all', { engine: { ...ENGINE, self_check: undefined } }, 'self-check'],
-    ['a level it does not run', { engine: { ...ENGINE, levels: ['recite'] } }, 'level:harakat'],
-    ['a feature it lacks', { engine: { ...ENGINE, can: { ...ENGINE.can, names: false } } }, 'names'],
-  ])('falls back to the server on %s, even when asked for the phone', (_n, over, why) => {
+    ['no engine (a stub build, no pack)', { engine: null }, 'no-pack', undefined],
+    ['a failed self-check', { engine: { ...ENGINE, self_check: { ok: false } } }, 'self-check', undefined],
+    ['no self-check at all', { engine: { ...ENGINE, self_check: undefined } }, 'self-check', undefined],
+    ['a level it does not run', { engine: { ...ENGINE, levels: ['recite'] } }, 'lacks', 'level:harakat'],
+    ['a feature it lacks', { engine: { ...ENGINE, can: { ...ENGINE.can, names: false } } }, 'lacks', 'names'],
+  ])('falls back to the server on %s, even when asked for the phone', (_n, over, why, detail) => {
     for (const asked of [{ testing: 'phone' as const }, { pin: 'phone' as const }, { config: 'phone' as const }]) {
-      expect(chooseWhere(input({ ...asked, ...over }))).toEqual({ on: 'server', why });
+      expect(chooseWhere(input({ ...asked, ...over }))).toEqual({ on: 'server', why, ...(detail ? { detail } : {}) });
     }
   });
 
   it('only `auto` asks whether the phone is fast enough', () => {
-    expect(chooseWhere(input({ config: 'auto', fastEnough: null }))).toEqual({ on: 'server', why: 'speed' });
-    expect(chooseWhere(input({ config: 'auto', fastEnough: false }))).toEqual({ on: 'server', why: 'speed' });
+    expect(chooseWhere(input({ config: 'auto', fastEnough: null }))).toEqual({ on: 'server', why: 'no-speed' });
+    expect(chooseWhere(input({ config: 'auto', fastEnough: false }))).toEqual({ on: 'server', why: 'slow' });
     expect(chooseWhere(input({ config: 'phone', fastEnough: false })).on).toBe('phone');
   });
 
@@ -59,6 +67,25 @@ describe('chooseWhere', () => {
     expect(chooseWhere(input({ engine, pin: 'phone' }))).toEqual({ on: 'server', why: 'replay' });
     expect(chooseWhere(input({ engine, config: 'phone' }))).toEqual({ on: 'server', why: 'replay' });
     expect(chooseWhere(input({ engine, config: 'auto' }))).toEqual({ on: 'server', why: 'replay' });
+  });
+});
+
+describe('joinWhere', () => {
+  const phone = { on: 'phone', why: 'config' } as const;
+  const slow = { on: 'server', why: 'slow' } as const;
+  const refused = { on: 'server', why: 'refused' } as const;
+
+  it('a recitation ran on the phone only if all its takes did, and the first that did not says why', () => {
+    expect(joinWhere(null, phone)).toEqual(phone);
+    expect(joinWhere(phone, phone)).toEqual(phone);
+    expect(joinWhere(phone, slow)).toEqual(slow);
+    expect(joinWhere(slow, phone)).toEqual(slow);
+    expect(joinWhere(slow, refused)).toEqual(slow);
+  });
+
+  it('a take nothing routed says nothing', () => {
+    expect(joinWhere(null, null)).toBeNull();
+    expect(joinWhere(phone, null)).toBeNull();
   });
 });
 

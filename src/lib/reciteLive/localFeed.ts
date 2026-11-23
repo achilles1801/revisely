@@ -12,7 +12,7 @@
 import { LiveEvent, parseEvent } from './contract';
 import type { ClientFrame, LiveConnect, LiveConnection, LiveHandlers, StartFrame } from './feed';
 import { NAMES_WAIT_MS } from './socket';
-import type { RunsOn } from './where';
+import type { WhereAnswer } from './where';
 
 const SAMPLE_RATE_HZ = 16_000;
 
@@ -35,6 +35,8 @@ export interface EngineBridge {
 
 export interface LocalDeps {
   engine: EngineBridge;
+  /** Why this take came to the phone (lib/reciteLive/where). */
+  asked: WhereAnswer;
   /** Where a take goes when the engine won't start it: the server. */
   fallback: LiveConnect;
   /** `clip` and `health` frames. */
@@ -246,7 +248,7 @@ export function localFeed(deps: LocalDeps): LiveConnect {
       },
       // i18n-ignore (a status for the log and Sentry)
       status: () => (server ? (server.status?.() ?? 'server') : finished ? 'finished' : take != null ? 'local' : 'local opening'),
-      ranOn: (): RunsOn => (server ? 'server' : 'phone'),
+      ranWhere: () => (server ? (server.ranWhere?.() ?? { on: 'server', why: 'refused' }) : deps.asked),
       audioClip: (from, to) => {
         const a = Math.max(0, Math.floor(from * SAMPLE_RATE_HZ));
         const b = Math.min(samples, Math.ceil(to * SAMPLE_RATE_HZ));

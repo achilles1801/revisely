@@ -524,6 +524,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Settings → Testing → “Recite runs on” chooses where this phone’s takes are checked: Automatic (what the Revisely team has set, the server for now), This phone, or The server. A tap moves to the next one.',
       '- The line under it says where the next take will run and, if it is the server, why: for example no engine on this phone yet. The on-device engine is still being built, so most phones say that.',
       '- A take the phone’s engine can’t run goes to the server by itself, with nothing lost and nothing to do. Everything on the screen works the same in both places.',
+      '- A take checked on this phone isn’t kept as test data yet, even with “Keep my recitations as test data” on. The line under the row says so.',
     ),
   },
 ];

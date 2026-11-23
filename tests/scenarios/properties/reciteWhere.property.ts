@@ -81,7 +81,7 @@ describe('where a take runs', () => {
           onFrames: () => () => undefined,
         };
         const events: string[] = [];
-        const c = localFeed({ engine, fallback: () => server })(START, {
+        const c = localFeed({ engine, asked: { on: 'phone', why: 'forced' }, fallback: () => server })(START, {
           onEvent: (e) => events.push(e.type),
           onClose: () => events.push('closed'),
         });
@@ -94,7 +94,7 @@ describe('where a take runs', () => {
         const want = [...before, ...after].map((s) => ('pcm' in s ? s.pcm : { type: 'seek', w: s.w }));
         expect(sent).toEqual(want);
         expect(events).toEqual([]); // the reciter sees nothing of it
-        expect(c.ranOn?.()).toBe('server');
+        expect(c.ranWhere?.().on).toBe('server');
       }),
       { numRuns: 60 },
     );

@@ -36,11 +36,13 @@ function setup(over: Partial<RouteDeps> = {}, startAnswer: { take?: number; code
     fastEnough: () => true,
     settings: () => ({ config: null, pin: null, testing: null }),
     warm,
-    onRouted: (a, refused) => routed.push([a.on, a.why, refused]),
+    onRouted: (a) => routed.push([a.on, a.why, a.detail]),
     ...over,
   });
   return { connect, server, start, warm, routed };
 }
+
+const sentWhy = (server: jest.Mock) => (server.mock.calls[0] as [{ ranWhy?: string }])[0].ranWhy;
 
 describe('routedFeed', () => {
   it('sends a take to the server with nothing set, and opens nothing', () => {
@@ -49,7 +51,8 @@ describe('routedFeed', () => {
     expect(t.server).toHaveBeenCalledTimes(1);
     expect(t.start).not.toHaveBeenCalled();
     expect(t.warm).not.toHaveBeenCalled();
-    expect(t.routed).toEqual([['server', 'asked', undefined]]);
+    expect(t.routed).toEqual([['server', 'config', undefined]]);
+    expect(sentWhy(t.server)).toBe('config');
   });
 
   it('runs a take on the engine when asked', async () => {
@@ -59,7 +62,7 @@ describe('routedFeed', () => {
     expect(t.start).toHaveBeenCalledTimes(1);
     expect(t.server).not.toHaveBeenCalled();
     expect(t.warm).toHaveBeenCalledTimes(1);
-    expect(c.ranOn?.()).toBe('phone');
+    expect(c.ranWhere?.()).toEqual({ on: 'phone', why: 'config' });
   });
 
   it('asked for the phone with no engine open: this take on the server, and the engine opening for the next', () => {
@@ -67,14 +70,14 @@ describe('routedFeed', () => {
     t.connect(START, handlers);
     expect(t.server).toHaveBeenCalledTimes(1);
     expect(t.warm).toHaveBeenCalledTimes(1);
-    expect(t.routed).toEqual([['server', 'no-engine', undefined]]);
+    expect(t.routed).toEqual([['server', 'no-pack', undefined]]);
   });
 
   it('a module without the engine calls goes to the server', () => {
     const t = setup({ engine: () => null, settings: () => ({ config: 'phone', pin: null, testing: null }) });
     t.connect(START, handlers);
     expect(t.server).toHaveBeenCalledTimes(1);
-    expect(t.routed).toEqual([['server', 'no-engine', undefined]]);
+    expect(t.routed).toEqual([['server', 'no-pack', undefined]]);
   });
 
   it('a take the engine refuses goes to the server, and says why', async () => {
@@ -82,9 +85,10 @@ describe('routedFeed', () => {
     const c = t.connect(START, handlers);
     await flush();
     expect(t.server).toHaveBeenCalledTimes(1);
-    expect(c.ranOn?.()).toBe('server');
+    expect(c.ranWhere?.()).toEqual({ on: 'server', why: 'refused', detail: 'start:-3' });
+    expect(sentWhy(t.server)).toBe('refused');
     expect(t.routed).toEqual([
-      ['phone', 'asked', undefined],
+      ['phone', 'config', undefined],
       ['server', 'refused', 'start:-3'],
     ]);
   });

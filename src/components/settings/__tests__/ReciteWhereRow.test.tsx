@@ -8,7 +8,7 @@ jest.mock('../../../context/ThemeContext', () => ({
 }));
 jest.mock('../../../lib/onDevice/engine', () => ({
   warmEngine: jest.fn(),
-  whereNow: jest.fn(() => ({ on: 'server', why: 'no-engine' })),
+  whereNow: jest.fn(() => ({ on: 'server', why: 'no-pack' })),
 }));
 
 const { warmEngine } = jest.requireMock('../../../lib/onDevice/engine') as { warmEngine: jest.Mock };
@@ -42,12 +42,14 @@ describe('ReciteWhereRow', () => {
   });
 
   it.each([
-    [{ on: 'phone', why: 'asked' }, 'Next take: on this phone'],
+    [{ on: 'phone', why: 'forced' }, 'Next take: on this phone. It won’t be kept as test data yet'],
     [{ on: 'phone', why: 'replay' }, 'Next take: a recorded take, played on this phone'],
-    [{ on: 'server', why: 'asked' }, 'Next take: on the server'],
+    [{ on: 'server', why: 'config' }, 'Next take: on the server'],
+    [{ on: 'server', why: 'no-pack' }, 'Next take: on the server. No engine on this phone yet'],
     [{ on: 'server', why: 'self-check' }, 'Next take: on the server. The engine failed its check'],
-    [{ on: 'server', why: 'speed' }, 'Next take: on the server. This phone’s speed isn’t checked yet'],
-    [{ on: 'server', why: 'level:strict' }, 'Next take: on the server. The engine can’t do this yet'],
+    [{ on: 'server', why: 'no-speed' }, 'Next take: on the server. This phone’s speed isn’t checked yet'],
+    [{ on: 'server', why: 'slow' }, 'Next take: on the server. This phone is too slow for it'],
+    [{ on: 'server', why: 'lacks' }, 'Next take: on the server. The engine can’t do this yet'],
   ] as const)('%j', (answer, line) => {
     expect(nextTakeLine(answer)).toBe(line);
   });

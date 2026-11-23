@@ -18,14 +18,18 @@ const choiceLabel = (c: RunsOn | null): string =>
 export function nextTakeLine(a: WhereAnswer): string {
   if (a.on === 'phone') return a.why === 'replay' ? t('settings.testing.whereNextReplay') : t('settings.testing.whereNextPhone');
   switch (a.why) {
-    case 'asked':
+    case 'forced':
+    case 'pin':
+    case 'config':
       return t('settings.testing.whereNextServer');
-    case 'no-engine':
+    case 'no-pack':
       return t('settings.testing.whereNextNoEngine');
     case 'self-check':
       return t('settings.testing.whereNextCheck');
-    case 'speed':
+    case 'no-speed':
       return t('settings.testing.whereNextSpeed');
+    case 'slow':
+      return t('settings.testing.whereNextSlow');
     default:
       return t('settings.testing.whereNextLacks');
   }

@@ -73,6 +73,7 @@ function setup(answer?: { take?: number; code?: number; error?: string }, start:
   const waits: { fn: () => void; ms: number; off?: boolean }[] = [];
   const connect = localFeed({
     engine: fake.engine,
+    asked: { on: 'phone', why: 'forced' },
     fallback: srv.connect,
     onHostFrame: (f) => host.push(f),
     onFallback: (w) => why.push(w),
@@ -216,7 +217,7 @@ describe('localFeed: a take on the phone', () => {
   it('says it ran on the phone', async () => {
     const t = setup();
     await t.answerStart();
-    expect(t.conn.ranOn!()).toBe('phone');
+    expect(t.conn.ranWhere!()).toEqual({ on: 'phone', why: 'forced' });
     expect(t.conn.status!()).toBe('local');
   });
 });
@@ -255,7 +256,7 @@ describe('localFeed: a take the engine will not start goes to the server', () =>
     ]);
     expect(t.events.filter((e) => e.type === 'error')).toEqual([]);
     expect(t.closedCount()).toBe(0);
-    expect(t.conn.ranOn!()).toBe('server');
+    expect(t.conn.ranWhere!().on).toBe('server');
     // And everything after it goes to the server.
     t.conn.sendAudio(pcm(8));
     t.conn.send({ type: 'end' });
@@ -277,7 +278,7 @@ describe('localFeed: a take the engine will not start goes to the server', () =>
     const failing = fakeEngine();
     failing.engine.start = () => Promise.reject(new Error('native gone'));
     const srv = fakeServer();
-    localFeed({ engine: failing.engine, fallback: srv.connect })(START, { onEvent: () => undefined, onClose: () => undefined });
+    localFeed({ engine: failing.engine, asked: { on: 'phone', why: 'forced' }, fallback: srv.connect })(START, { onEvent: () => undefined, onClose: () => undefined });
     await flush();
     expect(srv.connect).toHaveBeenCalledTimes(1);
     expect(t.srv.connect).not.toHaveBeenCalled();

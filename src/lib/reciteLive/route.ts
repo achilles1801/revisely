@@ -4,6 +4,10 @@ import type { LiveConnect } from './feed';
 import { EngineBridge, localFeed } from './localFeed';
 import { chooseWhere, EngineInfo, RunsOn, WhereAnswer, WhereSetting } from './where';
 
+/** The server's take line says why the take came to it (`ranWhy`; a checker that doesn't read it ignores it). */
+const toServer = (server: LiveConnect, answer: WhereAnswer): LiveConnect => (start, handlers) =>
+  Object.assign(server({ ...start, ranWhy: answer.why }, handlers), { ranWhere: () => answer });
+
 export interface RouteDeps {
   server: LiveConnect;
   engine: () => EngineBridge | null;
@@ -13,8 +17,8 @@ export interface RouteDeps {
   /** Open the engine in the background, for the takes after this one. */
   warm: () => void;
   onHostFrame?: (frame: Record<string, unknown>) => void;
-  /** Where a take went and why; `refused` when the engine turned it down at its start. */
-  onRouted?: (answer: WhereAnswer, refused?: string) => void;
+  /** Where a take went and why; again, as `refused`, when the engine turns it down at its start. */
+  onRouted?: (answer: WhereAnswer) => void;
 }
 
 export function routedFeed(deps: RouteDeps): LiveConnect {
@@ -24,15 +28,22 @@ export function routedFeed(deps: RouteDeps): LiveConnect {
     const answer = chooseWhere({ ...s, engine: deps.info(), fastEnough: deps.fastEnough(), start });
     const engine = answer.on === 'phone' ? deps.engine() : null;
     if (!engine) {
-      deps.onRouted?.(answer.on === 'phone' ? { on: 'server', why: 'no-engine' } : answer);
-      return deps.server(start, handlers);
+      const served: WhereAnswer = answer.on === 'phone' ? { on: 'server', why: 'no-pack' } : answer;
+      deps.onRouted?.(served);
+      return toServer(deps.server, served)(start, handlers);
     }
     deps.onRouted?.(answer);
+    const refused = (detail: string): WhereAnswer => ({ on: 'server', why: 'refused', detail });
+    let why = '';
     return localFeed({
       engine,
-      fallback: deps.server,
+      asked: answer,
+      fallback: (s, h) => toServer(deps.server, refused(why))(s, h),
       onHostFrame: deps.onHostFrame,
-      onFallback: (why) => deps.onRouted?.({ on: 'server', why: 'refused' }, why),
+      onFallback: (detail) => {
+        why = detail;
+        deps.onRouted?.(refused(detail));
+      },
     })(start, handlers);
   };
 }

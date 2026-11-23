@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { logger } from '../../lib/logger';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import { settleUnfinished, startNotFound, type LiveState } from '../../lib/reciteLive/state';
+import type { WhereAnswer } from '../../lib/reciteLive/where';
 import { recordFromTake, sameTake } from '../../lib/reciteMemory/fromTake';
 import { openWordsBetween } from '../../lib/reciteMemory/memory';
 import { memoryId, MemoryRecord, TakeLevel, TakeRecord } from '../../lib/reciteMemory/record';
@@ -20,8 +21,8 @@ export interface LiveTakeView {
   wordTime: (w: number) => number | null;
   /** A recitation longer than the checker's cap: its takes (RECITE-22). */
   links?: Array<{ take: string | null; from: number }> | null;
-  /** 'phone' when the take ran on the phone's engine (ONDEV-4). */
-  ranOn?: 'phone' | null;
+  /** Where the take ran and why (ONDEV-4); null when nothing routed it. */
+  ranWhere?: WhereAnswer | null;
 }
 
 /** Today in the phone's zone, when there's no revision day to file a take under. */
@@ -135,7 +136,7 @@ export function useRememberTake({
       openWords: (from, to) => openWordsBetween(records, from, to),
       links: view.links,
       peeked,
-      ranOn: view.ranOn,
+      ranWhere: view.ranWhere,
     });
   }, [enabled, live, day, level, records, peeked]);
 
