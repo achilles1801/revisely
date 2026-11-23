@@ -370,6 +370,20 @@ export const settings = {
     /** Revisely Dev's row opening the on-device bench (screens/main/OnDeviceBenchScreen, ONDEV-1). */
     bench: 'On-device model',
     benchSub: 'Time Recite’s model on this phone',
+    /** Revisely Dev's row choosing where this phone's takes run (components/settings/ReciteWhereRow, ONDEV-4). */
+    where: 'Recite runs on',
+    whereAuto: 'Automatic',
+    wherePhone: 'This phone',
+    whereServer: 'The server',
+    whereHint: 'Changes where this phone’s takes are checked',
+    whereNextPhone: 'Next take: on this phone. It won’t be kept as test data yet',
+    whereNextReplay: 'Next take: a recorded take, played on this phone',
+    whereNextServer: 'Next take: on the server',
+    whereNextNoEngine: 'Next take: on the server. No engine on this phone yet',
+    whereNextCheck: 'Next take: on the server. The engine failed its check',
+    whereNextSpeed: 'Next take: on the server. This phone’s speed isn’t checked yet',
+    whereNextSlow: 'Next take: on the server. This phone is too slow for it',
+    whereNextLacks: 'Next take: on the server. The engine can’t do this yet',
   },
   /** Revisely Dev's on-device bench: Recite's model timed on this phone (ONDEV-1). */
   bench: {

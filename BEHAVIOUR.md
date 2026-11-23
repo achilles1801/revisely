@@ -1615,6 +1615,17 @@ shows up once and they must go through it and complete it … just the main stuf
   a charger). A run the app left the foreground during, or that the phone suspended, says so on its result and in its record: its times leave out the suspended windows, it names the longest clean stretch, and it gives no battery rate. A battery drop under two of the phone's steps (iOS reports five points at a time) gives no rate either. A run that fails says why and the others go on. The results go to the dev backend (the phone's model,
   chip, cores and memory, the build, each run's numbers; never the account or any audio) and can be shared. The store
   app has none of it: the native module is linked into Revisely Dev's builds only.
+- **ONDEV-4.** A take runs on the phone's engine or on the checker's server, one pipeline in two places with the same
+  frames, chosen per take: this phone's choice (Settings → Testing → Recite runs on: Automatic, This phone, The server),
+  else the account's pin (`entitlements/{uid}.reciteWhere`, which no client can write), else `config/app.recite.where`
+  (phone, server or auto), else the server. `auto` also needs the phone to have passed its speed check. Whatever asks
+  for the phone, a take goes to the server when this build has no engine, no pack is open, the engine failed its
+  self-check or can't run that take's level or features, and when the engine refuses the take at its start: the server
+  then gets the take whole, its audio and controls in order, and the reciter sees nothing of it. Once the engine has
+  said `ready`, a failure ends the take as an error. The engine's `clip` and `health` frames never reach the take's
+  state. Every take's record says where it ran and why (`ranOn`, `ranWhy`: who chose, or what kept it off the phone), and a take
+  on the server tells its take line why. A take on the phone isn't kept as test data yet, and Settings → Testing says so.
+  Revisely Dev only.
 
 - **ONDEV-2.** Recite's pack (the model and its tables, sealed) reaches a phone only through the server's `recitePack`:
   signed in, App Check from the Revisely Dev app, the pack's access claim, at most 6 calls and 3 device keys an account a

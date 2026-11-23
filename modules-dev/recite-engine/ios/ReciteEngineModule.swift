@@ -9,7 +9,17 @@ public class ReciteEngineModule: Module {
   public func definition() -> ModuleDefinition {
     Name("ReciteEngine")
 
-    Events("onBenchProgress")
+    Events("onBenchProgress", "onEngineFrames")
+
+    OnCreate {
+      RECEngine.shared.onFrames = { [weak self] take, frames, code in
+        self?.sendEvent("onEngineFrames", ["take": take, "frames": frames, "code": code])
+      }
+    }
+
+    OnDestroy {
+      RECEngine.shared.onFrames = nil
+    }
 
     /// What the bench reports the phone as: its model identifier (e.g. iPhone16,2), cores, memory and heat.
     Function("deviceInfo") { () -> [String: Any] in
@@ -33,6 +43,41 @@ public class ReciteEngineModule: Module {
 
     /// Which engine this build linked: recite-core or its stub (core/fetch.js), as JSON.
     Function("coreInfo") { () -> String in RECCore.infoJSON() }
+
+    // The engine (recite_core.h) on its own thread: RECEngine. A take's frames come back as onEngineFrames.
+
+    /// Opens the engine from named files ({name, path}), read into memory. Resolves {ok, code, error, info}.
+    AsyncFunction("engineOpenFiles") { (items: [[String: String]], options: String, promise: Promise) in
+      let plain = items.map { item -> [String: String] in
+        var out = item
+        if let path = item["path"] { out["path"] = ReciteEngineModule.plainPath(path) }
+        return out
+      }
+      RECEngine.shared.openFiles(plain, options: options) { promise.resolve($0) }
+    }
+
+    /// rc_info's JSON while the engine is open.
+    Function("engineInfo") { () -> String? in RECEngine.shared.info }
+
+    /// Starts a take from the contract's start frame. Resolves {take} or {code, error}.
+    AsyncFunction("engineStart") { (frame: String, promise: Promise) in
+      RECEngine.shared.startTake(frame) { promise.resolve($0) }
+    }
+
+    /// The bytes are copied here: the array is JavaScript's, and the engine's thread reads them later.
+    Function("engineFeed") { (take: Int, pcm: Int16Array) in
+      RECEngine.shared.feedTake(take, pcm: Data(bytes: pcm.rawPointer, count: pcm.byteLength))
+    }
+
+    Function("engineControl") { (take: Int, frame: String) in RECEngine.shared.controlTake(take, frame: frame) }
+
+    Function("engineFinish") { (take: Int) in RECEngine.shared.finishTake(take) }
+
+    Function("engineClose") { (take: Int) in RECEngine.shared.closeTake(take) }
+
+    AsyncFunction("engineRelease") { (promise: Promise) in
+      RECEngine.shared.releaseEngine { promise.resolve(nil) }
+    }
 
     /// A file's SHA-256 (hex), read in 1 MB pieces.
     AsyncFunction("sha256") { (path: String, promise: Promise) in

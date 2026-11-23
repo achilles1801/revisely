@@ -96,6 +96,10 @@ describe('RECITE_CORE_TOKEN', () => {
     const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).forEach((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : all.push(path.relative(core, path.join(d, e.name)))));
     walk(core);
     expect(all.filter((f) => /\.(a|so|zip|xcframework|cc|cpp|hpp)$/.test(f))).toEqual([]);
-    expect(all.filter((f) => f.endsWith('.c')).sort()).toEqual(['glue/recite_core_info.c', 'stub/recite_core_stub.c']);
+    expect(all.filter((f) => f.endsWith('.c')).sort()).toEqual([
+      'glue/recite_core_info.c',
+      'glue/recite_host.c', // drains rc_poll for the iOS and Android glue: public, calls only rc_*
+      'stub/recite_core_stub.c',
+    ]);
   });
 });

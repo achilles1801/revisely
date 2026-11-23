@@ -12,6 +12,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { logger } from '../logger';
 import { setReciteCheckOff } from '../reciteLive/off';
+import { applyReciteWhereConfig, loadReciteWhere } from '../reciteLive/whereSettings';
 
 export const KILL_SWITCH_EVERY_MS = 10 * 60_000;
 export const KILL_SWITCH_KEY = '@revisely_whats_new_off';
@@ -63,6 +64,7 @@ export function refreshWhatsNewOff(force = false, now = Date.now()): Promise<voi
       const next = whatsNewOffOf(snap.exists() ? snap.get('whatsNewOff') : undefined);
       const reciteOff = whatsNewOffOf(snap.exists() ? snap.get('reciteCheckOff') : undefined);
       setReciteCheckOff(reciteOff);
+      applyReciteWhereConfig(snap.exists() ? snap.get('recite.where') : undefined);
       readAt = now;
       set(next);
       await AsyncStorage.setItem(KILL_SWITCH_KEY, next ? '1' : '0').catch(() => undefined);
@@ -82,6 +84,7 @@ export function refreshWhatsNewOff(force = false, now = Date.now()): Promise<voi
 export function startWhatsNewOff(): void {
   if (started) return;
   started = true;
+  void loadReciteWhere();
   void AsyncStorage.getItem(RECITE_OFF_KEY)
     .then((saved) => {
       if (readAt == null) setReciteCheckOff(saved === '1');

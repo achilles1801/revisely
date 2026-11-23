@@ -4,6 +4,7 @@ import type { QuranWords } from '../recite/quranWords';
 import { pageAccuracy } from '../reciteLive/score';
 import { furthestWord, LiveState, marksInOrder, mistakeCount, removedMarks } from '../reciteLive/state';
 import { countsAsMistake, isUnclear } from '../reciteLive/contract';
+import type { WhereAnswer } from '../reciteLive/where';
 import { MAX_LINKS, MAX_MARKS, MAX_PASSED, MAX_PEEKED, MAX_REMOVED, TakeLevel, TakeRecord } from './record';
 
 export interface TakeContext {
@@ -23,6 +24,8 @@ export interface TakeContext {
   links?: Array<{ take: string | null; from: number }> | null;
   /** The words shown by hand during the take (RMEM-8): kept for its summary later. */
   peeked?: ReadonlySet<number> | null;
+  /** The take ran on the phone's engine. */
+  ranWhere?: WhereAnswer | null;
 }
 
 /**
@@ -65,6 +68,7 @@ export function recordFromTake(state: LiveState, words: QuranWords, ctx: TakeCon
     recordingId: ctx.recordingId,
     // No final answer came (lib/reciteLive/state `settleUnfinished`): what the take found before it.
     ...(state.final.unfinished ? { unfinished: true } : {}),
+    ...(ctx.ranWhere ? { ranOn: ctx.ranWhere.on, ranWhy: ctx.ranWhere.why } : {}),
     ...(ctx.links && ctx.links.length > 1 ? { links: ctx.links.slice(0, MAX_LINKS) } : {}),
     // What its summary showed, for when it is opened again (RMEM-8): the words peeked, and the marks called Not a
     // mistake, so they can still be put back.

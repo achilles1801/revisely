@@ -526,6 +526,16 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- It’s kept encrypted on the phone and out of backups. An account the team hasn’t given access sees “Not available for this account yet”.',
     ),
   },
+  {
+    // Nov 23 2026: one pipeline in two places (on-device-plan.md §12).
+    title: 'Where Recite runs (Settings → Testing)',
+    covers: ['ONDEV-4'],
+    routes: ['Settings'],
+    text: lines(
+      '- “Recite runs on”: Automatic (the team’s setting, the server for now), This phone or The server. The line under it says where the next take runs and why.',
+      '- A take the phone’s engine can’t run goes to the server by itself, with nothing lost. A take on the phone isn’t kept as test data yet.',
+    ),
+  },
 ];
 
 /**
