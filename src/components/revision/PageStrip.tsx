@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { I18nManager, StyleSheet, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
+import { mushafRow } from '../../lib/mushafDirection';
 import { t } from '../../i18n';
 
 /** The room the strip takes above the header (ReaderFrame's `strip`). */
@@ -30,7 +31,9 @@ export function stripBars(
 
 /**
  * The day's pages above the page, always on show (SESS-1): a bar each, filled once revised, the page on screen's
- * taller. After a swipe the controls hide, so this is what says how far the day has come.
+ * taller. After a swipe the controls hide, so this is what says how far the day has come. The bars run right to left,
+ * the first page's on the right, the way the pages turn under the finger, in every language (Majd, Nov 23 2026: "the bars
+ * should be colored the other way ie from right to left just like how the user swipes in that direction").
  */
 export function PageStrip({
   pages,
@@ -46,7 +49,7 @@ export function PageStrip({
   const revised = pages.filter((p) => done.has(p)).length;
   return (
     <View
-      style={[styles.strip, { gap: bars.length > 16 ? 2 : 4 }]}
+      style={[styles.strip, { flexDirection: mushafRow(I18nManager.isRTL), gap: bars.length > 16 ? 2 : 4 }]}
       accessible
       accessibilityRole="progressbar"
       accessibilityLabel={t('revision.end.progress', { done: revised, total: pages.length })}
@@ -71,7 +74,6 @@ export function PageStrip({
 const styles = StyleSheet.create({
   strip: {
     height: PAGE_STRIP_HEIGHT,
-    flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
   },
