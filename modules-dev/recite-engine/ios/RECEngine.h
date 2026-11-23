@@ -41,7 +41,8 @@ typedef void (^RECEngineFrames)(NSInteger take, NSArray<NSString *> *frames, NSI
 - (void)finishTake:(NSInteger)take;
 - (void)closeTake:(NSInteger)take;
 /// Closes every take and the engine.
-- (void)releaseEngine:(void (^)(void))done;
+/// Named for Swift: its importer would otherwise drop "Engine" and leave `release`, which ARC forbids.
+- (void)releaseEngine:(void (^)(void))done NS_SWIFT_NAME(releaseEngine(_:));
 
 @end
 
