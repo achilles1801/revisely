@@ -1,6 +1,8 @@
 // How a mark is worded on its card and in the summary (pure). Surah first, never a page number (NAME-1).
 
-import { surahName } from '../passages';
+import { ayahKey } from '../ayahKeys';
+import { pageNameOfAyah, surahName } from '../passages';
+import { firstWordsOfAyah } from '../recite/quranWords';
 import { tajweedName } from '../reciteCheck/result';
 import type { QuranWords } from '../recite/quranWords';
 import { isUnclear, type Mark, type MarkInto } from './contract';
@@ -36,18 +38,26 @@ export function markTitle(mark: Mark): string {
 
 /** "An-Naml, ayah 23", and "· likely" for a mark past the normal bar only. */
 export function markPlace(mark: Mark): string {
-  const place = t('reciteLive.describe.place', { surah: surahName(mark.ayah[0]), ayah: mark.ayah[1] });
+  const place = pageNameOfAyah(ayahKey(mark.ayah[0], mark.ayah[1]));
   return mark.sure === 'likely' && !isUnclear(mark) ? t('reciteLive.describe.placeLikely', { place }) : place;
 }
 
 /**
- * Where a slip went, on the end-of-take card (`into`; Majd said yes, Nov 15 2026): "You continued with Luqman 31:6, a
- * similar ayah", "(and 2 others)" with more ayat reading the same; for a swapped ending, "You ended ayah 5 as ayah 3
+ * Where a slip went, on the end-of-take card (`into`; Majd said yes, Nov 15 2026): "You continued with «…» in Luqman
+ * (31:6), a similar ayah", "(and 2 others)" with more ayat reading the same; for a swapped ending, "You ended ayah 5 as ayah 3
  * ends" (the same surah, as the checker only names those). `place` is where the mark is, as the card names it.
  */
-export function intoLine(mark: Mark & { into: MarkInto }, place: string): string {
+export function intoLine(mark: Mark & { into: MarkInto }): string {
   const [s, a] = mark.into.ayah;
-  const there = t('reciteLive.describe.there', { surah: surahName(s), sura: s, ayah: a });
+  // A swapped ending is about two exact ayat, so it keeps their numbers.
+  const place =
+    s === mark.ayah[0]
+      ? t('reciteLive.describe.ayahN', { n: mark.ayah[1] })
+      : t('reciteLive.describe.place', { surah: surahName(mark.ayah[0]), ayah: mark.ayah[1] });
+  const words = firstWordsOfAyah(s, a);
+  const there = words
+    ? t('reciteLive.describe.thereWords', { words, surah: surahName(s), sura: s, ayah: a })
+    : t('reciteLive.describe.there', { surah: surahName(s), sura: s, ayah: a });
   if (mark.into.ending) {
     const as = s === mark.ayah[0] ? t('reciteLive.describe.ayahN', { n: a }) : there;
     return t('reciteLive.describe.endedAs', { place, as });
@@ -59,8 +69,12 @@ export function intoLine(mark: Mark & { into: MarkInto }, place: string): string
 }
 
 /** The same for VoiceOver: the surah and ayah in words. */
-export function spokenIntoLine(mark: Mark & { into: MarkInto }, place: string): string {
+export function spokenIntoLine(mark: Mark & { into: MarkInto }): string {
   const [s, a] = mark.into.ayah;
+  const place =
+    s === mark.ayah[0]
+      ? t('reciteLive.describe.spokenAyahN', { n: mark.ayah[1] })
+      : t('reciteLive.describe.spokenThere', { surah: surahName(mark.ayah[0]), ayah: mark.ayah[1] });
   const there = t('reciteLive.describe.spokenThere', { surah: surahName(s), ayah: a });
   if (mark.into.ending) {
     return t('reciteLive.describe.endedAs', { place, as: s === mark.ayah[0] ? t('reciteLive.describe.spokenAyahN', { n: a }) : there });

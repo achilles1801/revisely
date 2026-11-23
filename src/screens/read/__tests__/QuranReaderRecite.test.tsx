@@ -2365,7 +2365,7 @@ describe('peeked words (Majd, Nov 15 2026: on the page in quiet grey, in the sum
     expect(screen.getByTestId('take-summary-peeked')).toHaveTextContent('2 words peeked');
     const rows = screen.getAllByTestId('take-summary-peeked-row');
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toHaveTextContent(/Peeked · ayah 23/);
+    expect(rows[0]).toHaveTextContent(/Peeked · An.Naml, 3rd.page/);
     mockPager.scrolled = [];
     fireEvent.press(rows[0]);
     expect(mockPager.scrolled).toContain(379);

@@ -8,6 +8,7 @@ import type { UserPage } from '../../../types';
 import { typeV2 } from '../../../theme/v2';
 import { ProgressRing } from '../../activity/DayParts';
 import { ActionSheet, SheetAction } from '../../v2/ActionSheet';
+import { FirstWords } from '../../v2/FirstWords';
 import { Mark } from '../../v2/Mark';
 import { JuzDots } from '../../v2/JuzDots';
 import { PillButton } from '../../v2/PillButton';
@@ -166,6 +167,7 @@ export function TodayPost({
           ) : null}
         </Text>
       </View>
+      <FirstWords words={lines.words} testID="today-first-words" />
       {detail.kind === 'progress' ? (
         <View style={styles.progressRow} testID="today-progress">
           <View style={styles.bar}>

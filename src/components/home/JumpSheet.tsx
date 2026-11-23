@@ -10,7 +10,8 @@ import { WheelPicker } from '../v2/WheelPicker';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { getAllSurahs, getJuzForPage, getPagesForJuz, getSurahDisplay, getSurahForPage } from '../../lib/quranData';
 import { isJuzMode, jumpablePages, type JumpTarget, todayStartPage } from '../../lib/jump';
-import { describePageRange, describePassage, spokenText } from '../../lib/passages';
+import { describePageRange, firstWordsOfPage, describePassage, spokenText } from '../../lib/passages';
+import { FirstWords } from '../v2/FirstWords';
 import type { User, UserPage } from '../../types';
 import { t } from '../../i18n';
 
@@ -181,6 +182,9 @@ export function JumpSheet({
                   : describePageRange(pageChosen, pageChosen, { juz: true })}
               </Text>
             ) : null}
+            {pageChosen != null ? (
+              <FirstWords words={firstWordsOfPage(pageChosen)} style={styles.firstWords} testID="jump-page-words" />
+            ) : null}
           </View>
         ) : (
           <ScrollView style={styles.list} testID={tab === 'juz' ? 'jump-juz-list' : 'jump-surah-list'}>
@@ -221,6 +225,7 @@ export function JumpSheet({
 }
 
 const styles = StyleSheet.create({
+  firstWords: { alignSelf: 'center' },
   body: { gap: 12, paddingBottom: 8 },
   tabs: { paddingHorizontal: layoutV2.gutter },
   list: { maxHeight: 340 },

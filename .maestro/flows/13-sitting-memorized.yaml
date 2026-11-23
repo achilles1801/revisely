@@ -245,7 +245,7 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: activity-finishes-page
-    text: "Al.Mulk.*12 finishes the page"
+    text: "Rest of Al.Mulk.* to go"
 - takeScreenshot: 13-day-memorized
 
 # Taken off again (MEM-3): the ayahs come off; the Day has nothing memorized and offers the page.

@@ -5,6 +5,7 @@ import { dayMonth, formatNumber, t, weekdayName } from '../../i18n';
 import { shiftDay } from '../journal';
 import { ayahKey } from '../ayahKeys';
 import { describeAyahs, surahName } from '../passages';
+import { firstWordsOfAyah } from '../recite/quranWords';
 import { daysSince } from '../recency';
 import { formatAccuracy } from '../reciteLive/score';
 import type { PerPage, RecitationInsights, SimilarSlip, SlippingPassage } from './insights';
@@ -89,7 +90,10 @@ export function similarTitle(s: SimilarSlip): string {
   const from = t('reciteInsights.surahAyah', { surah: surahName(s.from[0]), ayah: s.from[1] });
   if (s.ending) return from;
   const into = s.into[0] === s.from[0] ? formatNumber(s.into[1]) : t('reciteInsights.surahAyah', { surah: surahName(s.into[0]), ayah: s.into[1] });
-  return t('reciteInsights.slip', { from, into });
+  const ref = t('reciteInsights.slip', { from, into });
+  const a = firstWordsOfAyah(s.from[0], s.from[1]);
+  const b = firstWordsOfAyah(s.into[0], s.into[1]);
+  return a && b ? t('reciteInsights.slipWords', { from: a, into: b, ref }) : ref;
 }
 
 /** "You went on with the similar ayah · twice, last on Tuesday", "You ended it as ayah 5 ends · once". */
@@ -100,13 +104,15 @@ export function similarNote(s: SimilarSlip, today: string): string {
 }
 
 /**
- * A take's slip into a similar ayah, under its line in Activity (RINS-3): "You went on with Al-Baqarah 123, a similar
- * ayah"; an ending, "You ended Al-Falaq 3 as ayah 5 ends".
+ * A take's slip into a similar ayah, under its line in Activity (RINS-3): "You went on with «…» in Al-Baqarah (123), a
+ * similar ayah"; an ending, "You ended Al-Falaq 3 as ayah 5 ends".
  */
 export function intoLine(s: Pick<SimilarSlip, 'from' | 'into' | 'ending'>): string {
   if (s.ending) {
     return t('reciteInsights.endedAs', { from: t('reciteInsights.surahAyah', { surah: surahName(s.from[0]), ayah: s.from[1] }), as: endingAs(s) });
   }
+  const words = firstWordsOfAyah(s.into[0], s.into[1]);
+  if (words) return t('reciteInsights.wentOnWith', { into: t('reciteInsights.intoWords', { words, surah: surahName(s.into[0]), ayah: s.into[1] }) });
   return t('reciteInsights.wentOnWith', { into: t('reciteInsights.surahAyah', { surah: surahName(s.into[0]), ayah: s.into[1] }) });
 }
 

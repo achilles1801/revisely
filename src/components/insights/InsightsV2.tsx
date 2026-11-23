@@ -22,6 +22,7 @@ import { RowText, ThreadRow } from '../v2/ThreadRow';
 import { Tap } from '../v2/Tap';
 import { countStrengths, StrengthBucket, strengthTone } from './strength';
 import { t } from '../../i18n';
+import { FirstWords } from '../v2/FirstWords';
 
 export { countStrengths, strengthBucket, strengthTone } from './strength';
 export type { StrengthBucket } from './strength';
@@ -132,6 +133,7 @@ export function InsightRow({
   accessibilityLabel,
   separator = true,
   testID,
+  firstWords,
 }: {
   number: number;
   name: string;
@@ -141,6 +143,8 @@ export function InsightRow({
   accessibilityLabel?: string;
   separator?: boolean;
   testID?: string;
+  /** How the page begins (NAME-2), under its strength. */
+  firstWords?: string;
 }) {
   return (
     <ThreadRow
@@ -152,6 +156,7 @@ export function InsightRow({
       testID={testID}
     >
       <StrengthLine rating={rating} text={text} />
+      <FirstWords words={firstWords} testID={testID ? `${testID}-words` : undefined} />
     </ThreadRow>
   );
 }

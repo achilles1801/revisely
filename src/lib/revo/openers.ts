@@ -5,7 +5,7 @@
 // pages, a juz. A day's and the Overview's line end with today's next part while today isn't done.
 // Opened again from the same place with nothing changed, its second sentence takes turns (REVO-35).
 
-import { surahName, placeOfPage } from '../passages';
+import { surahName, placeOfPage, withoutAmount } from '../passages';
 import { shiftDay } from '../journal';
 import { isRevisable } from '../memorizedAyahs';
 import { getJuzForPage, getSurahForPage } from '../quranData';
@@ -217,7 +217,7 @@ function dayLine(f: Extract<PlaceFacts, { kind: 'day' }>, ctx: RevoContext): Bui
   let lead: string;
   let chips: (string | null)[];
   if (plan && plan.pages > 0) {
-    const name = passageLong(f.plan);
+    const name = withoutAmount(passageLong(f.plan));
     const done = plan.pages - plan.notDone;
     // "all 28 pages", "both pages", "its page".
     const every = plan.pages === 1 ? 'its page' : plan.pages === 2 ? 'both pages' : `all ${plural(plan.pages, 'page')}`;

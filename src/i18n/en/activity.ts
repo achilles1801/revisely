@@ -139,7 +139,7 @@ export const activity = {
     deletePagesTitle: 'Delete these pages?',
     deletePagesBody: '{{passage}} leaves the day’s Revised block.',
     noteAt: 'Note · {{time}}',
-    finishesPage: '{{ayahs}} finishes the page',
+    finishesPage: 'Rest of {{page}} to go',
     notInCustomPlan: 'Not in your custom plan yet',
     addToPlan: 'Add to your plan',
     reviseTomorrow: 'Revise them tomorrow',

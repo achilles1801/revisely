@@ -233,6 +233,7 @@ export const reciteLive: NonNullable<ArStrings['reciteLive']> = {
     place: '{{surah}}، الآية {{ayah}}',
     placeLikely: '{{place}} · على الأرجح',
     there: '{{surah}} {{sura}}:{{ayah}}',
+    thereWords: '«{{words}}» في {{surah}} ({{sura}}:{{ayah}})',
     ayahN: 'الآية {{n}}',
     endedAs: 'ختمت {{place}} كما تُختم {{as}}',
     continued: 'أكملت بآية متشابهة: {{there}}',

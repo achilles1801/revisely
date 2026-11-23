@@ -183,12 +183,12 @@ describe('the juz sheet', () => {
       expect(m.cells.find((c) => c.page === 546)?.state).toBe('weak');
     });
 
-    it('a surah names its weakest ayahs; a strong one says how often it was skipped', () => {
+    it('a surah names its weakest pages; a strong one says how often it was skipped', () => {
       const hashr = m.surahs.find((s) => plainText(s.name) === 'Al-Hashr')!;
-      expect(hashr.text).toMatch(/^Ayahs \d+–\d+ weak$/);
+      expect(hashr.text).toMatch(/^\d+(st|nd|rd|th).page weak$/);
       expect(hashr.alert).toBe(true);
       const mumtahanah = m.surahs.find((s) => plainText(s.name) === 'Al-Mumtahanah')!;
-      expect(mumtahanah.text).toMatch(/^Ayahs \d+–\d+ moderate$/);
+      expect(mumtahanah.text).toMatch(/^\d+(st|nd|rd|th).page moderate$/);
       expect(m.surahs.slice(-1)[0].text).toBe('Strong · skipped 3 times');
     });
   });
@@ -241,10 +241,10 @@ describe('a juz being learned (MEM-7, mock j1)', () => {
     expect(cell.share).toBeGreaterThan(0.4);
     expect(cell.share).toBeLessThan(0.75);
     expect(plainText(m.learningText ?? '')).toBe('Al-Mulk, first 2 pages so far');
-    expect(m.continueAt && { page: m.continueAt.page, label: plainText(m.continueAt.label) }).toEqual({ page: 563, label: 'Al-Mulk 21' });
+    expect(m.continueAt && { page: m.continueAt.page, label: plainText(m.continueAt.label) }).toEqual({ page: 563, label: 'Al-Mulk, 2nd page · middle' });
     const mulk = m.surahs.find((s) => s.sura === 67)!;
     expect(mulk.state).toBe('learning');
-    expect(plainText(mulk.text)).toBe('Ayahs 1–20 · 21–30 to go');
+    expect(plainText(mulk.text)).toBe('Part of the page · rest of the page to go');
     expect(mulk.firstPage).toBe(563);
     expect(m.surahs.find((s) => s.sura === 68)).toMatchObject({ text: 'Not memorized', state: 'not-memorized' });
   });

@@ -176,7 +176,7 @@ export const activity: NonNullable<ArStrings['activity']> = {
     deletePagesTitle: 'حذف هذه الصفحات؟',
     deletePagesBody: 'تخرج {{passage}} من قسم المراجعة في اليوم.',
     noteAt: 'ملاحظة · {{time}}',
-    finishesPage: '{{ayahs}} تكمل الصفحة',
+    finishesPage: 'بقية {{page}} لم تُحفظ بعد',
     notInCustomPlan: 'ليست في خطتك المخصصة بعد',
     addToPlan: 'إضافة إلى خطتك',
     reviseTomorrow: 'مراجعتها غدًا',

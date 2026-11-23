@@ -234,6 +234,15 @@ export function loadQuranWords(): Promise<QuranWords> {
 }
 
 /** The word data if it has been loaded, else null. */
+/** An ayah's first words in the mushaf's script, up to four, once the word data has loaded (null until then). */
+export function firstWordsOfAyah(sura: number, ayah: number, data: QuranWords | null = getQuranWords()): string | null {
+  if (!data) return null;
+  const [start, end] = data.verseRange(sura, ayah);
+  const words: string[] = [];
+  for (let w = start; w < Math.min(end, start + 4); w++) words.push(data.uthmani(w));
+  return words.length > 0 ? words.join(' ') : null;
+}
+
 export function getQuranWords(): QuranWords | null {
   return loaded;
 }

@@ -15,7 +15,7 @@ import { getRevisionDateForUser, getRevisionDayForUser } from '../../lib/fajrBou
 import { daysBetween } from '../../lib/activityHeatmap';
 import { getJuzName, getQuranData, getSurahForPage } from '../../lib/quranData';
 import { RATINGS, getRatingLabel } from '../../lib/ratings';
-import { describePassage, pagesNote, spokenText } from '../../lib/passages';
+import { describePassage, firstWordsOfPage, pagesNote, spokenText } from '../../lib/passages';
 import { layoutV2 } from '../../theme/v2';
 import { ActionSheet } from '../v2/ActionSheet';
 import { PillButton } from '../v2/PillButton';
@@ -341,6 +341,7 @@ export function BrowseByStrength({
                   onPress={() => onOpenPage(row.pageNumber)}
                   accessibilityLabel={rowText.spoken}
                   testID={`browse-page-${row.pageNumber}`}
+                  firstWords={firstWordsOfPage(row.pageNumber)}
                 />
               );
             })}

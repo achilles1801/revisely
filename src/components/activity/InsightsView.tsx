@@ -37,7 +37,8 @@ import {
 import { getPagesForJuz } from '../../lib/quranData';
 import { allFirstTomorrow } from '../../lib/weakSpotActions';
 import { openRevo } from '../../lib/revo/open';
-import { describePassage, spokenText } from '../../lib/passages';
+import { describePassage, firstWordsOfPage, spokenText } from '../../lib/passages';
+import { FirstWords } from '../v2/FirstWords';
 import { JuzSheet } from './JuzSheet';
 import { Sheet } from '../v2/Sheet';
 import { hourDetail, minutesWords, monthOfMemorizing, uncoveredRows, type UncoveredRow } from '../../lib/insightsTaps';
@@ -1106,11 +1107,12 @@ function WeakSpots({
             >
               <View style={[styles.dot8, { backgroundColor: palette.red }]} />
               <View style={styles.flex}>
-                {/* The surah and ayahs first; the page only as a quiet detail (Majd, Nov 7 2026). */}
+                {/* The surah and which page first; the mushaf's number only as a quiet detail. */}
                 <ChromeText numberOfLines={2}>
                   <ChromeText style={[typeV2.name, { color: palette.text }]}>{r.label}</ChromeText>
                   <ChromeText style={[typeV2.body, { color: palette.secondary }]}>{`  ${r.pagesNote}`}</ChromeText>
                 </ChromeText>
+                <FirstWords words={firstWordsOfPage(r.pages[0])} testID={`weak-spot-words-${r.pages[0]}`} />
                 <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{reasonOf(r)}</ChromeText>
               </View>
               <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />

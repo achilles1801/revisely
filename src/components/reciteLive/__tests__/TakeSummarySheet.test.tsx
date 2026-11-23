@@ -125,13 +125,13 @@ describe('the take summary with screen readers and the largest text', () => {
     expect(screen.getByLabelText('Score 96%, 3 mistakes · 1 a page')).toBeTruthy();
   });
 
-  it('a finding says its ayah; when the take ran into the next surah, the surah too', () => {
-    expect(findingPlace(wrong(A23, [27, 23]), false)).toBe('ayah 23');
-    expect(plainText(findingPlace(wrong(Q1, [28, 1]), true))).toBe('Al-Qasas, 1st page · start');
+  it('a finding says which page of which surah it is on', () => {
+    expect(plainText(findingPlace(wrong(A23, [27, 23])))).toBe('An-Naml, 3rd page');
+    expect(plainText(findingPlace(wrong(Q1, [28, 1])))).toBe('Al-Qasas, 1st page');
     show({ to: Q1 + 4, marks: [wrong(A23 + 3, [27, 23]), wrong(Q1, [28, 1])] });
     const titles = screen.getAllByTestId('take-summary-finding-title').map((t) => plainText(flat(t.props.children)));
-    expect(titles).toEqual(['Wrong word · An-Naml, 3rd page · start', 'Wrong word · Al-Qasas, 1st page · start']);
-    expect(screen.getAllByRole('button', { name: /Al-Qasas, 1st page · start\. Show it on the page/ })).toHaveLength(1);
+    expect(titles).toEqual(['Wrong word · An-Naml, 3rd page', 'Wrong word · Al-Qasas, 1st page']);
+    expect(screen.getAllByRole('button', { name: /Al-Qasas, 1st page\. Show it on the page/ })).toHaveLength(1);
   });
 
   it('the score is read as one: the score and the mistakes', () => {
@@ -170,7 +170,7 @@ describe('the take summary with screen readers and the largest text', () => {
     const unclear: Mark = { id: 'u', w: A23 + 1, ayah: [27, 23], kind: 'harakat', sure: 'likely' };
     show({ marks: [unclear, wrong(A23 + 3, [27, 23])] });
     const titles = screen.getAllByTestId('take-summary-finding-title').map((t) => plainText(flat(t.props.children)));
-    expect(titles).toEqual(['Wrong word · ayah 23', 'Not clear · ayah 23']);
+    expect(titles).toEqual(['Wrong word · An-Naml, 3rd page', 'Not clear · An-Naml, 3rd page']);
     expect(screen.getByText('Say it more clearly. Not counted in the score.')).toBeTruthy();
     expect(screen.getByText('1 wrong word, 1 not clear')).toBeTruthy();
     expect(screen.getByLabelText('Score 96%, 1 mistake')).toBeTruthy();
@@ -194,7 +194,7 @@ describe('the take summary with screen readers and the largest text', () => {
     const swatch = style(screen.getByTestId('take-summary-swatch-slip'));
     expect(swatch.borderRadius).toBeLessThan((swatch.width as number) / 2);
     // The kind is spelled out beside it.
-    expect(screen.getByText('Extra word · ayah 23')).toBeTruthy();
+    expect(screen.getByText(/^Extra word · An.Naml, 3rd.page$/)).toBeTruthy();
     expect(screen.getByText('1 wrong word, 1 extra, 1 wrong haraka, 1 tajweed note (Beta)')).toBeTruthy();
     // The word in ink on its colour, as on the page (the wrong word's, said, on its colour in its phrase: RECITE-24).
     expect(screen.getAllByTestId('take-summary-finding-highlight').map((e) => style(e).backgroundColor)).toEqual([p.markSlip, p.markTajweed, p.markWord]);
