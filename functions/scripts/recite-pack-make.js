@@ -15,11 +15,11 @@
  *            ayahs.bin=/pack/ayahs.bin,\
  *            norms.bin=/pack/norms.bin,stops.bin=/pack/stops.bin,lexicon.bin=/pack/lexicon.bin,\
  *            letters.bin=/pack/letters.bin,mel.bin=/pack/mel.bin,config.json=/pack/config.json \
- *     --strict v5.onnx=/models/v5-marked.onnx,strict.bin=/pack-strict/strict.bin \
+ *     --strict v5.onnx=/models/v5m-server-int8.onnx,strict.bin=/pack-strict/strict.bin \
  *     --apps 1:433792838929:ios:…,1:433792838929:android:… \
  *     --claim onDeviceBench
  *
- * Only marked models leave the Mac: leave --strict out until v5 has its ownership mark (the core part works alone).
+ * Only marked models leave the Mac: v7m-* and v5m-server-int8.onnx (their hashes are in the private checker/marks.json).
  *
  *   --dry       seal and check only: no credentials, nothing uploaded or written
  *   --no-claim  any signed-in account of the listed apps (the default claim is onDeviceBench)
