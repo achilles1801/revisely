@@ -485,7 +485,7 @@ owner's `on-device-release.md`).
 - **Recite's pack on the phone** (Settings → Downloads and storage, BEHAVIOUR.md ONDEV-2, ONDEV-3; design in the shared
   notes, `on-device-a3-pack.md`):
   - **Server:** `functions/src/recitePack/` (the gated callable, the `.rcpk` format).
-  - **A new pack** (after any file in `golden/pack-v1` or `pack-strict`, or a model, changes): from `functions/`, after
+  - **A new pack** (after any file in `golden/pack-v3` or `pack-strict`, or a model, changes; a pack folder is never remade in place, and `manifest.json` travels in the core part): from `functions/`, after
     `npm ci && npm run build`, `GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-dev-admin.json node
     scripts/recite-pack-make.js --lab` (`--dry` first). It refuses a table that isn't its manifest's and a model without its
     ownership mark, and the id comes from the files' hashes, so a changed file is a new version and nothing is ever
