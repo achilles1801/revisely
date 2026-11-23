@@ -11,6 +11,8 @@ import { memorizedMonthsData, monthDays, monthReadout, slotAt, stepIndex, type M
 import { spokenText } from '../../../lib/passages';
 import { Tap } from '../../v2/Tap';
 import { CHART_TEXT_MAX, ChartFrame, ChartPlot } from './ChartFrame';
+import { t } from '../../../i18n';
+import { forwardIcon } from '../../../i18n/direction';
 
 const BAR_AREA = 96;
 /** How far back the records are read: Insights' window (twelve months, with room). */
@@ -75,7 +77,11 @@ export function MemorizedChart({
     setPicked(i);
   };
 
-  const hint = failed ? 'Couldn’t load your memorization' : !items ? 'Loading…' : `${plural(total, 'page')} in ${months} months · tap a month to see it`;
+  const hint = failed
+    ? t('revo.chart.memorizedFailed')
+    : !items
+      ? t('common.loading')
+      : t('revo.chart.memorizedHint', { pages: plural(total, 'page'), months });
 
   return (
     <ChartFrame
@@ -115,7 +121,7 @@ export function MemorizedChart({
                 <Text style={[styles.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHART_TEXT_MAX}>
                   {plural(d.pages, 'page')}
                 </Text>
-                {onOpenDay ? <Ionicons name="chevron-forward" size={15} color={palette.secondary} /> : null}
+                {onOpenDay ? <Ionicons name={forwardIcon()} size={15} color={palette.secondary} /> : null}
               </Tap>
             ))}
           </View>
@@ -126,7 +132,7 @@ export function MemorizedChart({
         <ChartPlot
           testID={`${testID}-plot`}
           label={`${title}. ${bars.map((b) => `${monthLabel(b.month, true)}: ${plural(b.pages, 'page')}`).join(', ')}`}
-          value={readout ? spokenText(`${readout.title}, ${readout.line}`) : 'Swipe up or down to pick a month'}
+          value={readout ? spokenText(`${readout.title}, ${readout.line}`) : t('revo.chart.pickMonth')}
           onStep={(by) => pick(stepIndex(picked, by, bars.length))}
           onActivate={() => pick(picked == null ? bars.length - 1 : null)}
           onTap={(x, _y, size) => {

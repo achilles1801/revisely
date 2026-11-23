@@ -115,10 +115,14 @@ export function pendingReason(name) {
   return hit ? hit.reason : null;
 }
 
+/** Screenshots tap-to-open.yaml takes when it taps again (a lost tap): evidence, not a screen to compare. */
+export const LOST_TAP = /^lost-tap-/;
+
 /**
  * The capture of each screen on a platform under `dir` (the flows' results,
  * or a downloaded screens artifact): …/<platform>/<flow>[-retryN]/run/…/
  * takeScreenshot/<name>.png. Of a flow's attempts, the last one that took it.
+ * Lost-tap screenshots (LOST_TAP) aren't screens.
  */
 export function findCaptures(dir, platform) {
   const found = new Map();
@@ -141,6 +145,7 @@ export function findCaptures(dir, platform) {
         const flow = m[1];
         const attempt = Number(m[2] ?? 0);
         const name = e.name.replace(/\.png$/, '');
+        if (LOST_TAP.test(name)) continue;
         const prev = found.get(name);
         if (!prev || attempt > prev.attempt) found.set(name, { name, flow, attempt, file: full });
       }

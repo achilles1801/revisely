@@ -15,6 +15,8 @@ export interface ReadPalette {
   control: string;
   /** Tint applied to the (black-ink) page PNGs; null = render as-is. */
   pageTint: string | null;
+  /** Over a word's ink, the page's colour half through: the word in quiet grey (Recite's peeked words). */
+  peekVeil: string;
 }
 
 // White and black pages, with the design's greys around them.
@@ -28,6 +30,7 @@ const DARK: ReadPalette = {
   textMuted: '#8A8A93',
   control: '#181818',
   pageTint: '#FFFFFF',
+  peekVeil: 'rgba(0,0,0,0.55)',
 };
 
 const LIGHT: ReadPalette = {
@@ -40,6 +43,7 @@ const LIGHT: ReadPalette = {
   textMuted: '#616977',
   control: '#F7F7F8',
   pageTint: null,
+  peekVeil: 'rgba(255,255,255,0.6)',
 };
 
 export function getReadPalette(isDark: boolean): ReadPalette {

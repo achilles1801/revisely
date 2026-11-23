@@ -208,7 +208,8 @@ export function parseWindow(body: unknown, win: VerseWindow): TcqVerse[] | null 
     const m = typeof item?.verse_key === 'string' ? /^(\d+):(\d+)$/.exec(item.verse_key) : null;
     if (!m || Number(m[1]) !== win.sura) return null;
     const n = Number(m[2]);
-    if (n < win.from || n > win.to || typeof item.text_english !== 'string' || item.text_english.length === 0) return null;
+    if (n < win.from || n > win.to || typeof item.text_english !== 'string' || item.text_english.length === 0)
+      return null;
     texts.set(n, item.text_english);
   }
   const verses: TcqVerse[] = [];
@@ -221,13 +222,21 @@ export function parseWindow(body: unknown, win: VerseWindow): TcqVerse[] | null 
 }
 
 /** A cached block with its age in seconds, if the entry holds all of it. */
-async function readCached(cache: Cache, key: Request, win: VerseWindow, now: number): Promise<{ verses: TcqVerse[]; age: number } | null> {
+async function readCached(
+  cache: Cache,
+  key: Request,
+  win: VerseWindow,
+  now: number,
+): Promise<{ verses: TcqVerse[]; age: number } | null> {
   try {
     const hit = await cache.match(key);
     if (!hit) return null;
     const stored = (await hit.json()) as { verses?: unknown; fetchedAt?: unknown };
     if (!Array.isArray(stored.verses)) return null;
-    const data = stored.verses.map((v: { verse_key?: unknown; text?: unknown } | null) => ({ verse_key: v?.verse_key, text_english: v?.text }));
+    const data = stored.verses.map((v: { verse_key?: unknown; text?: unknown } | null) => ({
+      verse_key: v?.verse_key,
+      text_english: v?.text,
+    }));
     const verses = parseWindow({ success: true, data }, win);
     if (!verses) return null;
     // An entry without a time is from before stale-while-revalidate: due for a refresh.
@@ -283,7 +292,11 @@ export async function handleTcq(
   if (pathname === '/api/tcq/policy') return policyResponse(env);
   const asked = route(pathname);
   if (!asked) {
-    return errorResponse(400, 'BAD_REQUEST', 'Expected /api/tcq/verses/<surah>:<verse> or /api/tcq/windows/<surah>:<verse>');
+    return errorResponse(
+      400,
+      'BAD_REQUEST',
+      'Expected /api/tcq/verses/<surah>:<verse> or /api/tcq/windows/<surah>:<verse>',
+    );
   }
   const timing = new Timing();
 
@@ -376,7 +389,13 @@ export async function handleTcq(
     if (res.status === 429) {
       const retry = res.headers.get('Retry-After') ?? '60';
       console.warn(`tcq: rate limited (${which}), retry after ${retry}`);
-      return { ok: false, status: 429, code: 'RATE_LIMITED', message: 'The Clear Quran is busy; try again shortly', headers: { 'Retry-After': retry } };
+      return {
+        ok: false,
+        status: 429,
+        code: 'RATE_LIMITED',
+        message: 'The Clear Quran is busy; try again shortly',
+        headers: { 'Retry-After': retry },
+      };
     }
     // Refusing the query itself (not our key, not their outage): another form may still work.
     const refused = [400, 403, 404, 405, 501, 503].includes(res.status);
@@ -384,13 +403,26 @@ export async function handleTcq(
       // 401/403 mean our key (revoked, wrong environment, unsigned agreement); 5xx theirs.
       const detail = await res.text().catch(() => '');
       console.error(`tcq: ${which} answered ${res.status} to ${label}: ${redactKeys(detail.slice(0, 300))}`);
-      if (res.status === 404) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Verse not found', unsupported: true };
-      return { ok: false, status: 502, code: 'UPSTREAM_ERROR', message: 'The Clear Quran could not answer; try again', unsupported: refused };
+      if (res.status === 404)
+        return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Verse not found', unsupported: true };
+      return {
+        ok: false,
+        status: 502,
+        code: 'UPSTREAM_ERROR',
+        message: 'The Clear Quran could not answer; try again',
+        unsupported: refused,
+      };
     }
     const verses = read(await res.json().catch(() => null));
     if (!verses) {
       console.error(`tcq: unexpected answer to ${label} for ${win.sura}:${win.from}-${win.to}`);
-      return { ok: false, status: 502, code: 'UPSTREAM_ERROR', message: 'The Clear Quran sent an unexpected answer', unsupported: true };
+      return {
+        ok: false,
+        status: 502,
+        code: 'UPSTREAM_ERROR',
+        message: 'The Clear Quran sent an unexpected answer',
+        unsupported: true,
+      };
     }
     console.log(`tcq: ${label} ${win.sura}:${win.from}-${win.to} (${which}) in ${Date.now() - start} ms`);
     return { ok: true, verses, from: win.from, to: win.to, cache: 'MISS' };
@@ -408,7 +440,11 @@ export async function handleTcq(
    * A block from this data centre's cache: fresh, or stale (served, and refreshed
    * in the background, once per isolate). Older than both: as if not cached.
    */
-  const fromCache = async (key: Request, win: VerseWindow, fetch: (t: Timing) => Promise<Outcome>): Promise<Outcome | null> => {
+  const fromCache = async (
+    key: Request,
+    win: VerseWindow,
+    fetch: (t: Timing) => Promise<Outcome>,
+  ): Promise<Outcome | null> => {
     if (!cache) return null;
     const entry = await timing.time('cache', () => readCached(cache, key, win, now));
     if (!entry || entry.age > fresh + stale) return null;
@@ -419,7 +455,10 @@ export async function handleTcq(
         fetch(new Timing())
           .then((out) => {
             if (out.ok) remember(key, out.verses);
-            else console.warn(`tcq: refresh of ${win.sura}:${win.from}-${win.to} failed (${out.code}); keeping the cached copy`);
+            else
+              console.warn(
+                `tcq: refresh of ${win.sura}:${win.from}-${win.to} failed (${out.code}); keeping the cached copy`,
+              );
           })
           .catch((err) => console.error('tcq: refresh failed', err))
           .finally(() => refreshing.delete(key.url)),
@@ -476,7 +515,10 @@ export async function handleTcq(
   }
 
   if (!result.ok) {
-    return errorResponse(result.status, result.code, result.message, { ...result.headers, 'Server-Timing': timing.header() });
+    return errorResponse(result.status, result.code, result.message, {
+      ...result.headers,
+      'Server-Timing': timing.header(),
+    });
   }
   if (asked.kind === 'window') {
     return ok({ surah: asked.sura, from: result.from, to: result.to, verses: result.verses }, result.cache, timing);

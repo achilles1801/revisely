@@ -1,7 +1,7 @@
 // Whether the help buttons are hidden (HELP-2): one switch for every screen, kept on the phone per
 // account (`@revisely_help:v1:<uid>`), so it needs no account field and no rules deploy. "Hide help
 // buttons" in a help sheet turns them off, with a toast and Undo on the screen it was hidden from
-// (components/help/HelpToast); Settings → Support → Help buttons turns them back on.
+// (components/help/HelpToast); Settings → Help and support → Help buttons turns them back on.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useSyncExternalStore } from 'react';

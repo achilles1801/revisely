@@ -10,8 +10,10 @@ import { shiftDay } from '../journal';
 import type { HistoryItem } from '../streakFromItems';
 import type { TodaySnapshot } from '../todaySnapshot';
 import { daySignals, revoPatterns, sessionStarts } from './patterns';
-import type { RevoContext, RevoTotals } from './types';
+import type { RevoContext, RevoGaps, RevoRecitation, RevoTotals } from './types';
 import { contextWords, memorizedWords } from './words';
+import { isDevVariant } from '../variant';
+import { currentLanguage } from '../../i18n';
 import { isRevisable, memorizedAyahs, memorizedPageShare, partlyMemorizedAyahs, revisablePages } from '../memorizedAyahs';
 
 const MAX_PAGES = 20;
@@ -80,9 +82,19 @@ export function buildRevoContext(input: {
    * takes them (lib/revo/release revoPatternsOn); otherwise the context is as before, which every server takes.
    */
   patterns?: boolean;
+  /**
+   * Send `recitation` and `gaps` from the store app: only once config/app.revoRecite says the server takes them from any
+   * app (lib/revo/release revoReciteOn). Revisely Dev sends them regardless.
+   */
+  recite?: boolean;
+  /** Their recitation (RINS-1; lib/revo/recitation), only for an account that recites. */
+  recitation?: RevoRecitation | null;
+  /** Insights' Gaps and Last revised (ACT-28, ACT-30; lib/revo/gaps): for an account that has them (gapsInsightsEnabled). */
+  gaps?: RevoGaps | null;
   now?: Date;
 }): RevoContext {
   const { user, pages, logs, snapshot } = input;
+  const dev = isDevVariant();
   const today = snapshot.day;
   const byNumber = new Map(pages.map((p) => [p.pageNumber, p]));
   const list = new Set(snapshot.pages);
@@ -151,6 +163,15 @@ export function buildRevoContext(input: {
     },
     passages: memorizedTodayWords ? { ...words.passages, memorizedToday: memorizedTodayWords } : words.passages,
     pageNames: words.pageNames,
+    ...(input.recitation && (dev || input.recite) ? { recitation: input.recitation } : {}),
+    // Revisely Dev: the server adds the Dev guide, what only Revisely Dev has (functions/src/revo/guide.ts). The
+    // store app never sends it, so its questions are asked exactly as before.
+    ...(dev ? { app: 'dev' as const } : {}),
+    // Revo answers in the app's language (Majd's choice 3): the server asks for Arabic. Only Revisely Dev offers it.
+    ...(currentLanguage() === 'ar' ? { language: 'ar' as const } : {}),
+    // Gaps, for an account that has them (the mistake detection release opened them to everyone; ACT-28), once the
+    // server takes them from any app (config/app.revoRecite); from Revisely Dev always.
+    ...(input.gaps && (dev || input.recite) ? { gaps: input.gaps } : {}),
     localTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
   };
 }

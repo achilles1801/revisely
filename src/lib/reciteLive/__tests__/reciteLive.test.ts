@@ -1,5 +1,7 @@
 import { quranWords } from '../../recite/__fixtures__/quranWords';
-import { GROUP_RANK, isUnclear, LiveEvent, markGroup, parseEvent, parseMark, severityOf, Mark } from '../contract';
+import { countsAsMistake, GROUP_RANK, isUnclear, LiveEvent, markGroup, markTier, parseEvent, parseMark, severityOf, strongestByWord, Mark } from '../contract';
+import { colourGroup, markFill, markFirm, toneFill, COLOURS_FOLLOW_TIERS } from '../../../components/reciteLive/markColours';
+import { paletteV2 } from '../../../theme/v2';
 import {
   applyEvent,
   dismissMark,
@@ -72,6 +74,12 @@ describe('the contract', () => {
     // The server's Premium gate (CHECK_GATE) under either name: the app opens the Premium page.
     expect(parseEvent({ type: 'error', reason: 'check_locked' })).toEqual({ type: 'error', reason: 'check_locked' });
     expect(parseEvent({ type: 'error', reason: 'premium_required' })).toEqual({ type: 'error', reason: 'premium_required' });
+    // recite-check-pair refusing a level it doesn't take (the socket starts the take on recite-check).
+    expect(parseEvent({ type: 'error', reason: 'level_elsewhere' })).toEqual({ type: 'error', reason: 'level_elsewhere' });
+    // Production's refusals (recite-server-prod-plan.md); `busy` is the phone's own, never the server's.
+    expect(parseEvent({ type: 'error', reason: 'paused' })).toEqual({ type: 'error', reason: 'paused' });
+    expect(parseEvent({ type: 'error', reason: 'app_check' })).toEqual({ type: 'error', reason: 'app_check' });
+    expect(parseEvent({ type: 'error', reason: 'busy' })).toEqual({ type: 'error', reason: 'server' });
     expect(parseEvent({ type: 'error', error: 'idle' })).toEqual({ type: 'error', reason: 'idle' });
   });
 
@@ -90,7 +98,7 @@ describe('the contract', () => {
   });
 
   it('reads Recite’s final answer: words only, no marks list or score (live.py’s follow result)', () => {
-    // As the service sends it at the end of a Recite take (scripts/recite-check/live.py, `self.follow`).
+    // As the service sends it at the end of a Recite take (revisely-internal's checker/live.py, `self.follow`).
     const recite = {
       type: 'done',
       result: {
@@ -106,7 +114,50 @@ describe('the contract', () => {
     expect(parseEvent({ type: 'done', result: { ...recite.result, follow: undefined } })).toBeNull();
   });
 
-  it('mistakes are words; slips are harakat, letters and tajweed', () => {
+  // Majd, Nov 22 2026: "saying a wrong haraka or letter IS a word mistake. the only two "tiers" is word (including
+  // haraqah and letters) mistakes and then second tier is tajweed level mistake which we can market as "beta"" (RECITE-2).
+  it('two tiers: a wrong word, haraka or letter is a mistake, tajweed its own tier; Not clear is neither [RECITE-2, RECITE-3]', () => {
+    const kinds = ['word', 'skipped', 'added', 'harakat', 'letter', 'tajweed'] as const;
+    expect(kinds.map((kind) => markTier(mark({ kind })))).toEqual(['mistake', 'mistake', 'mistake', 'mistake', 'mistake', 'tajweed']);
+    expect(markTier(mark({ kind: 'harakat', sure: 'likely' }))).toBe('unclear');
+    expect(markTier(mark({ kind: 'letter', sure: 'likely' }))).toBe('unclear');
+    // A likely word mistake is still a mistake (only a haraka or letter can be Not clear), and so is a likely tajweed note a note.
+    expect(markTier(mark({ kind: 'word', sure: 'likely' }))).toBe('mistake');
+    expect(markTier(mark({ kind: 'tajweed', sure: 'likely' }))).toBe('tajweed');
+    // Every mistake counts, nothing else does.
+    for (const kind of kinds) for (const sure of ['clear', 'likely'] as const) {
+      const m = mark({ kind, sure });
+      expect(countsAsMistake(m) && !isUnclear(m)).toBe(markTier(m) === 'mistake');
+    }
+  });
+
+  it('a word shows its strongest mark: a mistake over a Not clear of the same kind [RECITE-2]', () => {
+    const unclear = mark({ id: 'u', kind: 'harakat', sure: 'likely' });
+    const wrong = mark({ id: 'w', kind: 'letter', sure: 'clear' });
+    expect(strongestByWord([unclear, wrong]).get(UTIYAT)?.id).toBe('w');
+    expect(strongestByWord([wrong, unclear]).get(UTIYAT)?.id).toBe('w');
+    // A wrong word still beats a wrong haraka, and a wrong haraka a tajweed note.
+    expect(strongestByWord([wrong, mark({ id: 'x', kind: 'word' })]).get(UTIYAT)?.id).toBe('x');
+    expect(strongestByWord([mark({ id: 't', kind: 'tajweed' }), unclear]).get(UTIYAT)?.id).toBe('u');
+  });
+
+  it('colours stay by what a mark is about until Majd decides; the switch moves them to the tiers in one place', () => {
+    const p = paletteV2(false, 'indigo');
+    const harakat = mark({ kind: 'harakat' });
+    const unclear = mark({ kind: 'letter', sure: 'likely' });
+    const tajweed = mark({ kind: 'tajweed' });
+    // As now (Nov 22 2026): a wrong haraka amber like Not clear.
+    expect(COLOURS_FOLLOW_TIERS).toBe(false);
+    expect([markFill(p, mark({ kind: 'word' })), markFill(p, harakat), markFill(p, unclear), markFill(p, tajweed)]).toEqual([p.markWord, p.markSlip, p.markSlip, p.markTajweed]);
+    expect(toneFill(p, 'slip')).toBe(p.markSlip);
+    // Switched: every mistake red, amber only for Not clear, violet for tajweed; the memory group never moves.
+    expect([colourGroup(harakat, true), colourGroup(unclear, true), colourGroup(tajweed, true)]).toEqual(['word', 'slip', 'tajweed']);
+    expect([markFill(p, harakat, true), markFirm(p, harakat, true), markFill(p, unclear, true)]).toEqual([p.markWord, p.markWordFirm, p.markSlip]);
+    expect(toneFill(p, 'slip', true)).toBe(p.markWord);
+    expect(markGroup(harakat)).toBe('slip');
+  });
+
+  it('a mark is about a whole word or a part of one (its colour and memory group)', () => {
     expect(['word', 'skipped', 'added'].map((kind) => severityOf({ kind } as Mark))).toEqual(['mistake', 'mistake', 'mistake']);
     expect(['harakat', 'letter', 'tajweed'].map((kind) => severityOf({ kind } as Mark))).toEqual(['slip', 'slip', 'slip']);
   });
@@ -121,18 +172,24 @@ describe('the contract', () => {
 });
 
 describe('the live state', () => {
-  it('ends with the final answer’s marks, on every fixture', () => {
+  it('[RECITE-14] ends with the final answer’s marks and every mark shown live on a word it didn’t judge, on every fixture', () => {
     for (const name of FIXTURES) {
       const events = eventsOf(name);
-      const done = events.find((e): e is Extract<LiveEvent, { type: 'done' }> => e.type === 'done')!;
+      const at = events.findIndex((e) => e.type === 'done');
+      const done = events[at] as Extract<LiveEvent, { type: 'done' }>;
+      const live = run(events.slice(0, at));
       const s = run(events);
       expect(s.status).toBe('done');
-      expect(marksInOrder(s).map((m) => m.id).sort()).toEqual(done.result.marks.map((m) => m.id).sort());
+      const judged = new Set(done.result.marks.map((m) => m.w));
+      const keptLive = Object.values(live.marks).filter((m) => !judged.has(m.w) && !done.result.marks.some((f) => f.id === m.id));
+      expect(marksInOrder(s).map((m) => m.id).sort()).toEqual([...done.result.marks, ...keptLive].map((m) => m.id).sort());
       // In mushaf order.
       const ws = marksInOrder(s).map((m) => m.w);
       expect(ws).toEqual([...ws].sort((a, b) => a - b));
-      // These checkers counted "not clear" marks in `mistakes` (no `unclear`); the app takes them out.
-      expect(mistakeCount(s)).toBe(done.result.score!.mistakes - done.result.marks.filter(isUnclear).length);
+      // These checkers counted "not clear" marks in `mistakes` (no `unclear`); the app takes them out. A mark kept from
+      // the take counts as it did.
+      const keptCounted = keptLive.filter((m) => countsAsMistake(m) && !isUnclear(m)).length;
+      expect(mistakeCount(s)).toBe(done.result.score!.mistakes + keptCounted - done.result.marks.filter(isUnclear).length - keptLive.filter(isUnclear).length);
     }
   });
 
@@ -392,6 +449,26 @@ describe('the replayed feed', () => {
     expect(got.length).toBe(n);
   });
 
+  it('a recorded take whose names came after `done` ends with them (draft 8)', () => {
+    const got: LiveEvent[] = [];
+    let closed = false;
+    const log: ReplayLog = {
+      events: [
+        { t: 0, type: 'ready', take: 't1' },
+        { t: 3, type: 'done', result: { v: 2, from: 0, to: 10, secs: 3, marks: [], score: null } },
+        { t: 3.5, type: 'into', names: [] },
+      ],
+    };
+    replayFeed(log)(
+      { type: 'start', s: 1, a: 1, s2: null, a2: null, mon: 4, mot: 4, aar: 0, letters: false, keep: false, namesAfter: true },
+      { onEvent: (e) => got.push(e), onClose: () => (closed = true) },
+    );
+    jest.advanceTimersByTime(3000);
+    expect([got.map((e) => e.type), closed]).toEqual([['ready', 'done'], false]);
+    jest.advanceTimersByTime(500);
+    expect([got.map((e) => e.type), closed]).toEqual([['ready', 'done', 'into'], true]);
+  });
+
   it('closing early stops every event', () => {
     const got: LiveEvent[] = [];
     const conn = replayFeed(fixture('alafasy.p2.clean.clean'))(
@@ -525,10 +602,11 @@ describe('the card’s words', () => {
     expect(markTitle(mark({ kind: 'skipped' }))).toBe('Skipped word');
     expect(markTitle(mark({ kind: 'added' }))).toBe('Extra word');
     expect(markTitle(mark({ kind: 'added', detail: 'trail' }))).toBe('Extra word after the end');
-    expect(markTitle(mark({ kind: 'harakat' }))).toBe('Harakat slip');
-    expect(markTitle(mark({ kind: 'harakat', detail: 'shadda' }))).toBe('Shadda slip');
-    expect(markTitle(mark({ kind: 'letter' }))).toBe('Letter slip');
-    expect(markTitle(mark({ kind: 'tajweed', rule: 'madd_munfasil' }))).toBe('Madd munfasil');
+    // A wrong haraka or letter is a mistake like a wrong word, and tajweed is Beta (Majd, Nov 22 2026; RECITE-2).
+    expect(markTitle(mark({ kind: 'harakat' }))).toBe('Wrong haraka');
+    expect(markTitle(mark({ kind: 'harakat', detail: 'shadda' }))).toBe('Wrong shadda');
+    expect(markTitle(mark({ kind: 'letter' }))).toBe('Wrong letter');
+    expect(markTitle(mark({ kind: 'tajweed', rule: 'madd_munfasil' }))).toBe('Madd munfasil (Beta)');
   });
 
   it('a haraka or letter past the normal bar only is “Not clear”: say it more clearly, not counted (Majd, Nov 15 2026)', () => {
@@ -540,7 +618,7 @@ describe('the card’s words', () => {
     expect(plainText(markPlace(unclear))).toBe('An-Naml, ayah 23');
     expect(markTitle(mark({ kind: 'letter', sure: 'likely' }))).toBe('Not clear');
     // Clear harakat and letters, and every word mark, keep their names.
-    expect(markTitle(mark({ kind: 'harakat', sure: 'clear' }))).toBe('Harakat slip');
+    expect(markTitle(mark({ kind: 'harakat', sure: 'clear' }))).toBe('Wrong haraka');
     expect(isUnclear(mark({ kind: 'word', sure: 'likely' }))).toBe(false);
     expect(isUnclear(mark({ kind: 'skipped', sure: 'likely' }))).toBe(false);
     expect(isUnclear(mark({ kind: 'tajweed', rule: 'ghunnah', sure: 'likely' }))).toBe(false);
@@ -662,6 +740,30 @@ describe('`into`: where a slip into a similar ayah went (contract draft 6, final
     expect(spokenIntoLine(m, 'ayah 5')).toBe(`You continued with ${surahName(31)}, ayah 6, a similar ayah`);
   });
 
+  it('after the final answer (draft 8): `into` joins each mark by id, shown, taken off or in the final answer', () => {
+    expect(parseEvent({ type: 'into', names: [{ id: 'a', into: { w: 3500, ayah: [31, 6] } }, { id: 'b', into: 'x' }, { into: { w: 1, ayah: [1, 1] } }], t: 9 }))
+      .toEqual({ type: 'into', names: [{ id: 'a', into: { w: 3500, ayah: [31, 6] } }] });
+    expect(parseEvent({ type: 'into', names: [] })).toEqual({ type: 'into', names: [] });
+    expect(parseEvent({ type: 'into' })).toBeNull();
+    const a = { ...base, id: 'a' };
+    const b = { ...base, id: 'b', w: 41, kind: 'word' as const };
+    const c = { ...base, id: 'c', w: 42 };
+    let st = applyEvent(applyEvent(LIVE_IDLE, { type: 'mark', mark: c }), { type: 'ready', take: 't1' } as LiveEvent);
+    st = dismissMark(st, 'c');
+    const into = { w: 3500, ayah: [31, 6] as [number, number] };
+    const early = applyEvent(st, { type: 'into', names: [{ id: 'a', into }] });
+    expect(early).toBe(st); // nothing to join before the final answer
+    st = applyEvent(st, { type: 'done', result: { v: 2, from: 40, to: 50, secs: 9, marks: [a, b, c], score: null, take: 't1' } } as LiveEvent);
+    expect(applyEvent(st, { type: 'into', names: [] })).toBe(st);
+    const named = applyEvent(st, { type: 'into', names: [{ id: 'a', into }, { id: 'c', into }, { id: 'zz', into }] });
+    expect(named.marks.a.into).toEqual(into);
+    expect(named.marks.b.into).toBeUndefined();
+    expect(named.removed.c.mark.into).toEqual(into); // Put back brings it with its name
+    expect(named.final!.marks.find((m) => m.id === 'a')!.into).toEqual(into);
+    expect(Object.keys(named.marks)).toEqual(Object.keys(st.marks));
+    expect(restoreMark(named, 'c').marks.c.into).toEqual(into);
+  });
+
   it('only marks that carry one, in page order', () => {
     const marks = [
       { ...base, id: 'b', w: 50, into: { w: 1, ayah: [1, 1] as [number, number] } },
@@ -669,5 +771,69 @@ describe('`into`: where a slip into a similar ayah went (contract draft 6, final
       { ...base, id: 'd', w: 41, into: { w: 2, ayah: [1, 2] as [number, number] } },
     ];
     expect(intoMarks(marks).map((m: { id: string }) => m.id)).toEqual(['d', 'b']);
+  });
+});
+
+describe('`off`: something else said where the next word goes (contract draft 7; the hidden view’s red cover)', () => {
+  const apply = applyEvent;
+  const connecting = liveConnecting;
+  const stopping = liveStopping;
+  const seek = seekOnPage;
+  const run = (events: LiveEvent[], from: LiveState = connecting({ start: 100 })): LiveState => events.reduce(apply, from);
+  const reciting: LiveEvent[] = [{ type: 'ready', take: 't', protocol: 6 }, { type: 'at', w: 104 }, { type: 'said', upTo: 104 }];
+
+  it('is read as an event (with its time), and an app that never gets it is unchanged', () => {
+    expect(parseEvent({ type: 'off', w: 105, t: 3.2 })).toEqual({ type: 'off', w: 105, t: 3.2 });
+    expect(parseEvent({ type: 'off' })).toBeNull();
+    expect(run(reciting).off).toBeNull();
+  });
+
+  it('marks the word, never a mark or the score', () => {
+    const s = run([...reciting, { type: 'off', w: 105 }]);
+    expect(s.off).toEqual({ w: 105, from: 104 });
+    expect(s.marks).toEqual({});
+    expect(s.score).toBeNull();
+  });
+
+  it('goes when the word is said (at reaches it, or said decides it), and not while the reciter stays put', () => {
+    const on = [...reciting, { type: 'off', w: 105 } as LiveEvent];
+    expect(run([...on, { type: 'at', w: 104 }]).off).toEqual({ w: 105, from: 104 });
+    expect(run([...on, { type: 'at', w: 105 }]).off).toBeNull();
+    expect(run([...on, { type: 'said', upTo: 105 }]).off).toBeNull();
+  });
+
+  it('goes when the reciter goes back to say it again', () => {
+    expect(run([...reciting, { type: 'off', w: 105 }, { type: 'at', w: 101 }]).off).toBeNull();
+  });
+
+  it('goes when a mark comes on the word, or the stray speech is marked as an extra word just before it', () => {
+    const on = [...reciting, { type: 'off', w: 105 } as LiveEvent];
+    const mark = (w: number, kind: Mark['kind']): LiveEvent => ({ type: 'mark', mark: { id: `${w}:${kind}:`, w, ayah: [27, 23], kind, sure: 'clear' } });
+    expect(run([...on, mark(105, 'word')]).off).toBeNull();
+    expect(run([...on, mark(104, 'added')]).off).toBeNull();
+    expect(run([...on, mark(90, 'word')]).off).toEqual({ w: 105, from: 104 });
+  });
+
+  it('only while reciting a found place, for a word not reached yet (a resume’s replay of a cleared one is ignored)', () => {
+    expect(run([{ type: 'ready', take: 't', protocol: 6 }, { type: 'off', w: 105 }], connecting({ anywhereFrom: 100 })).off).toBeNull();
+    expect(run([...reciting, { type: 'off', w: 104 }]).off).toBeNull();
+    expect(run([...reciting, { type: 'at', w: 106 }, { type: 'off', w: 105 }]).off).toBeNull();
+    expect(run([{ type: 'off', w: 105 }]).off).toBeNull(); // connecting
+  });
+
+  it('goes with Stop, a page turned by hand, the final answer and a failure', () => {
+    const on = run([...reciting, { type: 'off', w: 105 }]);
+    expect(stopping(on).off).toBeNull();
+    expect(seek(on, 200).off).toBeNull();
+    expect(apply(on, { type: 'done', result: { v: 2, take: 't', from: 100, to: 110, secs: 9, marks: [], score: null } }).off).toBeNull();
+    expect(apply(on, { type: 'error', reason: 'server' }).off).toBeNull();
+  });
+});
+
+describe('protocol 7: where the start was found', () => {
+  it('locked carries where (page or quran); anything else is left out', () => {
+    expect(parseEvent({ type: 'locked', w: 10, s: 1, a: 2, where: 'quran' })).toEqual({ type: 'locked', w: 10, s: 1, a: 2, where: 'quran' });
+    expect(parseEvent({ type: 'locked', w: 10, s: 1, a: 2, where: 'page' })).toEqual({ type: 'locked', w: 10, s: 1, a: 2, where: 'page' });
+    expect(parseEvent({ type: 'locked', w: 10, s: 1, a: 2, where: 'mars' })).toEqual({ type: 'locked', w: 10, s: 1, a: 2 });
   });
 });

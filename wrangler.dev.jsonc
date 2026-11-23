@@ -37,6 +37,16 @@
     "DEV_GATE": "1",
     // The account, Premium and Open Door pages (docs/account, docs/premium, docs/apply) are open here only.
     "ACCOUNT_PAGES": "1",
+    // The home's Recite section, mistake detection (docs/index.html, worker/recite.ts): here only until the release.
+    "RECITE_SECTION": "1",
+    // The site dressed for Ramadan (worker/ramadan.ts, docs/assets/ramadan.css): lanterns, lights, the greeting. Here
+    // only; revisely.app gets it on Majd's word (ramadanTheme.test.ts fails if wrangler.jsonc sets it).
+    "RAMADAN_THEME": "1",
+    // Its phases (counting down, Ramadan, Eid, then off), switched by date in the visitor's browser. Both dates hang
+    // on the moon sighting: these are the Umm al-Qura calendar's expected 1 Ramadan and 1 Shawwal 1448 (Eid is Mar 10
+    // if Ramadan has 30 days). Correct them here once the sighting is announced; the pages hold no dates.
+    "RAMADAN_START": "2027-02-08",
+    "RAMADAN_EID": "2027-03-09",
     // Their sign-in's web config: revisely-dev's Hosting site serves it at /__/firebase/init.json (an empty site,
     // released only for that), and the worker serves it at the same path here.
     "FIREBASE_HOSTING": "revisely-dev.web.app",

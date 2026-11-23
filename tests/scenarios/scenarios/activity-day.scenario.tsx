@@ -97,7 +97,7 @@ it('[DAY-9] [DAY-2] [LOG-3] [AHEAD-2] at 00:30 before Fajr, everything done show
   const monday = new DailyLog(again);
   await monday.open('2026-11-02');
   await again.until(() => monday.entries().length === 1, "Monday's log to hold the note");
-  const label: string = again.screen.queryAllByTestId(/^journal-note-(?!menu)[^-]+$/)[0].props.accessibilityLabel;
+  const label: string = again.screen.queryAllByTestId(/^day-note-/)[0].props.accessibilityLabel;
   expect(label).toMatch(/, 12:30 am$/);
   await monday.back();
   const tuesday = new DailyLog(again);

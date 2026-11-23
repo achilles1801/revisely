@@ -1,25 +1,25 @@
 {
-  "recordedAt": "2026-11-10T02:34:07.945Z",
-  "how": "functions/scripts/record-anthropic.js",
+  "recordedAt": null,
+  "how": "functions/scripts/record-anthropic.js on 2026-11-23T11:36:10.256Z; request moved by hand to the system prompt it is sent with now (the real re-record waits on Majd)",
   "request": {
     "model": "claude-sonnet-5-5",
     "max_tokens": 800,
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "617c5a68f5ea543d75c823a16ba54f438a61b7c94a5b75be68a42075006825e6",
+    "systemSha256": "7ba3c3de0a6cd2ab7a3f2d11e5a911427eb65fabbcad6316f0af8f325117f5e6",
     "outputSchemaSha256": "ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e"
   },
   "status": 200,
   "body": {
     "model": "claude-sonnet-5-5",
-    "id": "msg_011CgtTzGwrENRjm6PVeWAnP",
+    "id": "msg_011ChKnqaR8NZgxEt2y6NCp9",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "{\"text\":\"You revised 4 of today's 10 pages, from An-Naba on, and kept your 2-day streak going. For tomorrow, how about putting Al-Mutaffifin 35 to Al-Inshiqaq first, since it's your weakest page?\",\"chart\":null,\"textAfter\":null,\"action\":{\"kind\":\"reviseFirst\",\"title\":\"Revise Al-Mutaffifin 35 to Al-Inshiqaq first\",\"detail\":\"Your weakest page, put at the front of tomorrow's session\",\"pages\":[589]},\"remember\":[],\"title\":\"Day in review\",\"chips\":[\"How is my week going?\",\"Which pages are weak?\"]}"
+        "text": "{\"text\":\"You revised 4 of today's 10 pages, and your streak is 2 days. Tonight, finish the 6 left from Al-Infitar, starting with the weak part in Al-Mutaffifin.\",\"chart\":null,\"textAfter\":null,\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"Finish the 6 pages left, from Al-Infitar\"},\"remember\":[],\"title\":\"Tuesday in review\",\"chips\":[\"Which pages are weakest?\",\"How was my week?\",\"Plan tomorrow\"]}"
       }
     ],
     "container": null,
@@ -29,12 +29,12 @@
     "usage": {
       "input_tokens": 555,
       "cache_creation_input_tokens": 0,
-      "cache_read_input_tokens": 17637,
+      "cache_read_input_tokens": 19818,
       "cache_creation": {
         "ephemeral_5m_input_tokens": 0,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 217,
+      "output_tokens": 184,
       "output_tokens_details": {
         "thinking_tokens": 0
       },

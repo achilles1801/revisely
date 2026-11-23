@@ -13,6 +13,7 @@ import {
   playedBarCount,
   waveformBars,
 } from '../../lib/waveform';
+import { t } from '../../i18n';
 
 /** The shortest bar: silence, or a stretch without levels. */
 export const MIN_BAR_HEIGHT = DOT;
@@ -40,7 +41,7 @@ export function AudioWaveform({
   height = 24,
   ticks,
   seekStep = 0.1,
-  accessibilityLabel = 'Playback position',
+  accessibilityLabel = t('v2.playbackPosition'),
   valueText,
   testID,
 }: {

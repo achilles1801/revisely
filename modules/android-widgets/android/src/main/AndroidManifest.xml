@@ -1,0 +1,63 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!--
+    The widgets move on at each revision day, prayer and midnight by an alarm. With this
+    permission (never asked for) Android 12 and 13 fire it on time, and 14+ wherever the user
+    allows "Alarms & reminders"; without it, Android may fire it up to 10 minutes late.
+    BOOT_COMPLETED's permission comes with expo-notifications.
+  -->
+  <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+  <application>
+    <receiver
+      android:name="app.revisely.widgets.TodayWidget"
+      android:exported="false"
+      android:label="@string/aw_today_name">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/aw_today_info" />
+    </receiver>
+
+    <receiver
+      android:name="app.revisely.widgets.VerseWidget"
+      android:exported="false"
+      android:label="@string/aw_verse_name">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/aw_verse_info" />
+    </receiver>
+
+    <receiver
+      android:name="app.revisely.widgets.QiblaWidget"
+      android:exported="false"
+      android:label="@string/aw_qibla_name">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/aw_qibla_info" />
+    </receiver>
+
+    <receiver
+      android:name="app.revisely.widgets.PrayerWidget"
+      android:exported="false"
+      android:label="@string/aw_prayer_name">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/aw_prayer_info" />
+    </receiver>
+
+    <!-- The next boundary's alarm, and what moves the clock: boot, time, time zone, 12/24-hour, locale. -->
+    <receiver android:name="app.revisely.widgets.WidgetTicker" android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.TIME_SET" />
+        <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+        <action android:name="android.intent.action.LOCALE_CHANGED" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+        <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+      </intent-filter>
+    </receiver>
+  </application>
+</manifest>

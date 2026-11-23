@@ -4,6 +4,7 @@
 // opens the memorized pages at that entry (Majd, Nov 8 2026).
 import React from 'react';
 import { act, fireEvent, render } from '@testing-library/react-native';
+import type { JournalNote } from '../../../src/types';
 import { DayBlocks } from '../../../src/components/activity/DayBlocks';
 import * as firestoreService from '../../../src/services/firestoreService';
 import { plainText } from '../../../src/lib/passages';
@@ -45,7 +46,9 @@ const props = {
   revisionNotes: [],
   memorizationNotes: [],
   onEditReading: noop,
-  onOpenLog: noop,
+  onEditNote: noop,
+  onDeleteNote: noop,
+  onDeleteAllNotes: noop,
   revisedLog: null,
   onDeleteRevised: noop,
   onDeleteMemorized: noop,
@@ -54,12 +57,21 @@ const props = {
 };
 
 describe('Activity day rows (ACT-6)', () => {
-  it('[ACT-6] a hold on a note under a block opens no menu', async () => {
-    const note = { id: 'n1', text: 'a note', kind: 'memorization', tag: 'memorization:x' } as never;
-    const screen = render((<DayBlocks {...props} notes={[note]} readings={[]} />) as never);
+  it('[ACT-6] a hold on a note opens Edit, Copy and Delete, and VoiceOver offers the same', async () => {
+    const note: JournalNote = { id: 'n1', at: Date.UTC(2026, 10, 3, 9), text: 'a note', kind: 'note', minutes: null, tag: 'memorization:x' };
+    const onEditNote = jest.fn();
+    const onDeleteNote = jest.fn();
+    const screen = render((<DayBlocks {...props} onEditNote={onEditNote} onDeleteNote={onDeleteNote} notes={[note]} readings={[]} />) as never);
     await flush();
-    fireEvent(screen.getByLabelText('Daily log. Open the log'), 'longPress');
-    expect(sheet().visible).toBe(false);
+    const row = screen.getByTestId('day-note-n1');
+    expect(row.props.accessibilityActions.map((a: { name: string }) => a.name)).toEqual(['edit', 'copy', 'delete']);
+    fireEvent(row, 'longPress');
+    expect(sheet().visible).toBe(true);
+    expect(sheet().actions.map((a) => a.label)).toEqual(['Edit', 'Copy', 'Delete']);
+    sheet().actions[0].onPress();
+    expect(onEditNote).toHaveBeenCalledWith(note);
+    sheet().actions[2].onPress();
+    expect(onDeleteNote).toHaveBeenCalledWith(note);
   });
 
   it('[ACT-6] a Read block header holds Edit and Delete, and VoiceOver offers the same actions', async () => {

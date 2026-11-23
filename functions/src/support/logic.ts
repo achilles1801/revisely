@@ -26,13 +26,17 @@ export const REPLY_WITHIN_DAYS = 7;
 export const REAPPLY_AFTER_DAYS = 30;
 const DAY_MS = 86_400_000;
 
-/** Where the program page is, per Firebase project. A project not listed has none: supportLink refuses. */
+/**
+ * Where the program page is, per Firebase project. A project not listed has none: supportLink refuses. Production's
+ * joined with the website's release (Majd, Nov 18 2026: "we can release to prod the website now", then "Everything now").
+ */
 export const SUPPORT_PAGES: Record<string, string> = {
   'revisely-dev': 'https://dev.revisely.app/apply/',
+  'revision-buddy-3a398': 'https://revisely.app/apply/',
 };
 
-/** The sites that call the callable from a browser (its CORS). revisely.app joins on Majd's word. */
-export const SUPPORT_ORIGINS = ['https://dev.revisely.app'];
+/** The sites that call the callable from a browser (its CORS): dev.revisely.app, and revisely.app from Nov 18 2026. */
+export const SUPPORT_ORIGINS = ['https://dev.revisely.app', 'https://revisely.app'];
 
 export type SupportErrorCode =
   | 'unauthenticated'
@@ -55,7 +59,9 @@ export class SupportError extends Error {
 // ---------------------------------------------------------------------------------------------------------------
 // Premium
 
-export const SOURCES = ['support', 'dev', 'purchase', 'gift', 'family'] as const;
+// `early`: Premium early access (Majd, Nov 16 2026): every account while config/app.earlyAccess is on, with no end date,
+// kept after paid Premium launches (early.ts). Last, so a tie between grants with no end date keeps its old winner.
+export const SOURCES = ['support', 'dev', 'purchase', 'gift', 'family', 'early'] as const;
 export type Source = (typeof SOURCES)[number];
 
 /** A grant, times in ms (admin.ts stores Timestamps). */

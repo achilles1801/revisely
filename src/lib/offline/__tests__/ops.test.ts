@@ -21,7 +21,9 @@ import {
 import { decode, encode } from '../codec';
 
 const AT = Date.UTC(2026, 10, 2, 9, 0, 0);
-const add = (over: Partial<Extract<OutboxOp, { kind: 'session.add' }>> = {}): Extract<OutboxOp, { kind: 'session.add' }> => ({
+const add = (
+  over: Partial<Extract<OutboxOp, { kind: 'session.add' }>> = {},
+): Extract<OutboxOp, { kind: 'session.add' }> => ({
   kind: 'session.add',
   date: '2026-11-02',
   assignedPages: [1, 2, 3, 4],
@@ -98,11 +100,25 @@ describe('a session change from the outbox', () => {
   it('never goes back from completed, and minutes stay above 0 (the rules refuse both)', () => {
     const done = mergeSessionAdd(null, add({ pagesRevised: [1, 2, 3, 4] }), AT);
     expect(done.state).toBe('COMPLETED');
-    const later = mergeSessionAdd(done, add({ assignedPages: [1, 2, 3, 4, 5, 6], pagesRevised: [5], durationAtLeast: 0 }), AT);
+    const later = mergeSessionAdd(
+      done,
+      add({ assignedPages: [1, 2, 3, 4, 5, 6], pagesRevised: [5], durationAtLeast: 0 }),
+      AT,
+    );
     expect(later.state).toBe('COMPLETED');
     expect(later.assignedPages).toEqual([1, 2, 3, 4, 5, 6]);
     expect(later.durationMinutes).toBeGreaterThan(0);
-    expect(applySessionEdit(done, { kind: 'session.edit', id: done.id, addRevised: [], removeRevised: [], pagesSkipped: [], durationMinutes: 0, weaknessUpdates: [] })!.durationMinutes).toBeNull();
+    expect(
+      applySessionEdit(done, {
+        kind: 'session.edit',
+        id: done.id,
+        addRevised: [],
+        removeRevised: [],
+        pagesSkipped: [],
+        durationMinutes: 0,
+        weaknessUpdates: [],
+      })!.durationMinutes,
+    ).toBeNull();
   });
 
   it('session.assigned: the assignment keeps only the day’s own pages now, only ever shrinking', () => {
@@ -126,7 +142,13 @@ describe('a session change from the outbox', () => {
 
   // Keep daily amount filled 2026-11-02 with 10–31 Oct's pages 7 and 8 (credited to those days, SESS-7).
   it('[SESS-7] a first save of catch-up pages alone keeps their credit, and they complete a day they fill', () => {
-    const catchUp = add({ assignedPages: [7, 8], pagesRevised: [], weaknessUpdates: [], ahead: { '2026-10-31': [7] }, checked: [7] });
+    const catchUp = add({
+      assignedPages: [7, 8],
+      pagesRevised: [],
+      weaknessUpdates: [],
+      ahead: { '2026-10-31': [7] },
+      checked: [7],
+    });
     const first = mergeSessionAdd(null, catchUp, AT);
     expect(first.ahead).toEqual({ '2026-10-31': [7] });
     expect(first.pagesRevised).toEqual([]);
@@ -149,7 +171,17 @@ describe('a session change from the outbox', () => {
   it('[SESS-7] a session saved before Keep daily amount filled the day takes the carried pages as its assignment', () => {
     // 1, 2 of the day's own pages saved; then Add to today moved 1–4 to tomorrow and filled the day with 7, 8.
     const before = mergeSessionAdd(null, add({ pagesRevised: [1, 2] }), AT);
-    const grown = mergeSessionAdd(before, add({ assignedPages: [7, 8], pagesRevised: [], weaknessUpdates: [], ahead: { '2026-10-31': [7, 8] }, checked: [1, 2, 7, 8] }), AT);
+    const grown = mergeSessionAdd(
+      before,
+      add({
+        assignedPages: [7, 8],
+        pagesRevised: [],
+        weaknessUpdates: [],
+        ahead: { '2026-10-31': [7, 8] },
+        checked: [1, 2, 7, 8],
+      }),
+      AT,
+    );
     const cut = applySessionAssigned(grown, { kind: 'session.assigned', id: grown.id, assignedPages: [7, 8] })!;
     expect(cut.assignedPages).toEqual([7, 8]);
     expect(cut.state).toBe('COMPLETED');
@@ -158,7 +190,15 @@ describe('a session change from the outbox', () => {
 
   it('an edit adds and takes out pages as sets (twice is once); a session that’s gone stays gone', () => {
     const s = mergeSessionAdd(null, add({ pagesRevised: [1, 2, 3] }), AT);
-    const op = { kind: 'session.edit' as const, id: s.id, addRevised: [4], removeRevised: [2], pagesSkipped: [2], durationMinutes: 9, weaknessUpdates: [] };
+    const op = {
+      kind: 'session.edit' as const,
+      id: s.id,
+      addRevised: [4],
+      removeRevised: [2],
+      pagesSkipped: [2],
+      durationMinutes: 9,
+      weaknessUpdates: [],
+    };
     const once = applySessionEdit(s, op)!;
     expect(once.pagesRevised).toEqual([1, 3, 4]);
     expect(applySessionEdit(once, op)).toEqual(once);
@@ -167,7 +207,11 @@ describe('a session change from the outbox', () => {
 });
 
 describe('what the app shows: the server’s copy with pending changes laid over it', () => {
-  const user = { uid: 'u1', displayName: 'Asiyah', notifications: { enabled: true, reminderTime: '08:00' } } as unknown as FirestoreUser;
+  const user = {
+    uid: 'u1',
+    displayName: 'Asiyah',
+    notifications: { enabled: true, reminderTime: '08:00' },
+  } as unknown as FirestoreUser;
 
   it('user fields, including nested ones', () => {
     expect(overlayUser(user, { displayName: 'A', 'notifications.reminderTime': '06:30' })).toMatchObject({
@@ -185,11 +229,22 @@ describe('what the app shows: the server’s copy with pending changes laid over
 
   it('sessions in order: added, edited, deleted, newest first', () => {
     const old = mergeSessionAdd(null, add({ date: '2026-11-01' }), AT);
-    const list = overlaySessions([old], [
-      entry(add()),
-      entry({ kind: 'session.edit', id: '2026-11-02', addRevised: [3], removeRevised: [], pagesSkipped: [], durationMinutes: 8, weaknessUpdates: [] }),
-      entry({ kind: 'session.delete', id: '2026-11-01' }),
-    ]);
+    const list = overlaySessions(
+      [old],
+      [
+        entry(add()),
+        entry({
+          kind: 'session.edit',
+          id: '2026-11-02',
+          addRevised: [3],
+          removeRevised: [],
+          pagesSkipped: [],
+          durationMinutes: 8,
+          weaknessUpdates: [],
+        }),
+        entry({ kind: 'session.delete', id: '2026-11-01' }),
+      ],
+    );
     expect(list.map((s) => s.id)).toEqual(['2026-11-02']);
     expect(list[0].pagesRevised).toEqual([1, 2, 3]);
   });
@@ -205,7 +260,9 @@ describe('what the app shows: the server’s copy with pending changes laid over
 
 describe('the phone’s storage format', () => {
   it('Timestamps come back as Timestamps; damaged text is no copy', () => {
-    const back = decode<{ t: Timestamp; n: null; list: number[] }>(encode({ t: Timestamp.fromMillis(AT), n: null, list: [1] }))!;
+    const back = decode<{ t: Timestamp; n: null; list: number[] }>(
+      encode({ t: Timestamp.fromMillis(AT), n: null, list: [1] }),
+    )!;
     expect(back.t).toBeInstanceOf(Timestamp);
     expect(back.t.toMillis()).toBe(AT);
     expect(back.list).toEqual([1]);
@@ -228,7 +285,9 @@ describe('overlayJournal (timestamped notes waiting on this phone)', () => {
 
   it('an added note shows in its day, next to the notes already there', () => {
     const base = [day('2026-11-02', [note('a', { at: AT - 1000 })])];
-    const out = overlayJournal(base, [change({ kind: 'journal.entry.add', date: '2026-11-02', entry: note('b', { at: AT }) })]);
+    const out = overlayJournal(base, [
+      change({ kind: 'journal.entry.add', date: '2026-11-02', entry: note('b', { at: AT }) }),
+    ]);
     expect(out[0].entries.map((n) => n.id)).toEqual(['a', 'b']);
   });
 
@@ -253,9 +312,10 @@ describe('overlayJournal (timestamped notes waiting on this phone)', () => {
 
   it('a change to one day leaves the others as they were', () => {
     const other = day('2026-11-01', [note('z')]);
-    const out = overlayJournal([day('2026-11-02', []), other], [
-      change({ kind: 'journal.entry.add', date: '2026-11-02', entry: note('a') }),
-    ]);
+    const out = overlayJournal(
+      [day('2026-11-02', []), other],
+      [change({ kind: 'journal.entry.add', date: '2026-11-02', entry: note('a') })],
+    );
     expect(out.find((d) => d.date === '2026-11-01')).toBe(other);
   });
 

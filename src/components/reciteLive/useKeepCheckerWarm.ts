@@ -57,3 +57,29 @@ export function useKeepCheckerWarm(on: boolean, busy: boolean, warm: () => void 
     };
   }, [on]);
 }
+
+/**
+ * Wakes the checker when the app opens or comes to the front, for an account that can recite (`on`), at most once every
+ * WARM_EVERY_MS (Nov 22 2026, the orchestrator's yes): production's instances scale to zero and take about 10 s to
+ * start, and the reader's own wake (above) came too late for a take begun as it opened. Only a GET of /health: no
+ * sign-in, no model, no interval, nothing while the app is in the background.
+ */
+export function useWarmCheckerOnFront(on: boolean, warm: () => void = warmUpReciteCheck): void {
+  const warmRef = useRef(warm);
+  warmRef.current = warm;
+  const lastRef = useRef(0);
+  useEffect(() => {
+    if (!on) return undefined;
+    const inFront = (s: string | null | undefined) => s !== 'background' && s !== 'inactive';
+    const wake = () => {
+      if (Date.now() - lastRef.current < WARM_EVERY_MS) return;
+      lastRef.current = Date.now();
+      warmRef.current();
+    };
+    if (inFront(AppState.currentState)) wake();
+    const sub = AppState.addEventListener('change', (s) => {
+      if (inFront(s)) wake();
+    });
+    return () => sub.remove();
+  }, [on]);
+}

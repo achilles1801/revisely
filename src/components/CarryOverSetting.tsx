@@ -5,6 +5,7 @@ import { SettingSwitch } from './settings/SettingSwitch';
 import { typeV2 } from '../theme/v2';
 import { useTheme } from '../context/ThemeContext';
 import { CarryOverMode, DEFAULT_CARRY_OVER_MODE } from '../lib/carryOver';
+import { t } from '../i18n';
 
 /**
  * Settings row: how "Add to today" (yesterday's leftovers) makes room. The
@@ -26,17 +27,17 @@ export function CarryOverSetting({
     <View style={styles.rowV2}>
       <SettingIcon name="arrow-redo-outline" />
       <View style={styles.textV2}>
-        <Text style={[typeV2.body, { color: palette.text }]}>Keep daily amount</Text>
+        <Text style={[typeV2.body, { color: palette.text }]}>{t('plan.carryOver.label')}</Text>
         <Text style={[typeV2.meta, { color: palette.secondary }]} testID="carry-over-explainer">
           {keepAmount
-            ? 'When you add pages you missed yesterday, today stays its usual size and the rest of your plan moves back.'
-            : 'When you add pages you missed yesterday, they go on top of today. Your plan stays as it is.'}
+            ? t('plan.carryOver.keep')
+            : t('plan.carryOver.add')}
         </Text>
       </View>
       <SettingSwitch
         value={keepAmount}
         onValueChange={(v) => onChange(v ? 'shift' : 'add')}
-        accessibilityLabel="Keep daily amount"
+        accessibilityLabel={t('plan.carryOver.label')}
       />
     </View>
   );

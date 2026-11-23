@@ -23,10 +23,19 @@ function resultOf(out: unknown): Record<string, unknown> | null {
 }
 
 /** Asks about one insight. `day` is the revision day (YYYY-MM-DD): one answer per insight and day. */
-export async function askCoach(insight: CoachInsight, totals: Record<string, number>, day: string): Promise<CoachAnswer> {
+export async function askCoach(
+  insight: CoachInsight,
+  totals: Record<string, number>,
+  day: string,
+): Promise<CoachAnswer> {
   const r = resultOf(await callFunction(signedIn(), 'askCoach', { insight, totals, day }));
-  if (!r || typeof r.answer !== 'string' || r.answer.trim() === '') throw new Error('The coach is unavailable. Try again.');
-  return { answer: r.answer, cached: r.cached === true, remainingToday: typeof r.remainingToday === 'number' ? r.remainingToday : 0 };
+  if (!r || typeof r.answer !== 'string' || r.answer.trim() === '')
+    throw new Error('The coach is unavailable. Try again.');
+  return {
+    answer: r.answer,
+    cached: r.cached === true,
+    remainingToday: typeof r.remainingToday === 'number' ? r.remainingToday : 0,
+  };
 }
 
 /** Turns the coach on or off for this account (the notice is shown before turning it on). */

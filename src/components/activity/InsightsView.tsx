@@ -19,6 +19,7 @@ import {
   formatPace,
   juzTiles,
   memorizationMonths,
+  HOURS_FROM_DAYS,
   minutesByHour,
   monthCount,
   monthLabel,
@@ -27,6 +28,7 @@ import {
   quranShare,
   reportMonth,
   reviseFirstLabel,
+  timedDays,
   untouchedJuz,
   weakSpotRows,
   weekCircles,
@@ -61,6 +63,14 @@ import {
   type SurahCoverage,
 } from '../../lib/coverageViews';
 import { PaceSheet } from './PaceSheet';
+import { GapsSection } from './GapsSection';
+import type { PushBack } from '../../lib/gapsCycle';
+import { gapsView } from '../../lib/insightsGaps';
+import { RecitationInsights } from './RecitationInsights';
+import { FirstSection, useFirstSection } from './sectionPlace';
+import { DEFAULT_SECTIONS, sectionsToShow, type InsightsSection, type TabLayout } from '../../lib/activitySections';
+import { stillMarkedWords } from '../../lib/reciteInsights/insights';
+import type { Recitation } from '../../lib/reciteInsights/useRecitation';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   activeDays,
@@ -72,17 +82,17 @@ import {
   memorizedIn,
   missedPattern,
   rangeSpan,
-  unit,
   weeklyPace,
   weeksGrid,
   type InsightsRange,
 } from '../../lib/insightsRange';
+import { t, weekdayLetters, formatNumeral, formatPercentage, formatNumber } from '../../i18n';
+import { chevron, forwardIcon } from '../../i18n/direction';
 
 /** Consistency's weeks grid: the gap between cells, and the largest a cell gets (3 months on a wide phone). */
 const GRID_GAP = 3;
 const GRID_CELL_MAX = 18;
 /** Its rows' weekday initials (Sunday first, as weeksGrid) and their column's width. */
-const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const GRID_LABEL_W = 12;
 
 export interface InsightsData {
@@ -115,6 +125,14 @@ export interface InsightsData {
   coverageSince?: Map<number, string>;
   /** Pages already first tomorrow (Insights' carry): their buttons show "First tomorrow ✓" (ACT-24). */
   firstTomorrow?: ReadonlySet<number>;
+  /** Gaps (ACT-28): Revisely Dev until a release opens it (lib/insightsGaps gapsInsightsEnabled). */
+  gaps?: boolean;
+  /** The first day the items were read from (Gaps: a gap before it began on a day not read, ACT-28). */
+  itemsFrom?: string | null;
+  /** The full revision against the plan (Gaps, ACT-28; lib/gapsCycle). */
+  pushBack?: PushBack | null;
+  /** The takes with Mark mistakes (Revisely Dev, an account that recites): the Recitation section (RINS-2). */
+  recitation?: Recitation | null;
 }
 
 /**
@@ -136,11 +154,11 @@ function FirstTomorrowDone({ pill, testID, onAddToPlan }: { pill?: boolean; test
       style={pill ? [styles.outlinePill, styles.donePill, { borderColor: palette.separator }] : styles.doneLink}
       accessible
       accessibilityRole="text"
-      accessibilityLabel="Goes first tomorrow"
+      accessibilityLabel={t('activity.insights.goesFirstTomorrow')}
       testID={testID}
     >
       <Ionicons name="checkmark" size={16} color={palette.secondary} />
-      <ChromeText style={[typeV2.name, { color: palette.secondary }]}>First tomorrow</ChromeText>
+      <ChromeText style={[typeV2.name, { color: palette.secondary }]}>{t('activity.insights.firstTomorrow')}</ChromeText>
     </View>
   );
 }
@@ -155,6 +173,10 @@ export function InsightsView({
   onTurnOnSmartTracking,
   onOpenDay,
   onOpenCalendar,
+  onOpenAyahs,
+  sections = DEFAULT_SECTIONS.insights,
+  onEditSections,
+  onOpenLastRevised,
 }: {
   data: InsightsData;
   onReviseTomorrow: (pages: number[]) => void;
@@ -169,7 +191,16 @@ export function InsightsView({
   /** A day (Consistency's circles and grid, a month's memorizations: ACT-23). */
   onOpenDay?: (day: string) => void;
   /** Overview at a month (Consistency's figure: ACT-23). */
-  onOpenCalendar?: (month: string) => void;
+  /** Overview at a month; a gap from Gaps also passes the gap, to mark on the calendar (ACT-28). */
+  onOpenCalendar?: (month: string, gap?: { from: string; to: string; cue: string }) => void;
+  /** The reader at some ayahs, highlighted (the Recitation section's rows, RINS-2). */
+  onOpenAyahs?: (sura: number, from: number, to: number) => void;
+  /** The user's order and the sections hidden (ACT-29); the usual layout without it. */
+  sections?: TabLayout<'insights'>;
+  /** Edit sections (ACT-29): from the line shown when every section is hidden. */
+  onEditSections?: () => void;
+  /** When each surah, juz, hizb or page was last revised (Gaps' link: ACT-30). */
+  onOpenLastRevised?: (sort?: 'waiting') => void;
 }) {
   // The juz sheet (ACT-21): mounted from its first opening on, so it can slide away after.
   const [juz, setJuz] = useState<number | null>(null);
@@ -178,17 +209,86 @@ export function InsightsView({
     setJuzUsed(true);
     setJuz(n);
   };
+  // The sections in the user's order, those hidden left out (ACT-29). A section the account can't have keeps its slot.
+  const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
+  const hasPace =
+    paceView({ revised: data.revised.filter((r) => r.day === r.countsFor), read: data.read, today: data.today, capacity: data.capacity, window: span.window }) != null;
+  // Gaps: for the accounts it is open to, once anything was revised (ACT-28).
+  const hasGaps = useMemo(
+    () =>
+      data.gaps === true &&
+      gapsView({ revised: data.revised, today: data.today, window: span.window, firstDay: data.firstDay, knownSince: data.itemsFrom, lastRevisedOn: data.lastRevisedOn }) != null,
+    [data.gaps, data.revised, data.today, span.window, data.firstDay, data.itemsFrom, data.lastRevisedOn],
+  );
+  const has = (id: InsightsSection) =>
+    id === 'weak'
+      ? data.smartTracking !== false || onTurnOnSmartTracking != null
+      : id === 'recitation'
+        ? data.recitation != null && onOpenAyahs != null
+        : id === 'pace'
+          ? hasPace
+          : id === 'gaps'
+            ? hasGaps
+            : true;
+  const shown = sectionsToShow(sections, has);
+  const part = (id: InsightsSection): React.ReactNode => {
+    switch (id) {
+      case 'coverage':
+        return <Coverage data={data} onPlanIt={onPlanIt} onAddToPlan={onAddToPlan} onOpenJuz={openJuz} onOpenPage={onOpenPage} />;
+      case 'consistency':
+        return <Consistency data={data} onOpenDay={onOpenDay} onOpenCalendar={onOpenCalendar} />;
+      case 'gaps':
+        return data.gaps ? (
+          <GapsSection
+            revised={data.revised}
+            today={data.today}
+            window={span.window}
+            inWords={span.inWords}
+            lastWords={span.lastWords}
+            all={span.all}
+            firstDay={data.firstDay}
+            knownSince={data.itemsFrom}
+            lastRevisedOn={data.lastRevisedOn}
+            onOpenDay={onOpenDay}
+            onOpenCalendar={onOpenCalendar}
+            pushBack={data.pushBack}
+            onOpenLastRevised={onOpenLastRevised}
+          />
+        ) : null;
+      case 'weak':
+        return data.smartTracking !== false ? (
+          <WeakSpots data={data} onReviseTomorrow={onReviseTomorrow} onOpenPage={onOpenPage} onSeeAllPages={onSeeAllPages} />
+        ) : onTurnOnSmartTracking ? (
+          <SmartTrackingInvite onPress={onTurnOnSmartTracking} />
+        ) : null;
+      case 'recitation':
+        return data.recitation && onOpenAyahs ? (
+          <RecitationInsights
+            records={data.recitation.records}
+            words={data.recitation.words}
+            today={data.today}
+            window={span.window}
+            inWords={span.inWords}
+            smartTracking={data.smartTracking !== false}
+            rating={data.rating}
+            revo={data.revo}
+            onOpenAyahs={onOpenAyahs}
+          />
+        ) : null;
+      case 'memorization':
+        return <Memorization data={data} onOpenDay={onOpenDay} />;
+      case 'pace':
+        return <Pace data={data} onOpenDay={onOpenDay} />;
+    }
+  };
   return (
     <View testID="activity-insights">
-      <Coverage data={data} onPlanIt={onPlanIt} onAddToPlan={onAddToPlan} onOpenJuz={openJuz} onOpenPage={onOpenPage} />
-      <Consistency data={data} onOpenDay={onOpenDay} onOpenCalendar={onOpenCalendar} />
-      {data.smartTracking !== false ? (
-        <WeakSpots data={data} onReviseTomorrow={onReviseTomorrow} onOpenPage={onOpenPage} onSeeAllPages={onSeeAllPages} />
-      ) : onTurnOnSmartTracking ? (
-        <SmartTrackingInvite onPress={onTurnOnSmartTracking} />
-      ) : null}
-      <Memorization data={data} onOpenDay={onOpenDay} />
-      <Pace data={data} onOpenDay={onOpenDay} />
+      {shown.map((id, i) => (
+        <FirstSection.Provider key={id} value={i === 0}>
+          {part(id)}
+        </FirstSection.Provider>
+      ))}
+      {shown.length === 0 ? <NothingShown onEdit={onEditSections} /> : null}
       {juzUsed ? (
         <JuzSheet
           juz={juz}
@@ -224,8 +324,10 @@ function Section({
   testID?: string;
 }) {
   const { palette } = useTheme();
+  // The first section shown has no hairline above it, whichever it is (ACT-29).
+  const isFirst = useFirstSection() || first;
   return (
-    <View style={[styles.section, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID={testID}>
+    <View style={[styles.section, !isFirst && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID={testID}>
       <View style={styles.sectionHead}>
         <View style={styles.flex}>
           <ChromeText style={[styles.sectionTitle, { color: palette.text }]} accessibilityRole="header">
@@ -265,11 +367,11 @@ function Figure({
   const inner = (
     <>
       <ChromeText style={[styles.big, { color: palette.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-        {value}
+        {formatNumeral(value)}
       </ChromeText>
       <ChromeText style={[typeV2.body, styles.flex, { color: palette.secondary }]}>
         {text}
-        {onPress ? ' ›' : ''}
+        {onPress ? ` ${chevron()}` : ''}
       </ChromeText>
       {right}
     </>
@@ -358,29 +460,31 @@ function Coverage({
   const untouched = untouchedJuz(tiles);
   const tileText = (text: string | number) => (color: string, dim: boolean) => (
     <ChromeText style={[styles.tileText, { color, opacity: dim ? 0.7 : 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-      {text}
+      {typeof text === 'number' ? formatNumber(text) : text}
     </ChromeText>
   );
-  const tile = (t: JuzTile) => {
+  const tile = (jt: JuzTile) => {
     const label =
-      t.state === 'none'
-        ? `Juz ${t.juz}, not memorized${t.learning ? ', learning' : ''}`
-        : t.state === 'stale'
-          ? `Juz ${t.juz}, ${t.daysSince == null ? 'never revised' : `revised ${t.daysSince} days ago`}`
-          : `Juz ${t.juz}, ${coverageWords(t.counts)}`;
+      jt.state === 'none'
+        ? t(jt.learning ? 'activity.insights.tileNotMemorizedLearning' : 'activity.insights.tileNotMemorized', { juz: jt.juz })
+        : jt.state === 'stale'
+          ? jt.daysSince == null
+            ? t('activity.insights.tileNeverRevised', { juz: jt.juz })
+            : t('activity.insights.tileRevisedAgo', { juz: jt.juz, count: jt.daysSince })
+          : t('activity.insights.juzWithWords', { juz: jt.juz, words: coverageWords(jt.counts) });
     // Each tile opens its juz (ACT-21), filled by the share revised this week and this month (ACT-26).
     return (
       <Tap
-        key={t.juz}
-        onPress={() => onOpenJuz(t.juz)}
+        key={jt.juz}
+        onPress={() => onOpenJuz(jt.juz)}
         style={styles.tile}
         accessibilityRole="button"
         accessibilityLabel={label}
-        accessibilityHint={`Opens Juz ${t.juz}`}
-        testID={`juz-tile-${t.juz}`}
+        accessibilityHint={t('activity.insights.opensJuz', { juz: jt.juz })}
+        testID={`juz-tile-${jt.juz}`}
       >
-        <CoverageFill look={fillLook(t.state, t.counts, palette)} label={tileText(t.juz)} style={styles.fill} contentStyle={styles.tileContent} />
-        {t.learning ? <View style={[styles.learnDot, { backgroundColor: palette.primary }]} /> : null}
+        <CoverageFill look={fillLook(jt.state, jt.counts, palette)} label={tileText(jt.juz)} style={styles.fill} contentStyle={styles.tileContent} />
+        {jt.learning ? <View style={[styles.learnDot, { backgroundColor: palette.primary }]} /> : null}
       </Tap>
     );
   };
@@ -404,7 +508,7 @@ function Coverage({
       onPress={() => onOpenJuz(juz)}
       accessibilityRole="button"
       accessibilityLabel={`${spokenText(sc.name)}, ${coverageWords(sc.counts)}`}
-      accessibilityHint={`Opens Juz ${juz}`}
+      accessibilityHint={t('activity.insights.opensJuz', { juz })}
       testID={`coverage-surah-${juz}-${sc.sura}`}
     >
       <CoverageFill
@@ -438,23 +542,35 @@ function Coverage({
   const legend = (['week', 'month', 'new', 'stale', 'none'] as const)
     .filter((key) => (key !== 'new' || anyNew) && (key !== 'none' || view !== 'surah'))
     .map((key) => ({ key, label: COVERAGE_LABELS[key], swatch: coverageLook(key, palette).box }));
-  const detail = view === 'surah' ? "Which surahs you've revised lately" : view === 'page' ? "Which pages you've revised lately" : "Which juz you've revised lately";
+  const detail =
+    view === 'surah'
+      ? t('activity.insights.coverageDetailSurah')
+      : view === 'page'
+        ? t('activity.insights.coverageDetailPage')
+        : t('activity.insights.coverageDetailJuz');
 
   return (
     <Section
-      first
-      title="Coverage"
+      title={t('activity.insights.coverage')}
       detail={detail}
       testID="insights-coverage"
     >
       <Figure
         // All time in cycles: over a long range the share nears 100%, so how many times round says more. Only
         // from the first whole cycle: before it, the share, as the other ranges show it (never "0 cycles").
-        value={inCycles ? cyclesText : `${pct}%`}
+        value={inCycles ? cyclesText : formatPercentage(pct)}
         text={
           inCycles
-            ? `${cyclesText === '1' ? 'cycle' : 'cycles'} of your ${count.of} memorized ${unit(count.of, 'page')} ${span.inWords}`
-            : `${count.revised} of ${count.of} memorized ${unit(count.of, 'page')} ${span.inWords}`
+            ? t('activity.insights.cyclesOfYour', {
+                count: Number(cyclesText),
+                pages: t('activity.insights.memorizedPages', { count: count.of }),
+                span: span.inWords,
+              })
+            : t('activity.insights.revisedOfMemorized', {
+                n: count.revised,
+                pages: t('activity.insights.memorizedPages', { count: count.of }),
+                span: span.inWords,
+              })
         }
         onPress={
           count.revised < count.of
@@ -464,15 +580,15 @@ function Coverage({
               }
             : undefined
         }
-        hint="Shows what wasn't revised"
+        hint={t('activity.insights.showsUnrevised')}
         testID="insights-coverage-figure"
       />
       <View style={styles.views}>
         <PillTabs<CoverageView>
           options={[
-            { value: 'juz', label: 'Juz' },
-            { value: 'surah', label: 'Surah' },
-            { value: 'page', label: 'Page' },
+            { value: 'juz', label: t('common.juz') },
+            { value: 'surah', label: t('common.surah') },
+            { value: 'page', label: t('common.page') },
           ]}
           value={view}
           onChange={setView}
@@ -503,14 +619,14 @@ function Coverage({
                   onPress={() => toggle(g.juz, isOpen)}
                   style={styles.juzHead}
                   accessibilityRole="button"
-                  accessibilityLabel={`Juz ${g.juz}, ${words}`}
+                  accessibilityLabel={t('activity.insights.juzWithWords', { juz: g.juz, words })}
                   accessibilityState={{ expanded: isOpen }}
-                  accessibilityHint={isOpen ? 'Hides its surahs' : 'Shows its surahs'}
+                  accessibilityHint={isOpen ? t('activity.insights.hidesSurahs') : t('activity.insights.showsSurahs')}
                   testID={`coverage-juz-${g.juz}`}
                 >
                   <CoverageFill look={fillLook(stateOf(g.counts), g.counts, palette)} label={tileText(g.juz)} style={styles.headTile} contentStyle={styles.tileContent} />
                   <View style={styles.flex}>
-                    <ChromeText style={[typeV2.name, { color: palette.text }]}>{`Juz ${g.juz}`}</ChromeText>
+                    <ChromeText style={[typeV2.name, { color: palette.text }]}>{t('common.juzN', { n: g.juz })}</ChromeText>
                     <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{words.charAt(0).toUpperCase() + words.slice(1)}</ChromeText>
                   </View>
                   <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={18} color={palette.secondary} />
@@ -533,11 +649,11 @@ function Coverage({
                 onPress={() => onOpenJuz(r.juz)}
                 style={styles.pageLabel}
                 accessibilityRole="button"
-                accessibilityLabel={`Juz ${r.juz}`}
-                accessibilityHint={`Opens Juz ${r.juz}`}
+                accessibilityLabel={t('common.juzN', { n: r.juz })}
+                accessibilityHint={t('activity.insights.opensJuz', { juz: r.juz })}
                 testID={`coverage-page-row-${r.juz}`}
               >
-                <ChromeText style={[styles.pageLabelText, { color: palette.secondary }]}>{r.juz}</ChromeText>
+                <ChromeText style={[styles.pageLabelText, { color: palette.secondary }]}>{formatNumber(r.juz)}</ChromeText>
               </Tap>
               <View style={styles.cells}>
                 {r.cells.map((c) => (
@@ -546,8 +662,12 @@ function Coverage({
                     onPress={() => onOpenPage?.(c.page)}
                     style={styles.cellSlot}
                     accessibilityRole="button"
-                    accessibilityLabel={`${spokenText(describePassage([c.page], { form: 'compact' }))}, page ${c.page}, ${pageWords(c.state)}`}
-                    accessibilityHint="Opens it in the reader"
+                    accessibilityLabel={t('activity.insights.pageCell', {
+                      passage: spokenText(describePassage([c.page], { form: 'compact' })),
+                      page: c.page,
+                      state: pageWords(c.state),
+                    })}
+                    accessibilityHint={t('activity.insights.opensInReader')}
                     testID={`coverage-page-${c.page}`}
                   >
                     <View style={[styles.cell, cellLook(c.state)]} />
@@ -574,24 +694,24 @@ function Coverage({
           <Tap
             onPress={() => onOpenJuz(untouched.first.juz)}
             accessibilityRole="button"
-            accessibilityHint={`Opens Juz ${untouched.first.juz}`}
+            accessibilityHint={t('activity.insights.opensJuz', { juz: untouched.first.juz })}
             style={styles.untouchedMain}
             testID="insights-untouched"
           >
           <View style={[styles.dot8, { backgroundColor: palette.red }]} />
           <View style={styles.flex}>
-            <ChromeText style={[typeV2.name, { color: palette.text }]}>{`Juz ${untouched.first.juz}, untouched the longest`}</ChromeText>
+            <ChromeText style={[typeV2.name, { color: palette.text }]}>{t('activity.insights.untouchedLongest', { juz: untouched.first.juz })}</ChromeText>
             <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>
               {[
-                untouched.first.daysSince == null ? 'Never revised' : `Last revised ${untouched.first.daysSince} days ago`,
+                untouched.first.daysSince == null
+                  ? t('activity.insights.neverRevised')
+                  : t('activity.insights.lastRevisedAgo', { count: untouched.first.daysSince }),
                 untouched.next
-                  ? `Juz ${untouched.next.juz}, ${
-                      untouched.next.daysSince != null
-                        ? `${untouched.next.daysSince} ${unit(untouched.next.daysSince, 'day')}`
-                        : untouched.next.state === 'new'
-                          ? 'not revised yet'
-                          : 'never'
-                    }`
+                  ? untouched.next.daysSince != null
+                    ? t('activity.insights.nextDays', { juz: untouched.next.juz, count: untouched.next.daysSince })
+                    : untouched.next.state === 'new'
+                      ? t('activity.insights.nextNotYet', { juz: untouched.next.juz })
+                      : t('activity.insights.nextNever', { juz: untouched.next.juz })
                   : null,
               ]
                 .filter(Boolean)
@@ -608,11 +728,11 @@ function Coverage({
             <Tap
               onPress={() => onPlanIt(getPagesForJuz(untouched.first.juz).filter((p) => data.memorized.has(p)))}
               accessibilityRole="button"
-              accessibilityLabel={`Plan Juz ${untouched.first.juz}`}
+              accessibilityLabel={t('activity.insights.planJuz', { juz: untouched.first.juz })}
               hitSlop={10}
               testID="insights-plan-it"
             >
-              <ChromeText style={[typeV2.name, { color: palette.link }]}>Plan it</ChromeText>
+              <ChromeText style={[typeV2.name, { color: palette.link }]}>{t('activity.insights.planIt')}</ChromeText>
             </Tap>
           )}
         </View>
@@ -621,8 +741,8 @@ function Coverage({
         <Sheet
           visible={uncoveredOpen}
           onClose={() => setUncoveredOpen(false)}
-          title={`Not revised ${span.inWords}`}
-          message={`${count.of - count.revised} of ${count.of} memorized ${unit(count.of, 'page')}`}
+          title={t('activity.insights.notRevisedSpan', { span: span.inWords })}
+          message={t('activity.insights.ofMemorized', { n: count.of - count.revised, pages: t('activity.insights.memorizedPages', { count: count.of }) })}
           messageMaxScale={CHROME_MAX_SCALE}
           scroll
           onHidden={() => {
@@ -644,7 +764,7 @@ function Coverage({
             />
           ))}
           <ChromeText style={[typeV2.meta, styles.uncoveredFoot, { color: palette.secondary }]}>
-            {`Every other memorized page was revised ${span.inTheLast}.`}
+            {t('activity.insights.everyOtherRevised', { span: span.inTheLast })}
           </ChromeText>
         </Sheet>
       ) : null}
@@ -660,13 +780,13 @@ function UncoveredLine({ row, separator, onPress }: { row: UncoveredRow; separat
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${spokenText(row.label)}, ${spokenText(row.detail)}`}
-      accessibilityHint={`Opens Juz ${row.juz}`}
+      accessibilityHint={t('activity.insights.opensJuz', { juz: row.juz })}
       style={[styles.uncoveredRow, separator && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: palette.separator }]}
       testID={`uncovered-${row.pages[0]}`}
     >
       <View style={[styles.uncoveredMark, { backgroundColor: palette.bubble }]}>
         {row.kind === 'juz' ? (
-          <ChromeText style={[typeV2.name, { color: palette.red }]}>{row.juz}</ChromeText>
+          <ChromeText style={[typeV2.name, { color: palette.red }]}>{formatNumber(row.juz)}</ChromeText>
         ) : (
           <Ionicons name="leaf-outline" size={18} color={palette.text} />
         )}
@@ -679,7 +799,7 @@ function UncoveredLine({ row, separator, onPress }: { row: UncoveredRow; separat
           {row.detail}
         </ChromeText>
       </View>
-      <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+      <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
     </Tap>
   );
 }
@@ -692,9 +812,9 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
   const active = useMemo(() => new Set([...data.revised.map((r) => r.day), ...data.read.map((r) => r.day)]), [data.revised, data.read]);
   const range = data.range ?? 30;
   const span = rangeSpan(range, data.today, data.firstDay);
-  const week = weekCircles(active, data.today);
+  const week = weekCircles(active, data.today, data.firstDay);
   const month = reportMonth(data.today);
-  const m = monthCount(active, month, data.today);
+  const m = monthCount(active, month, data.today, data.firstDay);
   const inRange = activeDays(active, data.today, span.window, data.firstDay);
   // 3 months and All time: a weeks grid by weekday (up to half a year) and the missed days' pattern;
   // 7 and 30 days: the week's circles. The grid has a column per week since the account's first (a short
@@ -706,14 +826,25 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
   const fullWeeks = range === 90 ? 13 : 26;
   const cell = Math.max(8, Math.min(GRID_CELL_MAX, Math.floor((width - 32 - GRID_LABEL_W - fullWeeks * GRID_GAP) / fullWeeks)));
   // A count from the account's first day names it, whatever the range ("since 8 November").
-  const sinceFirst = data.firstDay ? `since ${dayAndMonth(data.firstDay)}` : 'since you started';
+  const sinceFirst = data.firstDay ? t('activity.insights.sinceDay', { day: dayAndMonth(data.firstDay) }) : t('activity.insights.sinceStarted');
+  // 7 days: the week and its month beside it ("5 of the last 7 days · 10 of 19 in November"), the month counted from the
+  // account's first day when it began in it ("· 10 of 12 since 8 November"); an account younger than the week counts
+  // from its first day alone, as the other ranges do (ACT-31: "1 of 19 in November" on a day-old account).
+  const monthWords =
+    m && m.of > 0
+      ? m.from
+        ? t('activity.insights.monthSince', { done: m.done, of: m.of, day: dayAndMonth(m.from) })
+        : t('activity.insights.monthIn', { done: m.done, of: m.of, month: monthName(month) })
+      : null;
   const figureText =
-    range === 7
-      ? `of the last 7 days · ${m.done} of ${m.of} in ${monthName(month)}`
-      : span.all || inRange.sinceStart
-        ? `of ${inRange.of} ${unit(inRange.of, 'day')} ${sinceFirst}`
-        : `of the last ${inRange.of} days`;
+    span.all || inRange.sinceStart
+      ? t('activity.insights.ofDaysSince', { count: inRange.of, since: sinceFirst })
+      : range === 7
+        ? [t('activity.insights.ofLastWeek'), monthWords].filter(Boolean).join(' · ')
+        : t('activity.insights.ofLastDays', { count: inRange.of });
   const hours = useMemo(() => minutesByHour([...data.revised, ...data.read], data.today, span.window), [data.revised, data.read, data.today, span.window]);
+  // The hours from 3 days with something timed: one session's hour says nothing about when they revise (ACT-31).
+  const hoursShown = useMemo(() => timedDays([...data.revised, ...data.read], data.today, span.window) >= HOURS_FROM_DAYS, [data.revised, data.read, data.today, span.window]);
   // The hours scrub (i8): a press that slides picks the hour under the finger; letting go puts it back.
   const [heldHour, setHeldHour] = useState<number | null>(null);
   const barsWidth = React.useRef(0);
@@ -736,12 +867,12 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
   const max = Math.max(1, ...hours);
 
   return (
-    <Section title="Consistency" detail="How often, and when" testID="insights-consistency">
+    <Section title={t('activity.insights.consistency')} detail={t('activity.insights.consistencyDetail')} testID="insights-consistency">
       <Figure
-        value={String(range === 7 ? week.filter((d) => d.done).length : inRange.done)}
+        value={String(inRange.done)}
         text={figureText}
         onPress={onOpenCalendar ? () => onOpenCalendar(range === 7 ? month : data.today.slice(0, 7)) : undefined}
-        hint="Opens the calendar"
+        hint={t('activity.insights.opensCalendar')}
         testID="insights-consistency-figure"
       />
       {grid ? (
@@ -754,7 +885,7 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
             accessibilityElementsHidden
             testID="insights-grid-weekdays"
           >
-            {WEEKDAY_INITIALS.map((letter, i) => (
+            {weekdayLetters().map((letter, i) => (
               <View key={i} style={[styles.gridLabel, { height: cell }]}>
                 <ChromeText style={[styles.gridLabelText, { color: palette.secondary, fontSize: cell >= 14 ? 11 : 9 }]}>{letter}</ChromeText>
               </View>
@@ -778,7 +909,7 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
                   ]}
                   accessible={c.state === 'done' || c.state === 'missed'}
                   accessibilityRole="button"
-                  accessibilityLabel={`${c.day}, ${c.state === 'done' ? 'revised or read' : 'missed'}`}
+                  accessibilityLabel={t(c.state === 'done' ? 'activity.insights.dayDone' : 'activity.insights.dayMissed', { day: c.day })}
                   testID={`insights-grid-${c.day}`}
                 />
               ))}
@@ -788,18 +919,25 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
       ) : (
       <View style={styles.circles}>
         {week.map((d) => (
-          // A day's circle opens that day; a missed one opens empty, with its + (ACT-23).
+          // A day's circle opens that day; a missed one opens empty, with its + (ACT-23). A day before the account is
+          // faint and opens nothing: it wasn't missed (ACT-31).
           <Tap
             key={d.day}
-            onPress={onOpenDay ? () => onOpenDay(d.day) : undefined}
-            disabled={!onOpenDay}
+            onPress={onOpenDay && !d.before ? () => onOpenDay(d.day) : undefined}
+            disabled={!onOpenDay || d.before}
             style={styles.circleCol}
+            accessible={!d.before}
             accessibilityRole="button"
-            accessibilityLabel={`${d.day}, ${d.done ? 'revised or read' : 'missed'}`}
-            accessibilityHint="Opens the day"
-            testID={`insights-day-${d.day}`}
+            accessibilityLabel={t(d.done ? 'activity.insights.dayDone' : 'activity.insights.dayMissed', { day: d.day })}
+            accessibilityHint={t('activity.insights.opensDay')}
+            testID={d.before ? `insights-day-before-${d.day}` : `insights-day-${d.day}`}
           >
-            <View style={[styles.circle, d.done ? { backgroundColor: palette.primary } : { borderWidth: 1.5, borderColor: palette.outline }]}>
+            <View
+              style={[
+                styles.circle,
+                d.done ? { backgroundColor: palette.primary } : d.before ? { backgroundColor: palette.track, opacity: 0.35 } : { borderWidth: 1.5, borderColor: palette.outline },
+              ]}
+            >
               {d.done ? <Ionicons name="checkmark" size={16} color={palette.onPrimary} /> : null}
             </View>
             <ChromeText style={[typeV2.meta, styles.letter, { color: palette.secondary }]}>{d.letter}</ChromeText>
@@ -812,13 +950,13 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
           {pattern}
         </ChromeText>
       ) : null}
-      {busiest ? (
+      {busiest && hoursShown ? (
         <View style={styles.hoursBlock} testID="insights-hours">
           {/* Press and slide on the bars (i8): the title becomes the hour under the finger. */}
           <ChromeText style={[typeV2.name, { color: palette.text }]} testID="insights-hours-title">
             {held ? held.title : busiest}
           </ChromeText>
-          <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{held ? held.detail : `Minutes by hour, ${span.lastWords}`}</ChromeText>
+          <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{held ? held.detail : t('activity.insights.minutesByHour', { span: span.lastWords })}</ChromeText>
           <GestureDetector gesture={scrub}>
             <View style={styles.hourBars} onLayout={(e) => (barsWidth.current = e.nativeEvent.layout.width)} testID="insights-hour-bars">
               {hours.map((v, h) => (
@@ -835,7 +973,10 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
                       : { height: 3, backgroundColor: palette.track },
                   ]}
                   accessible
-                  accessibilityLabel={`${hourDetail([], data.today, span.window, span.inWords, h).title}, ${v > 0 ? minutesWords(v) : 'nothing timed'}`}
+                  accessibilityLabel={t('activity.insights.hourBar', {
+                    hour: hourDetail([], data.today, span.window, span.inWords, h).title,
+                    minutes: v > 0 ? minutesWords(v) : t('activity.insights.nothingTimed'),
+                  })}
                 />
               ))}
             </View>
@@ -843,7 +984,7 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
           <View style={styles.hourLabels}>
             {[0, 6, 12, 18].map((h) => (
               <ChromeText key={h} style={[typeV2.meta, styles.hourLabel, { color: palette.secondary, left: `${(h / 24) * 100}%` }]}>
-                {h === 0 ? '12 AM' : h === 6 ? '6 AM' : h === 12 ? '12 PM' : '6 PM'}
+                {h === 0 ? t('activity.insights.hour12am') : h === 6 ? t('activity.insights.hour6am') : h === 12 ? t('activity.insights.hour12pm') : t('activity.insights.hour6pm')}
               </ChromeText>
             ))}
           </View>
@@ -857,21 +998,39 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
 
 /** Links in Insights are chrome: their text stops growing at 1.4× (Dynamic Type). */
 const LINK_MAX_SCALE = 1.4;
-const INVITE = 'Turn on Smart Tracking to see your weak spots';
 
 /**
  * Smart Tracking off: no page is rated, so Weak spots gives way to one line that turns it on
  * (Settings → Revision, at its switch). A label, not a guide (ACT-12).
  */
-function SmartTrackingInvite({ onPress }: { onPress: () => void }) {
+/** Every section hidden (ACT-29): one quiet line, and the way back. */
+function NothingShown({ onEdit }: { onEdit?: () => void }) {
   const { palette } = useTheme();
   return (
-    <View style={[styles.section, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]}>
-      <Tap onPress={onPress} accessibilityRole="link" accessibilityLabel={INVITE} hitSlop={8} style={styles.invite} testID="insights-smart-tracking">
+    <View style={styles.section} testID="insights-nothing-shown">
+      <ChromeText style={[typeV2.body, { color: palette.secondary }]}>{t('activity.insights.everySectionHidden')}</ChromeText>
+      {onEdit ? (
+        <Tap onPress={onEdit} accessibilityRole="button" hitSlop={8} style={styles.invite} testID="insights-edit-sections">
+          <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
+            {t('activity.insights.editSections')}
+          </ChromeText>
+          <Ionicons name={forwardIcon()} size={16} color={palette.link} />
+        </Tap>
+      ) : null}
+    </View>
+  );
+}
+
+function SmartTrackingInvite({ onPress }: { onPress: () => void }) {
+  const { palette } = useTheme();
+  const first = useFirstSection();
+  return (
+    <View style={[styles.section, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]}>
+      <Tap onPress={onPress} accessibilityRole="link" accessibilityLabel={t('activity.insights.smartTrackingInvite')} hitSlop={8} style={styles.invite} testID="insights-smart-tracking">
         <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
-          {INVITE}
+          {t('activity.insights.smartTrackingInvite')}
         </ChromeText>
-        <Ionicons name="chevron-forward" size={16} color={palette.link} />
+        <Ionicons name={forwardIcon()} size={16} color={palette.link} />
       </Tap>
     </View>
   );
@@ -899,28 +1058,41 @@ function WeakSpots({
     inWords: rangeSpan(data.range ?? 30, data.today, data.firstDay).inWords,
   });
   const pages = rows.flatMap((r) => r.pages);
+  // Words Recite still marks on each page (Revisely Dev, RINS-2): said on the weak spot's row.
+  const marked = useMemo(() => {
+    const words = data.recitation?.words;
+    const byPage = new Map<number, number>();
+    if (!data.recitation || !words) return byPage;
+    for (const w of stillMarkedWords(data.recitation.records)) byPage.set(words.pageOf(w.w), (byPage.get(words.pageOf(w.w)) ?? 0) + 1);
+    return byPage;
+  }, [data.recitation]);
+  const markedOn = (rowPages: number[]) => rowPages.reduce((n, p) => n + (marked.get(p) ?? 0), 0);
+  const reasonOf = (r: { pages: number[]; reason: string }) => {
+    const n = markedOn(r.pages);
+    return n > 0 ? `${r.reason} · ${t('activity.insights.stillMarked', { count: n })}` : r.reason;
+  };
   return (
     <Section
-      title="Weak spots"
-      detail={`Weak now, or skipped most ${rangeSpan(data.range ?? 30, data.today, data.firstDay).inWords}`}
+      title={t('activity.insights.weakSpots')}
+      detail={t('activity.insights.weakSpotsDetail', { span: rangeSpan(data.range ?? 30, data.today, data.firstDay).inWords })}
       right={
         data.revo ? (
           <Tap
-            onPress={() => openRevo({ attach: { kind: 'insight', label: 'Weak spots', insight: 'weakSpots' }, place: { kind: 'weakSpots' } })}
+            onPress={() => openRevo({ attach: { kind: 'insight', label: t('activity.insights.weakSpots'), insight: 'weakSpots' }, place: { kind: 'weakSpots' } })}
             accessibilityRole="button"
-            accessibilityLabel="Ask Revo about your weak spots"
+            accessibilityLabel={t('activity.insights.askRevoWeakSpots')}
             style={[styles.ask, { borderColor: palette.outline }]}
             testID="insights-ask-revo"
           >
             <Ionicons name="sparkles-outline" size={16} color={palette.accentText} />
-            <ChromeText style={[typeV2.name, { color: palette.text }]}>Ask</ChromeText>
+            <ChromeText style={[typeV2.name, { color: palette.text }]}>{t('activity.insights.ask')}</ChromeText>
           </Tap>
         ) : undefined
       }
       testID="insights-weak-spots"
     >
       {rows.length === 0 ? (
-        <ChromeText style={[typeV2.body, styles.none, { color: palette.secondary }]}>Nothing weak or often skipped</ChromeText>
+        <ChromeText style={[typeV2.body, styles.none, { color: palette.secondary }]}>{t('activity.insights.nothingWeak')}</ChromeText>
       ) : (
         <View style={styles.weakList}>
           {rows.map((r, i) => (
@@ -928,7 +1100,7 @@ function WeakSpots({
               key={r.label}
               onPress={() => onOpenPage(r.pages[0])}
               accessibilityRole="button"
-              accessibilityLabel={`${spokenText(r.label)}. ${r.reason}. Open it`}
+              accessibilityLabel={t('activity.insights.weakRow', { label: spokenText(r.label), reason: reasonOf(r) })}
               style={[styles.weakRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]}
               testID={`weak-spot-${r.pages[0]}`}
             >
@@ -939,9 +1111,9 @@ function WeakSpots({
                   <ChromeText style={[typeV2.name, { color: palette.text }]}>{r.label}</ChromeText>
                   <ChromeText style={[typeV2.body, { color: palette.secondary }]}>{`  ${r.pagesNote}`}</ChromeText>
                 </ChromeText>
-                <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{r.reason}</ChromeText>
+                <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{reasonOf(r)}</ChromeText>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+              <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
             </Tap>
           ))}
         </View>
@@ -967,9 +1139,9 @@ function WeakSpots({
           testID="insights-see-all-pages"
         >
           <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
-            See all pages by strength
+            {t('activity.insights.seeAllByStrength')}
           </ChromeText>
-          <Ionicons name="chevron-forward" size={16} color={palette.link} />
+          <Ionicons name={forwardIcon()} size={16} color={palette.link} />
         </Tap>
       ) : null}
     </Section>
@@ -993,23 +1165,26 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
   const top = Math.max(10, ...months.map((m) => m.pages));
   const share = quranShare(data.memorized.size);
   return (
-    <Section title="Memorization" detail="Pages memorized each month" testID="insights-memorization">
+    <Section title={t('activity.insights.memorization')} detail={t('activity.insights.memorizationDetail')} testID="insights-memorization">
       {shownMonth ? (
         <Figure
           value={String(shownMonth.pages)}
-          text={[`${shownMonth.pages === 1 ? 'page' : 'pages'} in ${monthName(shownMonth.month)}`, shownMonth.passage || null].filter(Boolean).join(' · ')}
-          right={<ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{`${data.memorized.size} in all`}</ChromeText>}
+          text={[t('activity.insights.pagesInMonth', { count: shownMonth.pages, month: monthName(shownMonth.month) }), shownMonth.passage || null].filter(Boolean).join(' · ')}
+          right={<ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{t('activity.insights.inAll', { n: data.memorized.size })}</ChromeText>}
           testID="insights-memorization-figure"
         />
       ) : (
         <Figure
           value={String(data.memorized.size)}
-          text={[data.memorized.size === 1 ? 'page' : 'pages', share].filter(Boolean).join(' · ')}
-          right={added > 0 ? <ChromeText style={[typeV2.name, { color: palette.good }]}>{`+${added} ${span.inWords}`}</ChromeText> : undefined}
+          text={[t('activity.insights.pagesWord', { count: data.memorized.size }), share].filter(Boolean).join(' · ')}
+          right={added > 0 ? <ChromeText style={[typeV2.name, { color: palette.good }]}>{`+${formatNumber(added)} ${span.inWords}`}</ChromeText> : undefined}
           testID="insights-memorization-figure"
         />
       )}
-      <View style={styles.monthBars}>
+      {/* No month with a page memorized: twelve empty bars say nothing (ACT-31). */}
+      {months.some((m) => m.pages > 0) ? (
+      <>
+      <View style={styles.monthBars} testID="insights-month-bars">
         {months.map((m, i) => {
           const last = i === months.length - 1;
           const lit = picked ? m.month === picked : last;
@@ -1022,11 +1197,11 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
               }}
               style={styles.monthCol}
               accessibilityRole="button"
-              accessibilityLabel={`${monthName(m.month)}, ${m.pages} ${unit(m.pages, 'page')}`}
+              accessibilityLabel={t('activity.insights.monthPages', { month: monthName(m.month), count: m.pages })}
               accessibilityState={{ selected: picked === m.month }}
               testID={`insights-month-${m.month}`}
             >
-              {lit && m.pages > 0 ? <ChromeText style={[typeV2.meta, styles.monthValue, { color: palette.text }]}>{m.pages}</ChromeText> : null}
+              {lit && m.pages > 0 ? <ChromeText style={[typeV2.meta, styles.monthValue, { color: palette.text }]}>{formatNumber(m.pages)}</ChromeText> : null}
               <View style={[styles.monthBar, { height: Math.round((72 * m.pages) / top), backgroundColor: palette.primary, opacity: lit ? 1 : 0.4 }]} />
             </Tap>
           );
@@ -1045,6 +1220,8 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
           </ChromeText>
         ))}
       </View>
+      </>
+      ) : null}
       {shownMonth ? (
         <View style={styles.monthList} testID="insights-month-list">
           {(allShown ? shownMonth.items : shownMonth.items.slice(0, 4)).map((it, i) => (
@@ -1054,7 +1231,7 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
               disabled={!onOpenDay}
               accessibilityRole="button"
               accessibilityLabel={`${spokenText(it.label)}, ${it.when}`}
-              accessibilityHint="Opens the day"
+              accessibilityHint={t('activity.insights.opensDay')}
               style={[styles.uncoveredRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }, i === 0 && styles.monthListFirst]}
               testID={`insights-month-item-${it.day}`}
             >
@@ -1069,16 +1246,16 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
                   {it.when}
                 </ChromeText>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+              <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
             </Tap>
           ))}
           {shownMonth.items.length === 0 ? (
-            <ChromeText style={[typeV2.meta, styles.none, { color: palette.secondary }]}>{`Nothing memorized in ${monthName(shownMonth.month)}`}</ChromeText>
+            <ChromeText style={[typeV2.meta, styles.none, { color: palette.secondary }]}>{t('activity.insights.nothingMemorizedIn', { month: monthName(shownMonth.month) })}</ChromeText>
           ) : null}
           {!allShown && shownMonth.items.length > 4 ? (
             <Tap onPress={() => setAllShown(true)} accessibilityRole="button" hitSlop={8} style={styles.seeAll} testID="insights-month-more">
               <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
-                {`${shownMonth.items.length - 4} more in ${monthName(shownMonth.month)}`}
+                {t('activity.insights.moreInMonth', { n: shownMonth.items.length - 4, month: monthName(shownMonth.month) })}
               </ChromeText>
               <Ionicons name="chevron-down" size={16} color={palette.link} />
             </Tap>
@@ -1107,7 +1284,7 @@ function WeekByWeek({ revised, today }: { revised: InsightsData['revised']; toda
   const last = known[known.length - 1].v;
   return (
     <View style={styles.weekByWeek} testID="insights-pace-weeks">
-      <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{`Week by week: ${formatPace(first)} → ${formatPace(last)} min a page`}</ChromeText>
+      <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{t('activity.insights.weekByWeek', { first: formatPace(first), last: formatPace(last) })}</ChromeText>
       <View style={styles.weekLine} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
         {width > 0 ? (
           <Svg width={width} height={h}>
@@ -1135,24 +1312,24 @@ function Pace({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (day: strin
     p.before == null || !span.before
       ? null
       : Math.abs(p.perPage - p.before) < 0.05
-        ? `The same as ${span.before}`
-        : `${p.perPage < p.before ? 'Down' : 'Up'} from ${formatPace(p.before)} ${span.before}`;
+        ? t('activity.insights.sameAs', { before: span.before })
+        : t(p.perPage < p.before ? 'activity.insights.downFrom' : 'activity.insights.upFrom', { pace: formatPace(p.before), before: span.before });
   return (
-    <Section title="Pace" detail="Minutes per page" testID="insights-pace">
+    <Section title={t('activity.insights.pace')} detail={t('activity.insights.paceDetail')} testID="insights-pace">
       <View style={[styles.paceTiles, stacked && styles.paceTilesStacked]} testID="insights-pace-tiles">
         <View style={[styles.paceTile, { backgroundColor: palette.bubble }]}>
           <View style={styles.paceFigure}>
             <ChromeText style={[styles.paceNumber, { color: palette.text }]}>{formatPace(p.perPage)}</ChromeText>
-            <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>min a page</ChromeText>
+            <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{t('activity.insights.minAPage')}</ChromeText>
           </View>
-          <ChromeText style={[typeV2.meta, styles.paceText, { color: palette.secondary }]}>{[`Revising, ${span.lastWords}.`, change].filter(Boolean).join(' ')}</ChromeText>
+          <ChromeText style={[typeV2.meta, styles.paceText, { color: palette.secondary }]}>{[t('activity.insights.revisingSpan', { span: span.lastWords }), change].filter(Boolean).join(' ')}</ChromeText>
         </View>
         <View style={[styles.paceTile, { backgroundColor: palette.bubble }]}>
           <View style={styles.paceFigure}>
-            <ChromeText style={[styles.paceNumber, { color: palette.text }]}>{p.dayMinutes}</ChromeText>
-            <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>min</ChromeText>
+            <ChromeText style={[styles.paceNumber, { color: palette.text }]}>{formatNumber(p.dayMinutes)}</ChromeText>
+            <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{t('activity.insights.min')}</ChromeText>
           </View>
-          <ChromeText style={[typeV2.meta, styles.paceText, { color: palette.secondary }]}>{`A ${p.capacity}-page day at that pace`}</ChromeText>
+          <ChromeText style={[typeV2.meta, styles.paceText, { color: palette.secondary }]}>{t('activity.insights.dayAtPace', { n: p.capacity })}</ChromeText>
         </View>
       </View>
       {span.all ? <WeekByWeek revised={data.revised} today={data.today} /> : null}
@@ -1162,12 +1339,15 @@ function Pace({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (day: strin
           setSheetOpen(true);
         }}
         accessibilityRole="button"
-        accessibilityHint="Shows each timed revision"
+        accessibilityHint={t('activity.insights.showsTimed')}
         style={styles.footnoteTap}
         testID="insights-pace-revisions"
       >
         <ChromeText style={[typeV2.meta, styles.flex, { color: palette.secondary }]}>
-          {[`From ${p.revisions} timed ${p.revisions === 1 ? 'revision' : 'revisions'} ›`, p.readingPerPage != null ? `Reading: ${formatPace(p.readingPerPage)} min a page.` : null]
+          {[
+            `${t('activity.insights.fromTimed', { count: p.revisions })} ${chevron()}`,
+            p.readingPerPage != null ? t('activity.insights.readingPace', { pace: formatPace(p.readingPerPage) }) : null,
+          ]
             .filter(Boolean)
             .join(' ')}
         </ChromeText>

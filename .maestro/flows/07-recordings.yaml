@@ -16,9 +16,7 @@ appId: com.revisionbuddy.app
 - runFlow: ../subflows/show-controls.yaml
 # While recording, the screen never settles (a live timer and waveform): don't
 # wait for it after these taps.
-- tapOn:
-    id: record-start
-    waitToSettleTimeoutMs: 500
+- runFlow: ../subflows/record-start.yaml
 # If the microphone's alert comes up (its grant didn't take: CI), Allow, as a
 # user would, and record if that didn't start it.
 - extendedWaitUntil:
@@ -38,7 +36,7 @@ appId: com.revisionbuddy.app
           timeout: 3000
           optional: true
       - tapOn:
-          id: record-start
+          id: "record-start|recite-mic"
           optional: true
           waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
@@ -66,7 +64,7 @@ appId: com.revisionbuddy.app
 - runFlow: ../subflows/show-controls.yaml
 - tapOn: "Back"
 - tapOn:
-    id: open-activity
+    id: tab-ActivityTab
 - extendedWaitUntil:
     visible:
       id: activity-blocks-views
@@ -96,7 +94,7 @@ appId: com.revisionbuddy.app
 - runFlow: ../subflows/relaunch.yaml
 - runFlow: ../subflows/backup-notice.yaml
 - tapOn:
-    id: open-activity
+    id: tab-ActivityTab
 - extendedWaitUntil:
     visible:
       id: activity-blocks-views

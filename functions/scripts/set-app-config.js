@@ -25,6 +25,11 @@
  *                                after 10 minutes, or at once when the server
  *                                refuses Revo. Turning Revo off and deleting its
  *                                data stay open to every account.
+ *   revoRecite                   Whether store phones send Revo the recitation and
+ *                                Insights' gaps (the 1.0.5 release; src/lib/revo/
+ *                                release revoReciteOn). On only after revoAsk and
+ *                                revoDayInReview from the release are deployed:
+ *                                older ones refuse both. Revisely Dev always sends them.
  *   revoPatterns                 Whether phones send Revo the patterns in their days
  *                                and each day's facts (REVO-40, src/lib/revo/release
  *                                revoPatternsOn). Turn it on only after revoAsk and
@@ -32,11 +37,28 @@
  *                                functions refuse fields they don't know, so every
  *                                question would fail. Off (unset) stops them, no
  *                                deploy needed. Phones read it with `revo`.
+ *   earlyAccess                  Premium early access (PREM-1, functions/src/support/
+ *                                early.ts): true while every account set up gets
+ *                                Premium for good (earlyAccessOnSignUp; older
+ *                                accounts: scripts/early-access.js). Off stops
+ *                                new grants; none already given is removed.
+ *                                Phones read it to word Premium (lib/premium).
  *   whatsNewOff                  The "What's new" kill switch (src/lib/whatsNew/
  *                                killSwitch.ts): true stops the walkthrough after
  *                                the update for everyone, without an update, in
  *                                case a card turns out wrong. Phones read it at
  *                                launch and back in front after 10 minutes.
+ *   reciteCheckOff               The phones' kill switch for mistake detection (the
+ *                                release plan, checker-prod.md, "Switching it off"):
+ *                                true hides Recite and Mark mistakes, and the mic
+ *                                records as before. The checker's own switch is
+ *                                PAUSED on its Cloud Run services, which refuses new
+ *                                takes within a minute; this one reaches phones as
+ *                                whatsNewOff does. Unset: on.
+ *   recite.where                 Where takes run (src/lib/reciteLive/where.ts): phone,
+ *                                server or auto (the phone when it has the engine and
+ *                                passed its speed check). Unset: the server. A take the
+ *                                engine can't run goes to the server whatever this says.
  *
  * Run from the functions/ directory:
  *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json \
@@ -49,8 +71,15 @@
  *   ... node scripts/set-app-config.js --revo testers            # back to testers only
  *   ... node scripts/set-app-config.js --revo-patterns on        # after deploying revoAsk,revoDayInReview with REVO-40
  *   ... node scripts/set-app-config.js --revo-patterns off       # phones stop sending them
+ *   ... node scripts/set-app-config.js --revo-recite on          # after deploying revoAsk,revoDayInReview with the 1.0.5 release
+ *   ... node scripts/set-app-config.js --revo-recite off         # store phones stop sending recitation and gaps
  *   ... node scripts/set-app-config.js --whats-new off           # stop the What's new walkthrough
  *   ... node scripts/set-app-config.js --whats-new on            # let it show again
+ *   ... node scripts/set-app-config.js --recite-check off        # hide Recite and Mark mistakes on phones
+ *   ... node scripts/set-app-config.js --recite-check on         # offer them again
+ *   ... node scripts/set-app-config.js --recite-where auto       # phone, server, auto, or unset
+ *   ... node scripts/set-app-config.js --early-access on         # every new account gets Premium (PREM-1)
+ *   ... node scripts/set-app-config.js --early-access off        # paid Premium: new accounts stop; grants stay
  *
  * A minimum above what the store has now is refused without --force: the app
  * would ignore it until the store caught up, then block everyone below it at once.
@@ -94,10 +123,32 @@ function parseArgs(argv) {
       if (!WHATS_NEW.includes(v)) throw new Error(`--revo-patterns needs on or off (got ${v ?? 'nothing'})`);
       opts.revoPatterns = v;
     }
+    else if (a === '--revo-recite') {
+      const v = argv[++i];
+      if (!WHATS_NEW.includes(v)) throw new Error(`--revo-recite needs on or off (got ${v ?? 'nothing'})`);
+      opts.revoRecite = v;
+    }
+    else if (a === '--early-access') {
+      const v = argv[++i];
+      if (!WHATS_NEW.includes(v)) throw new Error(`--early-access needs on or off (got ${v ?? 'nothing'})`);
+      opts.earlyAccess = v;
+    }
     else if (a === '--whats-new') {
       const v = argv[++i];
       if (!WHATS_NEW.includes(v)) throw new Error(`--whats-new needs on or off (got ${v ?? 'nothing'})`);
       opts.whatsNew = v;
+    }
+    else if (a === '--recite-check') {
+      const v = argv[++i];
+      if (!WHATS_NEW.includes(v)) throw new Error(`--recite-check needs on or off (got ${v ?? 'nothing'})`);
+      opts.reciteCheck = v;
+    }
+    else if (a === '--recite-where') {
+      const v = argv[++i];
+      if (!['phone', 'server', 'auto', 'unset'].includes(v)) {
+        throw new Error(`--recite-where needs phone, server, auto or unset (got ${v ?? 'nothing'})`);
+      }
+      opts.reciteWhere = v;
     }
     else if (a === '--force') opts.force = true;
     else if (a === '--clear-min') opts.clearMin = true;
@@ -124,7 +175,7 @@ async function main() {
   } catch (err) {
     console.error(err.message);
     console.error(
-      'Usage: node scripts/set-app-config.js --show | [--min-ios V] [--min-android V] [--latest-android V [--latest-android-code N]] [--clear-min] [--revo testers|everyone|off] [--revo-patterns on|off] [--whats-new on|off] [--force]',
+      'Usage: node scripts/set-app-config.js --show | [--min-ios V] [--min-android V] [--latest-android V [--latest-android-code N]] [--clear-min] [--revo testers|everyone|off] [--revo-patterns on|off] [--revo-recite on|off] [--whats-new on|off] [--recite-check on|off] [--recite-where phone|server|auto|unset] [--early-access on|off] [--force]',
     );
     process.exit(1);
   }
@@ -150,7 +201,11 @@ async function main() {
           testing: testing ? { android: { version: testing.version, code: testing.code } } : {},
           revo: REVO.includes(data.revo) ? data.revo : 'testers (unset)',
           revoPatterns: data.revoPatterns === true ? 'on' : 'off',
+          revoRecite: data.revoRecite === true ? 'on' : 'off',
           whatsNew: data.whatsNewOff === true ? 'off' : 'on',
+          reciteCheck: data.reciteCheckOff === true ? 'off' : 'on',
+          reciteWhere: data.recite?.where ?? 'server (unset)',
+          earlyAccess: data.earlyAccess === true ? 'on' : 'off',
         },
         null,
         2,
@@ -158,7 +213,8 @@ async function main() {
     );
     console.log(`App Store has ${store ?? 'unknown'}.`);
   };
-  const changes = opts.minIos || opts.minAndroid || opts.latestAndroid || opts.clearMin || opts.revo || opts.revoPatterns || opts.whatsNew;
+  const changes = opts.minIos || opts.minAndroid || opts.latestAndroid || opts.clearMin || opts.revo || opts.revoPatterns || opts.revoRecite || opts.whatsNew
+    || opts.reciteCheck || opts.earlyAccess;
   if (opts.show || !changes) {
     show(current);
     return;
@@ -192,7 +248,11 @@ async function main() {
   }
   if (opts.revo) update.revo = opts.revo;
   if (opts.revoPatterns) update.revoPatterns = opts.revoPatterns === 'on' ? true : FieldValue.delete();
+  if (opts.revoRecite) update.revoRecite = opts.revoRecite === 'on' ? true : FieldValue.delete();
   if (opts.whatsNew) update.whatsNewOff = opts.whatsNew === 'off' ? true : FieldValue.delete();
+  if (opts.reciteCheck) update.reciteCheckOff = opts.reciteCheck === 'off' ? true : FieldValue.delete();
+  if (opts.reciteWhere) update['recite.where'] = opts.reciteWhere === 'unset' ? FieldValue.delete() : opts.reciteWhere;
+  if (opts.earlyAccess) update.earlyAccess = opts.earlyAccess === 'on';
   if (opts.clearMin && (opts.minIos || opts.minAndroid)) {
     console.error('--clear-min with a minimum: pick one.');
     process.exit(1);

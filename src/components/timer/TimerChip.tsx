@@ -9,6 +9,8 @@ import { spacing } from '../../theme/spacing';
 import { radius } from '../../theme/radius';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
+import { t } from '../../i18n';
+import type { SittingEnded } from '../../lib/sitting';
 
 /** Height of the chip (it sits in the reader's control capsule). */
 export const TIMER_CHIP_SIZE = 36;
@@ -19,7 +21,7 @@ interface TimerChipProps {
   /** Crowded: the clock without its icon. */
   compact?: boolean;
   /** Passed to the card's controls: how a saved session is told, and what runs before End (REC-1). */
-  onSaved?: (date: string, seconds: number, ended: { pages: number[] }) => void;
+  onSaved?: (date: string, seconds: number, ended: SittingEnded) => void;
   beforeEnd?: () => Promise<void>;
 }
 
@@ -52,7 +54,7 @@ export function TimerChip({ onOpenQuran, compact, onSaved, beforeEnd }: TimerChi
     setOpen(true);
   };
 
-  const label = `${running ? 'Timer running' : 'Timer paused'}, ${clock}. Open timer controls`;
+  const label = t(running ? 'timer.chip.running' : 'timer.chip.paused', { clock });
 
   // A bare stopwatch while idle; while timing, the clock on the accent's tint
   // (running) or the quiet fill (paused). Taps don't buzz.
@@ -96,7 +98,7 @@ export function TimerChip({ onOpenQuran, compact, onSaved, beforeEnd }: TimerChi
       onPress={openCard}
       hitSlop={4}
       accessibilityRole="button"
-      accessibilityLabel="Open timer"
+      accessibilityLabel={t('timer.chip.open')}
       style={styles.bare}
       testID="timer-chip-idle"
     >

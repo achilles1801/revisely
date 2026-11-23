@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { onRecordingsChanged } from '../lib/recordings';
 import { configureBackup, onBackupStatus, requestBackup, setNetwork } from '../lib/recordingBackupController';
 import { logger } from '../lib/logger';
+import { t } from '../i18n';
 
 export const backupNoticeKey = (uid: string) => `recordingBackup.noticeShown.${uid}`;
 
@@ -83,13 +84,13 @@ export function RecordingBackupController() {
         };
         const cellular = userRef.current?.recordingBackupCellular === true;
         Alert.alert(
-          'Your recordings are backed up',
-          `Recordings are now saved to your Revisely account as well as this phone, so you keep them if you lose or change your phone. Only you can access them. Uploads use ${
-            cellular ? 'Wi-Fi or mobile data' : 'Wi-Fi only'
-          }. You can turn this off in Settings → Activity → Back up recordings.`,
+          t('recordings.backupNotice.title'),
+          t('recordings.backupNotice.body', {
+            network: cellular ? t('recordings.backupNotice.cellular') : t('recordings.backupNotice.wifi'),
+          }),
           [
             {
-              text: 'Turn off',
+              text: t('recordings.backupNotice.turnOff'),
               style: 'cancel',
               onPress: () => {
                 const current = userRef.current;
@@ -101,7 +102,7 @@ export function RecordingBackupController() {
                 acknowledge();
               },
             },
-            { text: 'OK', onPress: acknowledge },
+            { text: t('common.ok'), onPress: acknowledge },
           ],
           { cancelable: false },
         );

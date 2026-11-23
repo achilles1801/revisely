@@ -17,7 +17,7 @@ appId: com.revisionbuddy.app
 - runFlow: ../subflows/relaunch.yaml
 - runFlow: ../subflows/backup-notice.yaml
 - tapOn:
-    id: open-activity
+    id: tab-ActivityTab
 - extendedWaitUntil:
     visible:
       id: activity-blocks-views

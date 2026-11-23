@@ -22,6 +22,8 @@ import { shouldDismiss } from '../v2/Sheet';
 import { useModalHold } from '../v2/modalTurn';
 import { alertSessionSaved } from './sessionSavedAlert';
 import { TimerControls } from './TimerControls';
+import { t } from '../../i18n';
+import type { SittingEnded } from '../../lib/sitting';
 
 /** Where the card grows from and shrinks back to: the chip that opened it, on screen. */
 export interface Frame {
@@ -91,7 +93,7 @@ export function TimerCard({
   /** "Open the Quran" in the controls; omitted where the Quran is already open. */
   onOpenQuran?: () => void;
   /** A session was saved (TimerControls); by default the "Session saved" alert. The reader says it its own way (REC-1). */
-  onSaved?: (date: string, seconds: number, ended: { pages: number[] }) => void;
+  onSaved?: (date: string, seconds: number, ended: SittingEnded) => void;
   /** Runs before End finishes the session (TimerControls): the reader stops its recording (REC-1). */
   beforeEnd?: () => Promise<void>;
 }) {
@@ -218,7 +220,7 @@ export function TimerCard({
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
       <GestureHandlerRootView style={StyleSheet.absoluteFill}>
-        <Backdrop onPress={onClose} label="Close timer" />
+        <Backdrop onPress={onClose} label={t('timer.card.close')} />
         <GestureDetector gesture={pan}>
           <Reanimated.View
             style={[
@@ -243,8 +245,8 @@ export function TimerCard({
                 style={styles.grabber}
                 accessible
                 accessibilityRole="button"
-                accessibilityLabel="Close"
-                accessibilityHint="Closes the timer"
+                accessibilityLabel={t('common.close')}
+                accessibilityHint={t('timer.card.closeHint')}
                 accessibilityActions={[{ name: 'activate' }]}
                 onAccessibilityAction={onClose}
                 testID="timer-card-handle"

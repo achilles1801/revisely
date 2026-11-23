@@ -3,6 +3,7 @@
 // (the same field a session's ratings write), not to the item.
 
 import type { RevisionItem } from './revisionItems';
+import { westernDigits } from '../i18n/digits';
 
 /** The strength choice → the page weakness rating it writes (ACT-8: 1–2 weak, 3 moderate, 4–5 strong). */
 export const STRENGTH_RATING = { weak: 2, moderate: 3, strong: 4 } as const;
@@ -10,8 +11,8 @@ export type Strength = keyof typeof STRENGTH_RATING;
 
 /** A page range typed as From and To: integers 1–604, From not after To. Null when not a range. */
 export function parsePageRange(from: string, to: string, total = 604): { from: number; to: number } | null {
-  const f = Number(from.trim());
-  const t = Number(to.trim());
+  const f = Number(westernDigits(from).trim());
+  const t = Number(westernDigits(to).trim());
   if (!Number.isInteger(f) || !Number.isInteger(t)) return null;
   if (f < 1 || t > total || f > t) return null;
   return { from: f, to: t };

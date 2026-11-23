@@ -20,6 +20,26 @@ export async function loadActivityHistory(day: string): Promise<HistoryItem[]> {
   return historyOf(r.revisions);
 }
 
+const samePages = (a: readonly number[], b: readonly number[]) => a.length === b.length && a.every((p, i) => p === b[i]);
+
+/** Two reads of the history hold the same items, in the same order: Home keeps the one it has (no render). */
+export function sameHistory(a: readonly HistoryItem[], b: readonly HistoryItem[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every((x, i) => {
+      const y = b[i];
+      return (
+        x.id === y.id &&
+        x.day === y.day &&
+        x.countsFor === y.countsFor &&
+        x.occurredAt === y.occurredAt &&
+        samePages(x.pages, y.pages) &&
+        samePages(x.assigned, y.assigned)
+      );
+    })
+  );
+}
+
 /** The server's Revised items as the streak reads them. */
 export function historyOf(
   revisions: { id: string; day: string; countsFor: string; pages: number[]; assigned: number[]; occurredAt: number | null }[],
@@ -112,16 +132,21 @@ export function shareActivityHistory(uid: string, day: string, items: HistoryIte
   for (const l of listeners) l();
 }
 
+/** The history Home read last for this account and day, or null. */
+export function sharedActivityHistory(uid: string | null | undefined, day: string): HistoryItem[] | null {
+  return shared && uid && shared.uid === uid && shared.day === day ? shared.items : null;
+}
+
 /** The history Home read last for this account and day, or null (callers use the logs, as Home does). */
 export function useSharedActivityHistory(uid: string | null | undefined, day: string): HistoryItem[] | null {
-  const current = useSyncExternalStore(
+  useSyncExternalStore(
     (onChange) => {
       listeners.add(onChange);
       return () => void listeners.delete(onChange);
     },
     () => shared,
   );
-  return current && uid && current.uid === uid && current.day === day ? current.items : null;
+  return sharedActivityHistory(uid, day);
 }
 
 /** Whether a history item is pages logged by hand (Activity's + → Revised elsewhere). */

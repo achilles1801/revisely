@@ -18,6 +18,9 @@ import { typeV2 } from '../../theme/v2';
 import { PillButton } from '../v2/PillButton';
 import { PillTabs } from '../v2/PillTabs';
 import { Tap } from '../v2/Tap';
+import { t } from '../../i18n';
+import type { SittingEnded } from '../../lib/sitting';
+import { westernDigits } from '../../i18n/digits';
 
 type Kind = 'stopwatch' | 'timer';
 type Direction = 'countUp' | 'countDown';
@@ -41,15 +44,16 @@ export function parseMinutes(text: string): number | null {
 
 /** "45 min", "1 h", "1 h 30 min". */
 export function lengthLabel(m: number): string {
-  if (m < 60) return `${m} min`;
-  return `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`;
+  if (m < 60) return t('timer.length.minutes', { m });
+  const h = Math.floor(m / 60);
+  return m % 60 ? t('timer.length.hoursMinutes', { h, m: m % 60 }) : t('timer.length.hours', { h });
 }
 
 interface TimerControlsProps {
   /** Close the surrounding sheet. */
   onClose: () => void;
   /** A session was saved: offer to open its day (to add pages). `pages`: those it held (REC-1). */
-  onSaved?: (date: string, seconds: number, ended: { pages: number[] }) => void;
+  onSaved?: (date: string, seconds: number, ended: SittingEnded) => void;
   /** Runs before the session ends, and is waited for: the reader stops its recording with it (REC-1). */
   beforeEnd?: () => Promise<void>;
   /** Shown while running, unless the reader is already open. */
@@ -138,18 +142,19 @@ function useTimerControls({ onClose, onSaved, beforeEnd, visible = true }: Timer
     const pages = pagesHeld(timer, now);
     // A recording running in the reader ends with it, and is saved first (REC-1).
     if (beforeEnd) await beforeEnd().catch(() => undefined);
-    if (!(await finish())) return;
+    const saved = await finish();
+    if (!saved) return;
     // The outcome is marked (taps don't buzz).
     haptics.success();
     onClose();
-    if (seconds >= MIN_SESSION_SECONDS) onSaved?.(date, seconds, { pages });
+    if (seconds >= MIN_SESSION_SECONDS) onSaved?.(date, seconds, { pages, sessionId: saved.sessionId ?? null });
   };
 
   const handleDiscard = () => {
-    Alert.alert('Discard this session?', "The time won't be logged.", [
-      { text: 'Keep going', style: 'cancel' },
+    Alert.alert(t('timer.discard.title'), t('timer.discard.body'), [
+      { text: t('timer.discard.keepGoing'), style: 'cancel' },
       {
-        text: 'Discard',
+        text: t('timer.discard.discard'),
         style: 'destructive',
         onPress: () => {
           haptics.warning();
@@ -231,21 +236,23 @@ export function TimerControls(props: TimerControlsProps) {
   // One line under the clock: what it does, or where it is.
   const caption = timer
     ? !running
-      ? 'Paused'
+      ? t('timer.caption.paused')
       : targetSeconds != null
-        ? `${mode === 'countDown' ? 'remaining of ' : 'of '}${lengthLabel(Math.round(targetSeconds / 60))}`
+        ? t(mode === 'countDown' ? 'timer.caption.remainingOf' : 'timer.caption.of', {
+            length: lengthLabel(Math.round(targetSeconds / 60)),
+          })
         : (timer.pagesRevised?.length ?? 0) > 0
-          ? `Revised: ${describePassage(timer.pagesRevised ?? [], { form: 'short', max: 2 })}`
+          ? t('timer.caption.revised', { what: describePassage(timer.pagesRevised ?? [], { form: 'short', max: 2 }) })
           : timer.pagesVisited.length > 0
-            ? `Opened: ${describePassage(timer.pagesVisited, { form: 'short', max: 2 })}`
-            : 'Saved to Activity when you end it'
+            ? t('timer.caption.opened', { what: describePassage(timer.pagesVisited, { form: 'short', max: 2 }) })
+            : t('timer.caption.savedWhenEnded')
     : kind === 'stopwatch'
-      ? 'Runs until you end it'
+      ? t('timer.caption.runsUntilEnded')
       : editing
         ? entryError
-          ? `${MIN_TYPED} to ${MAX_TYPED} minutes`
-          : 'Type the minutes'
-        : 'Ends by itself and is saved';
+          ? t('timer.caption.range', { min: MIN_TYPED, max: MAX_TYPED })
+          : t('timer.caption.typeMinutes')
+        : t('timer.caption.endsAndSaves');
 
   return (
     <View testID="timer-controls-v2">
@@ -253,8 +260,8 @@ export function TimerControls(props: TimerControlsProps) {
         <View style={v2.tabs}>
           <PillTabs<Kind>
             options={[
-              { value: 'stopwatch', label: 'Stopwatch' },
-              { value: 'timer', label: 'Timer' },
+              { value: 'stopwatch', label: t('timer.stopwatch') },
+              { value: 'timer', label: t('timer.timer') },
             ]}
             value={kind}
             onChange={setKind}
@@ -268,7 +275,7 @@ export function TimerControls(props: TimerControlsProps) {
           <View style={v2.entry}>
             <TextInput
               value={draft}
-              onChangeText={(t) => setDraft(t.replace(/[^0-9]/g, '').slice(0, 3))}
+              onChangeText={(text) => setDraft(westernDigits(text).replace(/[^0-9]/g, '').slice(0, 3))}
               onBlur={endEdit}
               onSubmitEditing={() => commitEdit()}
               keyboardType="number-pad"
@@ -279,18 +286,18 @@ export function TimerControls(props: TimerControlsProps) {
               maxLength={3}
               style={[v2.clock, v2.entryInput, typeV2.numeral, { color: palette.text, borderColor: entryError ? palette.red : palette.outline }]}
               maxFontSizeMultiplier={1.2}
-              accessibilityLabel="Minutes"
-              accessibilityHint={`${MIN_TYPED} to ${MAX_TYPED}`}
+              accessibilityLabel={t('timer.minutes')}
+              accessibilityHint={t('timer.minutesRange', { min: MIN_TYPED, max: MAX_TYPED })}
               testID="timer-minutes-input"
             />
             <Text style={[typeV2.body, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-              min
+              {t('timer.min')}
             </Text>
             <PillButton
-              title="Set"
+              title={t('timer.set')}
               variant="outline"
               onPress={() => commitEdit()}
-              accessibilityLabel="Set the length"
+              accessibilityLabel={t('timer.setLength')}
               style={v2.set}
               testID="timer-minutes-set"
             />
@@ -300,7 +307,7 @@ export function TimerControls(props: TimerControlsProps) {
             onPress={typeable ? beginEdit : undefined}
             disabled={!typeable}
             accessibilityRole={typeable ? 'button' : undefined}
-            accessibilityLabel={typeable ? `${clockText}. Type the length` : undefined}
+            accessibilityLabel={typeable ? t('timer.typeLength', { length: clockText }) : undefined}
             testID="timer-clock-tap"
           >
             <Text
@@ -338,7 +345,7 @@ export function TimerControls(props: TimerControlsProps) {
             onPress={() => setMinutes((m) => stepLength(m, -1))}
             hitSlop={6}
             accessibilityRole="button"
-            accessibilityLabel="Shorter"
+            accessibilityLabel={t('timer.shorter')}
             style={[v2.step, { borderColor: palette.outline }]}
             testID="timer-minus"
           >
@@ -347,7 +354,7 @@ export function TimerControls(props: TimerControlsProps) {
           <Tap
             onPress={beginEdit}
             accessibilityRole="button"
-            accessibilityLabel={`${lengthLabel(minutes)}. Type the length`}
+            accessibilityLabel={t('timer.typeLength', { length: lengthLabel(minutes) })}
             style={v2.lengthTap}
             testID="timer-minutes-tap"
           >
@@ -364,7 +371,7 @@ export function TimerControls(props: TimerControlsProps) {
             onPress={() => setMinutes((m) => stepLength(m, 1))}
             hitSlop={6}
             accessibilityRole="button"
-            accessibilityLabel="Longer"
+            accessibilityLabel={t('timer.longer')}
             style={[v2.step, { borderColor: palette.outline }]}
             testID="timer-plus"
           >
@@ -373,8 +380,8 @@ export function TimerControls(props: TimerControlsProps) {
           <View style={v2.direction}>
             <PillTabs<Direction>
               options={[
-                { value: 'countDown', label: 'Down', icon: 'arrow-down' },
-                { value: 'countUp', label: 'Up', icon: 'arrow-up' },
+                { value: 'countDown', label: t('timer.down'), icon: 'arrow-down' },
+                { value: 'countUp', label: t('timer.up'), icon: 'arrow-up' },
               ]}
               value={direction}
               onChange={setDirection}
@@ -390,26 +397,26 @@ export function TimerControls(props: TimerControlsProps) {
             onPress={handleDiscard}
             hitSlop={6}
             accessibilityRole="button"
-            accessibilityLabel="Discard timer"
+            accessibilityLabel={t('timer.discardTimer')}
             style={[v2.step, v2.discard, { borderColor: palette.outline }]}
             testID="timer-discard"
           >
             <Ionicons name="trash-outline" size={17} color={palette.red} />
           </Tap>
           <PillButton
-            title={running ? 'Pause' : 'Resume'}
+            title={running ? t('timer.pause') : t('timer.resume')}
             variant="outline"
             icon={running ? 'pause' : 'play'}
             onPress={running ? pause : resume}
-            accessibilityLabel={running ? 'Pause timer' : 'Resume timer'}
+            accessibilityLabel={running ? t('timer.pauseTimer') : t('timer.resumeTimer')}
             style={v2.action}
             testID="timer-pause"
           />
           <PillButton
-            title="End"
+            title={t('timer.end')}
             icon="stop"
             onPress={handleEnd}
-            accessibilityLabel="Stop and save timer"
+            accessibilityLabel={t('timer.stopAndSave')}
             style={v2.action}
             testID="timer-end"
           />
@@ -417,10 +424,10 @@ export function TimerControls(props: TimerControlsProps) {
       ) : (
         <View style={v2.row}>
           <PillButton
-            title="Start"
+            title={t('timer.start')}
             icon="play"
             onPress={handleStart}
-            accessibilityLabel="Start timer"
+            accessibilityLabel={t('timer.startTimer')}
             style={v2.action}
             testID="timer-start"
           />
@@ -432,13 +439,13 @@ export function TimerControls(props: TimerControlsProps) {
           onPress={onOpenQuran}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel="Open the Quran"
+          accessibilityLabel={t('timer.openQuran')}
           style={v2.link}
           testID="timer-open-quran"
         >
           <Ionicons name="book-outline" size={15} color={palette.link} />
           <Text style={[typeV2.meta, { color: palette.link }]} maxFontSizeMultiplier={1.4}>
-            Open the Quran
+            {t('timer.openQuran')}
           </Text>
         </Tap>
       ) : null}

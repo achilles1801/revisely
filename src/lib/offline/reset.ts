@@ -36,7 +36,11 @@ export function whenResetAdopted(uid: string, mark: number, timeoutMs = 30_000):
     };
     const timer = setTimeout(() => {
       done();
-      reject(new Error('This phone didn’t get the new account in time. Close the app, open it, and load the scenario again.'));
+      reject(
+        new Error(
+          'This phone didn’t get the new account in time. Close the app, open it, and load the scenario again.',
+        ),
+      );
     }, timeoutMs);
     const done = () => {
       clearTimeout(timer);

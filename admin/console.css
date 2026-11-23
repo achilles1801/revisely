@@ -423,6 +423,10 @@ td.wrap { white-space: normal; min-width: 18ch; max-width: 48ch; overflow-wrap: 
 .auth-submit { width: 100%; }
 .auth-err { margin: 0; font-size: 13px; color: var(--crit-ink); background: var(--crit-bg); border-radius: 8px; padding: 8px 10px; }
 .auth-foot { margin: 2px 0 0; font-size: 12px; color: var(--ink-3); text-align: center; }
+.auth-alt { border: 0; background: transparent; color: var(--accent); font: inherit; font-size: 13px; padding: 6px; align-self: center; cursor: pointer; }
+/* Phone-first: 46pt targets, and 16px inputs so Safari doesn't zoom in on focus. */
+.auth-card .btn, .auth-card input { min-height: 46px; font-size: 16px; box-sizing: border-box; }
+.auth-actions { flex-wrap: wrap; }
 .auth-lock { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; color: var(--crit-ink); background: var(--crit-bg); }
 .auth-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 .auth-actions .btn { padding: 8px 14px; }
@@ -467,6 +471,32 @@ td.wrap { white-space: normal; min-width: 18ch; max-width: 48ch; overflow-wrap: 
 .dialog .sub { font-size: 12px; color: var(--ink-3); }
 .staff-roles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (max-width: 760px) { .staff-roles { grid-template-columns: 1fr; } }
+/* The audit log's labels: each tap, folded away until asked for. */
+#auditTable details summary { cursor: pointer; color: var(--accent); font-size: 12.5px; white-space: nowrap; }
+#auditTable ol.taps { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--ink-2); max-height: 260px; overflow: auto; }
+.ar-inline { font-family: "Amiri Quran", "Amiri", "Geeza Pro", serif; font-size: 16px; }
+/* Staff → Access requests: a card per person, phone-first (the actions wrap under the name). */
+.req-list { display: flex; flex-direction: column; }
+.req { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 12px 0; border-top: 1px solid var(--line-2); }
+.req:first-child { border-top: 0; }
+.req-who { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1 1 260px; }
+.req-face { width: 40px; height: 40px; border-radius: 50%; flex: none; object-fit: cover; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 600; }
+.req-id { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
+.req-id b, .req-id span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.req-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.req-acts .btn { min-height: 40px; }
+.req-other { display: inline-flex; gap: 6px; align-items: center; }
+.req-other select { min-height: 40px; }
+.btn.danger-text { color: var(--crit-ink); }
+.staff-more summary { cursor: pointer; font-weight: 500; color: var(--accent); padding: 4px 0; }
+.staff-more .staff-give { margin-top: 10px; }
+@media (max-width: 560px) {
+  .req-acts { width: 100%; }
+  .req-acts > .btn.primary { flex: 1 1 100%; min-height: 46px; }
+}
+.auth-hint { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--warn-bg); color: var(--warn-ink); font-size: 13px; line-height: 1.45; }
+/* Retention table: a share beside each count */
+#retTable .pc { color: var(--ink-3); font-size: 12px; margin-left: 4px; }
 
 /* Premium */
 .premium-sources { grid-template-columns: repeat(5, minmax(0, 1fr)); }

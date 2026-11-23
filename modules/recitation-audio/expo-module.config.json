@@ -1,6 +1,9 @@
 {
-  "platforms": ["apple"],
+  "platforms": ["apple", "android"],
   "apple": {
     "modules": ["RecitationAudioModule"]
+  },
+  "android": {
+    "modules": ["app.revisely.recitationaudio.RecitationAudioModule"]
   }
 }

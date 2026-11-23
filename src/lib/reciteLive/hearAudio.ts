@@ -74,7 +74,7 @@ export async function playClip(pcm: Int16Array): Promise<void> {
     logger.warn('Your recitation: the clip could not be written', err);
     return;
   }
-  await playUri(uri, 'Your recitation');
+  await playUri(uri, 'Your recitation'); // i18n-ignore (a name for the log)
 }
 
 /**
@@ -82,5 +82,6 @@ export async function playClip(pcm: Int16Array): Promise<void> {
  * the earpiece; the take's microphone must already be paused (a recording session would hear it).
  */
 export async function playReference(verse: VerseKey): Promise<void> {
+  // i18n-ignore (a name for the log)
   await playUri(recitationUrl(verse, getRecitation().getVoice()), 'Hear it: the reciter’s ayah');
 }

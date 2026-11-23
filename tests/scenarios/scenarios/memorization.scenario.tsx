@@ -4,7 +4,7 @@
 
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
-import { ActivityDayView, DailyLog, Home, homeStack, Manager } from '../harness/screens';
+import { ActivityDayView, Home, homeStack, Manager } from '../harness/screens';
 import { Phone } from '../harness/phone';
 import type { UserPage } from '../../../src/types';
 
@@ -25,7 +25,7 @@ async function account(): Promise<Phone> {
 const statusOf = (pages: UserPage[], range: number[]) =>
   range.every((n) => pages.find((p) => p.pageNumber === n)?.status === 'memorized');
 
-describe('memorization in the manager, the composer and Activity (ACT-10)', () => {
+describe('memorization in the manager and Activity (ACT-10)', () => {
   it('[ACT-10] a juz marked in the manager with Today shows as a Memorized entry in Activity', async () => {
     const phone = await account();
     setNow(`${TODAY} 21:00`);
@@ -43,45 +43,22 @@ describe('memorization in the manager, the composer and Activity (ACT-10)', () =
     await app.close();
   });
 
-  it('[ACT-10] a page range typed in the Memorized composer marks those pages, and Activity shows them', async () => {
-    const phone = await account();
-    setNow(`${TODAY} 21:00`);
-    const app = await phone.open(homeStack);
-    await new Home(app).ready();
-    const log = new DailyLog(app);
-    await log.open();
-    const { fireEvent } = app.mods.rtl;
-    fireEvent.changeText(app.screen.getByTestId('memorize-from'), '21');
-    fireEvent.changeText(app.screen.getByTestId('memorize-to'), '25');
-    fireEvent.press(app.screen.getByTestId('journal-send'));
-    await app.until(() => statusOf(app.app.pages, pagesRange(21, 25)), 'pages 21–25 to be memorized');
-    await app.untilSynced();
-    const day = new ActivityDayView(app);
-    await day.open(TODAY);
-    await day.waitMemorized();
-    expect(day.memorizedBlockShown()).toBe(true);
-    await app.close();
-  });
-
   it('[ACT-10] deleting a Memorized entry in Activity un-marks its pages', async () => {
     const phone = await account();
     setNow(`${TODAY} 21:00`);
     const app = await phone.open(homeStack);
     await new Home(app).ready();
-    const log = new DailyLog(app);
-    await log.open();
-    const { fireEvent } = app.mods.rtl;
-    fireEvent.changeText(app.screen.getByTestId('memorize-from'), '21');
-    fireEvent.changeText(app.screen.getByTestId('memorize-to'), '25');
-    fireEvent.press(app.screen.getByTestId('journal-send'));
-    await app.until(() => statusOf(app.app.pages, pagesRange(21, 25)), 'pages 21–25 to be memorized');
+    const manager = new Manager(app);
+    await manager.open();
+    await manager.markJuzToday(2); // Juz 2 is pages 22–41; 20 of them are new.
+    await app.until(() => statusOf(app.app.pages, pagesRange(22, 41)), 'juz 2 to be memorized');
     await app.untilSynced();
     const day = new ActivityDayView(app);
     await day.open(TODAY);
     await day.deleteMemorized();
-    await app.until(() => !statusOf(app.app.pages, pagesRange(21, 25)), 'pages 21–25 to be un-marked');
+    await app.until(() => !statusOf(app.app.pages, pagesRange(22, 41)), 'juz 2 to be un-marked');
     await app.untilSynced();
-    expect(app.app.pages.filter((p) => p.pageNumber >= 21 && p.pageNumber <= 25).every((p) => p.status !== 'memorized')).toBe(true);
+    expect(app.app.pages.filter((p) => p.pageNumber >= 22 && p.pageNumber <= 41).every((p) => p.status !== 'memorized')).toBe(true);
     await app.close();
   });
 });

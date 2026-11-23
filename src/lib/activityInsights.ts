@@ -1,6 +1,8 @@
 // Activity's Insights and calendar marks, from items (Activity spec section 5, C3).
 // Pure: the screens pass in items and get the figures. Days are YYYY-MM-DD revision days.
 
+import { dayNumber, daysBetween } from './dayKeys';
+
 export interface Revised { day: string; pages: number[]; assigned?: number[]; minutes: number | null; countsFor: string; }
 export interface Memorized { day: string; pages: number[]; }
 export interface Read { day: string; pages: number[]; minutes: number | null; }
@@ -8,8 +10,6 @@ export interface Read { day: string; pages: number[]; minutes: number | null; }
 /** Pace shows only when at least this many items carry minutes (suggested; open point). */
 export const PACE_MIN_ITEMS = 10;
 
-const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
-const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
 
 /** The last day each page was revised (own or credited items, by the day it counts for). */
 /**
@@ -102,16 +102,24 @@ export function pace(items: { pages: number[]; minutes: number | null; day: stri
   return pages > 0 ? minutes / pages : null;
 }
 
+/**
+ * A day's revised pages against its plan (ACT-32): `assigned` is the day's plan, `done` how many of those pages were
+ * revised, and `pages` every page revised, the plan's and any others. Pages outside the plan never count toward it.
+ */
+function revisedAgainstPlan(own: Pick<Revised, 'pages' | 'assigned'>[]): { done: number; assigned: number; pages: number[] } {
+  const plan = new Set(own.flatMap((r) => r.assigned ?? []));
+  const pages = [...new Set(own.flatMap((r) => r.pages))].sort((a, b) => a - b);
+  return { done: pages.filter((p) => plan.has(p)).length, assigned: plan.size, pages };
+}
+
 /** One calendar day's marks (C3): the ring is the share of assigned pages revised. */
 export function dayMarks(
   day: string,
   input: { revised: Revised[]; memorized: Memorized[]; read: Read[]; noteDays: Set<string> },
 ): { ring: number | null; memorized: boolean; read: boolean; note: boolean } {
-  const own = input.revised.filter((r) => r.day === day && r.countsFor === day);
-  const assigned = own.reduce((n, r) => n + (r.assigned?.length ?? 0), 0);
-  const revised = own.reduce((n, r) => n + r.pages.length, 0);
+  const { done, assigned } = revisedAgainstPlan(input.revised.filter((r) => r.day === day && r.countsFor === day));
   return {
-    ring: assigned > 0 ? Math.min(1, revised / assigned) : null,
+    ring: assigned > 0 ? done / assigned : null,
     memorized: input.memorized.some((m) => m.day === day),
     read: input.read.some((r) => r.day === day),
     note: input.noteDays.has(day),
@@ -122,15 +130,14 @@ export function dayMarks(
 export function dayPreview(
   day: string,
   input: { revised: Revised[]; memorized: Memorized[]; read: Read[]; noteDays: Set<string> },
-): { revised: { done: number; assigned: number; minutes: number | null } | null; memorizedPages: number; readPages: number; readMinutes: number | null; notes: boolean } {
+): { revised: { done: number; assigned: number; pages: number[]; minutes: number | null } | null; memorizedPages: number; readPages: number; readMinutes: number | null; notes: boolean } {
   const own = input.revised.filter((r) => r.day === day && r.countsFor === day);
-  const assigned = own.reduce((n, r) => n + (r.assigned?.length ?? 0), 0);
-  const done = own.reduce((n, r) => n + r.pages.length, 0);
+  const counted = revisedAgainstPlan(own);
   const minutes = own.reduce<number | null>((n, r) => (r.minutes == null ? n : (n ?? 0) + r.minutes), null);
   const reads = input.read.filter((r) => r.day === day);
   const readMinutes = reads.reduce<number | null>((n, r) => (r.minutes == null ? n : (n ?? 0) + r.minutes), null);
   return {
-    revised: own.length > 0 ? { done, assigned, minutes } : null,
+    revised: counted.assigned > 0 || counted.pages.length > 0 ? { ...counted, minutes } : null,
     memorizedPages: input.memorized.filter((m) => m.day === day).reduce((n, m) => n + m.pages.length, 0),
     readPages: reads.reduce((n, r) => n + r.pages.length, 0),
     readMinutes,

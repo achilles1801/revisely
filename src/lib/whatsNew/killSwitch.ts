@@ -11,6 +11,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { logger } from '../logger';
+import { setReciteCheckOff } from '../reciteLive/off';
+import { applyReciteWhereConfig, loadReciteWhere } from '../reciteLive/whereSettings';
 
 export const KILL_SWITCH_EVERY_MS = 10 * 60_000;
 export const KILL_SWITCH_KEY = '@revisely_whats_new_off';
@@ -18,6 +20,9 @@ const READ_TIMEOUT_MS = 10_000;
 
 /** Off only for exactly `true`: anything else (unset, a typo) leaves the walkthrough on. */
 export const whatsNewOffOf = (value: unknown): boolean => value === true;
+
+// Recite's kill switch rides on the same read of config/app (lib/reciteLive/off).
+export const RECITE_OFF_KEY = '@revisely_recite_check_off';
 
 /** undefined until the phone's copy (or a read) has answered. */
 let off: boolean | undefined;
@@ -57,9 +62,13 @@ export function refreshWhatsNewOff(force = false, now = Date.now()): Promise<voi
     try {
       const snap = await withTimeout(getDoc(doc(db, 'config', 'app')));
       const next = whatsNewOffOf(snap.exists() ? snap.get('whatsNewOff') : undefined);
+      const reciteOff = whatsNewOffOf(snap.exists() ? snap.get('reciteCheckOff') : undefined);
+      setReciteCheckOff(reciteOff);
+      applyReciteWhereConfig(snap.exists() ? snap.get('recite.where') : undefined);
       readAt = now;
       set(next);
       await AsyncStorage.setItem(KILL_SWITCH_KEY, next ? '1' : '0').catch(() => undefined);
+      await AsyncStorage.setItem(RECITE_OFF_KEY, reciteOff ? '1' : '0').catch(() => undefined);
     } catch (err) {
       // Offline or refused: the phone's copy stands (on, with none), and the next return tries again.
       logger.warn("Could not read What's new's switch", err);
@@ -75,6 +84,12 @@ export function refreshWhatsNewOff(force = false, now = Date.now()): Promise<voi
 export function startWhatsNewOff(): void {
   if (started) return;
   started = true;
+  void loadReciteWhere();
+  void AsyncStorage.getItem(RECITE_OFF_KEY)
+    .then((saved) => {
+      if (readAt == null) setReciteCheckOff(saved === '1');
+    })
+    .catch(() => undefined);
   void AsyncStorage.getItem(KILL_SWITCH_KEY)
     .then((saved) => {
       // A read that has already answered wins over the copy.

@@ -9,14 +9,24 @@ import { layoutV2 } from '../theme/v2';
 import { useReduceMotion } from '../design/motion';
 import { useMiniPlayer } from '../lib/nowPlaying';
 import { MINI_PLAYER_GAP, MINI_PLAYER_HEIGHT } from '../components/player/MiniPlayer';
+import { StringLights } from '../components/ramadan/StringLights';
+import { useRamadanTheme } from '../lib/ramadanTheme';
+import { t } from '../i18n';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
 // Icon-only: outline when idle, filled when selected.
 const TAB_ICONS: Record<string, { active: IconName; inactive: IconName }> = {
   Home: { active: 'home', inactive: 'home-outline' },
+  // Revisely Dev's Activity tab (TAB-2): the pulse, as on the button it replaces at the top of Home.
+  ActivityTab: { active: 'pulse', inactive: 'pulse-outline' },
   Read: { active: 'book', inactive: 'book-outline' },
   Insights: { active: 'stats-chart', inactive: 'stats-chart-outline' },
+};
+
+// What VoiceOver says for a tab: its route's name, but for a route named apart from its screen.
+const TAB_LABELS: Record<string, () => string> = {
+  ActivityTab: () => t('home.screen.activityTab'),
 };
 
 const BAR_HEIGHT = 52;
@@ -64,6 +74,7 @@ type TabBarProps = Omit<PagerTabBarProps, 'position'> & {
 export function TabBar({ state, descriptors, navigation, position, showInsightsTab = true, onInsightsTabPress }: TabBarProps) {
   const { palette } = useTheme();
   const bottomGap = useBottomGap();
+  const ramadan = useRamadanTheme();
   const still = useSharedValue(state.index);
   still.value = state.index;
   const progress = position ?? still;
@@ -81,6 +92,8 @@ export function TabBar({ state, descriptors, navigation, position, showInsightsT
       style={[styles.bar, { backgroundColor: palette.bg, borderTopColor: palette.separator, paddingBottom: bottomGap }]}
       testID="tab-bar-v2"
     >
+      {/* Revisely Dev's Ramadan theme (THEME-1): string lights along the top edge. */}
+      {ramadan ? <StringLights /> : null}
       <SwipeAccent progress={progress} count={visibleRoutes.length} />
       {visibleRoutes.map((route) => (
         <Tab
@@ -227,7 +240,7 @@ function Tab({
     <Pressable
       accessibilityRole="button"
       accessibilityState={focused ? { selected: true } : {}}
-      accessibilityLabel={routeName}
+      accessibilityLabel={TAB_LABELS[routeName]?.() ?? routeName}
       onPress={onPress}
       hitSlop={6}
       style={({ pressed }) => [styles.tab, pressed && { opacity: 0.55 }]}

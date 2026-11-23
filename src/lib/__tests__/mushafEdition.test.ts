@@ -72,15 +72,15 @@ describe('mushafEdition', () => {
   });
 
   it('names the prints once their publishers differ', () => {
-    const before = MUSHAF_EDITIONS.madani1405.credit;
-    MUSHAF_EDITIONS.madani1405.credit = 'Another publisher';
+    // The credit is a getter (it follows the app's language): stand another publisher in for one print.
+    const spy = jest.spyOn(MUSHAF_EDITIONS.madani1405, 'credit', 'get').mockReturnValue('Another publisher');
     try {
       expect(mushafCredits()).toEqual([
         'Madani 1405: Another publisher',
         'Madani 1441: King Fahd Glorious Qur’an Printing Complex, Madinah',
       ]);
     } finally {
-      MUSHAF_EDITIONS.madani1405.credit = before;
+      spy.mockRestore();
     }
   });
 });

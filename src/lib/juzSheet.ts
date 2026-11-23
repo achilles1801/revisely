@@ -10,6 +10,7 @@ import { coverageRecency, coverageSince, daysSince, lastRevisedWords, recencyLin
 import { describeSurahs } from './pageRanges';
 import { describeAyahs, pageRunEnds, surahName } from './passages';
 import { strengthOf, type Strength } from './activityDayParts';
+import { t } from '../i18n';
 
 /** How recently a memorized page was revised: the Coverage tiles' bands (ACT-4); `new`: not revised yet (ACT-25). */
 export type Recency = 'week' | 'month' | 'new' | 'older';
@@ -90,7 +91,7 @@ export interface JuzSheetModel {
 }
 
 /** "3 times" for a count of skips (recency's "once", "twice" are for revisions: lib/recency). */
-const skipsWord = (n: number) => `${n} ${n === 1 ? 'time' : 'times'}`;
+const skipsWord = (n: number) => t('lib.juzSheet.times', { count: n });
 
 /** A memorized page's band; never revised, it is `new` for 30 days from `since` (lib/recency coverageRecency). */
 export function recencyOf(lastDay: string | null | undefined, today: string, since?: string | null): Recency {
@@ -112,7 +113,7 @@ function ayahsIn(sura: number, pages: number[]): string {
   const keys = pages.flatMap((p) => ayahsOnPage(p)).filter((k) => suraOf(k) === sura).map(ayahOf);
   if (keys.length === 0) return '';
   const run = firstRun(keys);
-  return `${run.one ? 'Ayah' : 'Ayahs'} ${run.text}`;
+  return run.one ? t('lib.juzSheet.ayah', { list: run.text }) : t('lib.juzSheet.ayahs', { list: run.text });
 }
 
 const ORDER: Record<Strength, number> = { weak: 0, moderate: 1, strong: 2 };
@@ -174,13 +175,13 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
   };
   const learningSuras = new Set(learning.flatMap((p) => ayahsHere(p).map(suraOf)));
   const learned = new Set(juzPages.flatMap(ayahsHere).filter((k) => learningSuras.has(suraOf(k))));
-  const learningText = learned.size > 0 ? `${describeAyahs(learned, { form: 'compact' })} so far` : null;
+  const learningText = learned.size > 0 ? t('lib.juzSheet.soFar', { what: describeAyahs(learned, { form: 'compact' }) }) : null;
   let continueAt: JuzSheetModel['continueAt'] = null;
   for (const p of learning) {
     const mine = new Set(ayahsHere(p));
     const next = ayahsOnPage(p).find((k) => !mine.has(k));
     if (next != null) {
-      continueAt = { page: p, label: `${surahName(suraOf(next))} ${ayahOf(next)}` };
+      continueAt = { page: p, label: t('lib.juzSheet.surahAyah', { surah: surahName(suraOf(next)), ayah: ayahOf(next) }) };
       break;
     }
   }
@@ -191,11 +192,15 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
   const stale = staleByDays && !beingLearned;
 
   // One wording with Revo (lib/recency): "Last revised 3 days ago · twice in 30 days".
-  const inWords = input.windowWords ?? `in ${windowDays} days`;
-  const inTheLast = input.windowInTheLast ?? `in the last ${windowDays} days`;
-  const timesText = (n: number) => (n > 0 ? `${timesWord(n)} ${inWords}` : `not ${inTheLast}`);
+  const inWords = input.windowWords ?? t('lib.juzSheet.inDays', { count: windowDays });
+  const inTheLast = input.windowInTheLast ?? t('lib.juzSheet.inTheLastDays', { count: windowDays });
+  const timesText = (n: number) => (n > 0 ? t('lib.juzSheet.timesIn', { times: timesWord(n), span: inWords }) : t('lib.juzSheet.notIn', { span: inTheLast }));
   const recency = (ago: number | null, n: number) =>
-    input.windowWords ? (ago == null ? lastRevisedWords(null) : `${lastRevisedWords(ago)} · ${timesText(n)}`) : recencyLine(ago, n, windowDays);
+    input.windowWords
+      ? ago == null
+        ? lastRevisedWords(null)
+        : t('lib.juzSheet.recency', { last: lastRevisedWords(ago), times: timesText(n) })
+      : recencyLine(ago, n, windowDays);
 
   const strength = (p: number): Strength => strengthOf(byNumber.get(p)?.weaknessRating ?? 4);
   const cellState = (p: number): JuzCellState =>
@@ -238,42 +243,45 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
       const done = all.filter((k) => learned.has(k));
       const toGo = all.filter((k) => !learned.has(k));
       const doneRun = firstRun(done.map(ayahOf));
-      const text = [`${doneRun.one ? 'Ayah' : 'Ayahs'} ${doneRun.text}`, toGo.length > 0 ? `${firstRun(toGo.map(ayahOf)).text} to go` : null]
+      const text = [
+        doneRun.one ? t('lib.juzSheet.ayah', { list: doneRun.text }) : t('lib.juzSheet.ayahs', { list: doneRun.text }),
+        toGo.length > 0 ? t('lib.juzSheet.toGo', { list: firstRun(toGo.map(ayahOf)).text }) : null,
+      ]
         .filter(Boolean)
         .join(' · ');
       return { ...base, firstPage: toGo.length > 0 ? pageOfAyah(toGo[0]) : base.firstPage, text, alert: false, state: 'learning' as const };
     }
     if (mine.length === 0) {
       const partly = pages.some((p) => byNumber.get(p)?.status === 'in_progress');
-      return { ...base, text: 'Not memorized', alert: false, state: partly ? ('learning' as const) : ('not-memorized' as const) };
+      return { ...base, text: t('lib.juzSheet.notMemorized'), alert: false, state: partly ? ('learning' as const) : ('not-memorized' as const) };
     }
     if (smartTracking) {
       const weakest = mine.reduce<Strength>((w, p) => (ORDER[strength(p)] < ORDER[w] ? strength(p) : w), 'strong');
       if (weakest !== 'strong') {
         const at = ayahsIn(sura, mine.filter((p) => strength(p) === weakest));
-        return { ...base, text: `${at} ${weakest}`.trim(), alert: weakest === 'weak', state: weakest };
+        return { ...base, text: t('lib.juzSheet.atStrength', { at, strength: t(`lib.juzSheet.${weakest}`) }).trim(), alert: weakest === 'weak', state: weakest };
       }
       const skips = mine.reduce((n, p) => n + (byNumber.get(p)?.skipCount ?? 0), 0);
-      return { ...base, text: skips > 0 ? `Strong · skipped ${skipsWord(skips)}` : 'Strong', alert: false, state: 'strong' as const };
+      return { ...base, text: skips > 0 ? t('lib.juzSheet.strongSkipped', { times: skipsWord(skips) }) : t('lib.juzSheet.strong'), alert: false, state: 'strong' as const };
     }
     const ago = lastOf(mine);
     const n = daysOf(mine);
     // Never revised yet, and none of it 30+ days on record: not revised yet, not stale (ACT-25).
-    if (ago == null && !mine.some((p) => bandOf(p) === 'older')) return { ...base, text: 'Not revised yet', alert: false, state: 'new' as const };
+    if (ago == null && !mine.some((p) => bandOf(p) === 'older')) return { ...base, text: t('lib.juzSheet.notRevised'), alert: false, state: 'new' as const };
     const state: Recency = ago == null || ago >= 30 ? 'older' : ago < 7 ? 'week' : 'month';
     return { ...base, text: recency(ago, n), alert: state === 'older', state };
   });
 
   return {
     juz,
-    title: `Juz ${juz}`,
+    title: t('lib.juzSheet.juz', { n: juz }),
     subtitle: describeSurahs({ first: start, last: end }),
     headline: beingLearned
-      ? 'Being learned'
+      ? t('lib.juzSheet.beingLearned')
       : memorized.length === 0
-        ? 'Not memorized yet'
+        ? t('lib.juzSheet.notMemorizedYet')
         : newest == null && !stale
-          ? 'Not revised yet'
+          ? t('lib.juzSheet.notRevised')
           : lastRevisedWords(newest),
     times: memorized.length === 0 || newest == null || beingLearned ? '' : timesText(daysOf(memorized)),
     stale,

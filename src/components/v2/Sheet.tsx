@@ -23,6 +23,7 @@ import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { Tap } from './Tap';
 import { ModalNest, useInsideModal, useModalTurn } from './modalTurn';
 import { Ionicons } from '@expo/vector-icons';
+import { t } from '../../i18n';
 
 /**
  * iOS: how long a closed sheet waits for its modal to report it has gone (onDismiss, normally a few
@@ -244,12 +245,12 @@ export function Sheet({
   // nothing), so it can't stay over the screen; the turn passes on and onHidden runs as if it had.
   useEffect(() => {
     if (!dismissing) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       e2eModal?.(testID, 'replaced');
       setModalKey((k) => k + 1);
       finish();
     }, DISMISS_FALLBACK_MS);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [dismissing, finish, testID]);
 
   const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [height * 0.6, 0] });
@@ -282,8 +283,8 @@ export function Sheet({
                 style={styles.grab}
                 accessible
                 accessibilityRole="button"
-                accessibilityLabel="Close"
-                accessibilityActions={[{ name: 'activate', label: 'Close' }]}
+                accessibilityLabel={t('common.close')}
+                accessibilityActions={[{ name: 'activate', label: t('common.close') }]}
                 onAccessibilityAction={(e) => {
                   if (e.nativeEvent.actionName === 'activate') onClose();
                 }}
@@ -388,7 +389,7 @@ export function Sheet({
       <GestureHandlerRootView style={styles.fill}>
         <Reanimated.View style={[StyleSheet.absoluteFill, dimmed]}>
           <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: palette.overlay, opacity: progress }]}>
-            <Backdrop onPress={onClose} label="Close" />
+            <Backdrop onPress={onClose} label={t('common.close')} />
           </Animated.View>
         </Reanimated.View>
         {keyboard ? (

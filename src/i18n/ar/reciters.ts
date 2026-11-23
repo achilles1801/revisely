@@ -1,0 +1,33 @@
+// Arabic for src/i18n/en/reciters.ts. Words and forms: src/i18n/ar-glossary.md.
+import type { ArStrings } from './types';
+
+export const reciters: NonNullable<ArStrings['reciters']> = {
+  husary: 'محمود خليل الحصري',
+  husaryShort: 'الحصري',
+  minshawi: 'محمد صديق المنشاوي',
+  minshawiShort: 'المنشاوي',
+  abdulbasit: 'عبد الباسط عبد الصمد',
+  abdulbasitShort: 'عبد الباسط',
+  alafasy: 'مشاري راشد العفاسي',
+  alafasyShort: 'العفاسي',
+  sudais: 'عبد الرحمن السديس',
+  sudaisShort: 'السديس',
+  shuraim: 'سعود الشريم',
+  shuraimShort: 'الشريم',
+  muaiqly: 'ماهر المعيقلي',
+  muaiqlyShort: 'المعيقلي',
+  ghamdi: 'سعد الغامدي',
+  ghamdiShort: 'الغامدي',
+  ajamy: 'أحمد بن علي العجمي',
+  ajamyShort: 'العجمي',
+  shatri: 'أبو بكر الشاطري',
+  shatriShort: 'الشاطري',
+  hudhaify: 'علي الحذيفي',
+  hudhaifyShort: 'الحذيفي',
+  ayyub: 'محمد أيوب',
+  ayyubShort: 'محمد أيوب',
+  tablawi: 'محمد محمود الطبلاوي',
+  tablawiShort: 'الطبلاوي',
+  dossari: 'ياسر الدوسري',
+  dossariShort: 'الدوسري',
+};

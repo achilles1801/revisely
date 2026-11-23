@@ -11,6 +11,9 @@ import { homeStack } from './screens';
 import { OpenApp, Phone } from './phone';
 import { ScenarioId, SeedPlan, buildScenario, parseContext } from '../../../functions/src/testScenarios';
 
+/** How many days of sessions the app reads, the latest first (src/context/AppContext.tsx). */
+export const SESSIONS_READ = 100;
+
 type Lib = typeof import('../../../src/lib/testScenarios');
 
 /**
@@ -43,12 +46,18 @@ export async function loadScenario(app: OpenApp, scenario: ScenarioId): Promise<
   const sent = lib.buildSeedContext(scenario, user, new Date());
   const plan = buildScenario(scenario, parseContext(sent, Date.now(), scenario), app.uid);
   await app.act(() => withAuthRetry(() => lib.loadTestScenario(scenario, user)));
-  const dates = plan.sessions.map((s) => s.date).join();
+  // The app reads the latest 100 days of sessions (AppContext's SESSIONS_READ; SYNC-6).
+  const dates = plan.sessions
+    .map((s) => s.date)
+    .filter((d) => !(scenario === 'offline-queue' && d === plan.today))
+    .slice(-SESSIONS_READ)
+    .join();
+  const memorized = plan.pages.filter((p) => p.status === 'memorized').length;
   await app.until(
     () =>
       planShown(app.app.user as unknown as Record<string, unknown> | null, plan.user) &&
       app.app.onboardingComplete &&
-      app.app.pages.filter((p) => p.status === 'memorized').length === plan.pages.length &&
+      app.app.pages.filter((p) => p.status === 'memorized').length === memorized &&
       [...app.app.logs]
         .map((l) => l.date)
         .filter((d) => !(scenario === 'offline-queue' && d === plan.today))

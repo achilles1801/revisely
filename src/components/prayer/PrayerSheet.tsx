@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -14,13 +14,17 @@ import { countdown, formatTime, gregorianDate, hijriDate, methodLabel, TIME_LABE
 import { usePrayerTimes, PrayerTimesNow } from './usePrayerTimes';
 import { usePrayerLocation } from './usePrayerLocation';
 import { usePrayerNotifyPermission } from './usePrayerNotifyPermission';
+import { alertSummary, PrayerAlertSheet } from './PrayerAlertSheet';
+import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 export type PrayerTab = 'times' | 'qibla';
 
 /**
  * Prayer: today's times and the Qibla, one sheet with two tabs. Home's compass
  * opens it on Qibla, the next-prayer line on Times (and Settings → Prayer on
- * either). Drags down to close, as every sheet.
+ * either). Drags down to close, as every sheet. A prayer's row opens its reminder and sound (Majd, Nov 23
+ * 2026: the sound is chosen from here too), and from there its athan voice.
  */
 export function PrayerSheet({
   visible,
@@ -28,6 +32,7 @@ export function PrayerSheet({
   onTab,
   onClose,
   onOpenCalculation,
+  onOpenVoice,
 }: {
   visible: boolean;
   tab: PrayerTab;
@@ -35,8 +40,11 @@ export function PrayerSheet({
   onClose: () => void;
   /** Calculation (method, Asr, adjustments): a screen of its own. */
   onOpenCalculation: () => void;
+  /** The athan voice picker for one prayer: a screen of its own (the host closes the sheet). */
+  onOpenVoice?: (prayer: PrayerName) => void;
 }) {
   const { user } = useApp();
+  const [editing, setEditing] = useState<PrayerName | null>(null);
   const times = usePrayerTimes(user);
   const qibla = useQiblaView(visible && tab === 'qibla');
   const location = usePrayerLocation(visible && tab === 'times', times.place != null);
@@ -48,15 +56,15 @@ export function PrayerSheet({
     <Sheet
       visible={visible}
       onClose={onClose}
-      title="Prayer"
-      footer={{ label: asking ? 'Not now' : 'Done', onPress: onClose, testID: 'prayer-done' }}
+      title={t('prayer.sheet.title')}
+      footer={{ label: asking ? t('common.notNow') : t('common.done'), onPress: onClose, testID: 'prayer-done' }}
       testID="prayer-sheet"
     >
       <View style={styles.tabs}>
         <PillTabs<PrayerTab>
           options={[
-            { value: 'times', label: 'Times' },
-            { value: 'qibla', label: 'Qibla' },
+            { value: 'times', label: t('prayer.sheet.times') },
+            { value: 'qibla', label: t('prayer.sheet.qibla') },
           ]}
           value={tab}
           onChange={onTab}
@@ -72,12 +80,21 @@ export function PrayerSheet({
             if (!on) setPrayerAlert(prayer, { on: false });
             else permission.ensure(() => setPrayerAlert(prayer, { on: true }));
           }}
+          onSound={setEditing}
           onOpenCalculation={onOpenCalculation}
         />
       ) : (
         <TimesLocation status={location.status} onAllow={location.allow} onOpenSettings={location.openSettings} onRetry={location.retry} />
       )}
       {permission.sheets}
+      <PrayerAlertSheet
+        prayer={visible ? editing : null}
+        onClose={() => setEditing(null)}
+        onVoice={(p) => {
+          setEditing(null);
+          onOpenVoice?.(p);
+        }}
+      />
     </Sheet>
   );
 }
@@ -86,10 +103,13 @@ export function PrayerSheet({
 export function TimesBody({
   times,
   onBell,
+  onSound,
   onOpenCalculation,
 }: {
   times: PrayerTimesNow;
   onBell: (prayer: PrayerName, on: boolean) => void;
+  /** A prayer's row: its reminder and sound. */
+  onSound?: (prayer: PrayerName) => void;
   onOpenCalculation: () => void;
 }) {
   const { palette } = useTheme();
@@ -126,7 +146,10 @@ export function TimesBody({
           const at = today[name];
           const isNext = isNextToday && next!.name === name;
           const past = at != null && at.getTime() <= now.getTime() && name !== current;
-          const sub = isNext ? nextIn : name === current ? 'Now' : null;
+          const alert = name === 'sunrise' ? null : prefs.alerts[name as PrayerName];
+          const when = isNext ? nextIn : name === current ? t('prayer.sheet.now') : null;
+          // A prayer that notifies says how ("Standard tone", "Athan · 10 min before").
+          const sub = [when, alert?.on ? alertSummary(alert) : null].filter(Boolean).join(' · ') || null;
           return (
             <TimeRow
               key={name}
@@ -135,7 +158,8 @@ export function TimesBody({
               sub={sub}
               highlight={isNext}
               past={past}
-              bell={name === 'sunrise' ? undefined : prefs.alerts[name as PrayerName].on}
+              bell={alert?.on}
+              onSound={alert && onSound ? () => onSound(name as PrayerName) : undefined}
               onBell={name === 'sunrise' ? undefined : (on) => onBell(name as PrayerName, on)}
               separator={i < DAY_TIMES.length - 1 && !isNext && !(isNextToday && DAY_TIMES[i + 1] === next!.name)}
             />
@@ -144,11 +168,11 @@ export function TimesBody({
       </View>
       <Tap onPress={onOpenCalculation} style={[styles.calc, { borderTopColor: palette.separator }]} accessibilityRole="button" testID="prayer-calculation">
         <Ionicons name="options-outline" size={24} color={palette.text} />
-        <Text style={[typeV2.body, styles.calcLabel, { color: palette.text }]}>Calculation</Text>
+        <Text style={[typeV2.body, styles.calcLabel, { color: palette.text }]}>{t('prayer.sheet.calculation')}</Text>
         <Text style={[typeV2.body, styles.calcValue, { color: palette.secondary }]} numberOfLines={1}>
-          {methodLabel(settings.method, true)} · {settings.madhab === 'hanafi' ? 'Hanafi' : 'Standard'}
+          {methodLabel(settings.method, true)} · {settings.madhab === 'hanafi' ? t('prayer.sheet.hanafi') : t('prayer.sheet.standard')}
         </Text>
-        <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
+        <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
       </Tap>
     </View>
   );
@@ -162,6 +186,7 @@ function TimeRow({
   past,
   bell,
   onBell,
+  onSound,
   separator,
 }: {
   name: TimeName;
@@ -171,32 +196,48 @@ function TimeRow({
   past: boolean;
   bell?: boolean;
   onBell?: (on: boolean) => void;
+  onSound?: () => void;
   separator: boolean;
 }) {
   const { palette } = useTheme();
   const ink = highlight ? palette.subtleText : past ? palette.secondary : palette.text;
   const label = TIME_LABELS[name];
+  const text = (
+    <>
+      <View style={styles.nameLine}>
+        <Text style={[typeV2.body, styles.name, highlight && styles.bold, { color: ink }]} maxFontSizeMultiplier={1.4}>
+          {label.en}
+        </Text>
+        <Text style={[arabicV2(17), styles.arabic, { color: ink }]} maxFontSizeMultiplier={1.3}>
+          {label.ar}
+        </Text>
+      </View>
+      {sub ? (
+        <Text style={[typeV2.meta, { color: highlight ? palette.subtleText : palette.secondary }]} maxFontSizeMultiplier={1.4}>
+          {sub}
+        </Text>
+      ) : null}
+    </>
+  );
   return (
     <View
       style={[styles.row, highlight && { backgroundColor: palette.accentSubtle, borderRadius: radiusV2.media }]}
       testID={`prayer-row-${name}`}
       accessibilityLabel={`${label.en}, ${time}${sub ? `, ${sub}` : ''}`}
     >
-      <View style={styles.rowText}>
-        <View style={styles.nameLine}>
-          <Text style={[typeV2.body, styles.name, highlight && styles.bold, { color: ink }]} maxFontSizeMultiplier={1.4}>
-            {label.en}
-          </Text>
-          <Text style={[arabicV2(17), styles.arabic, { color: ink }]} maxFontSizeMultiplier={1.3}>
-            {label.ar}
-          </Text>
-        </View>
-        {sub ? (
-          <Text style={[typeV2.meta, { color: highlight ? palette.subtleText : palette.secondary }]} maxFontSizeMultiplier={1.4}>
-            {sub}
-          </Text>
-        ) : null}
-      </View>
+      {onSound ? (
+        <Tap
+          onPress={onSound}
+          style={styles.rowText}
+          accessibilityRole="button"
+          accessibilityLabel={t('prayer.sheet.soundLabel', { name: label.en })}
+          testID={`prayer-row-${name}-sound`}
+        >
+          {text}
+        </Tap>
+      ) : (
+        <View style={styles.rowText}>{text}</View>
+      )}
       <Text style={[typeV2.body, typeV2.numeral, highlight && styles.bold, { color: ink }]} maxFontSizeMultiplier={1.4}>
         {time}
       </Text>
@@ -206,7 +247,7 @@ function TimeRow({
           hitSlop={8}
           style={styles.bell}
           accessibilityRole="switch"
-          accessibilityLabel={`${label.en} notification`}
+          accessibilityLabel={t('prayer.sheet.bell', { name: label.en })}
           accessibilityState={{ checked: !!bell }}
           testID={`prayer-bell-${name}`}
         >
@@ -253,32 +294,32 @@ function TimesLocation({
     case 'needs-permission':
       content = (
         <>
-          {title('Allow location for prayer times')}
-          {body('Revisely works out the times for where you are. Your location stays on this phone.')}
+          {title(t('prayer.sheet.permission.title'))}
+          {body(t('prayer.sheet.permission.body'))}
         </>
       );
-      action = <PillButton title="Allow location" size="lg" onPress={onAllow} testID="prayer-allow-location" />;
+      action = <PillButton title={t('prayer.sheet.permission.allow')} size="lg" onPress={onAllow} testID="prayer-allow-location" />;
       break;
     case 'denied':
       content = (
         <>
-          {title('Location is off for Revisely')}
-          {body('Turn it on in Settings to see prayer times.')}
+          {title(t('prayer.sheet.denied.title'))}
+          {body(t('prayer.sheet.denied.body'))}
         </>
       );
-      action = <PillButton title="Open Settings" size="lg" onPress={onOpenSettings} />;
+      action = <PillButton title={t('common.openSettings')} size="lg" onPress={onOpenSettings} />;
       break;
     case 'no-location':
       content = (
         <>
-          {title("Couldn't find where you are")}
-          {body('Check that Location Services is on, then try again.')}
+          {title(t('prayer.sheet.noLocation.title'))}
+          {body(t('prayer.sheet.noLocation.body'))}
         </>
       );
-      action = <PillButton title="Try again" variant="outline" size="lg" onPress={onRetry} />;
+      action = <PillButton title={t('common.tryAgain')} variant="outline" size="lg" onPress={onRetry} />;
       break;
     default:
-      content = title('Finding where you are…');
+      content = title(t('prayer.sheet.locating'));
   }
   return (
     <View style={styles.locate} testID={`prayer-location-${status}`}>

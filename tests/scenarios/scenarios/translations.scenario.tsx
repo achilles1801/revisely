@@ -34,6 +34,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { pageOfVerse } from '../../../src/lib/verses';
 import { __resetNetworkStateForTests, setNetworkState } from '../../../src/lib/networkState';
 import NetInfo from '@react-native-community/netinfo';
+// The in-app browser (expo-web-browser), where a credit's link opens (LINK-1).
+jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn(async () => ({ type: 'opened' })) }));
 
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 
@@ -182,15 +184,20 @@ describe('a held verse in a QuranEnc translation (TRANS)', () => {
     expect(screen.getByText("Couldn't load this verse. Check your connection.")).toBeTruthy();
   });
 
-  it('[TRANS-2] under it: QuranEnc’s own credit, the version shown and a link to its page on QuranEnc.com', async () => {
+  it('[TRANS-2] [LINK-1] under it: QuranEnc’s own credit, the version shown and a link to its page on QuranEnc.com, opened in the app’s own browser', async () => {
     openSheet(URDU, APP_STORE);
     await until(() => shown() != null, 'the translation');
     const credit = screen.getByTestId('translation-credit');
     expect(textOf(credit as never)).toBe(`${URDU_CREDIT} · v1.1.3QuranEnc.com`);
+    // The page opens in the app's own browser (LINK-1), never handed to the phone's.
     const Linking = require('react-native').Linking;
-    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    const handed = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    const { openBrowserAsync } = jest.requireMock('expo-web-browser') as { openBrowserAsync: jest.Mock };
+    openBrowserAsync.mockClear();
     fireEvent.press(screen.getByLabelText('QuranEnc.com, opens the website'));
-    expect(open).toHaveBeenCalledWith('https://quranenc.com/en/browse/urdu_junagarhi');
+    expect(openBrowserAsync).toHaveBeenCalledWith('https://quranenc.com/en/browse/urdu_junagarhi');
+    expect(handed).not.toHaveBeenCalled();
+    handed.mockRestore();
   });
 
   it('[TRANS-2] the picker shows each translation with the same credit', async () => {

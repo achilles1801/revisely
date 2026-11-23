@@ -12,22 +12,24 @@
 // {{Label}} is text the app shows (drawn in ink); [[icon]] a button's own glyph; [[revo]] Revo's disc.
 
 import { helpPlainText, helpTextParts, type HelpIcon, type HelpTextPart } from './topics';
+import { currentLanguage } from '../../i18n';
+import { WHATS_NEW_AR } from './whatsNew.ar';
 
 /**
  * A feature a card describes that may still be for testers only. A card (or a row of the last card)
  * whose feature isn't open to the account is left out (components/whatsNew/needs decides, with each
  * feature's own gate), and a live release may not need a feature that is still testers only.
  */
-export type WhatsNewNeed = 'activity' | 'sittings' | 'revo' | 'help' | 'translations';
+export type WhatsNewNeed = 'activity' | 'sittings' | 'revo' | 'help' | 'translations' | 'recite' | 'insights' | 'reciteRevo';
 
 /** The pictures (components/whatsNew/pictures): a part of the screen the card is about. */
-export type WhatsNewPicture = 'activity' | 'elsewhere' | 'ayah';
+export type WhatsNewPicture = 'activity' | 'elsewhere' | 'ayah' | 'marks' | 'again' | 'gaps';
 
 /**
  * A card that plays as a full-screen moment instead of a picture over words (components/whatsNew):
  * 'revo' is RevoMoment (lib/whatsNew/revoMoment), ending on Turn on Revo or Later.
  */
-export type WhatsNewMoment = 'revo';
+export type WhatsNewMoment = 'revo' | 'recite';
 
 export interface WhatsNewRow {
   id: string;
@@ -140,9 +142,113 @@ export const RELEASES: readonly WhatsNewRelease[] = [
       },
     ],
   },
+  {
+    // The mistake detection release (Majd, Nov 16 2026: "it should mainly mention mistake detection and probably the new
+    // stuff in insights and whatever else i might've forgotten"). Switched on with the release PR, with its gates.
+    id: '1.0.5',
+    live: true,
+    cards: [
+      {
+        id: 'recite',
+        title: 'Recite, and see your mistakes',
+        text:
+          'Tap [[mic]] in the reader and recite from memory. The page follows you, and with {{Mark mistakes}} on, ' +
+          'each mistake is highlighted as you go.',
+        // A take plays by itself (components/whatsNew/ReciteMoment), the card's words at its end.
+        moment: 'recite',
+        covers: ['RECITE-1', 'RECITE-2'],
+        needs: 'recite',
+      },
+      {
+        id: 'marks',
+        title: 'Every mistake, explained',
+        text:
+          'Tap a highlight to see what was expected, hear the ayah, and hear yourself there. ' +
+          '{{Not clear}} never counts, and {{Not a mistake}} takes one off.',
+        picture: 'marks',
+        covers: ['RECITE-3', 'RECITE-4'],
+        needs: 'recite',
+      },
+      {
+        id: 'again',
+        title: 'Until it sticks',
+        text:
+          '{{Recite the mistakes again}} goes over just those ayat. A mistake stays marked on the page until you say ' +
+          'it right on two different days.',
+        picture: 'again',
+        covers: ['RECITE-7', 'RMEM-2', 'RMEM-3'],
+        needs: 'recite',
+      },
+      {
+        id: 'gaps',
+        title: 'Gaps, in Insights',
+        text: 'See each time you went 2 days or more without revising, and with {{Last revised}}, when you last revised each surah and juz.',
+        picture: 'gaps',
+        covers: ['ACT-28', 'ACT-30'],
+        needs: 'insights',
+      },
+      {
+        id: 'more',
+        title: 'Also new',
+        covers: [],
+        rows: [
+          {
+            id: 'test',
+            icon: 'shuffle-outline',
+            title: 'Test me',
+            text: 'Hold [[mic]] and pick {{Test me}}: five places at random in what you’ve memorized.',
+            covers: ['RECITE-8'],
+            needs: 'recite',
+          },
+          {
+            // With Revo's row (Nov 18 2026), so Premium has a row of its own: the last card has four at most.
+            id: 'recitation',
+            icon: 'trending-up-outline',
+            title: 'Your recitation in Insights',
+            text: 'Your score over time, and the passages that keep slipping. Revo knows them too: ask it what keeps slipping, or about one take.',
+            covers: ['RINS-2', 'RINS-1', 'RINS-3'],
+            needs: 'recite',
+          },
+          {
+            // Majd, Nov 18 2026: free for everyone who signs up during early access, kept for life (PREM-1).
+            id: 'premium',
+            icon: 'star-outline',
+            title: 'Premium, in early access',
+            text: '{{Mark mistakes}} and {{Test me}} are part of Premium: free for everyone during early access, and yours for life.',
+            covers: ['PREM-1'],
+            needs: 'recite',
+          },
+          {
+            id: 'search',
+            icon: 'search-outline',
+            title: 'A new search',
+            text: 'The field and the mic sit at the bottom, and each ayah found comes with its meaning.',
+            covers: ['SEARCH-1'],
+          },
+        ],
+      },
+    ],
+
+  },
 ];
 
 export const CURRENT_RELEASE: WhatsNewRelease = RELEASES[RELEASES.length - 1];
+
+/**
+ * The next release, still dark: not in RELEASES yet, so the current release stays what store users, TestFlight testers,
+ * E2E and the scenarios see and what onboarding marks. Revisely Dev's testers see it in Settings → About → What's new
+ * and in the run at launch (releaseFor). The release PR appends it to RELEASES with `live: true`, opening its
+ * features' gates in the same change, and sets this back to null.
+ */
+export const NEXT_RELEASE: WhatsNewRelease | null = null;
+
+/** Every release with cards, the next one included (the drift check reads them all). */
+export const ALL_RELEASES: readonly WhatsNewRelease[] = NEXT_RELEASE ? [...RELEASES, NEXT_RELEASE] : RELEASES;
+
+/** The release a screen in `mode` shows: the next one for a tester's replay or run in Revisely Dev, else the current. */
+export function releaseFor(mode: 'required' | 'forced' | 'replay', dev: boolean): WhatsNewRelease {
+  return mode !== 'required' && dev && NEXT_RELEASE ? NEXT_RELEASE : CURRENT_RELEASE;
+}
 
 /**
  * Whether an account has seen `release` (NEW-1): it finished it, or a later one, or set up after it
@@ -171,7 +277,19 @@ export function cardsFor(release: WhatsNewRelease, open: (need: WhatsNewNeed) =>
       if (rows.length > 0) out.push({ ...card, rows });
     } else out.push(card);
   }
-  return out;
+  return currentLanguage() === 'ar' ? out.map((card) => inArabic(release.id, card)) : out;
+}
+
+/** A card and its rows in Arabic, where whatsNew.ar.ts has them (else as here). */
+function inArabic(release: string, card: WhatsNewCard): WhatsNewCard {
+  const key = `${release}/${card.id}`;
+  const ar = WHATS_NEW_AR[key];
+  const rows = card.rows?.map((row) => {
+    const r = WHATS_NEW_AR[`${key}/${row.id}`];
+    return r?.text != null ? { ...row, title: r.title, text: r.text } : row;
+  });
+  const words = ar ? { title: ar.title, ...(card.text != null && ar.text != null ? { text: ar.text } : {}) } : {};
+  return { ...card, ...words, ...(rows ? { rows } : {}) };
 }
 
 /** Every need a release's cards and rows name. */
@@ -194,5 +312,5 @@ export function whatsNewParts(text: string): WhatsNewPart[] {
 
 /** A card's words as read aloud (VoiceOver), never a glyph's private character. */
 export function whatsNewPlainText(text: string): string {
-  return helpPlainText(text.replace(/\[\[revo\]\]/g, 'Revo’s R'));
+  return helpPlainText(text.replace(/\[\[revo\]\]/g, currentLanguage() === 'ar' ? 'شعار \u2068Revo\u2069' : 'Revo’s R'));
 }

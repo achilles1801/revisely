@@ -13,6 +13,8 @@ import { sittingsEnabled } from '../../lib/sitting';
 import { everyTranslationOffered } from '../../lib/translationsOffered';
 import { revoAvailable } from '../../lib/revo/availability';
 import { useRevoRelease, type RevoRelease } from '../../lib/revo/release';
+import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
+import { gapsInsightsEnabled } from '../../lib/insightsGaps';
 
 type Who = Pick<User, 'previewTester'> | null | undefined;
 
@@ -31,6 +33,15 @@ export function needOpen(need: WhatsNewNeed, user: Who, revo: RevoRelease): bool
     case 'translations':
       // The verse sheet's picker of every translation (TRANS-5).
       return everyTranslationOffered(user);
+    case 'recite':
+      // The reader's mic: Recite, Mark mistakes, Test me (RECITE-*), and what takes leave behind (RMEM-*, RINS-2).
+      return reciteLiveForAccount(user);
+    case 'insights':
+      // Insights' Gaps and Last revised (ACT-28, ACT-30).
+      return gapsInsightsEnabled(user);
+    case 'reciteRevo':
+      // Revo told what Recite found (RINS-1, RINS-3): both open.
+      return reciteLiveForAccount(user) && revoAvailable(user, revo);
   }
 }
 

@@ -8,8 +8,23 @@ import type { OutboxEntry, OutboxOp } from './ops';
 import { ayahsOfPages, pageOfAyah, sortedAyahs } from '../ayahKeys';
 
 export interface DayItems {
-  revisions: { id: string; day: string; countsFor: string; pages: number[]; skipped: number[]; assigned: number[]; minutes: number | null }[];
-  memorized: { id: string; day: string; pages: number[]; minutes?: number | null; updatedAt?: number | null; verses?: number[] }[];
+  revisions: {
+    id: string;
+    day: string;
+    countsFor: string;
+    pages: number[];
+    skipped: number[];
+    assigned: number[];
+    minutes: number | null;
+  }[];
+  memorized: {
+    id: string;
+    day: string;
+    pages: number[];
+    minutes?: number | null;
+    updatedAt?: number | null;
+    verses?: number[];
+  }[];
   reads: { id: string; day: string; pages: number[]; minutes: number | null; occurredAt: number | null }[];
   doneAhead: { fromDay: string; pages: number[] }[];
 }
@@ -68,7 +83,11 @@ export function keepTaken(taken: OutboxEntry[], entry: OutboxEntry, day: string)
  * reached the server, and what's shown (which already has it) stays until the server's copy comes:
  * redrawn from an older copy, the add vanished until that read came back (Nov 2026).
  */
-export function joinedSince(before: ReadonlySet<string>, entries: readonly OutboxEntry[], day: string): { joined: boolean; ids: Set<string> } {
+export function joinedSince(
+  before: ReadonlySet<string>,
+  entries: readonly OutboxEntry[],
+  day: string,
+): { joined: boolean; ids: Set<string> } {
   const ids = new Set(entries.filter((e) => touchesDay(e.op, day)).map((e) => e.id));
   return { joined: [...ids].some((id) => !before.has(id)), ids };
 }
@@ -108,7 +127,11 @@ export function overlayDayItems(items: DayItems, entries: readonly OutboxEntry[]
       // Ayahs merge as the server merges them (firestoreService.addMemorizationPages).
       const byAyah = (op.verses && op.verses.length > 0) || (prev?.verses && prev.verses.length > 0);
       const verses = byAyah
-        ? sortedAyahs([...(prev?.verses ?? []), ...(op.verses ?? []), ...(op.verses && op.verses.length > 0 ? [] : ayahsOfPages(op.pages))])
+        ? sortedAyahs([
+            ...(prev?.verses ?? []),
+            ...(op.verses ?? []),
+            ...(op.verses && op.verses.length > 0 ? [] : ayahsOfPages(op.pages)),
+          ])
         : undefined;
       memorized = [
         ...memorized.filter((m) => m.id !== day),
@@ -134,12 +157,17 @@ export function overlayDayItems(items: DayItems, entries: readonly OutboxEntry[]
         .filter((m) => m.pages.length > 0);
     } else if (op.kind === 'reading.add' && op.session.date === day) {
       const r = readItemFor(op.id, uid, op.session);
-      reads = [...reads.filter((x) => x.id !== op.id), { id: r.id, day: r.day, pages: r.pages, minutes: r.minutes, occurredAt: r.occurredAt }];
+      reads = [
+        ...reads.filter((x) => x.id !== op.id),
+        { id: r.id, day: r.day, pages: r.pages, minutes: r.minutes, occurredAt: r.occurredAt },
+      ];
     } else if (op.kind === 'reading.pages') {
       reads = reads.map((x) => (x.id === op.id ? { ...x, pages: op.pages } : x));
     } else if (op.kind === 'reading.delete') {
       reads = reads.filter((x) => x.id !== op.id);
     }
   }
-  return revisions === items.revisions && memorized === items.memorized && reads === items.reads ? items : { ...items, revisions, memorized, reads };
+  return revisions === items.revisions && memorized === items.memorized && reads === items.reads
+    ? items
+    : { ...items, revisions, memorized, reads };
 }

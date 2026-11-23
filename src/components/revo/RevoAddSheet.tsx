@@ -26,13 +26,14 @@ import { Tap } from '../v2/Tap';
 import { ContextChip } from './RevoParts';
 import { RevoMonth, ringOf } from './RevoMonth';
 import { RevoPagesGrid } from './RevoPagesGrid';
+import { t } from '../../i18n';
 
 type Tab = 'surahs' | 'juz' | 'days' | 'pages';
-const TABS: { value: Tab; label: string }[] = [
-  { value: 'surahs', label: 'Surahs' },
-  { value: 'juz', label: 'Juz' },
-  { value: 'days', label: 'Days' },
-  { value: 'pages', label: 'Pages' },
+const tabs = (): { value: Tab; label: string }[] => [
+  { value: 'surahs', label: t('revo.add.surahs') },
+  { value: 'juz', label: t('common.juz') },
+  { value: 'days', label: t('revo.add.days') },
+  { value: 'pages', label: t('revo.add.pages') },
 ];
 const SURAHS = getAllSurahs();
 const JUZ = Array.from({ length: 30 }, (_, i) => i + 1);
@@ -122,12 +123,12 @@ export function RevoAddSheet({ initial, onCancel, onAdd }: { initial: readonly R
   };
   const juzRow = (n: number, last: boolean) => {
     const f = facts(`juz:${n}`, () => juzPages(n));
-    const key: AddKey = { kind: 'juz', juz: n, label: `Juz ${n}` };
+    const key: AddKey = { kind: 'juz', juz: n, label: t('common.juzN', { n }) };
     return (
       <AddRow
         key={keyId(key)}
         mark={<Mark label={String(n)} />}
-        name={`Juz ${n}`}
+        name={t('common.juzN', { n })}
         line={`${plainText(describePassage(juzPages(n), { form: 'short', wholeJuz: false }))} · ${f ? passagePreview(f) : ''}`}
         dim={f?.memorized === 0}
         on={isChosen(keys, key)}
@@ -176,32 +177,42 @@ export function RevoAddSheet({ initial, onCancel, onAdd }: { initial: readonly R
     );
   };
 
-  const GROUP: Record<AddFound['kind'], string> = { surah: 'Surah', juz: 'Juz', pages: 'Pages', day: 'Days' };
-  const groupOf = (r: AddFound) => (r.kind === 'pages' && r.ayahs ? 'Ayahs' : r.kind === 'surah' && results.filter((x) => x.kind === 'surah').length > 1 ? 'Surahs' : GROUP[r.kind]);
+  const GROUP: Record<AddFound['kind'], string> = {
+    surah: t('common.surah'),
+    juz: t('common.juz'),
+    pages: t('revo.add.pages'),
+    day: t('revo.add.days'),
+  };
+  const groupOf = (r: AddFound) =>
+    r.kind === 'pages' && r.ayahs
+      ? t('revo.add.ayahs')
+      : r.kind === 'surah' && results.filter((x) => x.kind === 'surah').length > 1
+        ? t('revo.add.surahs')
+        : GROUP[r.kind];
   const initialJuz = getJuzForPage(context?.today.nextPages[0] ?? prepared?.src.pages.find((p) => p.status === 'memorized')?.pageNumber ?? 1);
 
   return (
     <View style={styles.fill} testID="revo-add-sheet">
       <View style={styles.head}>
-        <Tap onPress={onCancel} accessibilityRole="button" accessibilityLabel="Cancel" style={styles.side} testID="revo-add-cancel">
+        <Tap onPress={onCancel} accessibilityRole="button" accessibilityLabel={t('common.cancel')} style={styles.side} testID="revo-add-cancel">
           <Text style={[typeV2.menu, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-            Cancel
+            {t('common.cancel')}
           </Text>
         </Tap>
         <Text style={[typeV2.sheetTitle, styles.title, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-          Add to chat
+          {t('revo.add.title')}
         </Text>
         <Tap
           onPress={() => prepared && onAdd([...others, ...buildAttachments(keys, prepared, extras ?? {})])}
           disabled={!addEnabled}
           accessibilityRole="button"
-          accessibilityLabel={count ? `Add ${count}` : 'Add'}
+          accessibilityLabel={count ? t('revo.add.addN', { n: count }) : t('revo.add.add')}
           accessibilityState={{ disabled: !addEnabled }}
           style={[styles.side, styles.right]}
           testID="revo-add-done"
         >
           <Text style={[typeV2.button, styles.addText, { color: addEnabled && count ? palette.link : palette.secondary }]} maxFontSizeMultiplier={1.4}>
-            {count ? `Add ${count}` : 'Add'}
+            {count ? t('revo.add.addN', { n: count }) : t('revo.add.add')}
           </Text>
         </Tap>
       </View>
@@ -211,16 +222,16 @@ export function RevoAddSheet({ initial, onCancel, onAdd }: { initial: readonly R
         <TextInput
           value={q}
           onChangeText={setQ}
-          placeholder="Surah, juz, day or page"
+          placeholder={t('revo.add.search')}
           placeholderTextColor={palette.secondary}
           style={[styles.searchInput, { color: palette.text }]}
           returnKeyType="search"
           autoCorrect={false}
-          accessibilityLabel="Search a surah, juz, day or page"
+          accessibilityLabel={t('revo.add.searchLabel')}
           testID="revo-add-search"
         />
         {q ? (
-          <Tap onPress={() => setQ('')} hitSlop={10} accessibilityRole="button" accessibilityLabel="Clear the search" testID="revo-add-search-clear">
+          <Tap onPress={() => setQ('')} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('revo.add.clearSearch')} testID="revo-add-search-clear">
             <Ionicons name="close-circle" size={17} color={palette.secondary} />
           </Tap>
         ) : null}
@@ -241,7 +252,7 @@ export function RevoAddSheet({ initial, onCancel, onAdd }: { initial: readonly R
         <ScrollView style={styles.fill} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" testID="revo-add-results">
           {results.length === 0 ? (
             <Text style={[typeV2.body, styles.empty, { color: palette.secondary }]} testID="revo-add-empty">
-              Nothing found. Try a surah, “Juz 14”, “Tuesday” or “p. 288”.
+              {t('revo.add.nothingFound')}
             </Text>
           ) : null}
           {results.map((r, i) => (
@@ -259,7 +270,7 @@ export function RevoAddSheet({ initial, onCancel, onAdd }: { initial: readonly R
         <>
           <View style={styles.tabs}>
             <PillTabs<Tab>
-              options={TABS}
+              options={tabs()}
               value={tab}
               onChange={(t) => {
                 juzScrolled.current = false;

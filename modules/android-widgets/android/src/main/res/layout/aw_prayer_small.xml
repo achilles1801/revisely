@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Prayer times, 2×2 (the default): the next prayer, its time and a countdown. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@android:id/background"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@drawable/aw_ground"
+  android:clipToOutline="true"
+  android:orientation="vertical"
+  android:padding="16dp">
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+    <FrameLayout
+    android:layout_width="28dp"
+    android:layout_height="28dp">
+    <ImageView
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:importantForAccessibility="no"
+      android:src="@drawable/aw_circle"
+      android:tint="@color/aw_fill" />
+    <ImageView
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:importantForAccessibility="no"
+      android:padding="6dp"
+      android:scaleType="fitCenter"
+      android:src="@drawable/aw_clock"
+      android:tint="@color/aw_text" />
+  </FrameLayout>
+    <LinearLayout
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:layout_marginStart="8dp"
+      android:layout_weight="1"
+      android:orientation="vertical">
+      <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="sans-serif-medium"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:text="@string/aw_prayer"
+        android:textColor="@color/aw_text"
+        android:textSize="15sp" />
+      <TextView
+        android:id="@+id/aw_place"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:text="@string/aw_sample_city"
+        android:textColor="@color/aw_secondary"
+        android:textSize="12sp" />
+    </LinearLayout>
+  </LinearLayout>
+  <LinearLayout
+    android:id="@+id/aw_ready"
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="1"
+    android:orientation="vertical">
+  <FrameLayout
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="1"
+    android:minHeight="6dp" />
+    <TextView
+      android:id="@+id/aw_next_name"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:fontFamily="sans-serif-medium"
+      android:includeFontPadding="false"
+      android:maxLines="1"
+      android:text="@string/aw_sample_prayer"
+      android:textColor="@color/aw_preview_accent"
+      android:textSize="16sp" />
+    <TextView
+      android:id="@+id/aw_next_time"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="2dp"
+      android:autoSizeMaxTextSize="28sp"
+      android:autoSizeMinTextSize="17sp"
+      android:autoSizeTextType="uniform"
+      android:fontFamily="sans-serif-medium"
+      android:fontFeatureSettings="tnum"
+      android:includeFontPadding="false"
+      android:maxLines="1"
+      android:text="@string/aw_sample_time"
+      android:textColor="@color/aw_text"
+      android:textSize="28sp" />
+  <FrameLayout
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="1"
+    android:minHeight="6dp" />
+    <FrameLayout
+      android:layout_width="match_parent"
+      android:layout_height="0.5dp"
+      android:background="@color/aw_separator" />
+  <Chronometer
+    android:id="@+id/aw_countdown"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:countDown="true"
+    android:fontFamily="sans-serif-medium"
+    android:fontFeatureSettings="tnum"
+    android:maxLines="1"
+    android:paddingTop="6dp"
+    android:textColor="@color/aw_text"
+    android:textSize="13sp"
+    android:visibility="gone" />
+  <TextView
+    android:id="@+id/aw_countdown_preview"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fontFamily="sans-serif-medium"
+    android:fontFeatureSettings="tnum"
+    android:maxLines="1"
+    android:paddingTop="6dp"
+    android:text="@string/aw_sample_countdown"
+    android:textColor="@color/aw_text"
+    android:textSize="13sp" />
+  </LinearLayout>
+
+  <TextView
+    android:id="@+id/aw_open"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="6dp"
+    android:ellipsize="end"
+    android:maxLines="3"
+    android:textColor="@color/aw_secondary"
+    android:textSize="13sp"
+    android:visibility="gone" />
+</LinearLayout>

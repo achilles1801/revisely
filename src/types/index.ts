@@ -5,7 +5,7 @@ export type PageStatus = 'not_memorized' | 'in_progress' | 'memorized';
 export interface User {
   id: string;
   createdAt: string;
-  name?: string;                    // User's display name
+  name?: string; // User's display name
   /** Set by an admin only (clients can't write it): this account's TestFlight
    *  installs follow the preview update channel (lib/updateChannel). */
   previewTester?: boolean;
@@ -15,7 +15,7 @@ export interface User {
   hasSeenSmartTrackingPreview: boolean;
 
   // Preferences
-  dailyPageCapacity: number;        // e.g., 20 pages
+  dailyPageCapacity: number; // e.g., 20 pages
   // How the daily quota is interpreted. 'pages' uses dailyPageCapacity as a
   // raw page count; 'juz' uses dailyJuzCount and ignores dailyPageCapacity.
   // 'pages' is the historical default; 'juz' was added so users who think
@@ -24,7 +24,7 @@ export interface User {
   scheduleMode: 'pages' | 'juz';
   // Only meaningful when scheduleMode === 'juz'. Defaults to 1 for new users.
   dailyJuzCount: number;
-  reminderTime: string;             // "08:00"
+  reminderTime: string; // "08:00"
   notificationsEnabled: boolean;
 
   // Current progress
@@ -84,7 +84,14 @@ export interface User {
    * `next`: the next day's pages put there that way while this day's carry still applies (read with
    * carryOverOn, lib/algorithm), so saving tomorrow's never drops today's.
    */
-  carryOver?: { day: string; pages: number[]; skip?: number; source?: 'insights' | null; from?: Record<string, string>; next?: { day: string; pages: number[]; source?: 'insights' | null } | null } | null;
+  carryOver?: {
+    day: string;
+    pages: number[];
+    skip?: number;
+    source?: 'insights' | null;
+    from?: Record<string, string>;
+    next?: { day: string; pages: number[]; source?: 'insights' | null } | null;
+  } | null;
   // Pages the whole schedule has been moved back by carry-overs; every day reads
   // its pages this many earlier in the cycle. Reset when a plan is saved.
   scheduleShiftPages?: number;
@@ -131,13 +138,13 @@ export interface SavedPlan {
 
 // User's relationship with each Quran page
 export interface UserPage {
-  pageNumber: number;               // 1-604
+  pageNumber: number; // 1-604
   status: PageStatus;
   dateMemorized: string | null;
-  weaknessRating: number;           // 1-5, default 4
+  weaknessRating: number; // 1-5, default 4
   lastRevisedDate: string | null;
   totalRevisionCount: number;
-  skipCount: number;                // times scheduled but not revised
+  skipCount: number; // times scheduled but not revised
   /**
    * A partly memorized page (status 'in_progress', Firestore's 'learning'): its memorized ayahs,
    * as sura × 1000 + ayah (lib/memorizedAyahs). Meaningless on any other status.
@@ -187,7 +194,7 @@ export interface JournalNote {
  * (see journalDayFromEntries), so the day-level views read them as before.
  */
 export interface JournalEntry {
-  date: string;                     // YYYY-MM-DD
+  date: string; // YYYY-MM-DD
   entries: JournalNote[];
   memorization: string;
   memorizationMinutes: number | null;
@@ -211,9 +218,9 @@ export interface ReadingSession {
   id: string;
   /** Revision day (YYYY-MM-DD, fajr-aware) the session started on. */
   date: string;
-  startedAt: number;                // ms since epoch
-  endedAt: number;                  // ms since epoch
-  durationSeconds: number;          // active time (pauses excluded)
+  startedAt: number; // ms since epoch
+  endedAt: number; // ms since epoch
+  durationSeconds: number; // active time (pauses excluded)
   mode: ReadingTimerMode;
   targetSeconds: number | null;
   /** Pages the user says they read — assigned/edited after the fact. */
@@ -224,9 +231,9 @@ export interface ReadingSession {
 
 // Static Quran reference data
 export interface QuranPage {
-  pageNumber: number;               // 1-604
-  juzNumber: number;                // 1-30
-  surahNumber: number;              // 1-114
+  pageNumber: number; // 1-604
+  juzNumber: number; // 1-30
+  surahNumber: number; // 1-114
   surahName: string;
   surahNameArabic: string;
   startingAyah: number;
@@ -239,4 +246,3 @@ export interface DailyAssignment {
   juzBreakdown: { juz: number; pages: number[] }[];
   totalPages: number;
 }
-

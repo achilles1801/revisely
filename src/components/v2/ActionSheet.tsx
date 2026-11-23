@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { radiusV2, typeV2 } from '../../theme/v2';
 import { Sheet } from './Sheet';
 import { Tap } from './Tap';
+import { t } from '../../i18n';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -40,7 +41,7 @@ export function ActionSheet({
   message,
   messageMaxScale,
   actions = [],
-  cancelLabel = 'Cancel',
+  cancelLabel = t('common.cancel'),
   children,
   testID,
 }: {

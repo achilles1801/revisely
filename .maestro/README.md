@@ -7,8 +7,10 @@ emulators, at a time and in a time zone each flow sets. CI (`ci.yml`) runs them 
 | When | Flows | Jobs |
 | --- | --- | --- |
 | A single PR into `develop` (and claude-fix's runs) | the smoke set: 02, 04, 05, 06 | two Android (02 05, 04 06) |
-| A PR into `develop` that changes code flows share (subflows, scripts, `run.sh`, `e2e.yml`, `ci.yml`) | the flows that use it with the smoke set, or all, each run twice with no reruns | both platforms: one job for three flows or fewer, else the full run's jobs with only those flows (TESTING.md, "Changing the tests themselves") |
-| A lower layer of a GitHub stack | none (the top layer tests the stack) | none |
+| A PR into `develop` that changes code flows share (subflows, scripts, flows) | the flows that use it, once with a retry (Android adds the smoke set) | both platforms: one job for five flows or fewer, else the full run's jobs with only those flows (TESTING.md, "Changing the tests themselves") |
+| A PR into `develop` that changes `run.sh`, `config.yaml`, `e2e.yml` or `ci.yml` | Android: every flow; iOS: the smoke set and the flows its other test files touch | Android: the full run's jobs; iOS: one job for the smoke set |
+| A lower layer of a GitHub stack, or a PR into `develop` whose commits another open PR into `develop` holds | none (the top tests them all; the lower PR's check is "Required (under #N)", and the top's passed run posts "Required" on it) | none |
+| By hand | every flow, or the flows asked for | iOS takes at most two macOS runners at a time |
 | The top of a stack into `develop`, a PR into `main`, a merge group | every flow | two iOS, two Android |
 | A push to `develop` (what just landed) | every flow on Android; iOS: the native build alone, kept for PRs | two Android, one iOS |
 | Every night (testing develop), by hand | every flow | two iOS, two Android |
@@ -118,14 +120,14 @@ rules it covers in its first lines; recordings have no rule there yet.
 | `01-onboarding` | Sign up, onboarding, Home's first day; a cold start; past midnight | SCHED-1, SYNC-4, DAY-1 |
 | `02-revision-session` | Leave with nothing marked; swipe; Back; the check; the end card; the tab bar is Home and Read | SESS-1, SESS-2, SESS-3, ACT-12 |
 | `03-revise-ahead` | Keep going; "Tomorrow starts at"; a day partly done ahead | AHEAD-1, -2, -3, -5, DAY-3, SESS-4 |
-| `04-fajr-boundary` | Settings → Start day at fajr; Home at 03:00 and 08:00; revise ahead and a note before Fajr (Activity's day, then its log) | DAY-1, -2, -3, -5, AHEAD-1, LOG-3 |
-| `05-daily-log` | Two notes (the first from Activity's day, +, which opens its log; the second in the log); one edited, the other deleted; each kept across a cold start | LOG-1, LOG-2, ACT-5 |
+| `04-fajr-boundary` | Settings → Revision → Start day at fajr; Home at 03:00 and 08:00; revise ahead and a note before Fajr (Activity's day, then its log) | DAY-1, -2, -3, -5, AHEAD-1, LOG-3 |
+| `05-daily-log` | Two notes from Activity's day (+); one edited and the other deleted from its menu; each kept across a cold start | LOG-1, LOG-2, ACT-5, ACT-6 |
 | `06-offline` | A session offline; a cold start offline; back online, the server has it | SYNC-1, SYNC-2, SESS-3 |
 | `07-recordings` | Record in a session, find it under Revised on Activity's day, play, delete | none yet |
 | `08-time-zone` | Kathmandu (UTC+5:45): the day turns at its midnight | DAY-1, DAY-6 |
-| `10-delete-account` | Settings → Delete account, confirmed twice: the account and its data leave the server, back at sign-in | ACCOUNT-1 |
-| `11-surah-names` | Every screen that names the Qur'an (Home, its › menu, Jump to, All activity, the schedule, the memorized pages, a session, the end card, the daily log), in light and then dark (`…-dark`). No position, so Home has no prayer line | NAME-1 |
-| `14-help` | An account that isn't a tester: Home's ? opens How Home works, with no Ask Revo (Revo is for testers here), closes; Hide help buttons, Undo, hidden again; still hidden after a cold start; Settings → Support → Help buttons brings it back. In the second job | HELP-1, HELP-2 |
+| `10-delete-account` | Settings → Account → Delete account, confirmed twice: the account and its data leave the server, back at sign-in | ACCOUNT-1 |
+| `11-surah-names` | Every screen that names the Qur'an (Home, its › menu, Jump to, All activity, the schedule, the memorized pages, a session, the end card), in light and then dark (`…-dark`). No position, so Home has no prayer line | NAME-1 |
+| `14-help` | An account that isn't a tester: Home's ? opens How Home works, with no Ask Revo (Revo is for testers here), closes; Hide help buttons, Undo, hidden again; still hidden after a cold start; Settings → Help and support → Help buttons brings it back. In the second job | HELP-1, HELP-2 |
 | `16-whats-new` | A tester: Settings → About → What's new replays the cards with a ✕; Testing → Show What's new at launch runs them after a cold start, no ✕, Android's back to the card before; a relaunch part way reopens the card it was on; after Done it doesn't come back. In the first job | NEW-2, NEW-3 |
 
 Every account is new: signed up in the flow (`subflows/signup.yaml`) with Al-Fatihah and Juz 30
@@ -149,13 +151,17 @@ Before Nov 7 2026 nothing did: Activity screens that didn't match the approved m
   (1080×2400). Every flow captures Indigo in light today. A capture in another accent or theme is
   its own screen, named with suffixes: `-crimson` or `-jade`, then `-dark` (`r4-sheet-jade-dark`;
   `VARIANTS` in `screens.mjs`).
+- **On an iPhone SE:** a run by hand can boot an iPhone SE (3rd generation) instead of the Pro, to check
+  small screens without the Mac's one simulator. Use `gh workflow run e2e.yml -f platform=ios -f device=se`
+  (add `-f flows='12-*'` for some flows). Its screenshots are kept in the screens artifact but not compared,
+  since the baselines are the Pro's size. CI and nightly runs always use the Pro. Flows see which iPhone
+  it is as `E2E_IPHONE` (`pro` or `se`), for the steps an SE needs done another way (`revo-close.yaml`).
 - **Normalised** before comparing or approving (`lib.mjs`): the status bar cropped, what still
   varies between runs masked (pink), and halved (each pixel the mean of 2×2), which keeps a
   baseline at 40–160 KB. The masks (`screens.mjs`, in the raw capture's pixels):
   - the E2E status line's clock (every screen);
   - a session's minutes in Home's "Recent sessions" (real time spent);
   - the next prayer's countdown ("in 2h 15m");
-  - the daily log's note times;
   - Revo's button on Home (Revo is being rebuilt; unmask it when Revo's baselines are approved).
 - **Compared** with pixelmatch (colour distance 0.1, anti-aliasing left out). More than 12 changed
   pixels of the halved image is a change: a changed digit of the 9 pt status line is about 15, and
@@ -305,6 +311,7 @@ The app's `Date` runs at an offset from the device's own clock (`src/lib/e2e/clo
 | `revisely://e2e/network?offline=1` (`0`) | the E2E network off: the emulators unreachable (iOS) |
 | `revisely://e2e/update-ready` | as if an update had just downloaded: "A new update is ready" opens by itself, as on a tester's phone (`src/lib/e2e/updates.ts`; flow 17) |
 | `revisely://e2e/recordings?set=activity` | the Activity mocks' recordings, written into the signed-in account's folder (`src/lib/e2e/demoRecordings.ts`; iOS takes `e2eRecordings` at launch instead: `subflows/relaunch-recordings.yaml`) |
+| `revisely://e2e/voice-search?heard=<words, URL-encoded>` (`?off=1`) | voice search on with no microphone or speech model: a search by voice shows Listening… for 4.5 s, then searches with these words (`src/lib/e2e/voiceSearch.ts`; flow 18) |
 
 - Time runs on from there, as on a phone; timers and animations use real time.
 - The offset is kept in a file in the app's Documents: a relaunch keeps the flow's time, and
@@ -366,6 +373,11 @@ A flow names its zone in a header line, `# e2e-zone: Asia/Kathmandu`; the rest r
 3. Select by `id:` (a `testID`). Add a `testID` to the app where one is missing.
 4. Work out what the user should see by hand from the plan, as the scenarios do, not with the app's
    code.
+5. A tap that opens something (a sheet, a modal, a screen) goes through `subflows/tap-to-open.yaml`
+   (`ID`, and `OPENS` as an id regex). On a loaded runner a tap can reach the app and be cancelled
+   before it's a press. This taps again only while `ID` is still there and nothing of `OPENS` has
+   come, at most twice. Each tap again saves a `lost-tap-<n>-<ID>` screenshot, which the weekly flake
+   report counts. Never use it for a switch, Next, or a button that stays on screen once it has worked.
 
 Things that bit:
 - Text with no-break spaces or hyphens (`p. 582`, `10 pages`, `Al‑Fatihah` on Home; the narrow
@@ -374,8 +386,8 @@ Things that bit:
 - An element made accessible as a group is read as one label: the end card is
   `", Revision complete, 10 pages revised today"`, and Home's ahead line is spoken
   ("Tomorrow starts at Al-Fajr, page 594"). Select by `id:` and match the label.
-- A multiline text field's `testID` doesn't reach iOS's accessibility tree: the log's field is
-  found by its label (`subflows/log-input.yaml`).
+- A multiline text field's `testID` doesn't reach iOS's accessibility tree: on iOS a field's
+  text is its value, which `text:` matches (`subflows/type.yaml`).
 - Percentages in `point:` must be whole numbers (CLAUDE.md). Maestro has no sleep: an optional
   wait for an element that never shows (`e2e-never-shown`) stands in.
 - The mushaf runs right to left: the next page comes in from the left. Swipe until a count or the
@@ -394,8 +406,8 @@ Things that bit:
   which waits for the session's header and taps again while Home's button is still on screen.
 - Android waits for the screen to settle after each command. A screen that never settles (a
   recording's timer) needs `waitToSettleTimeoutMs` on the tap, or each tap takes a minute.
-- On Android, text typed into a field as it gains focus can be lost; `subflows/type-in-log.yaml`
-  checks the field and types again. Android also writes times as "12:23 pm" and may show dialog
+- On Android, text typed into a field as it gains focus can be lost; `subflows/type.yaml`
+  waits for the field to hold it. Android also writes times as "12:23 pm" and may show dialog
   buttons in capitals: match with `(?i)`.
 - The iOS Simulator's keyboard can stall under load and drop what is typed meanwhile (run
   42403217365: "Keyboard queue task timeout detected" in `device.log`, the keyboard connection

@@ -6,10 +6,12 @@ import { layoutV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import { countdown, formatTime, TIME_LABELS } from '../../lib/prayer/times';
 import type { PrayerTimesNow } from './usePrayerTimes';
+import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 /**
- * "Asr 2:11 PM · in 1h 12m" under Home's header (Settings → Home screen → Next
- * prayer); opens the Prayer sheet on Times. One line, not a post: Home keeps
+ * "Asr 2:11 PM · in 1h 12m" under Home's header (Settings → Prayer → Next prayer
+ * on Home); opens the Prayer sheet on Times. One line, not a post: Home keeps
  * its one Today post. Nothing opaque and no hairline, so Home's glow carries
  * on behind it without an edge.
  */
@@ -25,8 +27,8 @@ export function NextPrayerLine({ times, onPress }: { times: PrayerTimesNow; onPr
       onPress={onPress}
       style={styles.row}
       accessibilityRole="button"
-      accessibilityLabel={`Next prayer: ${name} at ${time}, ${left}`}
-      accessibilityHint="Opens prayer times"
+      accessibilityLabel={t('prayer.next.label', { name, time, left })}
+      accessibilityHint={t('prayer.next.hint')}
       testID="next-prayer-line"
     >
       <Ionicons name="time-outline" size={20} color={palette.accentText} />
@@ -37,7 +39,7 @@ export function NextPrayerLine({ times, onPress }: { times: PrayerTimesNow; onPr
         <Text style={[typeV2.meta, typeV2.numeral, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={1.4}>
           {left}
         </Text>
-        <Ionicons name="chevron-forward" size={14} color={palette.secondary} />
+        <Ionicons name={forwardIcon()} size={14} color={palette.secondary} />
       </View>
     </Tap>
   );

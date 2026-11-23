@@ -9,6 +9,7 @@ import { placeOfAyah } from '../../lib/passages';
 import { getSurahDisplay } from '../../lib/quranData';
 import { WheelItem, WheelPicker } from '../v2/WheelPicker';
 import { RangeFields, type RangeWheelProps } from './RangeFields';
+import { t } from '../../i18n';
 
 /** The surahs from `lo`'s to `hi`'s, and for one of them the ayahs inside `lo`–`hi`. */
 function bounds(lo: AyahKey, hi: AyahKey, sura: number): { first: number; last: number } {
@@ -18,7 +19,7 @@ function bounds(lo: AyahKey, hi: AyahKey, sura: number): { first: number; last: 
 }
 
 /** "Al-Mulk, ayah 20". */
-export const ayahLabel = (key: AyahKey) => (ayahOf(key) === 1 ? `${placeOfAyah(key)}, ayah 1` : placeOfAyah(key));
+export const ayahLabel = (key: AyahKey) => (ayahOf(key) === 1 ? t('activity.ayahFields.ayahOne', { place: placeOfAyah(key) }) : placeOfAyah(key));
 
 function AyahWheels({ value, lo, hi, onChange, testID }: RangeWheelProps) {
   const firstSura = suraOf(lo);
@@ -28,13 +29,13 @@ function AyahWheels({ value, lo, hi, onChange, testID }: RangeWheelProps) {
     () =>
       Array.from({ length: lastSura - firstSura + 1 }, (_, i) => {
         const s = getSurahDisplay(firstSura + i);
-        return { key: String(firstSura + i), label: s?.nameDisplay ?? `Surah ${firstSura + i}`, arabic: s?.nameArabicVoweled };
+        return { key: String(firstSura + i), label: s?.nameDisplay ?? t('common.surahN', { n: firstSura + i }), arabic: s?.nameArabicVoweled };
       }),
     [firstSura, lastSura],
   );
   const { first, last } = bounds(lo, hi, sura);
   const ayahs = useMemo<WheelItem[]>(
-    () => Array.from({ length: last - first + 1 }, (_, i) => ({ key: String(first + i), label: `Ayah ${first + i}` })),
+    () => Array.from({ length: last - first + 1 }, (_, i) => ({ key: String(first + i), label: t('activity.ayahFields.ayahN', { n: first + i }) })),
     [first, last],
   );
   return (
@@ -48,10 +49,10 @@ function AyahWheels({ value, lo, hi, onChange, testID }: RangeWheelProps) {
           // The same ayah where the surah has it, inside the range.
           onChange(ayahKey(s, Math.min(b.last, Math.max(b.first, ayahOf(value)))));
         }}
-        label="Surah"
+        label={t('common.surah')}
         testID={`${testID}-surah`}
       />
-      <WheelPicker items={ayahs} index={ayahOf(value) - first} onChange={(i) => onChange(ayahKey(sura, first + i))} label="Ayah" testID={`${testID}-ayah`} />
+      <WheelPicker items={ayahs} index={ayahOf(value) - first} onChange={(i) => onChange(ayahKey(sura, first + i))} label={t('activity.ayahFields.ayah')} testID={`${testID}-ayah`} />
     </View>
   );
 }

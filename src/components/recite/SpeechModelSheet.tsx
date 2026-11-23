@@ -7,6 +7,7 @@ import { Sheet } from '../v2/Sheet';
 import { PillButton } from '../v2/PillButton';
 import { formatModelSize } from '../../lib/recite/speechModel';
 import { cancelModelDownload, startModelDownload, useSpeechModelState } from '../../lib/recite/speechModelStore';
+import { t } from '../../i18n';
 
 /**
  * Following the recitation word by word needs the speech model on the phone:
@@ -18,8 +19,8 @@ export function SpeechModelSheet({
   visible,
   onClose,
   onReady,
-  title = 'Follow word by word',
-  intro = 'Revisely can listen as you recite and show each word as you say it.',
+  title = t('recite.speechModel.title'),
+  intro = t('recite.speechModel.intro'),
 }: {
   visible: boolean;
   onClose: () => void;
@@ -62,7 +63,7 @@ export function SpeechModelSheet({
       visible={visible}
       onClose={onClose}
       title={title}
-      footer={{ label: downloading ? 'Close' : 'Not now', onPress: onClose, testID: 'speech-model-close' }}
+      footer={{ label: downloading ? t('common.close') : t('common.notNow'), onPress: onClose, testID: 'speech-model-close' }}
       testID="speech-model-sheet"
     >
       <View style={styles.body}>
@@ -70,7 +71,7 @@ export function SpeechModelSheet({
           {intro}
         </Text>
         <Text style={[typeV2.meta, styles.centred, { color: palette.secondary }]} maxFontSizeMultiplier={1.4} testID="speech-model-privacy">
-          It works on this iPhone: your voice isn’t recorded or sent anywhere.
+          {t('recite.speechModel.privacy')}
         </Text>
         {downloading ? (
           <View style={styles.progress} testID="speech-model-progress">
@@ -78,9 +79,9 @@ export function SpeechModelSheet({
               <View style={[styles.bar, { backgroundColor: palette.primary, width: `${percent}%` }]} />
             </View>
             <Text style={[typeV2.meta, typeV2.numeral, styles.centred, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-              Downloading {percent}% of {size}. You can close this; it carries on.
+              {t('recite.speechModel.downloading', { percent, size })}
             </Text>
-            <PillButton title="Cancel" variant="outline" size="lg" onPress={cancelModelDownload} testID="speech-model-cancel" />
+            <PillButton title={t('common.cancel')} variant="outline" size="lg" onPress={cancelModelDownload} testID="speech-model-cancel" />
           </View>
         ) : (
           <View style={styles.progress}>
@@ -88,11 +89,11 @@ export function SpeechModelSheet({
               {model.status === 'missing' && model.error
                 ? model.error
                 : cellular
-                  ? `A one-time download of ${size}. You’re on mobile data.`
-                  : `A one-time download of ${size}.`}
+                  ? t('recite.speechModel.oneTimeCellular', { size })
+                  : t('recite.speechModel.oneTime', { size })}
             </Text>
             <PillButton
-              title={cellular ? `Download on mobile data` : `Download ${size}`}
+              title={cellular ? t('recite.speechModel.downloadCellular') : t('recite.speechModel.download', { size })}
               size="lg"
               onPress={() => {
                 startModelDownload();

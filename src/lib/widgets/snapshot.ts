@@ -1,5 +1,6 @@
 // What the Home and Lock Screen widgets show, worked out by the app and handed to
-// the widget extension (targets/widget) through the App Group's shared defaults.
+// the widget extension (targets/widget) through the App Group's shared defaults, and
+// on Android to the home-screen widgets (modules/android-widgets), which read the same JSON.
 //
 // The widget can't run the scheduler, so the app writes a week of days ahead:
 // today with what's done, then each following revision day as it would start.
@@ -18,6 +19,7 @@ import { paletteV2, type AccentName } from '../../theme/v2';
 import type { QuranPage, RevisionLog, User, UserPage } from '../../types';
 import { widgetQibla, type City, type Coords, type WidgetQibla } from './qibla';
 import { partlyMemorizedAyahs, revisablePages } from '../memorizedAyahs';
+import { t } from '../../i18n';
 
 /** Shared by the app and the extension (app.config.js, targets/widget). */
 export { widgetAppGroup } from '../variant';
@@ -56,6 +58,9 @@ export interface WidgetColors {
   /** The primary pill (Start revision), and the text on it. */
   primary: string;
   onPrimary: string;
+  /** The accent's tint (the next prayer's cell in Android's 4×1 prayer widget), and text on it. */
+  accentSubtle: string;
+  subtleText: string;
 }
 
 export interface WidgetSnapshot {
@@ -133,7 +138,15 @@ export interface WidgetInputs {
 function colorsFor(accent: AccentName): WidgetSnapshot['colors'] {
   const pick = (isDark: boolean): WidgetColors => {
     const p = paletteV2(isDark, accent);
-    return { accentText: p.accentText, done: p.done, onDone: p.onDone, primary: p.primary, onPrimary: p.onPrimary };
+    return {
+      accentText: p.accentText,
+      done: p.done,
+      onDone: p.onDone,
+      primary: p.primary,
+      onPrimary: p.onPrimary,
+      accentSubtle: p.accentSubtle,
+      subtleText: p.subtleText,
+    };
   };
   return { light: pick(false), dark: pick(true) };
 }
@@ -142,9 +155,10 @@ function colorsFor(accent: AccentName): WidgetSnapshot['colors'] {
 export function juzLabel(juzBreakdown: { juz: number }[]): string {
   const js = [...new Set(juzBreakdown.map((j) => j.juz))].sort((a, b) => a - b);
   if (js.length === 0) return '';
-  if (js.length === 1) return `Juz ${js[0]}`;
-  if (js.every((j, i) => i === 0 || j === js[i - 1] + 1)) return `Juz ${js[0]}–${js[js.length - 1]}`;
-  return js.length <= 3 ? `Juz ${js.join(', ')}` : `${js.length} juz`;
+  if (js.length === 1) return t('common.juzN', { n: js[0] });
+  if (js.every((j, i) => i === 0 || j === js[i - 1] + 1))
+    return t('common.juzRange', { from: js[0], to: js[js.length - 1] });
+  return js.length <= 3 ? t('common.juzList', { list: js.join(', ') }) : t('common.juzCount', { count: js.length });
 }
 
 /** The Lock Screen's rectangular widget fits about this many characters on its line. */
@@ -158,13 +172,6 @@ function shortLabel(pages: number[], title: string, partial: PartialPages): stri
 function localDay(s: string): Date {
   const [y, m, d] = s.split('-').map(Number);
   return new Date(y, m - 1, d);
-}
-
-function previousDay(s: string): string {
-  const d = localDay(s);
-  d.setDate(d.getDate() - 1);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 export { aliveStreak };
@@ -189,7 +196,11 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
 
   // A day with a session, or whose pages were all revised ahead, is a day done.
   const logOf = new Map(input.logs.map((l) => [l.date, l]));
-  const done = completedDays(creditIndex(input.logs), (d) => logOf.get(d)?.assignedPages ?? planDuePages(user, d, memorized), catchUpIndex(input.logs));
+  const done = completedDays(
+    creditIndex(input.logs),
+    (d) => logOf.get(d)?.assignedPages ?? planDuePages(user, d, memorized),
+    catchUpIndex(input.logs),
+  );
   const days: WidgetDay[] = [];
   let startsAt = input.now;
   for (let i = 0; i < WIDGET_DAYS_AHEAD; i++) {
@@ -197,7 +208,12 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
     const endsAt = getNextRevisionDayStart(user, startsAt);
     const assignment = generateDailyAssignment(input.pages, input.quranData, user, localDay(day));
     // The day's pages in the order it reads them, by surah (CLAUDE.md: surahs and juz first).
-    const title = describePagesToRevise(assignment.pages, partial, { form: 'short', order: 'given', wholeJuz: false, max: 2 });
+    const title = describePagesToRevise(assignment.pages, partial, {
+      form: 'short',
+      order: 'given',
+      wholeJuz: false,
+      max: 2,
+    });
 
     // As Home: done once every page of the day is revised, today or ahead.
     const credited = creditedOnDay(input.logs, day);
@@ -219,7 +235,9 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
       total,
       done: completed ? total : doneHere,
       completed,
-      streak: input.history ? streakReadingFromItems({ user, pages: input.pages, items: input.history, today: day }).streak : aliveStreak(done, day),
+      streak: input.history
+        ? streakReadingFromItems({ user, pages: input.pages, items: input.history, today: day }).streak
+        : aliveStreak(done, day),
     });
     // Never stall: a boundary that isn't later (an odd clock) moves on a day.
     startsAt = endsAt.getTime() > startsAt.getTime() ? endsAt : new Date(startsAt.getTime() + 86_400_000);

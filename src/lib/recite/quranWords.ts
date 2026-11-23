@@ -1,8 +1,12 @@
 // Every word of the Qur'an: its text and where it sits on the mushaf pages.
 //
-// src/data/quranWords.dat (JSON) is built by scripts/build-quran-words.py from
-// quran.com's word text and the glyph bounds of the page images (the same source
-// as ayahBounds.json). It is an asset rather than part of the JavaScript bundle,
+// src/data/quranWords.dat (JSON) was built by scripts/build-quran-words.py
+// (feature/mistake-detection) from quran.com's word text and the glyph bounds of
+// the page images (the same source as ayahBounds.json). Its word boxes (x0, x1) are
+// fitted to the page images the app shows by scripts/check-word-boxes.py, to a
+// tenth of a unit: the glyph data's sat 2 to 12 units off the words' ink, and a
+// hidden page's covers cut the end of a word recited (Majd, Nov 21 2026). Run it
+// again after rebuilding the file. It is an asset rather than part of the JavaScript bundle,
 // so an update that doesn't change it doesn't download its 3 MB again; it is read
 // once, the first time recitation checking needs it.
 //
@@ -21,7 +25,7 @@ export interface QuranWordsData {
   uthmani: string[];
   /** Each verse's words in standard spelling, no diacritics. */
   imlaei: string[];
-  /** page, line, x0, x1 of every word (1024-wide page space). */
+  /** page, line, x0, x1 of every word (1024-wide page space; x to a tenth, fitted to the images). */
   boxes: number[];
   /** Per page: line, y0, y1, ... */
   lines: Record<string, number[]>;
@@ -45,8 +49,8 @@ export class QuranWords {
   private readonly position: Uint16Array;
   private readonly page: Uint16Array;
   private readonly line: Uint8Array;
-  private readonly x0: Uint16Array;
-  private readonly x1: Uint16Array;
+  private readonly x0: Float32Array;
+  private readonly x1: Float32Array;
   /** First word of each verse, by verse number in mushaf order (0-based). */
   private readonly verseStart: Int32Array;
   /** verseIndexOf[sura] = index of its first verse. */
@@ -72,8 +76,8 @@ export class QuranWords {
     this.position = new Uint16Array(total);
     this.page = new Uint16Array(total);
     this.line = new Uint8Array(total);
-    this.x0 = new Uint16Array(total);
-    this.x1 = new Uint16Array(total);
+    this.x0 = new Float32Array(total);
+    this.x1 = new Float32Array(total);
     this.verseStart = new Int32Array(data.counts.length + 1);
     this.suraVerse = new Int32Array(116);
     this.pageStart = new Int32Array(606).fill(-1);
