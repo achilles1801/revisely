@@ -22,7 +22,7 @@
  *            norms.bin=/pack/norms.bin,stops.bin=/pack/stops.bin,lexicon.bin=/pack/lexicon.bin,\
  *            letters.bin=/pack/letters.bin,mel.bin=/pack/mel.bin,config.json=/pack/config.json,\
  *            manifest.json=/pack/manifest.json \
- *     --strict v5.onnx=/models/v5m-server-int8.onnx,strict.bin=/pack-strict/strict.bin \
+ *     --strict v5.onnx=/models/v5m-server-int8.onnx,v5.check=/pack/v5.check,strict.bin=/pack-strict/strict.bin \
  *     --apps 1:433792838929:ios:…,1:433792838929:android:… \
  *     --claim onDeviceBench
  *
@@ -45,7 +45,7 @@ const { PACK_ID, RCPK_FORMAT, KEY_BYTES, contentPackId, open, packContainer, sea
 /** The names recite-core's rc_open takes (recite_core.h). */
 const CORE_NEEDS = ['v7.graph.onnx', 'v7.weights.f16', 'v7.weights.json', 'v7.check', 'words.rcwt', 'ayahs.bin', 'norms.bin',
   'stops.bin', 'lexicon.bin', 'letters.bin', 'mel.bin', 'config.json', 'manifest.json'];
-const STRICT_NEEDS = ['v5.onnx', 'strict.bin'];
+const STRICT_NEEDS = ['v5.onnx', 'v5.check', 'strict.bin'];
 const BLOB_NAMES = new Set([...CORE_NEEDS, ...STRICT_NEEDS]);
 /** The lab's tables. A pack folder is never remade in place: a new one sits beside the others under its own name. */
 const TABLES_FOLDER = 'golden/pack-v3';
