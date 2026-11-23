@@ -579,7 +579,7 @@ service cloud.firestore {
     function isValidReciteTake(d) {
       return d.keys().hasOnly(['v', 'kind', 'take', 'createdAt', 'rev', 'day', 'level', 'hidden', 'from', 'to',
                                'secs', 'mistakes', 'tajweed', 'unclear', 'accuracy', 'marks', 'passed',
-                               'recordingId', 'deleted', 'updatedAt']) &&
+                               'recordingId', 'deleted', 'updatedAt', 'unfinished', 'links', 'peeked', 'removed', 'ranOn', 'ranWhy']) &&
              d.keys().hasAll(['take', 'level', 'hidden', 'from', 'to', 'secs', 'mistakes', 'tajweed', 'unclear',
                               'accuracy', 'marks', 'passed', 'recordingId']) &&
              (d.take == null || (d.take is string && d.take.size() <= 100)) &&
@@ -593,7 +593,19 @@ service cloud.firestore {
              d.accuracy is number && d.accuracy >= 0 && d.accuracy <= 1 &&
              d.marks is list && d.marks.size() <= 400 &&
              d.passed is list && d.passed.size() <= 400 &&
-             (d.recordingId == null || (d.recordingId is string && d.recordingId.size() <= 100));
+             (d.recordingId == null || (d.recordingId is string && d.recordingId.size() <= 100)) &&
+             // A take kept without its final answer (long takes, Nov 20 2026): written only as true.
+             d.get('unfinished', true) == true &&
+             // Where it was checked and why (ONDEV-4, Revisely Dev): the app's closed list (lib/reciteLive/where).
+             d.get('ranOn', 'phone') in ['phone', 'server'] &&
+             d.get('ranWhy', 'config') in ['forced', 'pin', 'config', 'no-pack', 'self-check', 'lacks', 'slow', 'no-speed',
+                                           'refused', 'replay'] &&
+             // A recitation longer than the checker's cap: its takes, each one's id and first word (RECITE-22).
+             (!('links' in d) || (d.links is list && d.links.size() >= 2 && d.links.size() <= 20)) &&
+             // The words shown by hand during the take, for its summary later (RMEM-8): their numbers.
+             (!('peeked' in d) || (d.peeked is list && d.peeked.size() >= 1 && d.peeked.size() <= 300)) &&
+             // The marks called Not a mistake, listed apart so the summary can put them back later (RMEM-8).
+             (!('removed' in d) || (d.removed is list && d.removed.size() >= 1 && d.removed.size() <= 100));
     }
 
     function isValidReciteClear(d) {
@@ -769,6 +781,25 @@ service cloud.firestore {
     }
 
     // ========================================================================
+    // ON-DEVICE BENCH (Revisely Dev, BEHAVIOUR.md ONDEV-1)
+    // ========================================================================
+    // Settings → Testing → On-device model sends one record per finished bench: the phone (model, chip, cores,
+    // memory), the build, and each run's timings and check. No uid, no account data, no audio. Create only;
+    // the team reads it with the admin SDK.
+    match /onDeviceBench/{benchId} {
+      allow create: if isAuthenticated() &&
+                       incomingData().keys().hasOnly(['createdAt', 'platform', 'device', 'app', 'windows', 'runs']) &&
+                       incomingData().keys().hasAll(['createdAt', 'platform', 'device', 'app', 'windows', 'runs']) &&
+                       incomingData().createdAt == request.time &&
+                       incomingData().platform in ['ios', 'android'] &&
+                       incomingData().device is map && incomingData().device.size() <= 20 &&
+                       incomingData().app is map && incomingData().app.size() <= 10 &&
+                       incomingData().windows is int && incomingData().windows > 0 && incomingData().windows <= 20000 &&
+                       incomingData().runs is list && incomingData().runs.size() >= 1 && incomingData().runs.size() <= 40;
+      allow read, update, delete: if false;
+    }
+
+    // ========================================================================
     // APP CONFIG
     // ========================================================================
     // config/app: the oldest supported version on each platform and the
@@ -840,6 +871,20 @@ service cloud.firestore {
     // Written by the function only; no client reads or writes it, its own
     // account included.
     match /adminResets/{userId} {
+      allow read, write: if false;
+    }
+
+    // Recite's pack for the phone (functions recitePack, Revisely Dev): which pack to give, its key, and each account's
+    // daily limits. Functions and the admin SDK only: a client could otherwise read the key or lift its own limit.
+    match /recitePacks/{packDoc} {
+      allow read, write: if false;
+    }
+
+    match /recitePackKeys/{packId} {
+      allow read, write: if false;
+    }
+
+    match /recitePackLimits/{userId} {
       allow read, write: if false;
     }
 

@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isDevVariant } from '../variant';
+import { strictReleased } from '../release/mistakeDetection';
 
 /**
  * The recitation check's settings, kept on this phone per account (Dev app, testers; not synced: a synced field
@@ -32,7 +34,17 @@ export interface ReciteCheckSettings {
   level: 'words' | 'strict';
   /** Reciting (Recite, Check) also saves the recitation as the session's recording; off in Settings. */
   saveRecording: boolean;
+  /** Words missed in past takes stay lightly marked on the page until said right (lib/reciteMemory); off in Settings. */
+  showPast: boolean;
+  /** A short sound and a tap as a take marks a mistake (lib/reciteLive/mistakeCue; Majd, Nov 20 2026); off in Settings. */
+  mistakeSound: boolean;
 }
+
+/**
+ * Whether Strict checks this madd at this length (RECITE-2; the per-rule measurements, Nov 23 2026): munfasil at 4 or
+ * 5 counts, and muttasil not yet. Settings says so on the rows it doesn't check.
+ */
+export const maddChecked = (rule: 'munfasil' | 'muttasil', counts: number): boolean => rule === 'munfasil' && counts !== 2;
 
 export const RECITE_CHECK_DEFAULTS: ReciteCheckSettings = {
   munfasil: 4,
@@ -45,7 +57,19 @@ export const RECITE_CHECK_DEFAULTS: ReciteCheckSettings = {
   markMistakes: false,
   level: 'words',
   saveRecording: true,
+  showPast: true,
+  mistakeSound: true,
 };
+
+/** Whether Strict is offered: Revisely Dev's, until its own switch is on (lib/release/mistakeDetection). */
+export const strictOffered = (): boolean => isDevVariant() || strictReleased();
+
+/**
+ * The level a take checks: Strict only where it is offered, so a Strict kept on a phone (Revisely Dev's settings, or
+ * one from before) checks Words & harakat everywhere else.
+ */
+export const checkLevel = (s: Pick<ReciteCheckSettings, 'level'>): 'words' | 'strict' =>
+  s.level === 'strict' && strictOffered() ? 'strict' : 'words';
 
 const KEY = (uid: string) => `@revisely_recite_check:v1:${uid}`;
 
@@ -75,6 +99,8 @@ export function parseReciteCheckSettings(raw: string | null): ReciteCheckSetting
     markMistakes: typeof s.markMistakes === 'boolean' ? s.markMistakes : s.mode === 'check' ? true : d.markMistakes,
     level: pick(s.level, ['words', 'strict'] as const, d.level),
     saveRecording: typeof s.saveRecording === 'boolean' ? s.saveRecording : d.saveRecording,
+    showPast: typeof s.showPast === 'boolean' ? s.showPast : d.showPast,
+    mistakeSound: typeof s.mistakeSound === 'boolean' ? s.mistakeSound : d.mistakeSound,
   };
 }
 
@@ -124,6 +150,11 @@ export function useReciteCheckSettings(uid: string | null | undefined): ReciteCh
     },
     () => current,
   );
+}
+
+/** Whether `uid`'s saved settings have been read (or failed to read): until then they are the defaults. */
+export function reciteCheckSettingsLoaded(uid: string | null | undefined): boolean {
+  return !!uid && owner === uid && pending === null;
 }
 
 /** Tests only. */

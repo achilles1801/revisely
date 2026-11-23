@@ -1,9 +1,24 @@
 import { dayTimes } from '../../prayer/times';
 import { DEFAULT_PRAYER_PREFS } from '../../prayer/prefs';
-import { morningTime, planRevisionReminders, REVISION_REMINDER_PREFIX, type PlanReminderInput } from '../plan';
+import {
+  LATER_DAYS,
+  morningTime,
+  planRevisionReminders,
+  REVISION_REMINDER_PREFIX,
+  type PlanReminderInput,
+} from '../plan';
 import { assignedOn, logFor, PLACE, pages, quranData, user as makeUser } from '../__fixtures__/reminderFixtures';
+import { getSurah, getSurahsForPage } from '../../quranData';
 
-const settings = { method: 'NorthAmerica', highLatitude: 'recommended' as const, madhab: 'standard' as const, adjustments: DEFAULT_PRAYER_PREFS.adjustments };
+/** No-break hyphens and spaces as plain ones. */
+const plain = (s: string) => s.replace(/\u2011/g, '-').replace(/[\u00a0\u202f]/g, ' ');
+
+const settings = {
+  method: 'NorthAmerica',
+  highLatitude: 'recommended' as const,
+  madhab: 'standard' as const,
+  adjustments: DEFAULT_PRAYER_PREFS.adjustments,
+};
 // Wednesday 28 October 2026, the demo day in the mocks.
 const day = new Date(2026, 9, 28);
 const at = (h: number, m = 0, d = day) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m);
@@ -17,19 +32,80 @@ function plan(overrides: Partial<PlanReminderInput> & { now: Date }) {
     quranData,
     place: null,
     settings,
+    laterDays: LATER_DAYS,
     ...overrides,
   });
 }
 const todayOf = (list: ReturnType<typeof plan>) => list.filter((r) => r.day === '2026-10-28');
-const times = (list: ReturnType<typeof plan>) => list.map((r) => `${r.kind}@${r.at.getDate()}:${r.at.getHours()}:${String(r.at.getMinutes()).padStart(2, '0')}`);
+const tomorrowOf = (list: ReturnType<typeof plan>) => list.filter((r) => r.day === '2026-10-29');
+/** The days after tomorrow (REMIND-2). */
+const laterOf = (list: ReturnType<typeof plan>) => list.filter((r) => r.day > '2026-10-29');
+const times = (list: ReturnType<typeof plan>) =>
+  list.map((r) => `${r.kind}@${r.at.getDate()}:${r.at.getHours()}:${String(r.at.getMinutes()).padStart(2, '0')}`);
 
 describe('planRevisionReminders', () => {
   it('plans morning, midday (3 PM without a place) and an hour before midnight, then the same for tomorrow', () => {
     const list = plan({ now: at(7) });
     expect(times(todayOf(list))).toEqual(['morning@28:8:00', 'midday@28:15:00', 'evening@28:23:00']);
-    expect(list).toHaveLength(6);
+    expect(times(tomorrowOf(list))).toEqual(['morning@29:8:00', 'midday@29:15:00', 'evening@29:23:00']);
+    expect(list).toHaveLength(6 + LATER_DAYS);
     expect(list.every((r) => r.id.startsWith(REVISION_REMINDER_PREFIX))).toBe(true);
-    expect(new Set(list.map((r) => r.id)).size).toBe(6);
+    expect(new Set(list.map((r) => r.id)).size).toBe(6 + LATER_DAYS);
+  });
+
+  it('the days after tomorrow get one each, in the morning, for a week counting today, then none (REMIND-2)', () => {
+    const list = plan({ now: at(7) });
+    expect(LATER_DAYS).toBe(6);
+    expect(times(laterOf(list))).toEqual([
+      'away@30:8:00',
+      'away@31:8:00',
+      'away@1:8:00',
+      'away@2:8:00',
+      'away@3:8:00',
+      'away@4:8:00',
+    ]);
+    expect(laterOf(list).map((r) => r.id)).toContain(`${REVISION_REMINDER_PREFIX}2026-11-02-away`);
+    // Never more than one on a day after tomorrow.
+    expect(new Set(laterOf(list).map((r) => r.day)).size).toBe(LATER_DAYS);
+    expect(laterOf(list).map((r) => r.day)).toEqual([
+      '2026-10-30',
+      '2026-10-31',
+      '2026-11-01',
+      '2026-11-02',
+      '2026-11-03',
+      '2026-11-04',
+    ]);
+    for (const r of laterOf(list)) {
+      expect(r.interruption).toBe('active');
+      expect(r.title).not.toMatch(/\d+ (pages?|days)/);
+    }
+    // Each names where that day's own pages start.
+    for (const r of laterOf(list)) {
+      const [y, m, d] = r.day.split('-').map(Number);
+      const first = assignedOn(makeUser(), new Date(y, m - 1, d))[0];
+      const surah = getSurah(getSurahsForPage(first)[0].number)!.name;
+      expect(plain(`${r.title} ${r.body}`)).toContain(plain(surah));
+    }
+  });
+
+  it('without later days (the store app until the release): today and tomorrow only', () => {
+    const list = plan({ now: at(7), laterDays: 0 });
+    expect(list).toHaveLength(6);
+    expect(laterOf(list)).toEqual([]);
+    expect(plan({ now: at(7), laterDays: undefined })).toHaveLength(6);
+  });
+
+  it('the wording of the days after tomorrow differs from one day to the next', () => {
+    const words = laterOf(plan({ now: at(7), name: 'Amina' })).map((r) => `${r.title} | ${r.body}`);
+    for (let i = 1; i < words.length; i++) expect(words[i]).not.toBe(words[i - 1]);
+    // All four wordings come up in a week.
+    expect(new Set(words.map((w) => w.replace(/:.*|,.*/, ''))).size).toBeGreaterThanOrEqual(3);
+  });
+
+  it('done for today, the days after tomorrow are still planned', () => {
+    const u = makeUser();
+    const logs = [logFor('2026-10-28', assignedOn(u, day))];
+    expect(laterOf(plan({ now: at(12, 50), user: u, logs }))).toHaveLength(LATER_DAYS);
   });
 
   it('morning is 8:00 AM when the account has no time (Settings no longer offers one)', () => {
@@ -105,7 +181,11 @@ describe('planRevisionReminders', () => {
 
   it('the copy for a juz plan names the juz, never a page', () => {
     const list = plan({ now: at(7), user: makeUser({ scheduleMode: 'juz' }) });
-    expect(todayOf(list).map((r) => r.body).join(' ')).toMatch(/Juz \d+/);
+    expect(
+      todayOf(list)
+        .map((r) => r.body)
+        .join(' '),
+    ).toMatch(/Juz \d+/);
   });
 
   it('plans nothing when no pages are assigned', () => {

@@ -12,11 +12,11 @@ jest.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Light: 'l', Medium: 'm', Heavy: 'h' },
 }));
 
-function renderPost(state: 'prompt' | 'done' = 'prompt') {
+function renderPost(state: 'prompt' | 'done' = 'prompt', eve = false) {
   const props = { onRead: jest.fn(), onMarkRead: jest.fn(), onDismiss: jest.fn() };
   render(
     <ThemeProvider>
-      <KahfPost state={state} {...props} />
+      <KahfPost state={state} eve={eve} {...props} />
     </ThemeProvider>,
   );
   return props;
@@ -35,6 +35,12 @@ describe('<KahfPost />', () => {
     renderPost();
     expect(await screen.findByText("It's Friday. Read Surah Al-Kahf.")).toBeTruthy();
     expect(screen.getByText('The whole surah, pages 293–304.')).toBeTruthy();
+  });
+
+  it('[KAHF-1] on Thursday evening, says Friday began at maghrib', async () => {
+    renderPost('prompt', true);
+    expect(await screen.findByText('Friday began at maghrib. Read Surah Al-Kahf.')).toBeTruthy();
+    expect(screen.queryByText("It's Friday. Read Surah Al-Kahf.")).toBeNull();
   });
 
   it('Read opens the surah; Not today, in its menu, dismisses', async () => {
@@ -68,7 +74,7 @@ describe('<KahfPost />', () => {
 
   it('once read: Open, with no prompt actions and no menu', async () => {
     const props = renderPost('done');
-    expect(await screen.findByText('Read today.')).toBeTruthy();
+    expect(await screen.findByText('Done for this Friday.')).toBeTruthy();
     expect(screen.queryByLabelText('Mark Surah Al-Kahf as read')).toBeNull();
     expect(screen.queryByLabelText('Al-Kahf options')).toBeNull();
     fireEvent.press(screen.getByLabelText('Open Surah Al-Kahf'));

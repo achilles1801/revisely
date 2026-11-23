@@ -3,9 +3,9 @@
 // on the phone. 7 days, 30 days (the default), 3 months and All time (since the account's first day:
 // Coverage in cycles, a weeks grid from the start).
 
-const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
-const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
-const shiftDay = (day: string, n: number) => new Date((dayNumber(day) + n) * 86_400_000).toISOString().slice(0, 10);
+import { formatDate, t, weekdayName } from '../i18n';
+import { dayNumber, daysBetween, shiftDay } from './dayKeys';
+
 
 export type InsightsRange = 7 | 30 | 90 | 'all';
 export const INSIGHTS_RANGES: InsightsRange[] = [7, 30, 90, 'all'];
@@ -20,22 +20,22 @@ export function parseRange(value: string | null | undefined): InsightsRange {
 
 /** The chip's and the menu's words: "7 days", "30 days", "3 months", "All time". */
 export function rangeLabel(range: InsightsRange): string {
-  return range === 'all' ? 'All time' : range === 90 ? '3 months' : `${range} days`;
+  return range === 'all' ? t('lib.insights.allTime') : range === 90 ? t('lib.insights.threeMonths') : t('lib.insights.days', { count: range });
 }
 
 /** "7 days", "30 days", "3 months" (a range of days, in a sentence). */
 export function rangeWords(range: Exclude<InsightsRange, 'all'>): string {
-  return range === 90 ? '3 months' : `${range} days`;
+  return range === 90 ? t('lib.insights.threeMonths') : t('lib.insights.days', { count: range });
 }
 
 /** Pace's comparison: "the week before", "the month before", "the 3 months before". */
 export function beforeWords(range: Exclude<InsightsRange, 'all'>): string {
-  return range === 7 ? 'the week before' : range === 30 ? 'the month before' : 'the 3 months before';
+  return range === 7 ? t('lib.insights.weekBefore') : range === 30 ? t('lib.insights.monthBefore') : t('lib.insights.threeMonthsBefore');
 }
 
 /** "9 September" (a day, as "since …" says it). */
 export function dayAndMonth(day: string): string {
-  return new Date(`${day}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+  return formatDate(new Date(`${day}T00:00:00Z`), { day: 'numeric', month: 'long', timeZone: 'UTC' }, 'en-GB');
 }
 
 /** A range as each section reads it: how many days, and the words for them. */
@@ -56,9 +56,16 @@ export interface RangeSpan {
 export function rangeSpan(range: InsightsRange, today: string, firstDay?: string | null): RangeSpan {
   if (range !== 'all') {
     const w = rangeWords(range);
-    return { window: range, inWords: `in ${w}`, lastWords: `last ${w}`, inTheLast: `in the last ${w}`, before: beforeWords(range), all: false };
+    return {
+      window: range,
+      inWords: t('lib.insights.inSpan', { span: w }),
+      lastWords: t('lib.insights.lastSpan', { span: w }),
+      inTheLast: t('lib.insights.inTheLast', { span: w }),
+      before: beforeWords(range),
+      all: false,
+    };
   }
-  const since = firstDay ? `since ${dayAndMonth(firstDay)}` : 'since you started';
+  const since = firstDay ? t('lib.insights.since', { day: dayAndMonth(firstDay) }) : t('lib.insights.sinceStart');
   const window = firstDay ? Math.max(1, daysBetween(firstDay, today) + 1) : 3650;
   return { window, inWords: since, lastWords: since, inTheLast: since, before: null, all: true };
 }
@@ -148,7 +155,8 @@ export function weeksGrid(active: Set<string>, today: string, weeks: number, fir
   return cols;
 }
 
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+/** A weekday's name by its number (0 Sunday): 1 November 2026 was a Sunday. */
+const weekday = (d: number) => weekdayName(new Date(Date.UTC(2026, 10, 1 + d, 12)), 'long', 'UTC');
 
 /**
  * A pattern in the missed days of the range, if there is a plain one: "Every missed day was a Saturday",
@@ -170,13 +178,13 @@ export function missedPattern(active: Set<string>, today: string, range: number,
   if (missed < 3) return null;
   const order = byDay.map((n, d) => ({ n, d })).sort((a, b) => b.n - a.n || a.d - b.d);
   const [top, second] = order;
-  if (top.n === missed) return `Every missed day was a ${WEEKDAYS[top.d]}`;
+  if (top.n === missed) return t('lib.insights.everyMissed', { day: weekday(top.d) });
   const sideBySide = (a: number, b: number) => (a - b + 7) % 7 === 1 || (b - a + 7) % 7 === 1;
   if (top.n + second.n === missed && sideBySide(top.d, second.d)) {
     const [a, b] = [top.d, second.d].sort((x, y) => ((x - y + 7) % 7 === 1 ? 1 : -1));
-    return `Every missed day was a ${WEEKDAYS[a]} or a ${WEEKDAYS[b]}`;
+    return t('lib.insights.everyMissedTwo', { a: weekday(a), b: weekday(b) });
   }
-  if (top.n >= 3 && top.n * 2 >= missed) return `Most missed days were ${WEEKDAYS[top.d]}s (${top.n} of ${missed})`;
+  if (top.n >= 3 && top.n * 2 >= missed) return t('lib.insights.mostMissed', { day: weekday(top.d), count: top.n, missed });
   return null;
 }
 

@@ -36,6 +36,7 @@ import {
 import { describePageRange, describePassage, spokenText } from '../../lib/passages';
 import { useApp } from '../../context/AppContext';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
+import { t } from '../../i18n';
 
 export type BuilderMode = 'balanced' | 'juz' | 'weakest';
 
@@ -186,26 +187,26 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
   };
 
   const modeOptions = [
-    { value: 'balanced' as BuilderMode, label: 'Balanced' },
-    { value: 'juz' as BuilderMode, label: 'By Juz' },
-    ...(smartTrackingEnabled ? [{ value: 'weakest' as BuilderMode, label: 'Weakest' }] : []),
+    { value: 'balanced' as BuilderMode, label: t('plan.builder.balanced') },
+    { value: 'juz' as BuilderMode, label: t('plan.builder.byJuz') },
+    ...(smartTrackingEnabled ? [{ value: 'weakest' as BuilderMode, label: t('plan.builder.weakest') }] : []),
   ];
 
   const modeFooter =
     mode === 'balanced'
-      ? 'Your memorized pages in order, split into even days that never go over your daily amount. Choose where today starts — it continues from there and wraps around.'
+      ? t('plan.builder.balancedFooter')
       : mode === 'juz'
-        ? 'Each day covers whole ajzaʼ you have memorized. Choose which juz is today.'
-        : 'Your shakiest and most overdue pages come first, based on your ratings and missed revisions.';
+        ? t('plan.builder.juzFooter')
+        : t('plan.builder.weakestFooter');
 
   const perDayLabel =
     stats.minPerDay === stats.maxPerDay
       ? pageCountLabel(stats.maxPerDay)
-      : `${stats.minPerDay}–${stats.maxPerDay} pages`;
+      : t('plan.builder.pagesRange', { min: stats.minPerDay, max: stats.maxPerDay });
   const previewFooter =
     stats.dayCount === 0
       ? undefined
-      : `${stats.dayCount}-day cycle · ${perDayLabel} a day. It starts today and repeats every ${stats.dayCount === 1 ? 'day' : `${stats.dayCount} days`}.`;
+      : t('plan.builder.cycle', { count: stats.dayCount, perDay: perDayLabel });
 
   const start = describeStartPage(resolvedStart);
 
@@ -218,7 +219,7 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
       subtitle:
         g.pages.length === g.totalPages
           ? pageCountLabel(g.pages.length)
-          : `${g.pages.length} of ${g.totalPages} pages memorized`,
+          : t('plan.builder.ofPagesMemorized', { have: g.pages.length, total: g.totalPages }),
       trailing: g.nameArabic,
       search: `${g.number}`,
       checked: startKey === `surah:${g.number}`,
@@ -226,7 +227,7 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
     const juzItems: PickerItem[] = juzGroups.map((g) => ({
       key: `juz:${g.juz}`,
       index: String(g.juz),
-      title: `Juz ${g.juz}`,
+      title: t('common.juzN', { n: g.juz }),
       subtitle: `${describePassage(g.pages, { form: 'short', wholeJuz: false, max: 2 })} · ${pageCountLabel(g.pages.length)}`,
       trailing: g.name,
       search: `${g.juz}`,
@@ -235,14 +236,14 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
     const pageItems: PickerItem[] = memorizedNumbers.map((p) => ({
       key: `page:${p}`,
       // Chosen by page (the Page tab): the number leads, the surah and juz follow.
-      title: `Page ${p}`,
+      title: t('common.pageN', { n: p }),
       subtitle: describePageRange(p, p, { juz: true }),
       checked: startKey === `page:${p}`,
     }));
     return [
-      { key: 'surah', label: 'Surah', items: surahItems },
-      { key: 'juz', label: 'Juz', items: juzItems },
-      { key: 'page', label: 'Page', items: pageItems },
+      { key: 'surah', label: t('common.surah'), items: surahItems },
+      { key: 'juz', label: t('common.juz'), items: juzItems },
+      { key: 'page', label: t('common.page'), items: pageItems },
     ];
   }, [surahGroups, juzGroups, memorizedNumbers, startKey]);
 
@@ -265,10 +266,10 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
     <>
       <PlanSheet
         ref={sheetRef}
-        title="New plan"
-        leftLabel="Cancel"
+        title={t('plan.builder.title')}
+        leftLabel={t('common.cancel')}
         onLeft={() => sheetRef.current?.dismiss()}
-        rightLabel="Apply"
+        rightLabel={t('common.apply')}
         onRight={apply}
         rightDisabled={preview.length === 0}
         snapPoints={['90%']}
@@ -286,45 +287,45 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
           <GroupedSection footer={modeFooter}>
             {mode === 'juz' ? (
               <GroupedRow
-                title="Juz per day"
+                title={t('plan.builder.juzPerDay')}
                 trailing={
                   <InlineStepper
                     value={juzPerDay}
                     min={1}
                     max={maxJuz}
                     onChange={setJuzPerDay}
-                    label="juz per day"
+                    label={t('plan.builder.juzPerDayLower')}
                   />
                 }
               />
             ) : (
               <GroupedRow
-                title="Pages per day"
+                title={t('plan.builder.pagesPerDay')}
                 trailing={
                   <InlineStepper
                     value={pagesPerDay}
                     min={1}
                     max={maxPages}
                     onChange={setPagesPerDay}
-                    label="pages per day"
+                    label={t('plan.builder.pagesPerDayLower')}
                   />
                 }
               />
             )}
             {showStart ? (
               <GroupedRow
-                title="Today starts at"
+                title={t('plan.builder.todayStartsAt')}
                 subtitle={start.subtitle || undefined}
                 value={start.title}
                 accessory="chevron"
                 onPress={openStartPicker}
-                accessibilityLabel={spokenText(`Today starts at ${start.title}, ${start.subtitle}`)}
+                accessibilityLabel={spokenText(t('plan.builder.todayStartsAtLabel', { title: start.title, subtitle: start.subtitle }))}
               />
             ) : null}
             {showOrder ? (
               <GroupedRow
-                title="Reverse order"
-                subtitle={direction === 'reverse' ? 'An-Nas back to Al-Fatiha' : 'Al-Fatiha to An-Nas'}
+                title={t('plan.builder.reverse')}
+                subtitle={direction === 'reverse' ? t('plan.builder.reverseOn') : t('plan.builder.reverseOff')}
                 trailing={
                   <Toggle
                     value={direction === 'reverse'}
@@ -332,7 +333,7 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
                       haptics.selection();
                       setDirection(v ? 'reverse' : 'forward');
                     }}
-                    accessibilityLabel="Reverse order"
+                    accessibilityLabel={t('plan.builder.reverse')}
                     testID="builder-reverse"
                   />
                 }
@@ -342,11 +343,11 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
 
           {preview.length > 0 ? (
             <GroupedSection
-              header="Preview"
+              header={t('plan.builder.preview')}
               divider={false}
               footer={
                 stats.dayCount > longCycleDays
-                  ? `${previewFooter} Gaps longer than about two weeks usually need more reinforcement — consider more pages per day.`
+                  ? t('plan.builder.longGap', { footer: previewFooter ?? '' })
                   : previewFooter
               }
               footerTone={stats.dayCount > longCycleDays ? 'warning' : 'default'}
@@ -357,14 +358,14 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
               ))}
               {preview.length > PREVIEW_DAYS ? (
                 <GroupedRow
-                  title={`${preview.length - PREVIEW_DAYS} more day${preview.length - PREVIEW_DAYS === 1 ? '' : 's'}`}
+                  title={t('plan.builder.moreDays', { count: preview.length - PREVIEW_DAYS })}
                   tone="muted"
                   style={styles.moreV2}
                 />
               ) : null}
             </GroupedSection>
           ) : (
-            <GroupedSection divider={false} footer="Mark pages as memorized first — there's nothing to schedule yet.">
+            <GroupedSection divider={false} footer={t('plan.builder.nothingYet')}>
               {null}
             </GroupedSection>
           )}
@@ -373,15 +374,15 @@ export const PlanBuilderSheet = forwardRef<PlanBuilderHandle, Props>(function Pl
 
       <ListPickerSheet
         ref={startSheetRef}
-        title="Today starts at"
+        title={t('plan.builder.todayStartsAt')}
         tabs={startTabs}
         activeTab={startTab}
         onTabChange={setStartTab}
         onSelect={onPickStart}
         onLeft={() => startSheetRef.current?.dismiss()}
-        searchPlaceholder="Search surahs, ajzaʼ or pages"
+        searchPlaceholder={t('plan.builder.searchStart')}
         stackBehavior="push"
-        footer="Revision starts here today and carries on in order, wrapping back around to the beginning."
+        footer={t('plan.builder.startFooter')}
       />
     </>
   );

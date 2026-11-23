@@ -1,9 +1,19 @@
-# Settings → Theme → THEME ("Light" or "Dark"), back on Home.
+# Settings → Appearance → Theme → THEME ("Light" or "Dark"), back on Home.
 #   env THEME
 appId: com.revisionbuddy.app
 ---
-- tapOn:
-    id: open-settings
+# Settings, again if the tap was lost (tap-to-open.yaml): Settings has a back button, Home has none.
+- runFlow:
+    file: tap-to-open.yaml
+    env:
+      ID: open-settings
+      OPENS: back
+# Appearance's page (SET-1).
+- runFlow:
+    file: tap-to-open.yaml
+    env:
+      ID: settings-page-appearance
+      OPENS: accent-row
 # Swipes first, counted, not timed, then centred, as settings-row.yaml does (the row has no id):
 # a loaded iOS runner took 20 s a swipe (#328's run 42565390013), and stopped at its first sight, the
 # row sat behind the tab bar and the tap opened Insights.
@@ -19,8 +29,18 @@ appId: com.revisionbuddy.app
     centerElement: true
     timeout: 60000
 - tapOn: "${THEME}(, selected)?"
-- tapOn:
-    id: back
+# Back to Settings' first level, then Home, again if a tap was lost: in #627's run 43768672117 (11 on iOS, run 1)
+# the theme took, the tap on back reached nothing, and Settings stayed for 10 s.
+- runFlow:
+    file: tap-to-open.yaml
+    env:
+      ID: back
+      OPENS: settings-page-appearance
+- runFlow:
+    file: tap-to-open.yaml
+    env:
+      ID: back
+      OPENS: today-post
 - extendedWaitUntil:
     visible:
       id: today-post

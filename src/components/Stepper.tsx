@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { radius } from '../theme/radius';
+import { t } from '../i18n';
 
 interface StepperProps {
   total: number;
@@ -21,7 +22,7 @@ export function Stepper({ total, current }: StepperProps) {
       style={styles.row}
       accessible
       accessibilityRole="progressbar"
-      accessibilityLabel={`Step ${current} of ${total}`}
+      accessibilityLabel={t('common.stepNOfTotal', { n: current, total })}
       accessibilityValue={{ min: 1, max: total, now: current }}
       testID="stepper"
     >

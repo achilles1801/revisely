@@ -1,24 +1,25 @@
 // Each word's remembered mistakes, from the account's takes (pure).
 //
-// A word is marked when a take with Mark mistakes finds it: a wrong, skipped or added word (the word group); a sure
-// harakat or letter slip (slip); a tajweed note at Strict (tajweed). Never "Not clear", never a mark called Not a
-// mistake (those aren't in the record), never a word before where the take started.
+// A word is marked when a take with Mark mistakes finds it: a wrong, skipped or added word (the word group); a harakat
+// or letter slip, sure or "Not clear" (slip: Majd, Nov 20 2026, "yes (a) is fine": a Not clear stays amber on the page
+// after the take, remembered like a slip until said clearly, and never counted in a score); a tajweed note at Strict
+// (tajweed). Never a mark called Not a mistake (those aren't in the record), never a word before where the take started.
 //
 // Every take that reached the word and checked its group is an attempt at it, right or wrong. The mark clears after
 // CLEAR_AFTER right takes in a row on as many different revision days (Majd, Nov 15 2026: two right takes on two
 // days): right once, straight after seeing the mistake, is short-term memory; right again on another day means it
-// stuck. Wrong again starts the count over. "Clear now" clears it at once. Words & harakat never clears a tajweed note
-// (it didn't check one), and a take that heard a word's harakat only as "Not clear" isn't an attempt at its slip.
+// stuck. Wrong again starts the count over, and a take that heard the word's harakat only as "Not clear" hasn't said it
+// clearly: it counts as wrong. "Clear now" clears it at once. Words & harakat never clears a tajweed note (it didn't
+// check one).
 
-import { countsAsMistake, GROUP_RANK, isUnclear, Mark, MarkGroup, markGroup } from '../reciteLive/contract';
+import { countsAsMistake, GROUP_RANK, Mark, MarkGroup, markGroup } from '../reciteLive/contract';
 import type { ClearRecord, MemoryRecord, TakeRecord } from './record';
 
 /** Right takes in a row, each on a revision day of its own, that clear a remembered mistake. */
 export const CLEAR_AFTER = 2;
 
-/** Whether a mark is remembered on the page: not "Not clear", and only what the summary counts or notes. */
+/** Whether a mark is remembered on the page: every mark the summary lists, Not clear included (RMEM-2). */
 export function remembers(m: Mark): boolean {
-  if (isUnclear(m)) return false;
   return countsAsMistake(m) || m.kind === 'tajweed';
 }
 
@@ -105,8 +106,6 @@ export function wordMemories(records: readonly MemoryRecord[]): Map<string, Word
       const take = e.take as TakeRecord;
       const marks = take.marks.filter((m) => m.w === w && markGroup(m) === group);
       const wrong = marks.find(remembers) ?? null;
-      // Heard only as "Not clear": not an attempt at this group.
-      if (!wrong && marks.some(isUnclear)) continue;
       attempts.push({ take, right: !wrong, mark: wrong, t: timeAt(take, w, wrong) });
       if (wrong) {
         open = true;

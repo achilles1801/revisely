@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Qibla, 1×1: the dial with the bearing in its middle. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@android:id/background"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@drawable/aw_ground"
+  android:clipToOutline="true"
+  android:padding="10dp">
+
+  <FrameLayout
+    android:layout_width="60dp"
+    android:layout_height="60dp"
+    android:layout_gravity="center">
+    <ImageView
+      android:id="@+id/aw_dial_ring"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:importantForAccessibility="no"
+      android:scaleType="fitCenter"
+      android:src="@drawable/aw_preview_dial_tiny_ring"
+      android:tint="@color/aw_secondary" />
+    <ImageView
+      android:id="@+id/aw_dial_body"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:importantForAccessibility="no"
+      android:scaleType="fitCenter"
+      android:src="@drawable/aw_preview_dial_tiny_body"
+      android:tint="@color/aw_kaaba" />
+    <ImageView
+      android:id="@+id/aw_dial_accent"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:importantForAccessibility="no"
+      android:scaleType="fitCenter"
+      android:src="@drawable/aw_preview_dial_tiny_accent"
+      android:tint="@color/aw_preview_accent" />
+    <ImageView
+      android:id="@+id/aw_dial_ink"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:importantForAccessibility="no"
+      android:scaleType="fitCenter"
+      android:src="@drawable/aw_preview_dial_tiny_ink"
+      android:tint="@color/aw_text" />
+    <TextView
+      android:id="@+id/aw_qibla_short"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_gravity="center"
+      android:layout_marginTop="2dp"
+      android:fontFamily="sans-serif-medium"
+      android:includeFontPadding="false"
+      android:maxLines="1"
+      android:text="@string/aw_sample_qibla_short"
+      android:textColor="@color/aw_text"
+      android:textSize="12sp" />
+    <ImageView
+      android:id="@+id/aw_no_location"
+      android:layout_width="16dp"
+      android:layout_height="16dp"
+      android:layout_gravity="center"
+      android:importantForAccessibility="no"
+      android:src="@drawable/aw_location_off"
+      android:tint="@color/aw_text"
+      android:visibility="gone" />
+  </FrameLayout>
+</FrameLayout>

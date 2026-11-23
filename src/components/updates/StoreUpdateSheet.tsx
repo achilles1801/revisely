@@ -9,6 +9,7 @@ import { markOffered, openStore, storeName, useStoreDecision } from '../../lib/u
 import { useBusyReasons } from '../../lib/updates/busy';
 import { useUpdateOffer } from '../../lib/updates/ota';
 import { modalShowing, useModalShowing } from '../v2/modalTurn';
+import { t } from '../../i18n';
 
 /** Home settles first. */
 export const OFFER_DELAY_MS = 1200;
@@ -31,12 +32,12 @@ export function StoreUpdateSheet() {
 
   useEffect(() => {
     if (!offer || !focused || busy || otaOffered || shown || sheetOpen) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       if (modalShowing()) return;
       setShown(offer);
       markOffered(offer);
     }, OFFER_DELAY_MS);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [offer, focused, busy, otaOffered, shown, sheetOpen]);
 
   const close = () => setShown(null);
@@ -44,19 +45,19 @@ export function StoreUpdateSheet() {
     <Sheet
       visible={shown != null}
       onClose={close}
-      title="New version available"
-      footer={{ label: 'Not now', onPress: close, testID: 'store-update-later' }}
+      title={t('updates.store.title')}
+      footer={{ label: t('updates.store.notNow'), onPress: close, testID: 'store-update-later' }}
       testID="store-update-sheet"
     >
       <View style={styles.body}>
         <Text style={[typeV2.body, styles.centred, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-          Revisely {shown} is on {storeName()}.
+          {t('updates.store.body', { version: shown ?? '', store: storeName() })}
         </Text>
         <Text style={[typeV2.meta, styles.centred, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
-          Your plan, progress and recordings stay as they are.
+          {t('updates.staysAsIs')}
         </Text>
         <PillButton
-          title="Update"
+          title={t('updates.store.update')}
           size="lg"
           onPress={() => {
             close();

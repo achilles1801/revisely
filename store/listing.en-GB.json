@@ -1,0 +1,15 @@
+{
+  "_note": "English (U.K.): the en-US listing (listing.json) with British spelling only: memorize → memorise, memorization → memorisation, memorized → memorised. Approved by Majd, Nov 21 2026. scripts/__tests__/asc.test.js fails when it drifts from listing.json; make the same change here. Written with: node scripts/asc.js listing --locale en-GB.",
+  "name": "Revisely",
+  "subtitle": "Quran revision, on schedule",
+  "promotionalText": "Meet Revo, your revision coach: ask how your week went, what to revise first, or how anything in the app works.",
+  "keywords": "quran,hifz,hafiz,memorise,memorisation,islam,muslim,mushaf,juz,surah,revision,review,tracker,planner",
+  "description": "Keep the Qur'an you've memorised. Revisely builds a daily revision schedule over exactly what you know, and keeps it going even when you miss a day. Free, with no ads.\n• Revise page by page, even offline\n• Time and record your recitation, or listen with a reciter\n• Revo, an optional AI coach that knows your progress\n• Activity calendar, insights and streaks\n• Widgets for your Home Screen and Lock Screen: today's revision, the next prayer and the Qibla",
+  "whatsNew": {
+    "minor": "Small fixes and improvements.",
+    "feature": "Recite from memory and see your mistakes as you go: turn on Mark mistakes in the reader."
+  },
+  "supportUrl": "https://revisely.app/support/",
+  "marketingUrl": "https://revisely.app",
+  "privacyPolicyUrl": "https://revisely.app/privacy/"
+}

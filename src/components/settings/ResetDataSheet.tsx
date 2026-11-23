@@ -6,6 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { radiusV2, typeV2 } from '../../theme/v2';
 import { useHaptics } from '../../design/haptics';
 import { resetMyData } from '../../lib/testerReset';
+import { t } from '../../i18n';
 
 const CONFIRM = 'RESET';
 
@@ -60,20 +61,19 @@ export function ResetDataSheet({
       visible={visible}
       onClose={close}
       keyboard
-      title="Reset my data"
-      left={{ label: 'Cancel', onPress: close, testID: 'reset-data-cancel' }}
+      title={t('settings.reset.title')}
+      left={{ label: t('common.cancel'), onPress: close, testID: 'reset-data-cancel' }}
       testID="reset-data-sheet"
     >
       <View style={styles.body}>
         <Text style={[typeV2.meta, { color: palette.secondary }]}>
-          Your progress, plan, sessions, daily log, reading times and recordings are deleted, here and in your
-          backup, and onboarding starts again. You stay signed in. A copy is kept that only the developer can read.
+          {t('settings.reset.body')}
         </Text>
-        <Text style={[typeV2.meta, { color: palette.text }]}>Type {CONFIRM} to confirm.</Text>
+        <Text style={[typeV2.meta, { color: palette.text }]}>{t('settings.typeToConfirm', { word: CONFIRM })}</Text>
         <TextInput
           value={text}
-          onChangeText={(t) => {
-            setText(t);
+          onChangeText={(next) => {
+            setText(next);
             if (error) setError(null);
           }}
           placeholder={CONFIRM}
@@ -86,7 +86,7 @@ export function ResetDataSheet({
           onSubmitEditing={confirm}
           selectionColor={palette.accentText}
           style={[typeV2.body, styles.input, { color: palette.text, backgroundColor: palette.fill }]}
-          accessibilityLabel={`Type ${CONFIRM} to confirm`}
+          accessibilityLabel={t('settings.typeToConfirmLabel', { word: CONFIRM })}
           testID="reset-data-input"
         />
         {error ? (
@@ -95,7 +95,7 @@ export function ResetDataSheet({
           </Text>
         ) : null}
         <PillButton
-          title={busy ? 'Resetting…' : 'Reset my data'}
+          title={busy ? t('settings.reset.resetting') : t('settings.reset.title')}
           onPress={confirm}
           size="lg"
           destructive

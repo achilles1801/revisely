@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tap } from '../v2/Tap';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
+import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 /**
  * Grouped list primitives, as in Settings.
@@ -52,14 +54,14 @@ export function SectionHeader({
           onPress={onToggle}
           hitSlop={{ top: 10, bottom: 10, left: 12, right: 12 }}
           accessibilityRole="button"
-          accessibilityLabel={`${title}, ${collapsed ? 'collapsed' : 'expanded'}`}
-          accessibilityHint={collapsed ? 'Shows the section' : 'Hides the section'}
+          accessibilityLabel={t(collapsed ? 'plan.section.collapsed' : 'plan.section.expanded', { title })}
+          accessibilityHint={collapsed ? t('plan.section.show') : t('plan.section.hide')}
           accessibilityState={{ expanded: !collapsed }}
           style={v2.headerToggle}
           testID={`section-toggle-${title}`}
         >
           {text}
-          <Ionicons name={collapsed ? 'chevron-forward' : 'chevron-down'} size={16} color={palette.secondary} />
+          <Ionicons name={collapsed ? forwardIcon() : 'chevron-down'} size={16} color={palette.secondary} />
         </Tap>
       ) : (
         text
@@ -249,7 +251,7 @@ export function GroupedRow({
         </Text>
       ) : null}
       {trailing}
-      {accessory === 'chevron' ? <Ionicons name="chevron-forward" size={16} color={palette.secondary} /> : null}
+      {accessory === 'chevron' ? <Ionicons name={forwardIcon()} size={16} color={palette.secondary} /> : null}
       {accessory === 'check' ? <Ionicons name="checkmark" size={20} color={palette.text} /> : null}
     </>
   );

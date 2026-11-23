@@ -1,0 +1,65 @@
+# Taps ID and waits up to 8 s for what it opens (OPENS, an id regex). If nothing has opened and ID is still on
+# screen, the tap was lost, and it taps again, at most twice.
+#   env ID:    the id to tap, e.g. revo-button
+#   env OPENS: what a tap that took shows, as an id regex, e.g. "revo-optin|revo-input"
+#
+# Why it exists:
+# - On a loaded runner Maestro's tap can reach the app and be cancelled before it becomes a press. In #574's run
+#   43738520119 (09-revo, iOS run 1) the app logged a touch start on Revo's button and a touch cancel 166 ms later.
+#   onPress never ran, and Home stayed as it was for 40 s. #608 met the same thing on the Fajr switch.
+# - Each flow used to fix this tap by tap, after it had failed CI. This is that guard, written once (Majd approved
+#   it, Nov 15 2026).
+#
+# Only for a tap whose target goes once it works: a button that opens a sheet, a modal or a screen over it. Then a
+# second tap can't undo the first.
+# - Never a switch (it toggles: fajr-switch.yaml has its own guard).
+# - Never Next or a step forward (a second tap would skip one).
+# - Never a button that stays on screen after it works.
+#
+# Counted: each tap again first saves a screenshot, lost-tap-<n>-<ID> (the screen as the tap was lost), with the
+# flow's other screenshots. attempts.js counts them per attempt, the weekly flake report (scripts/e2e/flakes.js)
+# lists them per flow, and the visual comparison skips them.
+#
+# Each check below is one Maestro answers at once: visible on what is there, or on what isn't once 7 s have passed
+# since the tap. A visible check on something absent waits up to 7 s minus the time since the last tap (README,
+# "Things that bit"). The caller still waits for what it expects next.
+appId: com.revisionbuddy.app
+---
+- tapOn:
+    id: ${ID}
+    waitToSettleTimeoutMs: 500
+    retryTapIfNoChange: false
+- evalScript: ${output.tapOpened = false}
+- repeat:
+    times: 2
+    commands:
+      - runFlow:
+          when:
+            true: ${output.tapOpened !== true}
+          commands:
+            - extendedWaitUntil:
+                visible:
+                  id: ${OPENS}
+                timeout: 8000
+                optional: true
+            - runFlow:
+                when:
+                  visible:
+                    id: ${OPENS}
+                commands:
+                  - evalScript: ${output.tapOpened = true}
+            - runFlow:
+                when:
+                  true: ${output.tapOpened !== true}
+                commands:
+                  - runFlow:
+                      when:
+                        visible:
+                          id: ${ID}
+                      commands:
+                        - evalScript: ${output.lostTaps = (output.lostTaps || 0) + 1}
+                        - takeScreenshot: lost-tap-${output.lostTaps}-${ID}
+                        - tapOn:
+                            id: ${ID}
+                            waitToSettleTimeoutMs: 500
+                            retryTapIfNoChange: false

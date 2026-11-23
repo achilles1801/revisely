@@ -12,7 +12,7 @@
  * they read (supportDecisions, consoleAudit and the rest) is closed to clients.
  */
 
-export const ROLES = ['owner', 'admin', 'reviewer', 'dev'] as const;
+export const ROLES = ['owner', 'admin', 'reviewer', 'dev', 'labeller'] as const;
 export type Role = (typeof ROLES)[number];
 
 /** Every permission, with what it opens (the page and set-role.js show these words). */
@@ -24,8 +24,9 @@ export const PERMISSIONS = {
   'openDoor.revoke': 'Take Premium through Open Door back',
   'premium.read': 'Premium: how many have it, from where, and what ends soon (counts only)',
   'accounts.read': 'Accounts: one account by exact email or id (sign-in, plan, Premium, Open Door state, Revo counts, tester flag)',
-  'audit.read': 'The audit log: every decision and role change',
+  'audit.read': 'The audit log: every decision, role change and recitation label',
   'roles.manage': 'Give and take roles',
+  'recite.label': 'Label recitation clips for the mistake checker (revisely-dev only; each label is theirs and logged)',
 } as const;
 export type Permission = keyof typeof PERMISSIONS;
 
@@ -41,9 +42,14 @@ export const GRANTS: Record<Role, readonly Permission[]> = {
   reviewer: ['openDoor.read', 'openDoor.decide'],
   /** Metrics and app health; nobody's answers, conversations or decisions. */
   dev: ['metrics.read'],
+  /**
+   * The labelling page only (Majd, Nov 16 2026: his Quran teacher labels recitations too, "only have permission in that
+   * dashboard with audit trail"). Signs in with their own revisely-dev account; every label is theirs and logged.
+   */
+  labeller: ['recite.label'],
 };
 
-export const ROLE_NAMES: Record<Role, string> = { owner: 'Owner', admin: 'Admin', reviewer: 'Reviewer', dev: 'Developer' };
+export const ROLE_NAMES: Record<Role, string> = { owner: 'Owner', admin: 'Admin', reviewer: 'Reviewer', dev: 'Developer', labeller: 'Labeller' };
 
 export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && (ROLES as readonly string[]).includes(value);
@@ -84,6 +90,12 @@ export interface StaffCaller {
   uid: string;
   email: string | null;
   role: Role | null;
+  /** the account's email is verified (Google, an email link): only then does it claim an invite */
+  emailVerified?: boolean;
+  /** for an access request: the account's name and photo, and how it signed in (the ID token's sign_in_provider) */
+  name?: string | null;
+  photo?: string | null;
+  method?: string | null;
 }
 
 /** The caller, if their role allows `permission`; refused otherwise, with no hint of what else exists. */

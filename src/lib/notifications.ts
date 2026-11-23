@@ -1,5 +1,4 @@
 import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { logger } from './logger';
 import { NOTIFICATION_LIGHT_COLOR } from '../theme/v2';
@@ -10,6 +9,7 @@ import {
   REMINDER_SILENT_CHANNEL_ID,
 } from './notificationChannels';
 import { notificationBehavior } from './prayer/soundPreview';
+import { t } from '../i18n';
 
 export { REMINDER_CHANNEL_ID };
 
@@ -35,35 +35,35 @@ export async function ensureAndroidChannels(): Promise<void> {
   try {
     await Promise.all([
       Notifications.setNotificationChannelAsync(REMINDER_CHANNEL_ID, {
-        name: 'Reminders',
-        description: 'Your revision reminders and the reading timer.',
+        name: t('reminders.channels.reminders'),
+        description: t('reminders.channels.remindersSub'),
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: NOTIFICATION_LIGHT_COLOR,
       }),
       Notifications.setNotificationChannelAsync(REMINDER_SILENT_CHANNEL_ID, {
-        name: 'Reminders (silent)',
-        description: 'Revision reminders set to go quietly: overnight, and the congratulation.',
+        name: t('reminders.channels.remindersSilent'),
+        description: t('reminders.channels.remindersSilentSub'),
         importance: Notifications.AndroidImportance.DEFAULT,
         sound: null,
         enableVibrate: false,
       }),
       Notifications.setNotificationChannelAsync(PRAYER_CHANNEL_ID, {
-        name: 'Prayer times',
-        description: 'A prayer’s time, or a reminder before it, with the standard tone.',
+        name: t('reminders.channels.prayer'),
+        description: t('reminders.channels.prayerSub'),
         importance: Notifications.AndroidImportance.HIGH,
         lightColor: NOTIFICATION_LIGHT_COLOR,
       }),
       Notifications.setNotificationChannelAsync(PRAYER_SILENT_CHANNEL_ID, {
-        name: 'Prayer times (silent)',
-        description: 'Prayer notifications set to Silent.',
+        name: t('reminders.channels.prayerSilent'),
+        description: t('reminders.channels.prayerSilentSub'),
         importance: Notifications.AndroidImportance.DEFAULT,
         sound: null,
         enableVibrate: false,
       }),
       Notifications.setNotificationChannelAsync(PLAYBACK_CHANNEL_ID, {
-        name: 'Recitation',
-        description: 'Play and pause a recitation from the notification and the lock screen.',
+        name: t('reminders.channels.recitation'),
+        description: t('reminders.channels.recitationSub'),
         importance: Notifications.AndroidImportance.LOW,
         sound: null,
         enableVibrate: false,
@@ -76,9 +76,9 @@ export async function ensureAndroidChannels(): Promise<void> {
 }
 
 // Requests notification permission (idempotent — no-op if already granted).
-// Returns true if the user has granted permission, false otherwise.
-// Works on simulators for local notifications; the device gate only applies
-// to fetching a push token below.
+// Returns true if the user has granted permission, false otherwise. Works on
+// simulators: the reminders are local notifications. (No push token is asked
+// for: nothing sends push, and the token fetched until Nov 2026 was never read.)
 export async function ensureNotificationsPermission(): Promise<boolean> {
   await ensureAndroidChannels();
 
@@ -88,25 +88,6 @@ export async function ensureNotificationsPermission(): Promise<boolean> {
   return status === 'granted';
 }
 
-export async function registerForPushNotificationsAsync() {
-  const granted = await ensureNotificationsPermission();
-  if (!granted) {
-    logger.log('Notification permission not granted');
-    return;
-  }
-
-  if (!Device.isDevice) {
-    logger.log('Must use physical device for push token');
-    return;
-  }
-
-  try {
-    return (await Notifications.getExpoPushTokenAsync()).data;
-  } catch (error) {
-    logger.log('Error getting push token:', error);
-  }
-}
-
 export async function scheduleDangerAlert(juz: number, enabled: boolean) {
   if (!enabled) {
     return;
@@ -114,8 +95,8 @@ export async function scheduleDangerAlert(juz: number, enabled: boolean) {
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'Time to review',
-      body: `Juz ${juz} is due for review`,
+      title: t('reminders.review.title'),
+      body: t('reminders.review.body', { juz }),
       sound: true,
     },
     trigger: { channelId: REMINDER_CHANNEL_ID }, // Immediate

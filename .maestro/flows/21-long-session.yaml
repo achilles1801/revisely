@@ -1,0 +1,217 @@
+# A recitation as long as a whole revision session's (RECITE-22; a session's mic is the reader's, RECITE-9): 45 minutes
+# of Mark mistakes with the page hidden, from An-Naml 23 on
+# page 379, where the checker ends a take at 15 minutes of its audio (live.py's MAX_SECONDS). The phone chains takes: at a
+# pause after an ayah past 14 minutes it ends the take and starts the next on the page on screen, and the screen shows
+# one recitation (no summary, no flash, the clock running on, the words and marks kept). The stand-in checker
+# (lib/e2e/reciteLive, `long=45`) enforces the cap as the real one does and starts each new take where the last ended. The
+# take's audio goes 5 times as fast as a phone's (45 minutes in 9), through the real socket (lib/reciteLive/socket).
+# Stop ends the recitation: one result, one summary, and the take's numbers (stalls, event to screen, lag, heap, links)
+# on the E2E status line.
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-14T10:00
+      BOUNDARY: midnight
+- runScript:
+    file: ../scripts/server-revo.js
+    env:
+      MODE: tester
+# Get Premium (and Settings' Premium switch later) call devGrantPremium and devRevokePremium, and Apply for support calls
+# supportLink: start their workers first, as a throwaway account (scripts/warm-premium.js), or the app's first call can
+# pass its 20 s (or the flow's wait) on a CI runner.
+- runScript:
+    file: ../scripts/warm-premium.js
+- runFlow: ../subflows/relaunch.yaml
+
+# The Dev UI, then the reader at An-Naml 23.
+- openLink:
+    link: revisely://e2e/recite-live?on=1&long=45&speed=5
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+- openLink:
+    link: revisely://read?page=379
+    optional: true
+- repeat:
+    while:
+      notVisible:
+        id: reader-background
+    times: 6
+    commands:
+      - runFlow: ../subflows/open-link-prompt.yaml
+      - extendedWaitUntil:
+          visible:
+            id: reader-background
+          timeout: 4000
+          optional: true
+      - runFlow:
+          when:
+            notVisible:
+              id: reader-background
+          commands:
+            - openLink:
+                link: revisely://read?page=379
+                optional: true
+
+# The controls: one mic (no record button) and the eye.
+- runFlow: ../subflows/reader-controls.yaml
+- assertNotVisible: "Record your recitation"
+
+# Hold the mic: Record and Recite. A new account has no Premium: Mark mistakes is locked, and a tap opens the
+# Premium page. Get Premium (Revisely Dev's free grant, devGrantPremium in the functions emulator) turns it on.
+- longPressOn:
+    id: recite-mic
+- extendedWaitUntil:
+    visible:
+      id: recite-mode-menu
+    timeout: 5000
+- assertVisible:
+    id: recite-mistakes-locked
+- tapOn:
+    id: recite-mistakes
+- extendedWaitUntil:
+    visible:
+      id: check-intro
+    timeout: 5000
+- tapOn:
+    id: check-intro-get
+- extendedWaitUntil:
+    visible: "Turn on"
+    timeout: 5000
+- assertVisible: "Premium in Revisely Dev"
+- tapOn: "Turn on"
+- extendedWaitUntil:
+    notVisible:
+      id: check-intro
+    timeout: 30000
+
+# Premium on: Mark mistakes unlocks. Switch it on (the menu stays), then Recite.
+- longPressOn:
+    id: recite-mic
+- extendedWaitUntil:
+    visible:
+      id: recite-mistakes-off
+    timeout: 10000
+- tapOn:
+    id: recite-mistakes
+- assertVisible:
+    id: recite-mistakes-on
+- tapOn:
+    id: recite-mode-recite
+
+# The AI notice, once; then the take.
+- extendedWaitUntil:
+    visible:
+      id: recite-notice-agree
+    timeout: 5000
+- tapOn:
+    id: recite-notice-agree
+- extendedWaitUntil:
+    visible:
+      id: recite-words
+    timeout: 10000
+
+# The page hidden, as Majd recited.
+- tapOn:
+    id: recite-eye
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ls01-hidden-start
+
+# Each check waits for the take's clock to reach its minute: the emulator's timers run a little slow, so 5x is about
+# 4.7x by the clock (the first run at 5x read 43:07 at 546 s).
+
+# Minute 7: following.
+- extendedWaitUntil:
+    visible:
+      id: recite-time
+      text: "([7-9]|1[0-4]):[0-9][0-9]"
+    timeout: 150000
+- assertVisible:
+    id: recite-words
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ls02-minute-7
+
+# Minute 16: past the first take's end at a pause near 14 minutes, the next take following, no summary or result.
+- extendedWaitUntil:
+    visible:
+      id: recite-time
+      text: "1[6-9]:[0-9][0-9]"
+    timeout: 200000
+- assertVisible:
+    id: recite-words
+- assertNotVisible:
+    id: take-summary
+- assertNotVisible:
+    id: recite-result
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ls03-minute-16
+
+# Minute 31: past the second take's end.
+- extendedWaitUntil:
+    visible:
+      id: recite-time
+      text: "3[1-9]:[0-9][0-9]"
+    timeout: 250000
+- assertVisible:
+    id: recite-words
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ls04-minute-31
+
+# Minute 45: still following, then Stop. The result in the bar (a tap opens the summary), or the summary itself.
+- extendedWaitUntil:
+    visible:
+      id: recite-time
+      text: "4[5-9]:[0-9][0-9]"
+    timeout: 250000
+- assertVisible:
+    id: recite-words
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ls05-minute-45
+- tapOn:
+    id: recite-stop
+- extendedWaitUntil:
+    visible:
+      id: recite-result
+    timeout: 8000
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: recite-result
+    commands:
+      - tapOn:
+          id: recite-result
+- extendedWaitUntil:
+    visible:
+      id: take-summary
+    timeout: 8000
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ls06-summary
+
+# The recitation's numbers on the status line once the summary closes: at least three takes chained.
+- tapOn:
+    id: take-summary-done
+- extendedWaitUntil:
+    visible:
+      id: e2e-take-stats
+    timeout: 8000
+- assertVisible:
+    id: e2e-take-stats
+    text: ".*links [3-9].*"
+- runFlow:
+    file: ../subflows/shot.yaml
+    env:
+      NAME: ls07-numbers

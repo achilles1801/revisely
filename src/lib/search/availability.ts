@@ -12,5 +12,12 @@ export const quranSearchEnabled = (user: Account) => user != null;
 /** Whether this binary can listen for a search (the native mic module and Whisper, on iPhone). */
 export const canSearchByVoice = () => Platform.OS === 'ios' && isMicStreamAvailable();
 
+/** E2E builds: words a voice search hears without a microphone (lib/e2e/voiceSearch). Others: never. */
+export function e2eVoiceHeard(): string | null {
+  return process.env.EXPO_PUBLIC_E2E === '1'
+    ? (require('../e2e/voiceSearch') as typeof import('../e2e/voiceSearch')).e2eVoiceHeard()
+    : null;
+}
+
 /** Searching by voice: anyone signed in, on a phone that can listen. */
-export const voiceSearchEnabled = (user: Account) => user != null && canSearchByVoice();
+export const voiceSearchEnabled = (user: Account) => user != null && (canSearchByVoice() || e2eVoiceHeard() != null);

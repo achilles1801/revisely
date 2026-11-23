@@ -15,7 +15,7 @@ import { loadScenario } from '../harness/testScenario';
 import { DailyLog, Home, Manager, homeStack } from '../harness/screens';
 import { pageOfTitle } from '../harness/words';
 import { Phone, type Booted, type OpenApp, revoMomentSeen } from '../harness/phone';
-import { SCENARIO_IDS, type ScenarioId, type SeedPlan } from '../../../functions/src/testScenarios';
+import { ALL_SCENARIO_IDS, type ScenarioId, type SeedPlan } from '../../../functions/src/testScenarios';
 import type { RevoContext } from '../../../src/lib/revo/types';
 import type { HistoryItem } from '../../../src/lib/streakFromItems';
 
@@ -120,7 +120,7 @@ async function revoAgreesWithHome(app: OpenApp, scenario: ScenarioId, plan: Seed
 
   // A page marked memorized counts on the revision day it was marked.
   const fajr = app.mods.require<Fajr>('src/lib/fajrBoundary');
-  const markedToday = plan.pages.filter((p) => fajr.revisionDayOf(p.dateMemorized, app.app.user) === plan.today).length;
+  const markedToday = plan.pages.filter((p) => p.dateMemorized != null && fajr.revisionDayOf(p.dateMemorized, app.app.user) === plan.today).length;
   expect([where, t.memorizedPages]).toEqual([where, markedToday]);
 }
 
@@ -138,7 +138,7 @@ it('[REVO-26] Revo is told today, the week and the streak as Home shows them, in
   app = await phone.open(homeWithRevo);
   await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
 
-  for (const scenario of SCENARIO_IDS) {
+  for (const scenario of ALL_SCENARIO_IDS) {
     advance(3 * MINUTE); // past the two minutes between loads
     const plan = await loadScenario(app, scenario);
     await revoAgreesWithHome(app, scenario, plan);
@@ -158,7 +158,7 @@ function revoAppStack(mods: Booted): ReactElement {
   const { createNativeStackNavigator } = req<any>('@react-navigation/native-stack');
   const Dashboard = req<any>('src/screens/main/DashboardScreen').default;
   const Session = req<any>('src/screens/revision/ActiveRevisionScreen').default;
-  const Journal = req<any>('src/screens/journal/JournalEntryScreen').default;
+  const ActivityDay = req<any>('src/screens/activity/ActivityDayScreen').default;
   const Manager = req<any>('src/screens/main/MemorizationScreen').default;
   const { ReadingTimerProvider } = req<any>('src/context/ReadingTimerContext');
   const { RevoHost } = req<any>('src/components/revo/RevoHost');
@@ -182,9 +182,9 @@ function revoAppStack(mods: Booted): ReactElement {
         { screenOptions: { headerShown: false, animation: 'none' } },
         h(Stack.Screen, { name: 'Dashboard', component: Dashboard }),
         h(Stack.Screen, { name: 'ActiveRevision', component: Session }),
-        h(Stack.Screen, { name: 'JournalEntry', component: Journal }),
+        h(Stack.Screen, { name: 'ActivityDay', component: ActivityDay }),
         h(Stack.Screen, { name: 'Memorization', component: Manager }),
-        ...['Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'ActivityDay', 'Insights'].map((name) =>
+        ...['Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'Insights', 'QuranReader'].map((name) =>
           h(Stack.Screen, { key: name, name, component: Elsewhere }),
         ),
       ),
@@ -311,7 +311,7 @@ it('[REVO-26] Revo is asked with the state the phone shows now: after Jump to, a
     ctx = await askRevo(app, asks, 'How much do I know?');
     expect([ctx.totals.memorizedPages, ctx.today.memorizedPages]).toEqual([604, 23]);
 
-    // A note in the daily log: notes reach Revo only as an attachment the user picks (REVO-2).
+    // A note on the day: notes reach Revo only as an attachment the user picks (REVO-2).
     const log = new DailyLog(app);
     await log.open();
     await log.add('Revised with my teacher after Fajr');

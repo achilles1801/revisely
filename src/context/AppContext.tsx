@@ -34,14 +34,7 @@ import { enqueue, loadOutbox, pendingEntries, removeEntries, subscribeOutbox } f
 import { noteResetAdopted, resetMark, staleEntries, wasReset } from '../lib/offline/reset';
 import { configureSync, onApplied, requestFlush } from '../lib/offline/sync';
 import { applyEntry } from '../lib/offline/apply';
-import {
-  overlayAccount,
-  overlaySessions,
-  OutboxEntry,
-  OutboxOp,
-  PageFields,
-  WeaknessChange,
-} from '../lib/offline/ops';
+import { overlayAccount, overlaySessions, OutboxEntry, OutboxOp, PageFields, WeaknessChange } from '../lib/offline/ops';
 import { restartFirestore, watchConnectivity } from '../lib/offline/connectivity';
 import { setCurrentAccount } from '../lib/offline/queue';
 import { removeAheadPages } from '../lib/aheadCredit';
@@ -90,6 +83,9 @@ function firestoreUserToLocal(fsUser: FirestoreUser): User {
   };
 }
 
+/** How many sessions (days) the app reads, the latest first (SYNC-6: the self-heal knows it holds no more). */
+const SESSIONS_READ = 100;
+
 function firestorePageToLocal(fsPage: FirestorePage): UserPage {
   return {
     pageNumber: fsPage.pageNumber,
@@ -100,7 +96,9 @@ function firestorePageToLocal(fsPage: FirestorePage): UserPage {
     totalRevisionCount: fsPage.totalRevisionCount || 0,
     skipCount: fsPage.skipCount || 0,
     // A partly memorized page keeps its memorized ayahs (MEM-1); any other page's are left behind.
-    ...(fsPage.status === 'learning' && Array.isArray(fsPage.verses) ? { verses: fsPage.verses.filter((k) => typeof k === 'number') } : {}),
+    ...(fsPage.status === 'learning' && Array.isArray(fsPage.verses)
+      ? { verses: fsPage.verses.filter((k) => typeof k === 'number') }
+      : {}),
   };
 }
 
@@ -111,7 +109,7 @@ function firestoreSessionToLog(fsSession: FirestoreSession): RevisionLog {
     assignedPages: fsSession.assignedPages,
     pagesRevised: fsSession.pagesRevised,
     pagesSkipped: fsSession.pagesSkipped,
-    weaknessUpdates: fsSession.weaknessUpdates.map(wu => ({
+    weaknessUpdates: fsSession.weaknessUpdates.map((wu) => ({
       page: wu.pageNumber,
       rating: wu.newRating,
     })),
@@ -227,10 +225,7 @@ interface ResetCheck {
 
 /** A change the server took, folded into `base` until its snapshot arrives. */
 function commitToBase(b: Base, entry: OutboxEntry): Base {
-  const view = overlayAccount(
-    { user: b.user ?? null, pages: b.pages ?? [], sessions: b.sessions ?? [] },
-    [entry],
-  );
+  const view = overlayAccount({ user: b.user ?? null, pages: b.pages ?? [], sessions: b.sessions ?? [] }, [entry]);
   return {
     ...b,
     user: b.user === undefined ? undefined : view.user,
@@ -446,7 +441,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       apply: applyEntry,
       // A server read works: Auth and App Check are fine, so a permission
       // error on a change is the rules refusing it.
-      probe: (u) => firestoreService.userDocExistsOnServer(u).then(() => true, () => false),
+      probe: (u) =>
+        firestoreService.userDocExistsOnServer(u).then(
+          () => true,
+          () => false,
+        ),
       // The reset check, if the user document's listener hasn't done it yet.
       beforeSend: async (u) => {
         const r = resetCheck.current;
@@ -468,11 +467,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const committed = next as Base | null;
       if (!committed) return;
       const parts: AccountPart[] =
-        entry.op.kind === 'user' ? ['user'] : entry.op.kind === 'pages' ? ['pages'] : entry.op.kind.startsWith('session.') ? ['sessions'] : [];
+        entry.op.kind === 'user'
+          ? ['user']
+          : entry.op.kind === 'pages'
+            ? ['pages']
+            : entry.op.kind.startsWith('session.')
+              ? ['sessions']
+              : [];
       await Promise.all(
-        parts
-          .filter((part) => committed[part] !== undefined)
-          .map((part) => writeAccountPart(u, part, committed[part])),
+        parts.filter((part) => committed[part] !== undefined).map((part) => writeAccountPart(u, part, committed[part])),
       );
     });
     const offOutbox = subscribeOutbox((u) => {
@@ -563,28 +566,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
         logger.error('Could not read the outbox', err);
         return [];
       }),
-    ]).then(([cached]) => {
-      if (!active) return;
-      // What the phone's changes are built on (none without a copy).
-      check.basis = cached ? resetMark(cached.user) : undefined;
-      check.copyRead = true;
-      if (cached) {
-        mutateBase((b) =>
-          b && b.uid === uid
-            ? {
-                ...b,
-                user: b.user === undefined ? cached.user : b.user,
-                pages: b.pages === undefined ? cached.pages : b.pages,
-                sessions: b.sessions === undefined ? cached.sessions : b.sessions,
-              }
-            : b,
-        );
-      }
-      setPending(pendingEntries(uid));
-      setCacheChecked(uid);
-      // The server may have answered first.
-      return settleResetCheck(uid);
-    }).finally(() => copyRead());
+    ])
+      .then(([cached]) => {
+        if (!active) return;
+        // What the phone's changes are built on (none without a copy).
+        check.basis = cached ? resetMark(cached.user) : undefined;
+        check.copyRead = true;
+        if (cached) {
+          mutateBase((b) =>
+            b && b.uid === uid
+              ? {
+                  ...b,
+                  user: b.user === undefined ? cached.user : b.user,
+                  pages: b.pages === undefined ? cached.pages : b.pages,
+                  sessions: b.sessions === undefined ? cached.sessions : b.sessions,
+                }
+              : b,
+          );
+        }
+        setPending(pendingEntries(uid));
+        setCacheChecked(uid);
+        // The server may have answered first.
+        return settleResetCheck(uid);
+      })
+      .finally(() => copyRead());
     const waitTimer = setTimeout(() => active && setWaitedOut(true), SERVER_WAIT_MS);
     return () => {
       active = false;
@@ -620,27 +625,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (ensuring[what]) return;
       ensuring[what] = true;
       // A sign-in creating the account (AuthContext) is its one creator: look once it is done.
-      firestoreService.accountCreatorDone().then(() => ensureOnServer({
-        fromCache,
-        skip: () =>
-          !active || firestoreService.isDeletingAccount(fbUser.uid) || firestoreService.isResettingAccount(fbUser.uid),
-        existsOnServer: () =>
-          what === 'user'
-            ? firestoreService.userDocExistsOnServer(fbUser.uid)
-            : firestoreService.pagesExistOnServer(fbUser.uid),
-        create: () =>
-          what === 'user'
-            ? firestoreService.createUser({
-                uid: fbUser.uid,
-                email: fbUser.email,
-                displayName: fbUser.displayName,
-                photoURL: fbUser.photoURL,
-              })
-            : firestoreService.initializeAllPages(fbUser.uid),
-        onLostRace: (err) => logger.warn(`User ${what} appeared while creating them`, err),
-        onError: (err) =>
-          logger.error(what === 'user' ? 'Failed to recreate missing user doc:' : 'Failed to initialize pages:', err),
-      }))
+      firestoreService
+        .accountCreatorDone()
+        .then(() =>
+          ensureOnServer({
+            fromCache,
+            skip: () =>
+              !active ||
+              firestoreService.isDeletingAccount(fbUser.uid) ||
+              firestoreService.isResettingAccount(fbUser.uid),
+            existsOnServer: () =>
+              what === 'user'
+                ? firestoreService.userDocExistsOnServer(fbUser.uid)
+                : firestoreService.pagesExistOnServer(fbUser.uid),
+            create: () =>
+              what === 'user'
+                ? firestoreService.createUser({
+                    uid: fbUser.uid,
+                    email: fbUser.email,
+                    displayName: fbUser.displayName,
+                    photoURL: fbUser.photoURL,
+                  })
+                : firestoreService.initializeAllPages(fbUser.uid),
+            onLostRace: (err) => logger.warn(`User ${what} appeared while creating them`, err),
+            onError: (err) =>
+              logger.error(
+                what === 'user' ? 'Failed to recreate missing user doc:' : 'Failed to initialize pages:',
+                err,
+              ),
+          }),
+        )
         .then((outcome) => {
           ensuring[what] = false;
           if (!active) return;
@@ -660,7 +674,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const unsubscribeUser = firestoreService.subscribeToUser(
       (fsUser, { fromCache }) => {
         if (!active) return;
-        if (serverReachableRef.current !== !fromCache) logger.log(`[net] the user document is ${fromCache ? 'from the cache' : 'from the server'}`);
+        if (serverReachableRef.current !== !fromCache)
+          logger.log(`[net] the user document is ${fromCache ? 'from the cache' : 'from the server'}`);
         setServerReachable(!fromCache);
         // Firestore's memory, not the server: the copy on the phone stands.
         if (fromCache) return;
@@ -751,7 +766,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         saveCopy(uid, 'sessions', sessions);
       },
       uid,
-      100,
+      SESSIONS_READ,
       onListenError,
     );
 
@@ -799,12 +814,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   pagesRef.current = pages;
 
   const userKnown = !!forThisUid && forThisUid.user !== undefined;
-  const ready =
-    userKnown &&
-    (forThisUid!.user === null || forThisUid!.pages !== undefined || forThisUid!.pagesSettled);
+  const ready = userKnown && (forThisUid!.user === null || forThisUid!.pages !== undefined || forThisUid!.pagesSettled);
   const offline = netIsOffline || serverReachable === false;
-  const connectionNeeded =
-    !!uid && cacheChecked === uid && !userKnown && (waitedOut || offline);
+  const connectionNeeded = !!uid && cacheChecked === uid && !userKnown && (waitedOut || offline);
   const loading = !!uid && !connectionNeeded && (cacheChecked !== uid || !ready);
 
   // A tester's TestFlight install follows the preview update channel; anything
@@ -848,53 +860,61 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // INITIALIZE USER IN FIRESTORE
   // ============================================================================
 
-  const initializeUserInFirestore = useCallback(async (
-    uid: string,
-    email?: string | null,
-    displayName?: string | null
-  ) => {
-    try {
-      // Check if user already exists
-      const existingUser = await firestoreService.getUser(uid);
-      if (existingUser) return;
+  const initializeUserInFirestore = useCallback(
+    async (uid: string, email?: string | null, displayName?: string | null) => {
+      try {
+        // Check if user already exists
+        const existingUser = await firestoreService.getUser(uid);
+        if (existingUser) return;
 
-      await firestoreService.createUser({ uid, email, displayName });
-    } catch (err) {
-      logger.error('Failed to initialize user in Firestore:', err);
-      setError(err instanceof Error ? err.message : 'Failed to initialize user');
-    }
-  }, []);
+        await firestoreService.createUser({ uid, email, displayName });
+      } catch (err) {
+        logger.error('Failed to initialize user in Firestore:', err);
+        setError(err instanceof Error ? err.message : 'Failed to initialize user');
+      }
+    },
+    [],
+  );
 
   // ============================================================================
   // PAGE OPERATIONS
   // ============================================================================
 
-  const savePages = useCallback(async (updatedPages: UserPage[], changedPageNumbers?: number[]) => {
-    if (!changedPageNumbers || changedPageNumbers.length === 0) return;
-    const changed = new Set(changedPageNumbers);
-    const pagesToSync = updatedPages.filter((p) => changed.has(p.pageNumber));
-    if (pagesToSync.length === 0) return;
-    // Never on top of pages the phone doesn't have (nothing loaded yet).
-    if (!viewRef.current || viewRef.current.pages.length === 0) {
-      logger.warn('[savePages] No pages loaded; change not saved');
-      return;
-    }
-    setError(null);
-    const shown = new Map(pagesRef.current.map((p) => [p.pageNumber, p] as const));
-    const changes = pagesToSync
-      .map((p) => pageChange(p, shown.get(p.pageNumber)))
-      .filter((c): c is PageFields => c != null);
-    if (changes.length === 0) return;
-    await enqueueOp({ kind: 'pages', pages: changes });
-  }, [enqueueOp]);
+  const savePages = useCallback(
+    async (updatedPages: UserPage[], changedPageNumbers?: number[]) => {
+      if (!changedPageNumbers || changedPageNumbers.length === 0) return;
+      const changed = new Set(changedPageNumbers);
+      const pagesToSync = updatedPages.filter((p) => changed.has(p.pageNumber));
+      if (pagesToSync.length === 0) return;
+      // Never on top of pages the phone doesn't have (nothing loaded yet).
+      if (!viewRef.current || viewRef.current.pages.length === 0) {
+        logger.warn('[savePages] No pages loaded; change not saved');
+        return;
+      }
+      setError(null);
+      const shown = new Map(pagesRef.current.map((p) => [p.pageNumber, p] as const));
+      const changes = pagesToSync
+        .map((p) => pageChange(p, shown.get(p.pageNumber)))
+        .filter((c): c is PageFields => c != null);
+      if (changes.length === 0) return;
+      await enqueueOp({ kind: 'pages', pages: changes });
+    },
+    [enqueueOp],
+  );
 
-  const updatePage = useCallback(async (page: UserPage) => {
-    await savePages([page], [page.pageNumber]);
-  }, [savePages]);
+  const updatePage = useCallback(
+    async (page: UserPage) => {
+      await savePages([page], [page.pageNumber]);
+    },
+    [savePages],
+  );
 
-  const updatePages = useCallback(async (updatedPages: UserPage[], changedPageNumbers?: number[]) => {
-    await savePages(updatedPages, changedPageNumbers);
-  }, [savePages]);
+  const updatePages = useCallback(
+    async (updatedPages: UserPage[], changedPageNumbers?: number[]) => {
+      await savePages(updatedPages, changedPageNumbers);
+    },
+    [savePages],
+  );
 
   // Re-derive per-page state (lastRevisedDate, totalRevisionCount, skipCount,
   // weaknessRating) from the canonical session logs and persist any diffs.
@@ -917,7 +937,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const deleted = new Set(waiting.flatMap((e) => (e.op.kind === 'revision.delete' ? [e.op.id] : [])));
           const seen = new Set(server.map((h) => h.id));
           const added = waiting.flatMap((e) =>
-            e.op.kind === 'revision.add' && !seen.has(e.op.item.id) ? [{ id: e.op.item.id, day: e.op.item.day, pages: e.op.item.pages }] : [],
+            e.op.kind === 'revision.add' && !seen.has(e.op.item.id)
+              ? [{ id: e.op.item.id, day: e.op.item.day, pages: e.op.item.pages }]
+              : [],
           );
           hand = [...server, ...added].filter((h) => !deleted.has(h.id));
         } catch (err) {
@@ -927,7 +949,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (uidRef.current !== forUid) return;
         if (pagesRef.current.length > 0) base = pagesRef.current;
       }
-      const next = recomputePagesFromLogs(base, freshLogs, hand);
+      // The app reads the latest SESSIONS_READ days of sessions: past that, older sessions aren't in the logs, and
+      // a page last revised before them keeps what it had (SYNC-6).
+      const read = baseRef.current?.uid === forUid ? baseRef.current?.sessions : undefined;
+      const completeSince =
+        read && read.length >= SESSIONS_READ ? read.reduce((d, s) => (s.date < d ? s.date : d), read[0].date) : null;
+      const next = recomputePagesFromLogs(base, freshLogs, hand, completeSince);
       const changed = next
         .filter((p) => {
           const old = base.find((c) => c.pageNumber === p.pageNumber);
@@ -1004,22 +1031,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // USER OPERATIONS
   // ============================================================================
 
-  const saveUser = useCallback(async (updatedUser: User) => {
-    setError(null);
-    // Only what this save changes (see changedOnly).
-    const shown = viewRef.current?.user ? firestoreUserToLocal(viewRef.current.user) : null;
-    const fields = changedOnly(userFields(updatedUser), shown ? userFields(shown) : null);
-    if (Object.keys(fields).length > 0) await enqueueOp({ kind: 'user', fields });
-    // Also sync the Firebase Auth profile so screens that fall back to
-    // `firebaseUser.displayName` reflect the new name. Best-effort (it needs
-    // the network): the user document is the source of truth.
-    const authName = getAuth().currentUser?.displayName ?? null;
-    if ((updatedUser.name ?? null) !== authName) {
-      updateAuthDisplayName(updatedUser.name ?? null).catch((authErr) =>
-        logger.warn('Failed to sync Firebase Auth displayName', authErr),
-      );
-    }
-  }, [enqueueOp]);
+  const saveUser = useCallback(
+    async (updatedUser: User) => {
+      setError(null);
+      // Only what this save changes (see changedOnly).
+      const shown = viewRef.current?.user ? firestoreUserToLocal(viewRef.current.user) : null;
+      const fields = changedOnly(userFields(updatedUser), shown ? userFields(shown) : null);
+      if (Object.keys(fields).length > 0) await enqueueOp({ kind: 'user', fields });
+      // Also sync the Firebase Auth profile so screens that fall back to
+      // `firebaseUser.displayName` reflect the new name. Best-effort (it needs
+      // the network): the user document is the source of truth.
+      const authName = getAuth().currentUser?.displayName ?? null;
+      if ((updatedUser.name ?? null) !== authName) {
+        updateAuthDisplayName(updatedUser.name ?? null).catch((authErr) =>
+          logger.warn('Failed to sync Firebase Auth displayName', authErr),
+        );
+      }
+    },
+    [enqueueOp],
+  );
 
   const createDefaultUser = useCallback((overrides?: Partial<User>): User => {
     return {
@@ -1107,80 +1137,99 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const checkedOf = (log: { pagesRevised: number[]; ahead?: Record<string, number[]>; checked?: number[] }): number[] =>
     log.checked ?? [...new Set([...log.pagesRevised, ...Object.values(log.ahead ?? {}).flat()])];
 
-  const addLog = useCallback(async (log: Omit<RevisionLog, 'id'> & { checked?: number[]; assignedExact?: boolean }) => {
-    setError(null);
-    const at = Date.now();
-    const existing = viewRef.current?.sessions.find((s) => s.id === log.date);
-    await enqueueOp(
-      {
-        kind: 'session.add',
-        date: log.date,
-        assignedPages: log.assignedPages ?? [],
-        pagesRevised: log.pagesRevised,
+  const addLog = useCallback(
+    async (log: Omit<RevisionLog, 'id'> & { checked?: number[]; assignedExact?: boolean }) => {
+      setError(null);
+      const at = Date.now();
+      const existing = viewRef.current?.sessions.find((s) => s.id === log.date);
+      await enqueueOp(
+        {
+          kind: 'session.add',
+          date: log.date,
+          assignedPages: log.assignedPages ?? [],
+          pagesRevised: log.pagesRevised,
+          pagesSkipped: log.pagesSkipped,
+          weaknessUpdates: weaknessChanges(log.weaknessUpdates, at),
+          // Minutes add up: what this phone knows plus this stretch.
+          durationAtLeast: (existing?.durationMinutes ?? 0) + (log.durationMinutes ?? 0),
+          durationAdd: log.durationMinutes ?? 0,
+          ...(log.ahead ? { ahead: log.ahead } : {}),
+          ...(log.ahead || log.checked ? { checked: checkedOf(log) } : {}),
+        },
+        at,
+      );
+      // The day's own pages now (assignedExact): pages its session holds that left the day (Keep
+      // daily amount moved them to tomorrow) leave its assignment, in a change of their own.
+      const before = existing?.assignedPages ?? [];
+      if (log.assignedExact && log.assignedPages && before.some((p) => !log.assignedPages!.includes(p))) {
+        await enqueueOp({ kind: 'session.assigned', id: log.date, assignedPages: log.assignedPages }, at);
+      }
+    },
+    [enqueueOp],
+  );
+
+  const updateLog = useCallback(
+    async (log: RevisionLog & { checked?: number[] }) => {
+      setError(null);
+      const at = Date.now();
+      const before = viewRef.current?.sessions.find((s) => s.id === log.id);
+      const old = new Set(before?.pagesRevised ?? []);
+      const next = new Set(log.pagesRevised);
+      const op: OutboxOp = {
+        kind: 'session.edit',
+        id: log.id,
+        addRevised: log.pagesRevised.filter((p) => !old.has(p)),
+        removeRevised: [...old].filter((p) => !next.has(p)),
         pagesSkipped: log.pagesSkipped,
+        durationMinutes: log.durationMinutes,
         weaknessUpdates: weaknessChanges(log.weaknessUpdates, at),
-        // Minutes add up: what this phone knows plus this stretch.
-        durationAtLeast: (existing?.durationMinutes ?? 0) + (log.durationMinutes ?? 0),
-        durationAdd: log.durationMinutes ?? 0,
-        ...(log.ahead ? { ahead: log.ahead } : {}),
-        ...(log.ahead || log.checked ? { checked: checkedOf(log) } : {}),
-      },
-      at,
-    );
-    // The day's own pages now (assignedExact): pages its session holds that left the day (Keep
-    // daily amount moved them to tomorrow) leave its assignment, in a change of their own.
-    const before = existing?.assignedPages ?? [];
-    if (log.assignedExact && log.assignedPages && before.some((p) => !log.assignedPages!.includes(p))) {
-      await enqueueOp({ kind: 'session.assigned', id: log.date, assignedPages: log.assignedPages }, at);
-    }
-  }, [enqueueOp]);
+        // Pages no longer revised here are no longer credited ahead either.
+        ...(log.ahead
+          ? {
+              ahead: removeAheadPages(
+                log.ahead,
+                [...old].filter((p) => !next.has(p)),
+              ),
+            }
+          : {}),
+        checked: checkedOf(log),
+      };
+      const forUid = uidRef.current;
+      const freshLogs = logsWith([op], at);
+      await enqueueOp(op, at);
+      // Signed out (or another account) meanwhile: nothing more for this one.
+      if (uidRef.current !== forUid) return;
+      await syncPagesFromLogs(pagesRef.current, freshLogs);
+    },
+    [enqueueOp, logsWith, syncPagesFromLogs],
+  );
 
-  const updateLog = useCallback(async (log: RevisionLog & { checked?: number[] }) => {
-    setError(null);
-    const at = Date.now();
-    const before = viewRef.current?.sessions.find((s) => s.id === log.id);
-    const old = new Set(before?.pagesRevised ?? []);
-    const next = new Set(log.pagesRevised);
-    const op: OutboxOp = {
-      kind: 'session.edit',
-      id: log.id,
-      addRevised: log.pagesRevised.filter((p) => !old.has(p)),
-      removeRevised: [...old].filter((p) => !next.has(p)),
-      pagesSkipped: log.pagesSkipped,
-      durationMinutes: log.durationMinutes,
-      weaknessUpdates: weaknessChanges(log.weaknessUpdates, at),
-      // Pages no longer revised here are no longer credited ahead either.
-      ...(log.ahead ? { ahead: removeAheadPages(log.ahead, [...old].filter((p) => !next.has(p))) } : {}),
-      checked: checkedOf(log),
-    };
-    const forUid = uidRef.current;
-    const freshLogs = logsWith([op], at);
-    await enqueueOp(op, at);
-    // Signed out (or another account) meanwhile: nothing more for this one.
-    if (uidRef.current !== forUid) return;
-    await syncPagesFromLogs(pagesRef.current, freshLogs);
-  }, [enqueueOp, logsWith, syncPagesFromLogs]);
+  const deleteLogs = useCallback(
+    async (logIds: string[]) => {
+      if (logIds.length === 0) return;
+      setError(null);
+      const at = Date.now();
+      const ops: OutboxOp[] = logIds.map((id) => ({ kind: 'session.delete', id }));
+      const forUid = uidRef.current;
+      const freshLogs = logsWith(ops, at);
+      for (const op of ops) await enqueueOp(op, at);
+      // A session's id is its revision day; its recordings go with it. Awaited
+      // so a recordings list refreshed afterwards no longer shows them.
+      await deleteRecordings((r) => logIds.some((day) => isRevisionRecordingOf(day)(r))).catch((err) =>
+        logger.warn('Could not delete session recordings', err),
+      );
+      if (uidRef.current !== forUid) return;
+      await syncPagesFromLogs(pagesRef.current, freshLogs);
+    },
+    [enqueueOp, logsWith, syncPagesFromLogs],
+  );
 
-  const deleteLogs = useCallback(async (logIds: string[]) => {
-    if (logIds.length === 0) return;
-    setError(null);
-    const at = Date.now();
-    const ops: OutboxOp[] = logIds.map((id) => ({ kind: 'session.delete', id }));
-    const forUid = uidRef.current;
-    const freshLogs = logsWith(ops, at);
-    for (const op of ops) await enqueueOp(op, at);
-    // A session's id is its revision day; its recordings go with it. Awaited
-    // so a recordings list refreshed afterwards no longer shows them.
-    await deleteRecordings((r) => logIds.some((day) => isRevisionRecordingOf(day)(r))).catch((err) =>
-      logger.warn('Could not delete session recordings', err),
-    );
-    if (uidRef.current !== forUid) return;
-    await syncPagesFromLogs(pagesRef.current, freshLogs);
-  }, [enqueueOp, logsWith, syncPagesFromLogs]);
-
-  const deleteLog = useCallback(async (logId: string) => {
-    await deleteLogs([logId]);
-  }, [deleteLogs]);
+  const deleteLog = useCallback(
+    async (logId: string) => {
+      await deleteLogs([logId]);
+    },
+    [deleteLogs],
+  );
 
   // ============================================================================
   // RENDER

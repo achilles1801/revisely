@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { hapticOf } from '../design/haptics';
 import { ReadPalette } from '../theme/readPalette';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
@@ -19,6 +19,7 @@ import {
   scrubberPreview,
 } from '../lib/mushafScrubber';
 import { getJuzForPage } from '../lib/quranData';
+import { t } from '../i18n';
 
 // Room either side of the track so the thumb can sit on page 1 / 604 and
 // still be under a finger.
@@ -94,7 +95,7 @@ export function MushafScrubber({
     setDragPage(next);
     // A tick at each juz boundary gives the drag some texture.
     const juz = getJuzForPage(next);
-    if (juzRef.current !== 0 && juz !== juzRef.current) Haptics.selectionAsync();
+    if (juzRef.current !== 0 && juz !== juzRef.current) hapticOf('selection').catch(() => undefined);
     juzRef.current = juz;
   }
 
@@ -118,9 +119,9 @@ export function MushafScrubber({
     <View style={styles.wrap} pointerEvents="box-none">
       {preview && (
         <View style={styles.bubble} pointerEvents="none">
-          <Text style={styles.bubblePage}>Page {preview.page}</Text>
+          <Text style={styles.bubblePage}>{t('mushaf.scrubber.page', { page: preview.page })}</Text>
           <Text style={styles.bubbleMeta} numberOfLines={1}>
-            {preview.surahs} · Juz {preview.juz}
+            {t('mushaf.scrubber.where', { surahs: preview.surahs, juz: preview.juz })}
           </Text>
         </View>
       )}
@@ -130,9 +131,9 @@ export function MushafScrubber({
         {...responder.panHandlers}
         accessible
         accessibilityRole="adjustable"
-        accessibilityLabel="Page position"
-        accessibilityHint="Drag to jump to another page"
-        accessibilityValue={{ min: 1, max: totalPages, now: page, text: `Page ${page}` }}
+        accessibilityLabel={t('mushaf.scrubber.label')}
+        accessibilityHint={t('mushaf.scrubber.hint')}
+        accessibilityValue={{ min: 1, max: totalPages, now: page, text: t('mushaf.scrubber.page', { page }) }}
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
         onAccessibilityAction={onAccessibilityAction}
         testID="mushaf-scrubber"

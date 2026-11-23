@@ -1,5 +1,7 @@
 import { CLAIM_LIMITS, ClaimKind, RESET_CALL_OPTIONS, ResetError, ResetLog, ResetStore, claimReset } from '../testerReset';
 import {
+  ALL_SCENARIO_IDS,
+  CHECK_SCENARIO_IDS,
   CLOCK_SKEW_MS,
   SCENARIO_IDS,
   ScenarioId,
@@ -14,8 +16,11 @@ import {
   parseContext,
   plannedPages,
   revisionDayAt,
+  revoDocuments,
+  scenarioDocuments,
   wallMs,
 } from '../testScenarios';
+import { ayahOfWord, pageOfWord, pageWords, wordsOnPagesReached } from '../scenarioTakes';
 
 const NOW = Date.parse('2026-11-05T18:00:00Z'); // 12:00 in Chicago
 
@@ -265,7 +270,7 @@ describe('every scenario', () => {
   const zones = ['America/Chicago', 'Asia/Amman', 'Pacific/Kiritimati', 'Etc/GMT+12', 'Europe/London'];
   const times = ['00:20', '04:30', '12:00', '23:50'];
 
-  it.each(SCENARIO_IDS.map((s) => [s]))('%s builds consistently in every zone and at any hour', (scenario) => {
+  it.each(ALL_SCENARIO_IDS.map((s) => [s]))('%s builds consistently in every zone and at any hour', (scenario) => {
     for (const zone of zones) {
       for (const t of times) {
         const [h, mi] = t.split(':').map(Number);
@@ -276,7 +281,14 @@ describe('every scenario', () => {
         expect(plan.user.onboardingComplete).toBe(true);
         // NEW-1: a loaded scenario opens on Home, never on "What's new".
         expect(plan.user.whatsNewSeen).toBe('all');
-        expect(plan.user.totalMemorizedPages).toBe(memorized.size);
+        expect(plan.user.totalMemorizedPages).toBe(plan.pages.filter((p) => p.status === 'memorized').length);
+        expect(plan.user.totalLearningPages).toBe(plan.pages.filter((p) => p.status === 'learning').length);
+        for (const p of plan.pages.filter((x) => x.status === 'learning')) {
+          // A page memorized in part: some of its ayahs, no date until it is whole (MEM-1).
+          expect(p.dateMemorized).toBeNull();
+          expect(p.verses!.length).toBeGreaterThan(0);
+          expect(p.startedAt!).toBeLessThanOrEqual(now);
+        }
         // Nothing on a day that hasn't started; one session a day, keyed by its day.
         const ids = plan.sessions.map((s) => s.id);
         expect(new Set(ids).size).toBe(ids.length);
@@ -311,6 +323,20 @@ describe('every scenario', () => {
           }
         }
         expect(plan.reads.map((r) => r.id)).toEqual(plan.readingSessions.map((r) => r.id));
+        // Recite takes: on days that have begun, before now, each mark inside its take, counted as the app counts.
+        for (const t of plan.takes) {
+          expect(t.day <= plan.today).toBe(true);
+          expect(t.createdAt + t.secs * 1000).toBeLessThanOrEqual(now);
+          expect(t.from).toBeLessThanOrEqual(t.to);
+          expect(new Set(t.marks.map((m) => m.w)).size).toBe(t.marks.length);
+          for (const m of t.marks) {
+            expect(m.w >= t.from && m.w <= t.to).toBe(true);
+            expect([m.sura, m.ayah]).toEqual(ayahOfWord(m.w));
+            expect(Object.values(m).every((v) => v !== undefined)).toBe(true);
+          }
+        }
+        for (const c of plan.clears) expect(c.createdAt).toBeLessThanOrEqual(now);
+        for (const chat of plan.revoChats) for (const m of chat.messages) expect(m.at).toBeLessThanOrEqual(now);
       }
     }
   });
@@ -365,11 +391,51 @@ describe('every scenario', () => {
     expect(days[1][0]).toBe(days[0][3]); // a page on two neighbouring days
     expect(new Set(days.flat())).toEqual(new Set(juzPages(30)));
 
-    const heavy = build('heavy-activity');
-    expect(heavy.memorizations.length).toBeGreaterThan(5);
-    expect(new Set(heavy.memorizations.map((m) => m.day.slice(0, 7))).size).toBeGreaterThanOrEqual(3);
-    expect(heavy.notes.length).toBeGreaterThan(20);
-    expect(heavy.readingSessions.length).toBeGreaterThan(10);
+    // Heavy: seven months, a hafiz-sized set with pages in part, gaps, takes, Revo.
+    const heavy = build('heavy');
+    const heavyDays = heavy.sessions.map((s) => s.date);
+    expect(heavyDays[0]).toBe(addDays(D, -210));
+    expect(heavy.user).toMatchObject({ scheduleMode: 'juz', dailyJuzCount: 1, smartTrackingEnabled: true, streak: 24 });
+    expect(heavy.pages.filter((p) => p.status === 'memorized').length).toBeGreaterThan(440);
+    expect(heavy.pages.filter((p) => p.status === 'learning').map((p) => p.pageNumber)).toEqual([50, 301]);
+    // The sixteen-day gap, three to four months ago, and today's juz begun.
+    expect(heavyDays.filter((d) => d >= addDays(D, -118) && d <= addDays(D, -103))).toEqual([]);
+    expect(heavy.sessions.find((s) => s.date === D)).toMatchObject({ state: 'IN_PROGRESS' });
+    expect(heavy.sessions.find((s) => s.date === addDays(D, -2))!.ahead).toBeDefined();
+    expect(new Set(heavy.memorizations.map((m) => m.day.slice(0, 7))).size).toBeGreaterThanOrEqual(6);
+    expect(heavy.notes.length).toBeGreaterThan(50);
+    expect(heavy.readingSessions.length).toBeGreaterThan(50);
+    expect(heavy.recordings.length).toBeGreaterThan(20);
+    expect(heavy.takes.length).toBeGreaterThan(80);
+    const kinds = new Set(heavy.takes.flatMap((t) => t.marks.map((m) => m.kind)));
+    expect([...kinds].sort()).toEqual(['harakat', 'letter', 'skipped', 'tajweed', 'word']);
+    expect(heavy.takes.some((t) => t.marks.some((m) => m.intoW != null))).toBe(true);
+    expect(heavy.takes.some((t) => t.marks.some((m) => m.sure === 'likely'))).toBe(true);
+    expect(heavy.takes.some((t) => t.hidden) && heavy.takes.some((t) => t.level === 'strict')).toBe(true);
+    expect(heavy.clears).toHaveLength(1);
+    expect(heavy.revoChats.map((c) => c.kind).sort()).toEqual(['chat', 'chat', 'review']);
+    expect(heavy.revoMemory.length).toBeGreaterThanOrEqual(4);
+
+    // Steady: yesterday missed after a twelve-day run (the grace ring), nothing yet today.
+    const steady = build('steady');
+    const done = new Set(steady.sessions.filter((s) => s.state === 'COMPLETED').map((s) => s.date));
+    expect(done.has(addDays(D, -1)) || steady.sessions.some((s) => s.date >= addDays(D, -1))).toBe(false);
+    for (let k = -13; k <= -2; k++) expect(done.has(addDays(D, k))).toBe(true);
+    expect(done.has(addDays(D, -14))).toBe(false);
+    expect(steady.user).toMatchObject({ scheduleMode: 'pages', dailyPageCapacity: 10 });
+    expect(steady.user.smartTrackingEnabled).toBeUndefined();
+    expect(steady.pages.filter((p) => p.status === 'learning').map((p) => p.pageNumber)).toEqual([501]);
+    expect(steady.takes.length).toBeGreaterThan(0);
+
+    // Starting: two weeks, Al-Mulk ayah by ayah, the first four takes.
+    const starting = build('starting');
+    expect(starting.user).toMatchObject({ dailyPageCapacity: 4, streak: 4 });
+    expect(starting.pages.filter((p) => p.status === 'learning').map((p) => p.pageNumber)).toEqual([563]);
+    expect(starting.pages.find((p) => p.pageNumber === 562)?.status).toBe('memorized');
+    expect(starting.memorizations.some((m) => (m.verses ?? []).length > 0)).toBe(true);
+    expect(starting.takes).toHaveLength(4);
+    expect(starting.takes.map((t) => t.marks.length)).toEqual([3, 1, 0, 1]);
+    expect(starting.sessions.some((s) => s.date === D)).toBe(false);
 
     const offline = build('offline-queue');
     expect(offline.outbox.map((o) => o.kind)).toEqual(['session.add', 'journal.entry.add', 'reading.add']);
@@ -378,8 +444,36 @@ describe('every scenario', () => {
   it('is the same for the same day: nothing random between two loads', () => {
     const zone = 'Asia/Amman';
     const now = at(zone, '12:00');
-    expect(buildScenario('heavy-activity', contextFor('heavy-activity', zone, now), 'u1')).toEqual(
-      buildScenario('heavy-activity', contextFor('heavy-activity', zone, now + 60_000), 'u1'),
-    );
+    expect(buildScenario('heavy', contextFor('heavy', zone, now), 'u1')).toEqual(buildScenario('heavy', contextFor('heavy', zone, now + 60_000), 'u1'));
+  });
+
+  it('offers three in Settings; the older ones stay loadable for the automated tests', () => {
+    expect([...SCENARIO_IDS]).toEqual(['heavy', 'steady', 'starting']);
+    expect(CHECK_SCENARIO_IDS).not.toContain('heavy-activity');
+    expect(new Set(ALL_SCENARIO_IDS).size).toBe(SCENARIO_IDS.length + CHECK_SCENARIO_IDS.length);
+  });
+
+  it('a take’s document is what the app stores and reads (lib/reciteMemory/record)', () => {
+    const zone = 'America/Chicago';
+    const plan = buildScenario('heavy', contextFor('heavy', zone, at(zone, '12:00')), 'u1');
+    const docs = scenarioDocuments(plan, (ms) => ms, 'NOW').filter((d) => d.path.startsWith('reciteTakes/'));
+    expect(docs).toHaveLength(plan.takes.length + plan.clears.length);
+    const take = docs.find((d) => d.data.kind === 'take' && (d.data.marks as unknown[]).length > 0)!.data;
+    expect(take).toMatchObject({ v: 1, kind: 'take', deleted: false, passed: [], recordingId: null, updatedAt: 'NOW' });
+    expect(Number.isInteger(take.rev) && Number.isInteger(take.secs)).toBe(true);
+    const marks = take.marks as { kind: string; sure: string }[];
+    const mistakes = marks.filter((m) => m.kind !== 'tajweed' && !((m.kind === 'harakat' || m.kind === 'letter') && m.sure === 'likely')).length;
+    expect(take.mistakes).toBe(mistakes);
+    expect(take.accuracy).toBeCloseTo(1 - mistakes / wordsOnPagesReached(take.from as number, take.to as number), 3);
+    // A page's words: its first and last, the next page starting after.
+    const [first, last] = pageWords(562);
+    expect(pageOfWord(first)).toBe(562);
+    expect(pageOfWord(last)).toBe(562);
+    expect(pageOfWord(last + 1)).toBe(563);
+    expect(ayahOfWord(first)).toEqual([67, 1]);
+    // Revo's documents are apart (only its functions write them).
+    const revo = revoDocuments(plan, 'u1');
+    expect(revo.filter((d) => d.path.startsWith('revoChats/') && !d.path.includes('/messages/'))).toHaveLength(3);
+    expect(revo.every((d) => d.data.uid === 'u1')).toBe(true);
   });
 });

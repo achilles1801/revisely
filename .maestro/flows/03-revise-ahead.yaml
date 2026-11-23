@@ -39,7 +39,7 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: session-page
-    text: "At.Tariq to Al.A'la.15 · .*"
+    text: "At.Tariq and Al.A'la · .*"
 # AHEAD-5: three of Wednesday's pages, swiped (591–593).
 - runFlow:
     file: ../subflows/swipe-pages.yaml
@@ -73,7 +73,7 @@ appId: com.revisionbuddy.app
 # phone for a new tester and puts Home back meanwhile (lib/whatsNew/due). Both attempts of #217's iOS
 # run 42619006611; Home's ? stopped meaning "tester" once help came to everyone.
 - tapOn:
-    id: open-activity
+    id: tab-ActivityTab
 - extendedWaitUntil:
     visible:
       id: activity-blocks-views
@@ -152,4 +152,4 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: session-page
-    text: "Al.'Asr to Al.Fil · .*"
+    text: "Al.'Asr, Al.Humazah and Al.Fil · .*"

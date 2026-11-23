@@ -1,0 +1,52 @@
+# Shows the reader's controls (the mic, the eye) with a tap on the page, and waits for the mic. Tapped again only
+# while the mic isn't there, at most twice more.
+#
+# Why: on a loaded runner iOS can cancel Maestro's tap before it becomes a press. In #635's run 43792854402 (iOS,
+# 18 run 1) the reader opened behind a 3 s JavaScript stall; the app then logged "touch start … on page-image" and
+# "touch cancel" 167 ms later, no touch end, and the controls never came.
+#
+# Not tap-to-open.yaml: the page stays on screen and its tap toggles the controls, so a second tap after one that
+# took would hide them. Here a tap happens only while the mic is missing.
+#
+# Each tap again first saves a screenshot, lost-tap-<n>-reader-background, which attempts.js counts and the visual
+# comparison skips, as tap-to-open.yaml's.
+#
+# A tap can also arrive as a hold: in #668's run 43843935731 (iOS, 18 run 1) it opened the held verse's menu (An-Naml
+# 27–28) instead of the controls. The menu keeps VoiceOver to itself, so the page was then not found at all and every
+# tap again failed. So an open menu is closed first, with a touch above it (any touch outside closes it, and goes no
+# further).
+appId: com.revisionbuddy.app
+---
+- evalScript: ${output.readerTaps = 0}
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: verse-menu-copy
+          commands:
+            - tapOn:
+                point: "50%,10%"
+            - extendedWaitUntil:
+                notVisible:
+                  id: verse-menu-copy
+                timeout: 3000
+      - runFlow:
+          when:
+            notVisible:
+              id: recite-mic
+          commands:
+            - runFlow:
+                when:
+                  true: ${output.readerTaps > 0}
+                commands:
+                  - evalScript: ${output.lostTaps = (output.lostTaps || 0) + 1}
+                  - takeScreenshot: lost-tap-${output.lostTaps}-reader-background
+            - evalScript: ${output.readerTaps = output.readerTaps + 1}
+            - tapOn:
+                id: reader-background
+      - extendedWaitUntil:
+          visible:
+            id: recite-mic
+          timeout: 6000

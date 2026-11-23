@@ -71,14 +71,16 @@ describe('Recite memory: the clear rule', () => {
     expect(memoryOf([missed, ...elsewhere])?.attempts).toHaveLength(1);
   });
 
-  it('“Not clear” is never remembered, and isn’t a try at the word’s harakat', () => {
+  it('[RMEM-2] “Not clear” is remembered like a slip until the word is said clearly; a Not clear try isn’t a clear one', () => {
     const unclear: Mark = { id: `${W}:harakat:`, w: W, ayah: [12, 88], kind: 'harakat', sure: 'likely', slip: { expected: 'ِ', heard: 'ُ' } };
-    expect(memoryOf([take(0, [unclear])])).toBeNull();
+    expect(memoryOf([take(0, [unclear])])).toMatchObject({ group: 'slip', open: true, needed: 2, lastMark: unclear });
     const slip: Mark = { ...unclear, sure: 'clear' };
     const records = [take(0, [slip]), take(1, [unclear]), take(2)];
     const m = memoryOf(records);
     expect(m).toMatchObject({ group: 'slip', open: true, needed: 1 });
-    expect(m?.attempts.map((a) => a.right)).toEqual([false, true]);
+    expect(m?.attempts.map((a) => a.right)).toEqual([false, false, true]);
+    // Said clearly on two days: cleared.
+    expect(memoryOf([...records, take(3)])).toMatchObject({ open: false });
   });
 
   it('a tajweed note is cleared only by takes at Strict', () => {

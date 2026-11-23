@@ -7,6 +7,7 @@ import { calendarDaysBetween, getPagesForDay, juzModeCycle } from './algorithm';
 import { creditIndex } from './aheadCredit';
 import { dateToLocalISODay } from './schedulePlans';
 import { revisablePages } from './memorizedAyahs';
+import { dayMonth, t, weekdayName } from '../i18n';
 
 const MAX_DAYS_AHEAD = 400;
 
@@ -22,7 +23,7 @@ export function revisionDayAfter(day: string): string {
 
 /** "Wed": a revision day's weekday, for the header and Activity. */
 export function weekdayLabel(day: string): string {
-  return parseDay(day).toLocaleDateString('en-US', { weekday: 'short' });
+  return weekdayName(parseDay(day), 'short');
 }
 
 /**
@@ -31,9 +32,9 @@ export function weekdayLabel(day: string): string {
  */
 export function aheadDayLabel(today: string, day: string, opts: { long?: boolean } = {}): string {
   const d = parseDay(day);
-  const weekday = opts.long ? d.toLocaleDateString('en-US', { weekday: 'long' }) : weekdayLabel(day);
-  if (calendarDaysBetween(parseDay(today), d) < 7) return weekday;
-  return `${weekday} ${d.getDate()} ${d.toLocaleDateString('en-US', { month: 'short' })}`;
+  const weekday = opts.long ? 'long' : 'short';
+  if (calendarDaysBetween(parseDay(today), d) < 7) return weekdayName(d, weekday);
+  return dayMonth(d, { weekday, month: 'short' });
 }
 
 function addDays(day: string, delta: number): string {
@@ -128,8 +129,8 @@ export function aheadLead(
   /** The weekday in full ("Thursday"), as Revo words it. */
   opts: { long?: boolean } = {},
 ): string {
-  if (plan.day === revisionDayAfter(today)) return 'Tomorrow';
-  if (plan.pages.length > 0 && startsCycle(user, pages, plan.day, plan.pages[0])) return 'Next cycle';
+  if (plan.day === revisionDayAfter(today)) return t('lib.plan.tomorrow');
+  if (plan.pages.length > 0 && startsCycle(user, pages, plan.day, plan.pages[0])) return t('lib.plan.nextCycle');
   return aheadDayLabel(today, plan.day, opts);
 }
 

@@ -2,13 +2,7 @@
 // only for the signed-in account; offline it waits and tries again later; a
 // change the server refuses for good is dropped (not retried forever).
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  enqueue,
-  loadOutbox,
-  pendingEntries,
-  resetOutboxForTests,
-  clearOutbox,
-} from '../outbox';
+import { enqueue, loadOutbox, pendingEntries, resetOutboxForTests, clearOutbox } from '../outbox';
 import {
   configureSync,
   requestFlush,
@@ -25,7 +19,8 @@ import type { OutboxEntry } from '../ops';
 jest.mock('../../logger', () => ({ logger: { log: jest.fn(), warn: jest.fn(), error: jest.fn() } }));
 const { logger } = jest.requireMock('../../logger');
 
-const offline = () => Object.assign(new Error('Failed to get document because the client is offline.'), { code: 'unavailable' });
+const offline = () =>
+  Object.assign(new Error('Failed to get document because the client is offline.'), { code: 'unavailable' });
 const usage = (seconds: number) => ({ kind: 'usage' as const, seconds });
 
 /** The app closing: everything in memory goes; what's on the phone stays. */
@@ -186,13 +181,22 @@ describe('sync', () => {
     await settleSync('u1');
     expect(pendingEntries('u1')).toEqual([]);
     expect(apply).toHaveBeenCalledTimes(2);
-    expect(logger.error).toHaveBeenCalledWith(expect.any(String), expect.anything(), { kind: 'usage', failure: 'refused', failures: 1 });
+    expect(logger.error).toHaveBeenCalledWith(expect.any(String), expect.anything(), {
+      kind: 'usage',
+      failure: 'refused',
+      failures: 1,
+    });
   });
 
   it('"permission denied" while the server otherwise works (the rules refusing it): a few tries, then dropped', async () => {
     jest.useFakeTimers();
     apply.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
-    configureSync({ currentUid: () => signedIn, isDeleting: () => false, apply: (...a) => apply(...a), probe: async () => true });
+    configureSync({
+      currentUid: () => signedIn,
+      isDeleting: () => false,
+      apply: (...a) => apply(...a),
+      probe: async () => true,
+    });
     await enqueue('u1', usage(1));
     requestFlush('u1');
     for (let i = 0; i < 6; i++) {
@@ -207,7 +211,12 @@ describe('sync', () => {
   it('"permission denied" while no server read works either (App Check, a sign-in out of date): kept, however long', async () => {
     jest.useFakeTimers();
     apply.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
-    configureSync({ currentUid: () => signedIn, isDeleting: () => false, apply: (...a) => apply(...a), probe: async () => false });
+    configureSync({
+      currentUid: () => signedIn,
+      isDeleting: () => false,
+      apply: (...a) => apply(...a),
+      probe: async () => false,
+    });
     await enqueue('u1', usage(1));
     requestFlush('u1');
     for (let i = 0; i < 12; i++) {
@@ -222,7 +231,8 @@ describe('sync', () => {
   it('an error that isn’t Firestore’s (a bug) is reported and dropped after a few tries, so it can’t hold up the rest', async () => {
     jest.useFakeTimers();
     apply.mockImplementation(async (_uid, e) => {
-      if ((e.op as { seconds: number }).seconds === 1) throw new TypeError("Cannot read properties of undefined (reading 'includes')");
+      if ((e.op as { seconds: number }).seconds === 1)
+        throw new TypeError("Cannot read properties of undefined (reading 'includes')");
     });
     await enqueue('u1', usage(1));
     await enqueue('u1', usage(2));
@@ -235,7 +245,11 @@ describe('sync', () => {
     expect(pendingEntries('u1')).toEqual([]);
     expect(apply.mock.calls.filter(([, e]) => (e.op as { seconds: number }).seconds === 1)).toHaveLength(5);
     expect(apply.mock.calls.at(-1)![1].op).toEqual(usage(2));
-    expect(logger.error).toHaveBeenCalledWith(expect.any(String), expect.anything(), { kind: 'usage', failure: 'bug', failures: 5 });
+    expect(logger.error).toHaveBeenCalledWith(expect.any(String), expect.anything(), {
+      kind: 'usage',
+      failure: 'bug',
+      failures: 5,
+    });
   });
 
   it('classifies Firestore errors', () => {

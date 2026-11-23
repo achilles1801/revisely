@@ -1,3 +1,5 @@
+import { formatDate as formatLocaleDate, t } from '../i18n';
+
 /**
  * Format date to YYYY-MM-DD in the user's local timezone.
  * Must use local components — `toISOString()` returns UTC and silently
@@ -15,7 +17,7 @@ export function formatDate(date: Date): string {
  */
 export function formatDateReadable(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleDateString('en-US', { 
+  return formatLocaleDate(d, { 
     month: 'short', 
     day: 'numeric', 
     year: 'numeric' 
@@ -52,8 +54,8 @@ export function generateId(): string {
  */
 export function getGreeting(): string {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Assalamu Alaikum';
-  if (hour < 18) return 'Assalamu Alaikum';
-  return 'Assalamu Alaikum';
+  if (hour < 12) return t('common.salam');
+  if (hour < 18) return t('common.salam');
+  return t('common.salam');
 }
 

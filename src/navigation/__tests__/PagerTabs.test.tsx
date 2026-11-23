@@ -65,45 +65,45 @@ describe('the pager physics', () => {
 });
 
 describe('the pages in the pager, from the settings', () => {
-  const tabs = ['Home', 'Read', 'Insights'];
+  const tabs = ['Home', 'ActivityTab', 'Read', 'Insights'];
 
-  it('Smart Tracking off: Home and Read, whichever is focused; Read is the last page', () => {
+  it('Smart Tracking off: Home, Activity and Read, whichever is focused; Read is the last page', () => {
     const count = swipeableTabCount(false);
-    expect(pagerRoutes(tabs, count, 0)).toEqual(['Home', 'Read']);
-    expect(pagerRoutes(tabs, count, 1)).toEqual(['Home', 'Read']);
+    expect(pagerRoutes(tabs, count, 0)).toEqual(['Home', 'ActivityTab', 'Read']);
+    expect(pagerRoutes(tabs, count, 2)).toEqual(['Home', 'ActivityTab', 'Read']);
   });
 
-  it('Smart Tracking on: all three', () => {
+  it('Smart Tracking on: all four', () => {
     expect(pagerRoutes(tabs, swipeableTabCount(true), 1)).toEqual(tabs);
   });
 
   it('off while Insights is still the tab on screen: it stays until left', () => {
-    expect(pagerRoutes(tabs, swipeableTabCount(false), 2)).toEqual(tabs);
+    expect(pagerRoutes(tabs, swipeableTabCount(false), 3)).toEqual(tabs);
   });
 });
 
 describe('the Insights tab, from the account', () => {
   it('a new account: shown with its glow, not a page; a tap or a swipe past Read opens the preview', () => {
     expect(insightsTab(false, false)).toEqual({ shown: true, opensPreview: true });
-    expect(swipeableTabCount(false)).toBe(2);
+    expect(swipeableTabCount(false)).toBe(3);
   });
 
   it('preview seen, Smart Tracking off: hidden; on: a page like the others', () => {
     expect(insightsTab(false, true)).toEqual({ shown: false, opensPreview: false });
     expect(insightsTab(true, true)).toEqual({ shown: true, opensPreview: false });
     expect(insightsTab(true, false)).toEqual({ shown: true, opensPreview: false });
-    expect(swipeableTabCount(true)).toBe(3);
+    expect(swipeableTabCount(true)).toBe(4);
   });
 
-  it('Insights in Activity (the new Activity): no Insights tab, Home and Read only, Smart Tracking or not', () => {
+  it('Insights in Activity (the new Activity): no Insights tab, Home, Activity and Read only, Smart Tracking or not', () => {
     for (const on of [false, true]) {
       for (const seen of [false, true]) {
         expect(insightsTab(on, seen, true)).toEqual({ shown: false, opensPreview: false });
       }
-      expect(swipeableTabCount(on, true)).toBe(2);
+      expect(swipeableTabCount(on, true)).toBe(3);
     }
-    expect(mainTabRoutes(true)).toEqual(['Home', 'Read']);
-    expect(mainTabRoutes(false)).toEqual(['Home', 'Read', 'Insights']);
+    expect(mainTabRoutes(true)).toEqual(['Home', 'ActivityTab', 'Read']);
+    expect(mainTabRoutes(false)).toEqual(['Home', 'ActivityTab', 'Read', 'Insights']);
   });
 });
 

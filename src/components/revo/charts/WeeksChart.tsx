@@ -9,6 +9,7 @@ import type { RevoDayFacts } from '../../../lib/revo/types';
 import { Tap } from '../../v2/Tap';
 import { CHART_TEXT_MAX, ChartFrame, ChartPlot } from './ChartFrame';
 import { ChartButtons, DetailTitle, Legend } from './ChartParts';
+import { t, formatDate } from '../../../i18n';
 
 /** The month column on the left. */
 const LABEL_W = 34;
@@ -16,9 +17,9 @@ const GAP = 5;
 
 type Pick = { kind: 'day'; w: number; d: number } | { kind: 'col'; d: number } | null;
 
-const letter = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString('en-US', { weekday: 'narrow' });
-const weekdayName = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' });
-const monthShort = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString('en-US', { month: 'short' });
+const letter = (day: string) => formatDate(new Date(`${day}T12:00:00`), { weekday: 'narrow' });
+const weekdayName = (day: string) => formatDate(new Date(`${day}T12:00:00`), { weekday: 'long' });
+const monthShort = (day: string) => formatDate(new Date(`${day}T12:00:00`), { month: 'short' });
 
 /**
  * The last few weeks a day a cell, Sunday to Saturday as Activity's calendar: the plan done, done
@@ -120,7 +121,7 @@ export function WeeksChart({
       <ChartPlot
         testID={`${testID}-plot`}
         label={`${title}. ${weeksHint(rows).split(' · ')[0]}`}
-        value={readout ? spokenText(`${readout.title}, ${readout.line}`) : 'Swipe up or down to pick a day'}
+        value={readout ? spokenText(`${readout.title}, ${readout.line}`) : t('revo.chart.pickDay')}
         onStep={stepTo}
         onActivate={() => setPicked(null)}
         onTap={(x, y, size) => {
@@ -159,11 +160,11 @@ export function WeeksChart({
       </ChartPlot>
       <Legend
         items={[
-          { color: palette.heat[2], label: 'Done' },
-          { color: palette.heat[1], label: 'Part' },
-          { color: palette.track, label: 'Missed', outline: true },
+          { color: palette.heat[2], label: t('revo.chart.done') },
+          { color: palette.heat[1], label: t('revo.chart.part') },
+          { color: palette.track, label: t('revo.chart.missed'), outline: true },
           // Days the plan gave nothing (a rest day, or before the plan began): the streak skips them too.
-          ...(rows.some((r) => r.some((c) => c.cell === 'rest')) ? [{ color: palette.heat[0], label: 'No plan' }] : []),
+          ...(rows.some((r) => r.some((c) => c.cell === 'rest')) ? [{ color: palette.heat[0], label: t('revo.chart.noPlan') }] : []),
         ]}
       />
     </ChartFrame>

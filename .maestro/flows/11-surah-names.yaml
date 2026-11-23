@@ -27,7 +27,7 @@ appId: com.revisionbuddy.app
 - runFlow: ../subflows/show-controls.yaml
 - assertVisible:
     id: session-page
-    text: "An.Naba.1–30 · Juz 30 · .*"
+    text: "An.Naba · Juz 30 · .*"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
@@ -81,7 +81,7 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: session-page
-    text: "At.Tariq to Al.A'la.15 · .*"
+    text: "At.Tariq and Al.A'la · .*"
 - runFlow:
     file: ../subflows/shot.yaml
     env:
@@ -100,49 +100,10 @@ appId: com.revisionbuddy.app
       NAME: 11-end-card-dark
 - runFlow: ../subflows/show-controls.yaml
 - tapOn: "Back"
-
-# Last, as it marks pages memorized (and so changes the schedule): the daily log, where a
-# Memorized entry from its pages is named by its surahs. In dark, then in light. The log
-# opens from a note on Activity's day, so today gets one first (the day's +).
-- runFlow: ../subflows/back-home.yaml
-- runFlow: ../subflows/open-day.yaml
-- runFlow:
-    file: ../subflows/add-day-note.yaml
-    env:
-      TEXT: Al-Mulk again tomorrow
-- runFlow: ../subflows/day-log.yaml
-- tapOn:
-    id: pill-memorization
-- tapOn:
-    id: memorize-from
-- inputText: "562"
-- tapOn:
-    id: memorize-to
-- inputText: "564"
-- runFlow: ../subflows/keyboard-done.yaml
-- tapOn:
-    id: journal-send
+# Home first, as after Tuesday's session: back-home's own check is immediate, and the session can take most of a second
+# to go (0.8 s on an iOS runner, run 44466446047), so it read the session as "not Home" and looked for a Back that had
+# gone with it.
 - extendedWaitUntil:
     visible:
-      id: journal-note-.*
-      text: "Memoriz.*Al.Mulk to Al.Qalam.15.*"
+      id: today-post
     timeout: 15000
-- runFlow:
-    file: ../subflows/shot.yaml
-    env:
-      NAME: 11-daily-log-dark
-- runFlow: ../subflows/back-home.yaml
-- runFlow:
-    file: ../subflows/theme.yaml
-    env:
-      THEME: Light
-- runFlow: ../subflows/open-log.yaml
-- extendedWaitUntil:
-    visible:
-      id: journal-note-.*
-      text: "Memoriz.*Al.Mulk to Al.Qalam.15.*"
-    timeout: 15000
-- runFlow:
-    file: ../subflows/shot.yaml
-    env:
-      NAME: 11-daily-log

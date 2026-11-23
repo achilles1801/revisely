@@ -44,7 +44,10 @@ export function watchConnectivity(onChange: (offline: boolean) => void, onBack: 
   const unsubNet = NetInfo.addEventListener((s) => {
     const next = netOffline(s);
     const cameBack = offline === true && !next;
-    if (next !== offline) logger.log(`[net] NetInfo: ${next ? 'offline' : 'online'} (${s.type}, reachable ${String(s.isInternetReachable)})`);
+    if (next !== offline)
+      logger.log(
+        `[net] NetInfo: ${next ? 'offline' : 'online'} (${s.type}, reachable ${String(s.isInternetReachable)})`,
+      );
     offline = next;
     onChange(next);
     if (cameBack) onBack();

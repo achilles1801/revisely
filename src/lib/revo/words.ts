@@ -4,6 +4,7 @@
 
 import { getJuzForPage } from '../quranData';
 import { describeAyahs, describePassage, describePagesToRevise, placeOfPageToRevise, plainText, type PartialPages, type PassageOptions } from '../passages';
+import { t } from '../../i18n';
 
 /** For labels (a chip, a chart's row, a picker row): "Al-Hashr 17–24", "Juz 28", "Al-Hashr to Al-Mumtahanah". */
 export function passageShort(pages: readonly number[]): string {
@@ -21,7 +22,7 @@ export function juzOf(pages: readonly number[]): string {
   const juz = pages.map(getJuzForPage);
   const lo = Math.min(...juz);
   const hi = Math.max(...juz);
-  return lo === hi ? `Juz ${lo}` : `Juz ${lo}–${hi}`;
+  return lo === hi ? t('common.juzN', { n: lo }) : t('common.juzRange', { from: lo, to: hi });
 }
 
 // What the server takes for a worded part (functions/src/revo/validate.ts passageText): one short
@@ -34,6 +35,11 @@ function fit(text: string, max: number): string | null {
   const t = plainText(text).trim();
   return t.length > 0 && t.length <= max && PASSAGE_RE.test(t) ? t : null;
 }
+
+/** A worded part for a sentence, as the server takes it (plain text, at most 160), or null. */
+export const passageWords = (text: string): string | null => fit(text, MAX_PASSAGE);
+/** A short worded part (an ayah, a page), as the server takes it (at most 100), or null. */
+export const shortWords = (text: string): string | null => fit(text, MAX_PAGE_NAME);
 
 export interface ContextWords {
   passages: { today?: string; startsAt?: string; next?: string; nextAt?: string; weakNext?: string; weak?: string };

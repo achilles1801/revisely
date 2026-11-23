@@ -3,15 +3,31 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
 import JourneySelectScreen from '../screens/onboarding/JourneySelectScreen';
 import JuzSelectionScreen from '../screens/onboarding/JuzSelectionScreen';
-import ScheduleScreen from '../screens/onboarding/ScheduleScreen';
+import DailyAmountScreen from '../screens/onboarding/DailyAmountScreen';
+import DayStartScreen from '../screens/onboarding/DayStartScreen';
+import ReminderScreen from '../screens/onboarding/ReminderScreen';
 
 export type JourneyStage = 'in_progress' | 'complete';
+export type ScheduleMode = 'pages' | 'juz';
+
+/** The daily amount, carried to the last question, which saves the plan. */
+interface AmountAnswer {
+  journeyStage: JourneyStage;
+  scheduleMode: ScheduleMode;
+  dailyCapacity: number;
+  dailyJuzCount: number;
+}
 
 export type OnboardingStackParamList = {
   Welcome: undefined;
   JourneySelect: undefined;
   JuzSelection: { journeyStage: JourneyStage };
-  Schedule: { journeyStage: JourneyStage };
+  DailyAmount: { journeyStage: JourneyStage };
+  DayStart: AmountAnswer;
+  Reminder: AmountAnswer & {
+    fajrBoundaryEnabled: boolean;
+    locationCoords: { latitude: number; longitude: number } | null;
+  };
 };
 
 const Stack = createNativeStackNavigator<OnboardingStackParamList>();
@@ -26,8 +42,8 @@ export function OnboardingNavigator() {
         // `slide_from_right` exposes the outgoing screen through the
         // incoming one because both are transparent, which reads as choppy
         // ghosting. A cross-dissolve sidesteps the layering entirely; the
-        // Stepper component already conveys forward progress so we don't
-        // need a directional cue.
+        // progress bars already convey forward progress so we don't need a
+        // directional cue.
         animation: 'fade',
         animationDuration: 220,
       }}
@@ -35,7 +51,9 @@ export function OnboardingNavigator() {
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
       <Stack.Screen name="JourneySelect" component={JourneySelectScreen} />
       <Stack.Screen name="JuzSelection" component={JuzSelectionScreen} />
-      <Stack.Screen name="Schedule" component={ScheduleScreen} />
+      <Stack.Screen name="DailyAmount" component={DailyAmountScreen} />
+      <Stack.Screen name="DayStart" component={DayStartScreen} />
+      <Stack.Screen name="Reminder" component={ReminderScreen} />
     </Stack.Navigator>
   );
 }

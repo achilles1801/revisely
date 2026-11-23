@@ -6,6 +6,7 @@ import { StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
+import { t } from '../../i18n';
 
 export type BlockKind = 'revised' | 'memorized' | 'read' | 'notes';
 
@@ -37,7 +38,7 @@ export function RevisedMark({ fraction, done, size = 36 }: { fraction: number; d
   const { palette } = useTheme();
   if (done) {
     return (
-      <View style={[styles.center, { width: size, height: size, borderRadius: size / 2, backgroundColor: palette.done }]} accessibilityLabel="Revised, done">
+      <View style={[styles.center, { width: size, height: size, borderRadius: size / 2, backgroundColor: palette.done }]} accessibilityLabel={t('activity.marks.revisedDone')}>
         <Ionicons name="checkmark" size={Math.round(size * 0.52)} color={palette.onDone} />
       </View>
     );
@@ -48,7 +49,7 @@ export function RevisedMark({ fraction, done, size = 36 }: { fraction: number; d
   const c = 2 * Math.PI * r;
   const f = Math.max(0, Math.min(1, fraction));
   return (
-    <View style={[styles.center, { width: size, height: size }]} accessibilityLabel={`${Math.round(f * 100)} percent revised`}>
+    <View style={[styles.center, { width: size, height: size }]} accessibilityLabel={t('activity.marks.percentRevised', { n: Math.round(f * 100) })}>
       <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
         <Circle cx={size / 2} cy={size / 2} r={r} stroke={palette.track} strokeWidth={stroke} fill="none" />
         <Circle

@@ -16,9 +16,17 @@ import {
   readItemFor as serverReadItem,
   revisionDayAt,
   revisionItemsFor as serverRevisionItems,
+  scenarioDocuments,
   wallMs,
 } from '../../../functions/src/testScenarios';
 import { SILENCE_M4A_BASE64 } from '../../../functions/src/silence';
+import { PAGE_FIRST_WORD, SLIPS, SURAH_VERSES, TAKE_PAGES, VERSE_WORDS } from '../../../functions/src/scenarioQuran';
+import { ayahOfWord, pageWords, wordText } from '../../../functions/src/scenarioTakes';
+import { QuranWords, type QuranWordsData } from '../recite/quranWords';
+import { fromStored } from '../reciteMemory/record';
+import { pageAccuracy } from '../reciteLive/score';
+import { countsAsMistake, isUnclear } from '../reciteLive/contract';
+import { ayahCount } from '../ayahKeys';
 import { getPagesScheduledForDate, juzKeyForPage } from '../algorithm';
 import { getPagesForJuz } from '../quranData';
 import { getFajrTimeFor, getRevisionDayForUser } from '../fajrBoundary';
@@ -166,6 +174,62 @@ describe('the server’s ports of the app’s rules', () => {
   it('the recordings’ audio is the app’s second of silence', () => {
     const file = fs.readFileSync(path.join(__dirname, '../../../assets/audio/silence.m4a'));
     expect(Buffer.from(SILENCE_M4A_BASE64, 'base64').equals(file)).toBe(true);
+  });
+});
+
+describe('the words the scenarios recite (functions/src/scenarioQuran.ts, scripts/scenario-quran.js)', () => {
+  const data = JSON.parse(fs.readFileSync(path.join(__dirname, '../../data/quranWords.dat'), 'utf8')) as QuranWordsData;
+  const words = new QuranWords(data);
+
+  it('each verse’s words, each page’s first word and each surah’s verses are the app’s (src/data/quranWords.dat)', () => {
+    expect([...VERSE_WORDS]).toEqual(data.counts);
+    for (let p = 1; p <= 604; p++) expect(PAGE_FIRST_WORD[p - 1]).toBe(words.pageRange(p)[0]);
+    expect(PAGE_FIRST_WORD[604]).toBe(words.count);
+    expect(SURAH_VERSES.map((_, i) => ayahCount(i + 1))).toEqual([...SURAH_VERSES]);
+    for (const w of [0, 547, 843, 30000, 75479, words.count - 1]) {
+      const ref = words.ref(w)!;
+      expect(ayahOfWord(w)).toEqual([ref.sura, ref.ayah]);
+      expect(pageWords(ref.page)[0]).toBeLessThanOrEqual(w);
+    }
+  });
+
+  it('the verses’ text and the slips into similar ayat say what the app’s words say', () => {
+    for (const p of TAKE_PAGES) {
+      const [first, end] = words.pageRange(p);
+      for (let w = first; w < end; w++) expect(wordText(w)).toBe(words.uthmani(w));
+    }
+    for (const slip of SLIPS) {
+      expect(words.uthmani(slip.w)).toBe(slip.expected);
+      expect([words.ref(slip.w)!.sura, words.ref(slip.w)!.ayah]).toEqual(slip.ayah);
+      expect([words.ref(slip.into.w)!.sura, words.ref(slip.into.w)!.ayah]).toEqual(slip.into.ayah);
+      if (slip.heard) expect(words.uthmani(slip.into.w)).toBe(slip.heard);
+    }
+  });
+
+  it('every take and cleared word a scenario writes reads back in the app (lib/reciteMemory/record) as written', () => {
+    const zone = 'America/Chicago';
+    const now = wallMs('2026-11-17', 12, 0, zone);
+    for (const scenario of SCENARIO_IDS) {
+      const plan = buildScenario(scenario, { zone, now, fajr: null }, 'u1');
+      const docs = scenarioDocuments(plan, (ms) => ms, null).filter((d) => d.path.startsWith('reciteTakes/'));
+      expect(docs).toHaveLength(plan.takes.length + plan.clears.length);
+      for (const { path: at, data: doc } of docs) {
+        const record = fromStored(at.split('/')[1], doc)!;
+        expect(record).not.toBeNull();
+        if (record.kind !== 'take') continue;
+        const take = plan.takes.find((t) => t.id === record.id)!;
+        expect(record.marks).toHaveLength(take.marks.length);
+        expect(record.from).toBe(take.from);
+        // The score as the take's summary counts it, by the page (lib/reciteLive/score).
+        expect(record.accuracy).toBeCloseTo(pageAccuracy(words, record.mistakes, record.from, record.to), 3);
+        for (const m of record.marks) {
+          expect(words.ref(m.w)).toMatchObject({ sura: m.ayah[0], ayah: m.ayah[1] });
+          if (m.slip && m.at) expect(words.uthmani(m.w).slice(m.at[0], m.at[1])).toBe(m.slip.expected);
+        }
+        // The page's own count of what goes in the score.
+        expect(record.mistakes).toBe(record.marks.filter((m) => countsAsMistake(m) && !isUnclear(m)).length);
+      }
+    }
   });
 });
 

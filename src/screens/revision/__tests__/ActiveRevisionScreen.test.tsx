@@ -4,11 +4,15 @@ import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import ActiveRevisionScreen from '../ActiveRevisionScreen';
-import { BulkActionsModal } from '../../../components/BulkActionsModal';
+import { PagesSheet } from '../../../components/revision/PagesSheet';
 import { getCurrentRevisionDay } from '../../../lib/algorithm';
 import { dateToLocalISODay } from '../../../lib/schedulePlans';
 import type { RevisionLog, User, UserPage } from '../../../types';
 import { navigateToActivityDay } from '../../../navigation/navigationRef';
+import { setMistakeDetectionReleasedForTests } from '../../../lib/release/mistakeDetection';
+
+// The release's switch is the kill switch: these tests run with it as each says, and back to as it ships.
+afterEach(() => setMistakeDetectionReleasedForTests(undefined));
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
@@ -28,83 +32,89 @@ const mockPager: {
   onAdvance?: (leftPage: number, currentPage: number) => void;
   pages?: number[];
   initialPage?: number;
-  pageOverlay?: (page: number, scale: number) => React.ReactNode;
-  onTapVerse?: (ayah: { page: number; sura: number; ayah: number }) => boolean;
-} = {};
+  /** Pages the screen turned to (scrollToPage, a take's turns): never a swipe, so never onAdvance. */
+  scrolled: number[];
+} = { scrolled: [] };
 // The session's route params (Home's "starts at" line opens a later day).
 let mockRouteParams: { aheadDay?: string; round?: boolean } | undefined;
 jest.mock('../../../components/MushafPager', () => {
   const { Pressable, View } = require('react-native');
+  const React = require('react');
   return {
-    MushafPager: (props: {
-      pages?: number[];
-      initialPage?: number;
-      onTap?: () => void;
-      onUserSwipe?: () => void;
-      onPageChange?: (p: number) => void;
-      onAdvance?: (leftPage: number, currentPage: number) => void;
-      onReachEnd?: (lastPage: number, bySwipe: boolean) => void;
-      endCard?: React.ReactNode;
-      pageOverlay?: (page: number, scale: number) => React.ReactNode;
-      onTapVerse?: (ayah: { page: number; sura: number; ayah: number }) => boolean;
-    }) => {
-      mockPager.pages = props.pages;
-      mockPager.initialPage = props.initialPage;
-      mockPager.onAdvance = props.onAdvance;
-      mockPager.onUserSwipe = props.onUserSwipe;
-      mockPager.onPageChange = props.onPageChange;
-      mockPager.onReachEnd = props.onReachEnd;
-      mockPager.pageOverlay = props.pageOverlay;
-      mockPager.onTapVerse = props.onTapVerse;
-      return (
-        <View>
-          <Pressable accessibilityLabel="The page" onPress={props.onTap} />
-          {props.endCard}
-        </View>
-      );
-    },
+    MushafPager: React.forwardRef(
+      (
+        props: {
+          pages?: number[];
+          initialPage?: number;
+          onTap?: () => void;
+          onUserSwipe?: () => void;
+          onPageChange?: (p: number) => void;
+          onAdvance?: (leftPage: number, currentPage: number) => void;
+          onReachEnd?: (lastPage: number, bySwipe: boolean) => void;
+          endCard?: React.ReactNode;
+          pageUnderlay?: (page: number, scale: number) => React.ReactNode;
+        },
+        ref: React.Ref<{ scrollToPage: (p: number) => boolean }>,
+      ) => {
+        mockPager.pages = props.pages;
+        mockPager.initialPage = props.initialPage;
+        mockPager.onAdvance = props.onAdvance;
+        mockPager.onUserSwipe = props.onUserSwipe;
+        mockPager.onPageChange = props.onPageChange;
+        mockPager.onReachEnd = props.onReachEnd;
+        React.useImperativeHandle(ref, () => ({
+          scrollToPage: (p: number) => {
+            if (!props.pages?.includes(p)) return false;
+            mockPager.scrolled.push(p);
+            props.onPageChange?.(p);
+            return true;
+          },
+        }));
+        return (
+          <View>
+            <Pressable accessibilityLabel="The page" onPress={props.onTap} />
+            {props.pageUnderlay?.(props.initialPage ?? 0, 0.38)}
+            {props.endCard}
+          </View>
+        );
+      },
+    ),
   };
 });
 let mockReduceMotion = false;
 jest.mock('../../../design/motion', () => ({ useReduceMotion: () => mockReduceMotion }));
-// The hidden mode's listening: the test sets what it reports and sees how it's used.
-const mockListener = {
-  active: false,
-  onPause: undefined as undefined | (() => void),
-  status: 'listening' as string,
-  yieldMic: jest.fn(async () => undefined),
-  resume: jest.fn(),
-};
-// Word by word (phase 2): the hook's state from the test, and how the screen uses it.
-const mockFollow = {
-  followable: true,
-  status: 'finding' as string,
-  active: false,
-  round: undefined as number | undefined,
-  onPageDone: undefined as undefined | ((p: number) => void),
-};
-jest.mock('../../../components/recite/useReciteFollow', () => ({
-  canFollowWords: () => mockFollow.followable,
-  useReciteFollow: (opts: { active: boolean; round?: number; onPageDone: (p: number) => void }) => {
-    mockFollow.active = opts.active;
-    mockFollow.round = opts.round;
-    mockFollow.onPageDone = opts.onPageDone;
-    return { status: mockFollow.status, available: mockFollow.followable, follow: null, heard: '', resume: jest.fn() };
-  },
-}));
-let mockModelState: Record<string, unknown> = { status: 'missing', error: null };
-jest.mock('../../../lib/recite/speechModelStore', () => ({
-  useSpeechModelState: () => mockModelState,
-  startModelDownload: jest.fn(),
-  cancelModelDownload: jest.fn(),
-}));
 jest.mock('@react-native-community/netinfo', () => ({ fetch: jest.fn(async () => ({ type: 'wifi' })) }));
-jest.mock('../../../components/recite/usePauseListener', () => ({
-  usePauseListener: (opts: { active: boolean; onPause: () => void }) => {
-    mockListener.active = opts.active;
-    mockListener.onPause = opts.onPause;
-    return { status: mockListener.status, hearing: false, yieldMic: mockListener.yieldMic, resume: mockListener.resume };
+
+// Recite (Revisely Dev): the gate's Dev app and microphone stream, the checker (the test sends its events), Premium.
+const mockRecite = { dev: false };
+jest.mock('../../../lib/variant', () => ({ ...jest.requireActual('../../../lib/variant'), isDevVariant: () => mockRecite.dev }));
+jest.mock('../../../lib/recite/micSource', () => ({
+  isMicStreamAvailable: () => true,
+  startMicStream: jest.fn(async () => ({ stop: jest.fn(async () => undefined) })),
+}));
+jest.mock('../../../lib/recite/quranWords', () => {
+  const actual = jest.requireActual('../../../lib/recite/quranWords');
+  const fixture = () => require('../../../lib/recite/__fixtures__/quranWords').quranWords();
+  return { ...actual, loadQuranWords: async () => fixture(), getQuranWords: () => null };
+});
+const mockLive: { start?: Record<string, unknown>; onEvent?: (e: import('../../../lib/reciteLive/contract').LiveEvent) => void } = {};
+jest.mock('../../../lib/reciteCheck/service', () => ({
+  ...jest.requireActual('../../../lib/reciteCheck/service'),
+  warmUpReciteCheck: jest.fn(),
+  sendLabel: jest.fn(async () => true),
+}));
+jest.mock('../../../lib/reciteLive/socket', () => ({
+  socketFeed: () => (start: Record<string, unknown>, handlers: { onEvent: (e: unknown) => void }) => {
+    mockLive.start = start;
+    mockLive.onEvent = handlers.onEvent as never;
+    return { sendAudio: () => undefined, send: () => undefined, close: jest.fn(), audioClip: () => new Int16Array(0) };
   },
+}));
+jest.mock('../../../lib/premium', () => ({
+  usePremium: () => ({ has: true, known: true, grant: null }),
+  setDevPremium: jest.fn(async () => true),
+  supportLinkUrl: jest.fn(async () => 'https://dev.revisely.app/apply/'),
+  premiumErrorText: () => 'Something went wrong. Try again.',
 }));
 
 // The recorder: the real hook, unless a test gives one (a recording in progress).
@@ -241,17 +251,21 @@ function setup(revised: number[], dayPages: number[] = DAY_PAGES) {
 beforeEach(() => {
   jest.clearAllMocks();
   mockReduceMotion = false;
-  mockListener.status = 'listening';
-  mockListener.active = false;
-  mockPager.pageOverlay = undefined;
-  mockPager.onTapVerse = undefined;
-  mockFollow.followable = true;
-  mockFollow.status = 'finding';
-  mockFollow.active = false;
-  mockModelState = { status: 'missing', error: null };
+  mockPager.scrolled = [];
+  mockRecite.dev = false;
+  mockLive.start = undefined;
+  mockLive.onEvent = undefined;
   mockRecorder = null;
   mockRecordings = [];
 });
+
+// The Pages sheet (SESS-1) is how a page is marked by hand: its circle for the page on screen.
+const pagesSheet = () => screen.UNSAFE_getByType(PagesSheet);
+const hereIsMarked = (): boolean => pagesSheet().props.done.has(pagesSheet().props.current);
+const toggleHere = () =>
+  act(() => {
+    pagesSheet().props.onToggle(pagesSheet().props.current);
+  });
 
 describe('ActiveRevisionScreen — unchecking saved pages', () => {
   it('removes an unchecked page from today’s session on exit', async () => {
@@ -260,7 +274,7 @@ describe('ActiveRevisionScreen — unchecking saved pages', () => {
     render(<ActiveRevisionScreen />);
     expect(screen.getByText(/10\/10/)).toBeTruthy();
 
-    fireEvent.press(screen.getByLabelText('Unmark current page'));
+    toggleHere();
     expect(screen.getByText(/9\/10/)).toBeTruthy();
 
     await act(async () => {
@@ -282,7 +296,7 @@ describe('ActiveRevisionScreen — unchecking saved pages', () => {
     render(<ActiveRevisionScreen />);
     // Opens on 331 (first unrevised); show the controls, mark it and leave.
     fireEvent.press(screen.getByLabelText('The page'));
-    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    toggleHere();
     await act(async () => {
       fireEvent.press(screen.getByLabelText('Back'));
     });
@@ -300,7 +314,7 @@ describe('ActiveRevisionScreen — every way out saves', () => {
     setup([332, 333]);
     const { unmount } = render(<ActiveRevisionScreen />);
     fireEvent.press(screen.getByLabelText('The page'));
-    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    toggleHere();
     expect(mockApp.addLog).not.toHaveBeenCalled();
     await act(async () => {
       unmount();
@@ -313,7 +327,7 @@ describe('ActiveRevisionScreen — every way out saves', () => {
   it('closed without Back: a saved page unchecked comes out of the session', async () => {
     const log = setup(DAY_PAGES);
     const { unmount } = render(<ActiveRevisionScreen />);
-    fireEvent.press(screen.getByLabelText('Unmark current page'));
+    toggleHere();
     await act(async () => {
       unmount();
     });
@@ -328,7 +342,7 @@ describe('ActiveRevisionScreen — every way out saves', () => {
     setup([332, 333]);
     const { unmount } = render(<ActiveRevisionScreen />);
     fireEvent.press(screen.getByLabelText('The page'));
-    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    toggleHere();
     await act(async () => {
       fireEvent.press(screen.getByLabelText('Back'));
     });
@@ -371,13 +385,15 @@ describe('ActiveRevisionScreen — a failed load', () => {
 });
 
 describe('ActiveRevisionScreen — reading and the controls', () => {
+  // The plain record button (no Recite): the release switched off, as on a binary without Recite.
+  beforeEach(() => setMistakeDetectionReleasedForTests(false));
   it('opens on the page alone: its number, the juz and surah; the controls hidden', () => {
     setup([332, 333]);
     render(<ActiveRevisionScreen />);
     expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(true);
     expect(byTestId('reader-footer').props.pointerEvents).toBe('none');
     expect(screen.getByText('331')).toBeTruthy();
-    expect(screen.queryByLabelText('Mark current page as revised')).toBeNull();
+    expect(screen.queryByLabelText('Pages')).toBeNull();
   });
 
   it('a tap on the page shows the controls; turning the page hides them', () => {
@@ -412,8 +428,8 @@ describe('ActiveRevisionScreen — reading and the controls', () => {
     setup([332, 333]);
     render(<ActiveRevisionScreen />);
     fireEvent.press(screen.getByLabelText('The page'));
-    fireEvent.press(screen.getByLabelText('Session menu'));
-    expect(screen.getByText('Jump or mark in bulk')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Pages'));
+    expect(screen.getByText('Mark all revised')).toBeTruthy();
     expect(screen.queryByText('Save and exit')).toBeNull();
     expect(screen.queryByText('End session')).toBeNull();
   });
@@ -572,7 +588,7 @@ describe('ActiveRevisionScreen — swiping off the last page', () => {
     setup([331, 332, 333, 334, 335, 336, 337, 338, 339]);
     render(<ActiveRevisionScreen />);
     await finish();
-    expect(screen.getByText(/^Al.Hajj.65–72 · Juz 17 · Hizb \d+$/)).toBeTruthy();
+    expect(screen.getByText(/^Al.Hajj · Juz 17 · Hizb \d+$/)).toBeTruthy();
     expect(screen.queryByText('Submit')).toBeNull();
     await act(async () => {
       fireEvent.press(screen.getByLabelText('Back'));
@@ -606,7 +622,7 @@ describe('ActiveRevisionScreen — the session completes on its last page', () =
     act(() => mockPager.onPageChange?.(340));
     fireEvent.press(screen.getByLabelText('The page'));
     await act(async () => {
-      fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+      toggleHere();
     });
     expect(mockApp.addLog).toHaveBeenCalledTimes(1);
     expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [340] }));
@@ -655,9 +671,9 @@ describe('ActiveRevisionScreen — the session completes on its last page', () =
       mockPager.onReachEnd?.(340, true);
     });
     act(() => mockPager.onPageChange?.(340));
-    fireEvent.press(screen.getByLabelText('Unmark current page'));
+    toggleHere();
     await act(async () => {
-      fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+      toggleHere();
     });
     expect(mockApp.addLog).toHaveBeenCalledTimes(1);
     expect(recorder.finish).toHaveBeenCalledTimes(2);
@@ -703,7 +719,7 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
 
     // One page of the next day, checked, then leave.
-    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    toggleHere();
     await act(async () => {
       unmount();
     });
@@ -730,8 +746,8 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     expect(mockPager.initialPage).toBe(DAY_PAGES[0]);
     expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
     // The same pages, to revise again: none is checked.
-    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    expect(hereIsMarked()).toBe(false);
+    toggleHere();
     await act(async () => {
       unmount();
     });
@@ -747,8 +763,8 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     mockRouteParams = { aheadDay: tomorrow(), round: true };
     const { unmount } = render(<ActiveRevisionScreen />);
     expect(mockPager.pages).toEqual(DAY_PAGES);
-    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    expect(hereIsMarked()).toBe(false);
+    toggleHere();
     await act(async () => {
       unmount();
     });
@@ -811,17 +827,16 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     // screen is tomorrow's: its check reflects tomorrow, not today.
     expect(mockPager.initialPage).toBe(NEXT[0]);
     expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
-    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
+    expect(hereIsMarked()).toBe(false);
   });
 
-  it('in a later day’s session, mark in bulk works on that day’s pages and leaves today’s as they were', async () => {
+  it('in a later day’s session, Mark all revised works on that day’s pages and leaves today’s as they were', async () => {
     setupTwoDays(DAY_PAGES);
     mockRouteParams = { aheadDay: tomorrow() };
     const { unmount } = render(<ActiveRevisionScreen />);
-    const bulk = () => screen.UNSAFE_getByType(BulkActionsModal);
-    expect(bulk().props.pages.map((p: { pageNumber: number }) => p.pageNumber)).toEqual(NEXT);
+    expect(pagesSheet().props.pages).toEqual(NEXT);
     act(() => {
-      bulk().props.onMarkAllComplete();
+      pagesSheet().props.onMarkAll();
     });
     await act(async () => {
       unmount();
@@ -852,7 +867,7 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     render(<ActiveRevisionScreen />);
     // The done page is not in the session: it opens on the next one, unchecked.
     expect(mockPager.initialPage).toBe(NEXT[1]);
-    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
+    expect(hereIsMarked()).toBe(false);
   });
 
   it('Keep going moves the page on screen to the next day’s first page', async () => {
@@ -862,189 +877,90 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
       mockPager.onReachEnd?.(340, true);
     });
     fireEvent.press(screen.getByTestId('session-end-keep-going'));
-    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
+    expect(hereIsMarked()).toBe(false);
     expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
   });
 });
 
-describe('ActiveRevisionScreen — hidden pages (testers)', () => {
-  const tester = () => {
-    setup([]);
+// Recite (Revisely Dev, Majd, Nov 17 2026): the reader's mic in a session (components/reciteLive/useReciteLayer; the
+// reader's tests cover a take itself). The old hidden page (the eye at the top, testers) is gone.
+describe('ActiveRevisionScreen — Recite (Revisely Dev)', () => {
+  const words = require('../../../lib/recite/__fixtures__/quranWords').quranWords();
+  // An-Naml 23 opens page 379; the session holds 379 and 380.
+  const A23 = words.verseFirstWord(27, 23);
+  const flush = () => act(async () => {});
+  const event = (e: import('../../../lib/reciteLive/contract').LiveEvent) => act(async () => mockLive.onEvent?.(e));
+  const live = async (dayPages: number[] = [379, 380]) => {
+    mockRecite.dev = true;
+    setup([], dayPages);
     mockApp.user = { ...mockApp.user, previewTester: true };
-  };
-  const hide = () => fireEvent.press(screen.getByLabelText('Hide the page'));
-  /** The verses page 331's cover leaves open, as the screen hands them to it. */
-  const shownOn331 = (): string[] => {
-    const overlay = mockPager.pageOverlay?.(331, 0.5) as React.ReactElement<{ revealed: ReadonlySet<string> }>;
-    return [...overlay.props.revealed];
+    const { setReciteCheckSettings, resetReciteCheckSettingsForTests } = require('../../../lib/reciteCheck/settings');
+    resetReciteCheckSettingsForTests();
+    setReciteCheckSettings('u1', { noticeSeen: true, mode: 'recite', markMistakes: false });
+    jest.requireMock('expo-audio').getRecordingPermissionsAsync.mockResolvedValue({ granted: true, canAskAgain: false });
+    render(<ActiveRevisionScreen />);
+    await flush();
+    await flush();
+    fireEvent.press(screen.getByLabelText('The page'));
   };
 
-  it('not a tester: no eye, and nothing listens', () => {
+  it('with the release switched off: not Revisely Dev (or not a tester): the record button, as before, and no eye at the top', async () => {
+    setMistakeDetectionReleasedForTests(false);
     setup([]);
+    mockApp.user = { ...mockApp.user, previewTester: true };
     render(<ActiveRevisionScreen />);
+    await flush();
     fireEvent.press(screen.getByLabelText('The page'));
+    expect(screen.getByLabelText('Record your recitation')).toBeTruthy();
+    expect(screen.queryByTestId('recite-mic')).toBeNull();
+    expect(screen.queryByTestId('reader-eye')).toBeNull();
     expect(screen.queryByLabelText('Hide the page')).toBeNull();
-    expect(mockListener.active).toBe(false);
-    expect(mockPager.pageOverlay).toBeUndefined();
   });
 
-  it('the eye hides the page: covers over it, the recite panel in the player’s place, listening', () => {
-    tester();
-    render(<ActiveRevisionScreen />);
-    fireEvent.press(screen.getByLabelText('The page'));
-    hide();
-    expect(mockListener.active).toBe(true);
-    expect(screen.getByTestId('recite-panel')).toBeTruthy();
-    expect(screen.queryByTestId('player-capsule')).toBeNull();
-    // The quiet row (hidden from VoiceOver while the controls are up).
-    expect(screen.getByText('Hidden · 0/10', { includeHiddenElements: true })).toBeTruthy();
-    expect(screen.getByText('Pause after a verse to see it', { includeHiddenElements: true })).toBeTruthy();
-    render(<>{mockPager.pageOverlay?.(331, 0.5)}</>);
-    expect(screen.getAllByTestId('hidden-cover').length).toBeGreaterThan(5);
+  it('[RECITE-9] a tester in Revisely Dev: the reader’s eye and mic in the player, the header as it was', async () => {
+    await live();
+    expect(screen.getByTestId('recite-mic')).toBeTruthy();
+    expect(screen.getByTestId('reader-eye')).toBeTruthy();
+    expect(screen.queryByLabelText('Record your recitation')).toBeNull();
+    // One eye: the bar's (the header keeps Back, the title, ✓ and ⋯).
+    expect(screen.getAllByLabelText('Hide the page')).toHaveLength(1);
+    expect(hereIsMarked()).toBe(false);
   });
 
-  it('a tap on a hidden page shows nothing: the pager gets no verse tap, so it brings the controls (Majd, Nov 14 2026)', () => {
-    tester();
-    render(<ActiveRevisionScreen />);
-    fireEvent.press(screen.getByLabelText('The page'));
-    hide();
-    expect(mockPager.onTapVerse).toBeUndefined();
-    expect(shownOn331()).toEqual([]);
+  it('[RECITE-9] holding the mic: Record, Recite and Mark mistakes, but no Test me (the reader’s)', async () => {
+    await live();
+    fireEvent(screen.getByTestId('recite-mic'), 'longPress');
+    expect(screen.getByTestId('recite-mode-menu')).toBeTruthy();
+    expect(screen.getByText('The page follows you')).toBeTruthy();
+    expect(screen.queryByText('Test me')).toBeNull();
   });
 
-  it('a pause after a verse shows the next one, in order; Next verse too', () => {
-    tester();
-    render(<ActiveRevisionScreen />);
-    fireEvent.press(screen.getByLabelText('The page'));
-    hide();
-    const { versesOnPage } = require('../../../lib/ayahBounds');
-    const [v1, v2] = versesOnPage(331);
-    const key = (v: { sura: number; ayah: number }) => `${v.sura}:${v.ayah}`;
-    act(() => mockListener.onPause?.());
-    expect(shownOn331()).toEqual([key(v1)]);
-    fireEvent.press(screen.getByLabelText('Show the next verse'));
-    expect(shownOn331()).toEqual([key(v1), key(v2)]);
-  });
-
-  it('Record while hidden: the listener gives the microphone up first', async () => {
-    tester();
-    render(<ActiveRevisionScreen />);
-    fireEvent.press(screen.getByLabelText('The page'));
-    hide();
+  it('[RECITE-9] a take turns the session’s pages but marks none; a page the session doesn’t hold isn’t turned to', async () => {
+    await live();
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    await flush();
+    await flush();
+    expect(mockLive.start).toBeTruthy();
+    await event({ type: 'ready', take: 't1', protocol: 6 });
+    await event({ type: 'locked', w: A23, s: 27, a: 23 });
+    // The bar is the take's, in the player's place.
+    expect(screen.getByTestId('recite-stop')).toBeTruthy();
+    const on380 = words.pageRange(380)[0] + 3;
+    await event({ type: 'at', w: on380 });
+    expect(mockPager.scrolled).toEqual([380]);
+    // Past the session's last page: the page stays.
+    await event({ type: 'at', w: words.pageRange(381)[0] + 3 });
+    expect(mockPager.scrolled).toEqual([380]);
+    // Nothing marked revised: page 380 isn't checked, and Back saves nothing (SESS-3).
+    expect(hereIsMarked()).toBe(false);
     await act(async () => {
-      fireEvent.press(screen.getByLabelText('Record your recitation'));
+      fireEvent.press(screen.getByLabelText('Back'));
     });
-    expect(mockListener.yieldMic).toHaveBeenCalled();
-  });
-
-  it('the mic switches listening off and on', () => {
-    tester();
-    render(<ActiveRevisionScreen />);
-    fireEvent.press(screen.getByLabelText('The page'));
-    hide();
-    fireEvent.press(screen.getByTestId('recite-mic'));
-    expect(mockListener.active).toBe(false);
-    fireEvent.press(screen.getByTestId('recite-mic'));
-    expect(mockListener.active).toBe(true);
-    expect(mockListener.resume).toHaveBeenCalled();
-  });
-
-  it('showing the page again: the player is back, nothing listens, and the next hide starts covered', () => {
-    tester();
-    render(<ActiveRevisionScreen />);
-    fireEvent.press(screen.getByLabelText('The page'));
-    hide();
-    fireEvent.press(screen.getByLabelText('Show the next verse'));
-    expect(shownOn331()).toHaveLength(1);
-    fireEvent.press(screen.getByLabelText('Show the page'));
-    expect(mockListener.active).toBe(false);
-    expect(screen.getByTestId('player-capsule')).toBeTruthy();
-    expect(mockPager.pageOverlay).toBeUndefined();
-    hide();
-    expect(shownOn331()).toEqual([]);
+    expect(mockApp.addLog).not.toHaveBeenCalled();
+    expect(mockApp.updatePages).not.toHaveBeenCalled();
   });
 });
 
-// Word by word: with the speech model on the phone, the reciter is followed on
-// the device and each word shows as it is said.
-describe('ActiveRevisionScreen — hidden pages, word by word', () => {
-  const tester = () => {
-    setup([]);
-    mockApp.user = { ...mockApp.user, previewTester: true };
-  };
-  const hide = () => {
-    fireEvent.press(screen.getByLabelText('The page'));
-    fireEvent.press(screen.getByLabelText('Hide the page'));
-  };
-
-  it('with the model: follows word by word (the pause listener steps aside), and says so', () => {
-    mockModelState = { status: 'ready', bytes: 59_707_625 };
-    tester();
-    render(<ActiveRevisionScreen />);
-    hide();
-    expect(mockFollow.active).toBe(true);
-    expect(mockListener.active).toBe(false);
-    expect(screen.getByTestId('recite-status')).toHaveTextContent('Start reciting');
-    expect(screen.getByText('Recite: each word shows as you say it', { includeHiddenElements: true })).toBeTruthy();
-    expect(screen.queryByTestId('recite-word-by-word')).toBeNull();
-  });
-
-  it('hiding the page again starts a new round (covered again); showing it keeps the round', () => {
-    mockModelState = { status: 'ready', bytes: 59_707_625 };
-    tester();
-    render(<ActiveRevisionScreen />);
-    hide();
-    const first = mockFollow.round;
-    fireEvent.press(screen.getByLabelText('Show the page'));
-    expect(mockFollow.active).toBe(false);
-    expect(mockFollow.round).toBe(first);
-    fireEvent.press(screen.getByLabelText('Hide the page'));
-    expect(mockFollow.active).toBe(true);
-    expect(mockFollow.round).toBe((first as number) + 1);
-  });
-
-  it('a page recited through counts as revised', () => {
-    mockModelState = { status: 'ready', bytes: 59_707_625 };
-    tester();
-    render(<ActiveRevisionScreen />);
-    hide();
-    act(() => mockFollow.onPageDone?.(331));
-    expect(screen.getAllByText(/1\/10/, { includeHiddenElements: true }).length).toBeGreaterThan(0);
-  });
-
-  it('without the model: the pause listener, and "Word by word" opens the download', async () => {
-    tester();
-    render(<ActiveRevisionScreen />);
-    hide();
-    expect(mockFollow.active).toBe(false);
-    expect(mockListener.active).toBe(true);
-    fireEvent.press(screen.getByTestId('recite-word-by-word'));
-    await act(async () => {});
-    expect(screen.getByTestId('speech-model-sheet')).toBeTruthy();
-    expect(screen.getByTestId('speech-model-privacy')).toBeTruthy();
-  });
-
-  it('downloading: the chip shows the progress', () => {
-    mockModelState = { status: 'downloading', progress: 0.42 };
-    tester();
-    render(<ActiveRevisionScreen />);
-    hide();
-    expect(screen.getByTestId('recite-word-by-word')).toHaveTextContent('42%');
-  });
-
-  it('a binary without the mic module: no chip, phase 1 as before', () => {
-    mockFollow.followable = false;
-    mockModelState = { status: 'ready', bytes: 1 };
-    tester();
-    render(<ActiveRevisionScreen />);
-    hide();
-    expect(mockFollow.active).toBe(false);
-    expect(mockListener.active).toBe(true);
-    expect(screen.queryByTestId('recite-word-by-word')).toBeNull();
-  });
-});
-
-// "They have to go find that recording in Activity": the end card offers it.
 describe('ActiveRevisionScreen — Listen back on the end card', () => {
   const recording = (day: string, extra: Record<string, unknown> = {}) => ({
     id: 'rec-1',

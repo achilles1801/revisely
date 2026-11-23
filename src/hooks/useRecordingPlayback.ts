@@ -7,6 +7,7 @@ import { claimAudio, onAudioClaimed, setAudioMode } from '../lib/audioFocus';
 import { isRecordingActive, locateInSegments, segmentStart, type RecordingMeta } from '../lib/recordings';
 import { downloadMissingSegments } from '../lib/recordingBackup';
 import { logger } from '../lib/logger';
+import { t } from '../i18n';
 
 // After a seek, the player can still report the old time once or twice; those
 // reports are ignored (for this long, or until one lands near the target), so
@@ -190,7 +191,7 @@ export function useRecordingPlayback({ onDownloaded }: { onDownloaded?: (r: Reco
 
   const playLocal = (r: RecordingMeta, fromMs = 0) => {
     if (isRecordingActive()) {
-      Alert.alert('Recording in progress', 'Pause the recording to play this one.');
+      Alert.alert(t('recordings.inProgress.title'), t('recordings.inProgress.body'));
       return;
     }
     claimAudio('recording-playback', owner);
@@ -230,7 +231,7 @@ export function useRecordingPlayback({ onDownloaded }: { onDownloaded?: (r: Reco
       playLocal(local, fromMs);
     } catch (err) {
       logger.warn('Could not download recording', err);
-      Alert.alert('Couldn’t download this recording', 'Check your connection and try again.');
+      Alert.alert(t('recordings.downloadFailed'), t('common.checkConnection'));
     } finally {
       downloadingRef.current = false;
       setDownloadingId(null);

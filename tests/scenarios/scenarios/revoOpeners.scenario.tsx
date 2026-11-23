@@ -45,7 +45,7 @@ function stack(mods: Booted): ReactElement {
         h(Stack.Screen, { name: 'ActiveRevision', component: Session }),
         h(Stack.Screen, { name: 'Activity', component: Activity }),
         h(Stack.Screen, { name: 'ActivityDay', component: ActivityDay }),
-        ...['Settings', 'PlanEdit', 'PlanDayEdit', 'ActivityAll', 'JournalEntry', 'Memorization', 'Insights', 'QuranReader', 'PagesByStrength', 'ListenBack'].map(
+        ...['Settings', 'PlanEdit', 'PlanDayEdit', 'ActivityAll', 'Memorization', 'Insights', 'QuranReader', 'PagesByStrength', 'ListenBack'].map(
           (name) => h(Stack.Screen, { key: name, name, component: Elsewhere }),
         ),
       ),

@@ -13,7 +13,8 @@ describe('screen readers in the live recitation', () => {
 
   it('a bar word says its mark in words: colour is never the only signal', () => {
     expect(spokenBarWord({ text: 'وَأُوهِيَتْ', tone: 'wrong' })).toBe('وَأُوهِيَتْ, wrong word,');
-    expect(spokenBarWord({ text: 'شَىْءٍ', tone: 'slip' })).toBe('شَىْءٍ, slip,');
+    expect(spokenBarWord({ text: 'شَىْءٍ', tone: 'slip', part: 'harakat' })).toBe('شَىْءٍ, wrong haraka,');
+    expect(spokenBarWord({ text: 'شَىْءٍ', tone: 'slip', part: 'letter' })).toBe('شَىْءٍ, wrong letter,');
     expect(spokenBarWord({ text: 'عَظِيمٌ', tone: 'tajweed' })).toBe('عَظِيمٌ, tajweed note,');
     expect(spokenBarWord({ text: 'مِن', tone: 'current' })).toBe('مِن');
   });

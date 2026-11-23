@@ -7,7 +7,9 @@
 import { MessagesRequest } from '../coach/call';
 import { REVO_MODEL } from '../coach/pricing';
 import { attachedText } from './attachText';
-import { GUIDE_PROMPT, OPEN_SCREEN_ACTION } from './guide';
+import { DEV_GUIDE_SYSTEM, GUIDE_PROMPT, OPEN_SCREEN_ACTION } from './guide';
+import { RECITATION_SYSTEM, recitationText } from './recitation';
+import { gapsText } from './gaps';
 import { REVO_OUTPUT_CONFIG } from './replySchema';
 import { RevoAttachment, RevoContext, RevoPattern, StoredMessage } from './types';
 
@@ -269,6 +271,8 @@ export function contextText(day: string, context: RevoContext, memory: readonly 
     const weak = context.weakPages.map((p) => (named[String(p)] ? `${named[String(p)]} (page ${p})` : `page ${p}`));
     lines.push(`Weak pages, the longest since revised first: ${weak.join('; ')}.`);
   }
+  if (context.recitation) lines.push(recitationText(context.recitation));
+  if (context.gaps) lines.push(gapsText(context.gaps));
   if (memory.length > 0) lines.push(`Remembered about them:\n${memory.map((m) => `- ${m}`).join('\n')}`);
   return lines.join('\n');
 }
@@ -309,18 +313,48 @@ function alternate(turns: { role: 'user' | 'assistant'; content: string }[], ope
 }
 
 /**
+ * The app is in Arabic (Majd's choice 3, Nov 2026: Revo answers in the app's language). The facts above stay in English;
+ * the answer, its chips and its card are written in Arabic as the app's Arabic writes (src/i18n/ar-glossary.md).
+ */
+export const ARABIC_SYSTEM = [
+  'The app is in Arabic. Write everything the user reads in Arabic: the reply, the suggestion chips, the action card\'s title and detail, and any memory note. The JSON keys and ids stay as they are.',
+  'Modern Standard Arabic in a warm product register: short plain sentences, imperatives for steps («افتح الإعدادات»), never «قم بـ». Address the user in the generic masculine.',
+  'Surah names in Arabic as the mushaf has them (البقرة، الملك), juz as «الجزء ٢٨», ayahs as «الآيات ١–١٢». Numbers in Arabic-Indic digits (٢٨، ٢٠٫٥٪), and 1 and 2 as words with the noun («صفحة واحدة»، «صفحتان»).',
+  'Use the app\'s Arabic words: مراجعة (revision), الوِرد اليومي (the daily portion), الأيام المتتالية (streak), مواضع الضعف (weak spots), التسميع (a take), تحديد الأخطاء (Mark mistakes), متابعة التلاوة (Recite), الإحصاءات (Insights), النشاط (Activity), الجدول (the schedule).',
+  'Arabic punctuation (، ؛ ؟) and « » quotes. Names stay in Latin: Revo, Revisely in prose is «ريفايزلي». Keep Qur\'an text exactly as written, in ﴿ ﴾.',
+].join('\n');
+
+/**
  * Every Revo request: the cached system prompt, the conversation, and structured output, so the
  * reply is the one JSON object the app reads (revo/replySchema.ts; reply.ts still checks it).
  */
-function request(messages: MessagesRequest['messages']): MessagesRequest {
+function request(messages: MessagesRequest['messages'], blocks: { dev?: boolean; recitation?: boolean; arabic?: boolean } = {}): MessagesRequest {
+  const system: MessagesRequest['system'] = [{ type: 'text', text: REVO_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }];
+  // Only from Revisely Dev (the context's `app`): the Dev guide, what only Revisely Dev has (guide.ts). Store requests
+  // never carry it, so they (their cache, and the recorded replies) stay exactly as they were.
+  if (blocks.dev) system.push({ type: 'text', text: DEV_GUIDE_SYSTEM, cache_control: { type: 'ephemeral' } });
+  // Revisely Dev's recitation rules, only with a recitation: every other request (and its cache) stays as it was.
+  if (blocks.recitation) system.push({ type: 'text', text: RECITATION_SYSTEM, cache_control: { type: 'ephemeral' } });
+  // The app in Arabic (context.language): answer in Arabic. English requests never carry it, so they stay as they were.
+  if (blocks.arabic) system.push({ type: 'text', text: ARABIC_SYSTEM, cache_control: { type: 'ephemeral' } });
   return {
     model: REVO_MODEL,
     max_tokens: REVO_MAX_TOKENS,
     thinking: REVO_THINKING,
-    system: [{ type: 'text', text: REVO_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+    system,
     messages,
     output_config: REVO_OUTPUT_CONFIG,
   };
+}
+
+/** Whether a request carries the user's recitation: the context's summary, or a take attached now or earlier in the chat. */
+function carriesRecitation(context: RevoContext, attached: readonly RevoAttachment[], history: readonly StoredMessage[] = []): boolean {
+  const take = (a: RevoAttachment) => a.kind === 'reciteTake';
+  return (
+    context.recitation !== undefined ||
+    attached.some(take) ||
+    history.some((m) => (m.attachList ?? (m.attachData ? [m.attachData] : [])).some(take))
+  );
 }
 
 export interface AskInput {
@@ -348,11 +382,16 @@ export function buildAskRequest(input: AskInput): MessagesRequest {
   parts.push(`Question: ${input.question}`);
   const turns = [...input.history.slice(-REVO_HISTORY).map((m) => historyTurn(m, opts)), { role: 'user' as const, content: parts.join('\n') }];
   const opening = input.chat?.kind === 'review' ? `Day in review (${weekdayOf(input.chat.day)}).` : '(Earlier in this chat.)';
-  return request(alternate(turns, opening));
+  return request(alternate(turns, opening), {
+    dev: input.context.app === 'dev',
+    recitation: carriesRecitation(input.context, input.attached, input.history.slice(-REVO_HISTORY)),
+    arabic: input.context.language === 'ar',
+  });
 }
 
 /** The Messages API body for a day in review. */
 export function buildReviewRequest(input: { day: string; context: RevoContext; memory: readonly string[]; smartTracking?: boolean; tester?: boolean }): MessagesRequest {
   const content = `${contextText(input.day, input.context, input.memory, { smartTracking: input.smartTracking, tester: input.tester })}\nWrite the day in review for this revision day.`;
-  return request([{ role: 'user', content }]);
+  // A day in review answers no how-to question, so it never needs the Dev guide.
+  return request([{ role: 'user', content }], { recitation: carriesRecitation(input.context, []), arabic: input.context.language === 'ar' });
 }

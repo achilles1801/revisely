@@ -7,6 +7,8 @@ import { useMiniPlayer } from '../../lib/nowPlaying';
 import { getRecitation, resolveVoice, shortVoiceLabel, verseTitle } from '../../lib/recitation';
 import type { VerseKey } from '../../lib/verses';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
+import { t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
 
 export const MINI_PLAYER_HEIGHT = 52;
 /** Between the mini player and the tab bar. */
@@ -30,7 +32,7 @@ export function MiniPlayer({ bottom, onOpen }: { bottom: number; onOpen: (verse:
   const playing = state.status === 'playing' || loading;
   const title = verseTitle(verse);
   const reciter = shortVoiceLabel(resolveVoice(recitation.getVoice()));
-  const detail = failed ? 'Couldn’t play' : reciter;
+  const detail = failed ? t('player.failed') : reciter;
 
   return (
     <Animated.View
@@ -56,7 +58,7 @@ export function MiniPlayer({ bottom, onOpen }: { bottom: number; onOpen: (verse:
           hitSlop={6}
           style={({ pressed }) => [styles.button, pressed && styles.pressed]}
           accessibilityRole="button"
-          accessibilityLabel={failed ? 'Try again' : playing ? 'Pause recitation' : 'Play recitation'}
+          accessibilityLabel={failed ? t('common.tryAgain') : playing ? t('player.pause') : t('player.play')}
           testID="mini-play-pause"
         >
           {loading ? (
@@ -69,7 +71,7 @@ export function MiniPlayer({ bottom, onOpen }: { bottom: number; onOpen: (verse:
           onPress={() => onOpen(verse)}
           style={({ pressed }) => [styles.label, pressed && styles.pressed]}
           accessibilityRole="button"
-          accessibilityLabel={`${title}, ${detail}. Open in the reader`}
+          accessibilityLabel={t('player.openLabel', { verse: title, detail })}
           testID="mini-label"
         >
           <Text style={[typeV2.body, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
@@ -82,7 +84,7 @@ export function MiniPlayer({ bottom, onOpen }: { bottom: number; onOpen: (verse:
           hitSlop={6}
           style={({ pressed }) => [styles.small, pressed && styles.pressed]}
           accessibilityRole="button"
-          accessibilityLabel="Stop recitation"
+          accessibilityLabel={t('player.stop')}
           testID="mini-stop"
         >
           <Ionicons name="close" size={18} color={palette.secondary} />
@@ -92,10 +94,10 @@ export function MiniPlayer({ bottom, onOpen }: { bottom: number; onOpen: (verse:
           hitSlop={6}
           style={({ pressed }) => [styles.small, styles.chevron, pressed && styles.pressed]}
           accessibilityRole="button"
-          accessibilityLabel="Open in the reader"
+          accessibilityLabel={t('player.open')}
           testID="mini-open"
         >
-          <Ionicons name="chevron-forward" size={20} color={palette.secondary} />
+          <Ionicons name={forwardIcon()} size={20} color={palette.secondary} />
         </Pressable>
       </View>
     </Animated.View>

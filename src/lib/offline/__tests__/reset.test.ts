@@ -1,12 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
-import {
-  noteResetAdopted,
-  resetAdoptedForTests,
-  resetMark,
-  staleEntries,
-  wasReset,
-  whenResetAdopted,
-} from '../reset';
+import { noteResetAdopted, resetAdoptedForTests, resetMark, staleEntries, wasReset, whenResetAdopted } from '../reset';
 import type { OutboxEntry } from '../ops';
 
 const entry = (id: string, at: number): OutboxEntry => ({ id, at, op: { kind: 'usage', seconds: 1 } });

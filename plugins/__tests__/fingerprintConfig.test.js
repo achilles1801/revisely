@@ -67,6 +67,13 @@ describe('fingerprint.config.js', () => {
     expect(dev.fileHookTransform).toBe(dev.devWidgetAsCommitted);
   });
 
+  it("counts modules-dev/ (Recite on the phone) toward Revisely Dev's fingerprints only", () => {
+    const dirs = (config) => config.extraSources.map((s) => s.filePath);
+    expect(dirs(loadConfig())).not.toContain('modules-dev');
+    expect(dirs(loadConfig('store'))).not.toContain('modules-dev');
+    expect(dirs(loadConfig('dev'))).toEqual([...dirs(loadConfig()), 'modules-dev']);
+  });
+
   it("hashes a Dev prebuild's widget files as committed", () => {
     const hook = loadConfig('dev').fileHookTransform;
     const dev = devPrebuilt();

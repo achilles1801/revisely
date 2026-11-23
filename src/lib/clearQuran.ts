@@ -31,6 +31,7 @@ import { currentRelease } from './releaseInfo';
 import { apiBase } from './variant';
 import { getSurahDisplay } from './quranData';
 import { nextVerse, previousVerse, VerseKey } from './verses';
+import { t } from '../i18n';
 
 /** The worker's Clear Quran routes: revisely.app's, or dev.revisely.app's in Revisely Dev (lib/variant). */
 export function clearQuranApi(): string {
@@ -456,16 +457,16 @@ export function clearQuranErrorHint(err: unknown): string {
   const code = err instanceof ClearQuranError ? err.code : 'NETWORK';
   switch (code) {
     case 'RATE_LIMITED':
-      return 'Too many requests right now. Try again in a minute.';
+      return t('verse.tcq.rateLimited');
     case 'DAILY_LIMIT':
-      return 'The Clear Quran has reached its limit for today. Try again tomorrow.';
+      return t('verse.tcq.dailyLimit');
     case 'UNAUTHENTICATED':
-      return 'Sign in again, then try again.';
+      return t('verse.tcq.signIn');
     case 'NOT_FOUND':
-      return "This verse isn't available.";
+      return t('verse.tcq.notFound');
     case 'UNAVAILABLE':
-      return 'The Clear Quran is unavailable right now. Try again shortly.';
+      return t('verse.tcq.unavailable');
     default:
-      return 'Check your connection and try again.';
+      return t('verse.tcq.network');
   }
 }

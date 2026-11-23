@@ -84,6 +84,11 @@ export interface StoredRecording {
   /** Kept on this phone only, never uploaded, whatever the backup setting: a live take's recording (Revisely Dev,
    *  Settings → Recite). Uploading a take's audio stays opt-in until Majd decides otherwise. */
   localOnly?: boolean;
+  /** A Recite take's audio (Revisely Dev; Majd, Nov 16 2026: "separate normal recordings from those recorded with mistake
+   *  detection"): it lives inside its take (Activity's Recited, Show on the page, a word's card) and is never listed as a
+   *  recording (`listRecordings()`: not in Recent, See all, a day's Read, the calendar's mic or Settings). Always
+   *  `localOnly`. RMEM-6. */
+  take?: boolean;
 }
 
 export interface MetaSegment {
@@ -183,6 +188,8 @@ export interface SegmentInfo {
   levels?: number[];
   /** A new recording kept on this phone only (StoredRecording.localOnly). */
   localOnly?: boolean;
+  /** A new recording that is a Recite take's audio (StoredRecording.take). */
+  take?: boolean;
   /** Hold the recording's upload from this segment on (holdUpload), until released: the recorder is still going. */
   holdUpload?: boolean;
 }
@@ -262,6 +269,7 @@ export function appendSegment(
         : normalizePageMarks(info.pageMarks),
       ...(info.open ? { open: true } : {}),
       ...((existing ? existing.localOnly : info.localOnly) ? { localOnly: true } : {}),
+      ...((existing ? existing.take : info.take) ? { take: true } : {}),
       storage: 'device',
     };
     // Held before the index lists it, so no backup run sees it unheld.
@@ -351,15 +359,49 @@ function toMeta(dir: Directory, e: StoredRecording): RecordingMeta | null {
   };
 }
 
-/** This account's recordings, newest first. Entries whose file is gone are dropped. */
-export function listRecordings(): Promise<RecordingMeta[]> {
+/** Which entries `listRecordings` gives: the recordings (the default), Recite takes' audio, or both. */
+export type RecordingsWhich = 'recordings' | 'takes' | 'all';
+
+/**
+ * This account's recordings, newest first. Entries whose file is gone are dropped. A Recite take's audio is not a
+ * recording (RMEM-6): it is left out unless asked for (`'takes'`, or `'all'` for a lookup by id).
+ */
+export function listRecordings(which: RecordingsWhich = 'recordings'): Promise<RecordingMeta[]> {
   return serial(async () => {
     const dir = accountDir();
     const entries = await readIndex(dir);
     const metas = entries.map((e) => toMeta(dir, e));
     const kept = entries.filter((_, i) => metas[i] != null);
     if (kept.length !== entries.length) writeIndex(dir, kept);
-    return (metas.filter(Boolean) as RecordingMeta[]).sort((a, b) => b.createdAt - a.createdAt);
+    return (metas.filter(Boolean) as RecordingMeta[])
+      .filter((m) => which === 'all' || (which === 'takes') === (m.take === true))
+      .sort((a, b) => b.createdAt - a.createdAt);
+  });
+}
+
+/**
+ * Takes saved before Nov 16 2026 were plain reading recordings. The ones a take record names (`ids`) become takes'
+ * audio again: only this phone's own WAVs (a take's recording, `localOnly`), never anything else. The index alone
+ * changes: no file is moved or deleted. Returns how many it marked.
+ */
+export function markTakeAudio(ids: Iterable<string>): Promise<number> {
+  const wanted = new Set(ids);
+  if (wanted.size === 0) return Promise.resolve(0);
+  return serial(async () => {
+    const dir = accountDir();
+    const entries = await readIndex(dir);
+    let marked = 0;
+    const next = entries.map((e) => {
+      if (e.take || !wanted.has(e.id) || !e.localOnly || e.kind !== 'reading') return e;
+      if (!segmentsOf(e).every((sg) => /\.wav$/i.test(sg.fileName))) return e;
+      marked += 1;
+      return { ...e, take: true };
+    });
+    if (marked > 0) {
+      writeIndex(dir, next);
+      notifyChanged();
+    }
+    return marked;
   });
 }
 
@@ -454,7 +496,7 @@ export const isRevisionRecordingOf = (day: string) => (r: StoredRecording) =>
 
 /** Reading recordings made while a reading session ran. */
 export const isReadingRecordingDuring = (startedAt: number, endedAt: number) => (r: StoredRecording) =>
-  r.kind === 'reading' && r.createdAt >= startedAt && r.createdAt <= endedAt;
+  r.kind === 'reading' && !r.take && r.createdAt >= startedAt && r.createdAt <= endedAt;
 
 /** Every recording of an account on this device (account deletion, sign-out wipe). */
 /**
@@ -465,22 +507,40 @@ export const isReadingRecordingDuring = (startedAt: number, endedAt: number) => 
  */
 export function deleteAllRecordings(
   uid?: string,
-  { withBackup = false, alsoIds = [] as string[] } = {},
+  { withBackup = false, alsoIds = [] as string[], keepTakes = false } = {},
 ): Promise<void> {
   return serial(async () => {
     const owner = uid ?? getAuth().currentUser?.uid ?? 'signed-out';
     const dir = new Directory(Paths.document, 'recordings', owner);
+    const entries = (withBackup || keepTakes) && dir.exists ? await readIndex(dir) : [];
+    // Settings' "Delete all recordings" (`keepTakes`): a Recite take's audio isn't a recording there (RMEM-6), so it
+    // stays with its take. Signing out, a deleted account or a reset take everything.
+    const takes = keepTakes ? entries.filter((e) => e.take) : [];
     if (withBackup) {
-      const entries = dir.exists ? await readIndex(dir) : [];
       // Every recording, deleted one by one (tombstones, so other phones don't
       // upload their copies again): those listed here, and `alsoIds`, the
       // backup's own list just fetched (recordings not listed here yet).
       queueCloudDeletes(
-        [...entries.map(cloudDeleteFor), ...alsoIds.filter(isSafeName).map((id) => ({ id, tombstone: true }))],
+        [
+          ...entries.filter((e) => !takes.includes(e)).map(cloudDeleteFor),
+          ...alsoIds.filter(isSafeName).map((id) => ({ id, tombstone: true })),
+        ],
         owner,
       );
     }
-    if (dir.exists) dir.delete();
+    if (dir.exists && takes.length > 0) {
+      // The whole folder but the takes' files and the index, which then lists only them.
+      const keep = new Set([...takes.flatMap((e) => segmentsOf(e).map((sg) => sg.fileName)), indexFile(dir).name]);
+      for (const entry of dir.list()) {
+        if (keep.has(entry.name)) continue;
+        try {
+          entry.delete();
+        } catch (err) {
+          logger.warn('Could not delete recording file', err);
+        }
+      }
+      writeIndex(dir, takes);
+    } else if (dir.exists) dir.delete();
     notifyChanged();
   });
 }

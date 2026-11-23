@@ -26,6 +26,7 @@ import {
 } from '../lib/quranData';
 import { arabicLabelLines } from '../lib/platformUi';
 import { ModalNest, useModalHold } from './v2/modalTurn';
+import { t } from '../i18n';
 
 interface EditSessionModalProps {
   visible: boolean;
@@ -90,9 +91,9 @@ export function EditSessionModal({
   };
 
   const handleDelete = () => {
-    Alert.alert('Delete session?', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: onDelete },
+    Alert.alert(t('revision.edit.deleteTitle'), t('revision.edit.deleteBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: onDelete },
     ]);
   };
 
@@ -121,14 +122,14 @@ export function EditSessionModal({
     if (smartTrackingEnabled) {
       actions.push({
         key: 'rate',
-        label: 'Rate strength for this page',
+        label: t('revision.edit.rate'),
         icon: 'stats-chart-outline',
         onPress: () => setSelectedPageForRating(currentPageNumber),
       });
     }
     actions.push({
       key: 'delete',
-      label: 'Delete session',
+      label: t('revision.edit.delete'),
       icon: 'trash-outline',
       destructive: true,
       onPress: handleDelete,
@@ -153,16 +154,16 @@ export function EditSessionModal({
           <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
           <View style={[styles.topBar, { backgroundColor: read.pageBg }]}>
-            <RoundButton icon="close" label="Close and save" onPress={handleCloseWithSave} palette={read} />
+            <RoundButton icon="close" label={t('revision.edit.closeAndSave')} onPress={handleCloseWithSave} palette={read} />
             <View style={styles.spacer} />
             <RoundButton
               icon={isCurrentRevised ? 'checkmark' : 'checkmark-outline'}
-              label={isCurrentRevised ? 'Unmark current page' : 'Mark current page as revised'}
+              label={isCurrentRevised ? t('revision.edit.unmarkCurrent') : t('revision.edit.markCurrent')}
               onPress={toggleCurrent}
               palette={read}
               active={isCurrentRevised}
             />
-            <RoundButton icon="ellipsis-horizontal" label="Session menu" onPress={() => setMenuOpen(true)} palette={read} />
+            <RoundButton icon="ellipsis-horizontal" label={t('revision.edit.menu')} onPress={() => setMenuOpen(true)} palette={read} />
           </View>
 
           <View style={styles.viewerWrap}>
@@ -175,7 +176,7 @@ export function EditSessionModal({
 
             <View style={styles.breadcrumb} pointerEvents="none">
               <Text style={crumbText} maxFontSizeMultiplier={1.3}>
-                Juz {juz} · Hizb {hizb}
+                {t('revision.edit.crumb', { juz, hizb })}
               </Text>
               <View style={styles.crumbRight}>
                 {firstSurah?.name ? (

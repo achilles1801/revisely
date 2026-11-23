@@ -23,6 +23,12 @@ jest.mock('expo-file-system', () => {
       mockFiles.set(this.uri, next);
       this.offset = at + bytes.length;
     }
+    readBytes(n: number) {
+      const at = this.offset ?? 0;
+      const out = (mockFiles.get(this.uri) ?? new Uint8Array(0)).slice(at, at + n);
+      this.offset = at + out.length;
+      return out;
+    }
     close() {}
   }
   class File {
@@ -62,6 +68,30 @@ beforeEach(() => {
   mockFailWrites = false;
   mockAppend.mockReset();
   mockAppend.mockResolvedValue({ id: 'rec-1', kept: true, restarted: false });
+});
+
+describe('a long recitation reads its earlier audio back from the recording (RECITE-22)', () => {
+  it('any stretch while it is recorded, what is still waiting to be written too, and writing carries on where it was', async () => {
+    const take = startTakeRecording({ day: '2026-11-22', page: 379, now: 1000 });
+    const a = tone(16000 * 3);
+    take.add(a.subarray(0, 40000));
+    // Half a second still waiting (written a second at a time): flushed before reading.
+    expect(Array.from(take.clip(1, 2.5) ?? [])).toEqual(Array.from(a.subarray(16000, 40000)));
+    take.add(a.subarray(40000));
+    expect(Array.from(take.clip(2.5, 3) ?? [])).toEqual(Array.from(a.subarray(40000)));
+    // Nothing past what was recorded, or backwards.
+    expect(take.clip(5, 6)).toBeNull();
+    expect(take.clip(2, 1)).toBeNull();
+    const saved = await take.finish();
+    expect(saved).toEqual({ day: '2026-11-22', recordingId: 'rec-1' });
+    // The whole file as it came, header and all.
+    const [, uri] = mockAppend.mock.calls[0];
+    const file = mockFiles.get(uri)!;
+    expect(file.length).toBe(44 + a.length * 2);
+    expect(Array.from(new Int16Array(file.slice(44).buffer))).toEqual(Array.from(a));
+    // Once finished, the file is the recording's: nothing more is read here.
+    expect(take.clip(0, 1)).toBeNull();
+  });
 });
 
 describe('a take kept as a recording', () => {

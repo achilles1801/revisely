@@ -3,6 +3,8 @@ import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
+import { spokenText } from '../../lib/passages';
+import { t } from '../../i18n';
 
 export const MODE_MENU_WIDTH = 276;
 
@@ -35,10 +37,26 @@ function MiniSwitch({ on, locked }: { on: boolean; locked: boolean }) {
   );
 }
 
+/** The page's remembered mistakes, offered as one take (lib/reciteLive/drill openDrill). */
+export interface MenuDrill {
+  /** Words still to fix on the page. */
+  count: number;
+  /** The stretch the take runs over, in words ("An-Naml, ayahs 23–27"). */
+  place: string;
+}
+
+/** The drill row's label: "Recite your 3 mistakes here". */
+export const drillLabel = (count: number) => t('reciteLive.menu.drill', { count });
+
 /**
  * Holding the mic: Record or Recite, above the bar at the right (like the held verse's menu: a card in the screen,
  * nothing dimmed, any touch outside closes it). Under Recite, one row: Mark mistakes, a switch (Premium; Majd, Nov 14
  * 2026). Without Premium it is off with a lock, and a tap opens the Premium page. Its level is in Settings.
+ *
+ * With Premium, a page that still has words to fix in Recite's memory adds one more row: "Recite your N mistakes
+ * here", one take over the stretch that holds them, which stops by itself at its end (the idea of Nov 15 2026). Last,
+ * Test me (Premium too; Majd, Nov 15 2026): a test at random places in what's memorized. It starts a test; it isn't
+ * what a tap on the mic starts.
  */
 export function ReciteModeMenu({
   visible,
@@ -50,7 +68,11 @@ export function ReciteModeMenu({
   onPick,
   onMarkMistakes,
   onLocked,
+  onTest,
+  testReady = false,
   onClose,
+  drill,
+  onDrill,
 }: {
   visible: boolean;
   mode: ReciteMenuMode;
@@ -65,7 +87,14 @@ export function ReciteModeMenu({
   onMarkMistakes: (on: boolean) => void;
   /** The locked switch was tapped. */
   onLocked: () => void;
+  /** Test me was tapped (without Premium, onLocked is called instead). Absent: no Test me row. */
+  onTest?: () => void;
+  /** Something is memorized to test (otherwise the row says so and does nothing). */
+  testReady?: boolean;
   onClose: () => void;
+  /** The page's remembered mistakes to recite again, when it has any (and the account has Premium). */
+  drill?: MenuDrill | null;
+  onDrill?: () => void;
 }) {
   const { palette, isDark } = useTheme();
   const first = useRef<View>(null);
@@ -136,26 +165,84 @@ export function ReciteModeMenu({
       >
         <View style={styles.clip}>
           <View style={mode === 'record' ? { backgroundColor: palette.accentSubtle } : undefined}>
-            {row('record', 'Record', 'Just record your recitation', 'radio-button-on', first)}
+            {row('record', t('reciteLive.menu.record'), t('reciteLive.menu.recordSub'), 'radio-button-on', first)}
           </View>
           <View style={[styles.separator, { backgroundColor: palette.separator }]} />
           <View style={recite ? { backgroundColor: palette.accentSubtle } : undefined}>
-            {row('recite', 'Recite', 'The page follows you', 'reader-outline')}
+            {row('recite', t('reciteLive.menu.recite'), t('reciteLive.menu.reciteSub'), 'reader-outline')}
             <Pressable
               onPress={() => (owned ? onMarkMistakes(!on) : onLocked())}
               accessibilityRole="switch"
-              accessibilityLabel={owned ? 'Mark mistakes' : 'Mark mistakes, part of Premium, locked'}
+              accessibilityLabel={owned ? t('reciteLive.menu.markMistakes') : t('reciteLive.menu.markMistakesLocked')}
               accessibilityState={{ checked: on }}
               hitSlop={{ top: 4, bottom: 4 }}
               style={({ pressed }) => [styles.toggle, pressed && { opacity: 0.6 }]}
               testID="recite-mistakes"
             >
               <Text style={[styles.toggleLabel, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
-                Mark mistakes
+                {t('reciteLive.menu.markMistakes')}
               </Text>
               <MiniSwitch on={on} locked={!owned} />
             </Pressable>
           </View>
+          {drill && onDrill ? (
+            <>
+              <View style={[styles.separator, { backgroundColor: palette.separator }]} />
+              <Pressable
+                onPress={onDrill}
+                accessibilityRole="button"
+                accessibilityLabel={`${drillLabel(drill.count)}, ${spokenText(drill.place)}`}
+                style={({ pressed }) => [styles.row, pressed && { backgroundColor: palette.fill }]}
+                testID="recite-mode-drill"
+              >
+                <View style={styles.icon}>
+                  <Ionicons name="refresh" size={21} color={palette.text} />
+                </View>
+                <View style={styles.label}>
+                  <Text style={[typeV2.menu, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
+                    {drillLabel(drill.count)}
+                  </Text>
+                  <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={2} maxFontSizeMultiplier={1.3}>
+                    {drill.place}
+                  </Text>
+                </View>
+                <View style={styles.tick} />
+              </Pressable>
+            </>
+          ) : null}
+          {onTest ? (
+            <>
+              <View style={[styles.separator, { backgroundColor: palette.separator }]} />
+              <Pressable
+                onPress={() => (!owned ? onLocked() : testReady ? onTest() : undefined)}
+                disabled={owned && !testReady}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  !owned
+                    ? t('reciteLive.menu.testLocked')
+                    : testReady
+                      ? t('reciteLive.menu.testReadyLabel')
+                      : t('reciteLive.menu.testNotReadyLabel')
+                }
+                accessibilityState={{ disabled: owned && !testReady }}
+                style={({ pressed }) => [styles.row, pressed && { backgroundColor: palette.fill }]}
+                testID="recite-mode-test"
+              >
+                <View style={styles.icon}>
+                  <Ionicons name="shuffle" size={21} color={owned && !testReady ? palette.secondary : palette.text} />
+                </View>
+                <View style={styles.label}>
+                  <Text style={[typeV2.menu, { color: owned && !testReady ? palette.secondary : palette.text }]} maxFontSizeMultiplier={1.4}>
+                    {t('reciteLive.menu.testMe')}
+                  </Text>
+                  <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={2} maxFontSizeMultiplier={1.3}>
+                    {owned && !testReady ? t('reciteLive.menu.testNotReady') : t('reciteLive.menu.testReady')}
+                  </Text>
+                </View>
+                {owned ? <View style={styles.tick} /> : <Ionicons name="lock-closed" size={14} color={palette.premium[0]} testID="recite-test-locked" />}
+              </Pressable>
+            </>
+          ) : null}
         </View>
       </View>
     </View>

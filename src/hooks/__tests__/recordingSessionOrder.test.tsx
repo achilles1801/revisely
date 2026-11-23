@@ -89,8 +89,7 @@ beforeEach(() => {
   jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
 });
 
-const setup = () =>
-  renderHook(() => useVoiceRecorder({ kind: 'revision', day: '2026-10-20', currentPage: 3 }));
+const setup = () => renderHook(() => useVoiceRecorder({ kind: 'revision', day: '2026-10-20', currentPage: 3 }));
 
 const expectRecordingStarted = (result: any) => {
   expect(result.current.phase).toBe('recording');

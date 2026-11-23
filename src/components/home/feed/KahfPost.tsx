@@ -8,20 +8,25 @@ import { Mark } from '../../v2/Mark';
 import { PillButton } from '../../v2/PillButton';
 import { RowText, ThreadRow } from '../../v2/ThreadRow';
 import { arabicLabelLines } from '../../../lib/platformUi';
+import { t } from '../../../i18n';
 
 /**
- * Friday on Home: a post suggesting Surah Al-Kahf. Read opens it; "Mark as
- * read" asks how long it took (a sheet) and logs a reading session; ⋯ hides it
- * for today. Once read, its mark is done.
+ * The Islamic Friday on Home (Thursday's maghrib to Friday's, KAHF-1): a post
+ * suggesting Surah Al-Kahf. Read opens it; "Mark as read" asks how long it took
+ * (a sheet) and logs a reading session; ⋯ hides it until Friday's maghrib. Once
+ * read, its mark is done.
  */
 export function KahfPost({
   state,
+  eve = false,
   saving = false,
   onRead,
   onMarkRead,
   onDismiss,
 }: {
   state: 'prompt' | 'done';
+  /** Thursday evening, after maghrib: Friday has begun but the revision day is still Thursday's. */
+  eve?: boolean;
   saving?: boolean;
   onRead: () => void;
   onMarkRead: (minutes: number) => void;
@@ -31,7 +36,7 @@ export function KahfPost({
   const [menuOpen, setMenuOpen] = useState(false);
   const [picking, setPicking] = useState(false);
   const pages = kahfPages();
-  const range = `pages ${pages[0]}–${pages[pages.length - 1]}`;
+  const range = t('home.kahf.range', { from: pages[0], to: pages[pages.length - 1] });
   const done = state === 'done';
 
   return (
@@ -40,52 +45,52 @@ export function KahfPost({
         mark={<Mark label="١٨" arabic done={done} />}
         name="Al-Kahf"
         nameAfter={
-          <Text style={[arabicV2(16), { color: palette.secondary, marginLeft: 6, lineHeight: 20 }]} accessibilityLanguage="ar" numberOfLines={arabicLabelLines}>
+          <Text style={[arabicV2(16), { color: palette.secondary, marginLeft: 6 }]} accessibilityLanguage="ar" numberOfLines={arabicLabelLines}>
             الكهف
           </Text>
         }
-        meta="Friday"
+        meta={t('home.kahf.friday')}
         onMenu={done ? undefined : () => setMenuOpen(true)}
-        menuLabel="Al-Kahf options"
+        menuLabel={t('home.kahf.options')}
         testID="kahf-post"
         footer={
           done ? (
-            <PillButton title="Open" variant="outline" onPress={onRead} accessibilityLabel="Open Surah Al-Kahf" />
+            <PillButton title={t('home.kahf.open')} variant="outline" onPress={onRead} accessibilityLabel={t('home.kahf.openLabel')} />
           ) : (
             <>
-              <PillButton title="Read" onPress={onRead} accessibilityLabel="Read Surah Al-Kahf" testID="kahf-read" />
+              <PillButton title={t('home.kahf.read')} onPress={onRead} accessibilityLabel={t('home.kahf.readLabel')} testID="kahf-read" />
               <PillButton
-                title={saving ? 'Saving…' : 'Mark as read'}
+                title={saving ? t('common.saving') : t('home.kahf.markRead')}
                 variant="outline"
                 onPress={() => setPicking(true)}
                 disabled={saving}
-                accessibilityLabel="Mark Surah Al-Kahf as read"
+                accessibilityLabel={t('home.kahf.markReadLabel')}
                 testID="kahf-mark"
               />
             </>
           )
         }
       >
-        <RowText>{done ? 'Read today.' : "It's Friday. Read Surah Al-Kahf."}</RowText>
-        <RowText secondary>{done ? `Saved as a reading session, ${range}.` : `The whole surah, ${range}.`}</RowText>
+        <RowText>{done ? t('home.kahf.doneFriday') : eve ? t('home.kahf.fridayBegan') : t('home.kahf.itsFriday')}</RowText>
+        <RowText secondary>{done ? t('home.kahf.saved', { range }) : t('home.kahf.whole', { range })}</RowText>
       </ThreadRow>
 
       <ActionSheet
         visible={menuOpen}
         onClose={() => setMenuOpen(false)}
         title="Al-Kahf"
-        actions={[{ key: 'hide', label: 'Not today', icon: 'eye-off-outline', onPress: onDismiss }]}
+        actions={[{ key: 'hide', label: t('home.kahf.notToday'), icon: 'eye-off-outline', onPress: onDismiss }]}
       />
       <ActionSheet
         visible={picking}
         onClose={() => setPicking(false)}
-        title="How long did it take?"
-        message={`Saved as a reading session of Al-Kahf (${range}).`}
+        title={t('home.kahf.howLong')}
+        message={t('home.kahf.savedOf', { range })}
         actions={KAHF_MINUTE_CHOICES.map((m) => ({
           key: `m${m}`,
-          label: `${m} minutes`,
+          label: t('home.kahf.minutes', { m }),
           icon: 'time-outline' as const,
-          detail: m === KAHF_DEFAULT_MINUTES ? 'Usual' : undefined,
+          detail: m === KAHF_DEFAULT_MINUTES ? t('home.kahf.usual') : undefined,
           onPress: () => onMarkRead(m),
         }))}
         testID="kahf-minutes"

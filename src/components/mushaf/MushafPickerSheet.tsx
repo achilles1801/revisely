@@ -17,6 +17,7 @@ import {
 import { otherEditionsOnPhone, removeOtherEditionPages } from '../../lib/mushafOffline';
 import { pageSizeTable } from '../../lib/pageCache';
 import { formatMegabytes, useMushafOffline } from '../../lib/mushafOfflineUi';
+import { t } from '../../i18n';
 
 /** Names and lines grow with Dynamic Type only this far (chrome). */
 const CHROME_TEXT_SCALE = 1.4;
@@ -59,26 +60,26 @@ export function MushafPickerSheet({ visible, onClose }: { visible: boolean; onCl
 
   const choose = (id: MushafEditionId) => {
     if (id === current) return;
-    void setMushafEdition(id).then(() => setTick((t) => t + 1));
+    void setMushafEdition(id).then(() => setTick((n) => n + 1));
   };
 
   const status = (id: MushafEditionId): string => {
-    if (id === current && offline.phase === 'complete') return 'On this phone';
+    if (id === current && offline.phase === 'complete') return t('mushaf.onPhone');
     const pages = id === current ? offline.pages : (others.find((o) => o.edition === id)?.pages ?? 0);
-    if (pages >= offline.total) return 'On this phone';
-    if (pages > 0) return `${pages} of ${offline.total} pages on this phone`;
-    return `${formatMegabytes(editionBytes(id))} to download`;
+    if (pages >= offline.total) return t('mushaf.onPhone');
+    if (pages > 0) return t('mushaf.pagesOnPhone', { pages, total: offline.total });
+    return t('mushaf.toDownload', { size: formatMegabytes(editionBytes(id)) });
   };
 
   const remove = (id: MushafEditionId, bytes: number) =>
-    Alert.alert(`Remove ${MUSHAF_EDITIONS[id].name}?`, `This frees ${formatMegabytes(bytes)}. It downloads again if you choose it.`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('mushaf.removeTitle', { name: MUSHAF_EDITIONS[id].name }), t('mushaf.removeBody', { size: formatMegabytes(bytes) }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: t('common.remove'),
         style: 'destructive',
         onPress: () => {
           removeOtherEditionPages(id);
-          setTick((t) => t + 1);
+          setTick((n) => n + 1);
         },
       },
     ]);
@@ -87,8 +88,8 @@ export function MushafPickerSheet({ visible, onClose }: { visible: boolean; onCl
     <Sheet
       visible={visible}
       onClose={onClose}
-      title="Mushaf"
-      right={{ label: 'Done', onPress: onClose, strong: true, testID: 'mushaf-picker-done' }}
+      title={t('mushaf.title')}
+      right={{ label: t('common.done'), onPress: onClose, strong: true, testID: 'mushaf-picker-done' }}
       scroll
       testID="mushaf-picker"
     >
@@ -132,12 +133,12 @@ export function MushafPickerSheet({ visible, onClose }: { visible: boolean; onCl
           onPress={() => remove(o.edition, o.bytes)}
           style={[styles.removeRow, { borderBottomColor: palette.separator }]}
           accessibilityRole="button"
-          accessibilityLabel={`Remove ${MUSHAF_EDITIONS[o.edition].name} from this phone, ${formatMegabytes(o.bytes)}`}
+          accessibilityLabel={t('mushaf.removeLabel', { name: MUSHAF_EDITIONS[o.edition].name, size: formatMegabytes(o.bytes) })}
           testID={`mushaf-remove-${o.edition}`}
         >
           <Ionicons name="trash-outline" size={22} color={palette.red} />
           <Text style={[typeV2.body, styles.removeText, { color: palette.red }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
-            Remove {MUSHAF_EDITIONS[o.edition].name}
+            {t('mushaf.removeRow', { name: MUSHAF_EDITIONS[o.edition].name })}
           </Text>
           <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_TEXT_SCALE}>
             {formatMegabytes(o.bytes)}

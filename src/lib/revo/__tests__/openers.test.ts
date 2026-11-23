@@ -271,3 +271,54 @@ describe('where Revo is opened from (REVO-38) and where its button shows (REVO-2
     }
   });
 });
+
+describe('Revo’s first line in Arabic (REVO-38, openers.ar.ts)', () => {
+  const { i18n } = jest.requireActual('../../../i18n') as typeof import('../../../i18n');
+  beforeAll(() => i18n.changeLanguage('ar'));
+  afterAll(() => i18n.changeLanguage('en'));
+  /** What the English builders write: none of it may reach an Arabic line. */
+  const ENGLISH = /\b(On|you revised|were revised|was revised|Nothing (is|was)|starting at|is rated|are rated|hasn’t|haven’t|in the last|weak pages?|come round|Plan )\b/;
+
+  it('[REVO-38] a past day: what was revised, in how long, the notes, as Arabic writes it; Arabic questions', () => {
+    const notes = { journal: [{ date: '2026-11-01', entries: [{ id: 'a', kind: 'note', text: 'Slow but steady' }, { id: 'b', kind: 'note', text: 'Revised after Fajr' }] }] };
+    const { text, chips } = opened({ kind: 'day', day: '2026-11-01', extras: notes as never });
+    expect(text).toContain('يوم الأحد راجعت كل ما في الخطة: صفحتان، ');
+    expect(text).toContain('، في ٢٠ دقيقة، وكتبت ملاحظتين.');
+    expect(text).toContain('اليوم، التالي: ');
+    expect(chips).toEqual(['كيف كانت مراجعة الأحد؟', 'كيف كان أسبوعي؟', 'ما الأيام التي تفوتني؟']);
+  });
+
+  it('[REVO-38] a missed day, a caught-up one, the month, the weak pages and a juz', () => {
+    expect(opened({ kind: 'day', day: '2026-11-03' }).text).toContain('صفحات الثلاثاء (صفحتان)، ');
+    expect(opened({ kind: 'day', day: '2026-11-02' }).text).toContain('يوم الاثنين رُوجع كل ما في الخطة: صفحتان، ');
+    expect(opened({ kind: 'day', day: '2026-11-02' }).text).toContain('منها ١ استُدركت لاحقًا.');
+    expect(opened({ kind: 'overview' }).text).toMatch(/راجعت هذا الشهر في [٠-٩]+ من [٠-٩]+ أيام، /);
+    // plainText turns no-break spaces into spaces.
+    expect(opened({ kind: 'juz', juz: 30 }).text).toContain('الجزء ٣٠');
+    expect(opened({ kind: 'juz', juz: 1 }).text).toContain('لم تحفظ شيئًا من الجزء ١ بعد.');
+    expect(opened({ kind: 'weakSpots' }).chips[0]).toMatch(/^خطة لمواضع ضعفي$|^لماذا تضعف؟$|ما أضعف المواضع؟/);
+  });
+
+  it('[REVO-38] no Arabic line, from any place, on any open, holds the English builders’ words or a broken value', () => {
+    const places: RevoPlace[] = [
+      ...['2026-10-20', '2026-11-01', '2026-11-02', '2026-11-03', '2026-11-06', '2026-11-08', '2026-11-20'].map((day) => ({ kind: 'day' as const, day })),
+      { kind: 'overview' },
+      { kind: 'insights' },
+      { kind: 'weakSpots' },
+      { kind: 'strength' },
+      { kind: 'juz', juz: 1 },
+      { kind: 'juz', juz: 30 },
+    ];
+    for (const strength of [true, false]) {
+      for (const place of places) {
+        for (let open = 0; open < 4; open++) {
+          const { text, chips } = opened(place, { open, strength });
+          expect([place, open, text]).not.toEqual([place, open, expect.stringMatching(ENGLISH)]);
+          expect(text).not.toMatch(/\bundefined\b|\bNaN\b|\bnull\b|\s{2}/);
+          for (const c of chips) expect([place, c]).not.toEqual([place, expect.stringMatching(/[A-Za-z]{3}/)]);
+          expect(chips.length).toBeLessThanOrEqual(3);
+        }
+      }
+    }
+  });
+});

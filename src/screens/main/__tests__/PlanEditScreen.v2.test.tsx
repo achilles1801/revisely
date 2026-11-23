@@ -203,8 +203,8 @@ describe('the schedule in the new design', () => {
   it('a v2 top bar: back, the title, Save as a solid pill (off until something changes)', async () => {
     await mount(<PlanEditScreen />);
     expect(flat(screen.getByTestId('plan-edit').props.style).backgroundColor).toBe(palette.bg);
-    expect(screen.getByRole('header', { name: 'Schedule' })).toBeTruthy();
-    expect(flat(screen.getByText('Schedule').props.style)).toMatchObject({ ...typeV2.barTitle, color: palette.text });
+    expect(screen.getByRole('header', { name: 'Edit schedule' })).toBeTruthy();
+    expect(flat(screen.getByText('Edit schedule').props.style)).toMatchObject({ ...typeV2.barTitle, color: palette.text });
     const save = screen.getByTestId('plan-save');
     expect(flat(save.props.style).backgroundColor).toBe(palette.primary);
     expect(save.props.accessibilityState).toMatchObject({ disabled: true });
@@ -212,14 +212,21 @@ describe('the schedule in the new design', () => {
     expect(mockNavigation.goBack).toHaveBeenCalled();
   });
 
-  it('flat: no glass anywhere, sections with bold headers, sentence-case rows', async () => {
+  it('[SCHED-7] tidied (option A): Daily amount first, the days unfolded, Create new plan and Saved plans as two rows', async () => {
     await mount(<PlanEditScreen />);
-    for (const header of ['Cycle', 'Saved plans', 'More']) {
-      expect(flat(screen.getByText(header).props.style)).toMatchObject({ fontWeight: '600', color: palette.text });
-    }
-    for (const label of ['Show all 10 days', 'Add rest day', 'Create new plan', 'Save current plan…', 'Daily amount']) {
+    expect(flat(screen.getByText('Your days').props.style)).toMatchObject({ fontWeight: '600', color: palette.text });
+    for (const label of ['Daily amount', 'Show all 10 days', 'Add rest day', 'Create new plan', 'Saved plans', 'Tap a day to change what’s on it.']) {
       expect(screen.getByText(label)).toBeTruthy();
     }
+    for (const gone of ['Cycle', 'More', 'Save current plan…', 'Use automatic schedule']) {
+      expect(screen.queryByText(gone)).toBeNull();
+    }
+    // Daily amount comes before the days.
+    const ids = ['plan-quota', 'day-list', 'plan-create'];
+    const order = screen.UNSAFE_root
+      .findAll((n: { props: { testID?: unknown }; type: unknown }) => typeof n.props.testID === 'string' && ids.includes(n.props.testID) && typeof n.type !== 'string')
+      .map((n: { props: { testID?: unknown } }) => n.props.testID);
+    expect([...new Set(order)]).toEqual(['plan-quota', 'day-list', 'plan-create']);
     // Running behind? (push back / skip ahead a day) is gone: Home's Jump to… moves where today starts.
     expect(screen.queryByText('Running behind?')).toBeNull();
     expect(screen.queryByTestId('plan-timing')).toBeNull();
@@ -227,9 +234,10 @@ describe('the schedule in the new design', () => {
     // "Show all" is a link; actions read in ink.
     expect(flat(screen.getByText('Show all 10 days').props.style).color).toBe(palette.link);
     expect(flat(screen.getByText('Create new plan').props.style).color).toBe(palette.text);
-    // What the plan is.
-    expect(within(screen.getByTestId('plan-hero')).getByText('Automatic')).toBeTruthy();
-    expect(within(screen.getByTestId('plan-hero')).getByText('Repeats every 10 days')).toBeTruthy();
+    // How much a day, and how often each page comes round; never "Automatic".
+    expect(within(screen.getByTestId('plan-hero')).getByText('3 pages a day')).toBeTruthy();
+    expect(within(screen.getByTestId('plan-hero')).getByText('Every page comes round every 10 days')).toBeTruthy();
+    expect(within(screen.getByTestId('plan-hero')).queryByText('Automatic')).toBeNull();
   });
 
   it('the days: the date column in sentence case, today in the accent, content as a feed row', async () => {
@@ -262,7 +270,8 @@ describe('the schedule in the new design', () => {
     await mount(<PlanEditScreen />);
     fireEvent.press(screen.getByTestId('plan-add-day'));
     expect(colorOf('plan-dirty')).toBe(palette.accentText);
-    expect(within(screen.getByTestId('plan-hero')).getByText('Custom plan')).toBeTruthy();
+    // [MEM-6] Saving the edit makes the automatic schedule a custom plan: said before Save.
+    expect(screen.getByTestId('plan-custom-note')).toBeTruthy();
     expect(screen.getByTestId('plan-save').props.accessibilityState).toMatchObject({ disabled: false });
     // Taps don't buzz.
     expect(Haptics.selectionAsync).not.toHaveBeenCalled();
@@ -315,21 +324,23 @@ describe('the schedule in the new design', () => {
     expect(within(sheet).getByText('Ajzaʼ per day')).toBeTruthy();
   });
 
-  it('a saved plan opens a v2 menu: Load plan replaces the days, Delete plan in red', async () => {
+  it('Saved plans opens a sheet: each plan with Load and a bin, and Save current plan…', async () => {
+    const { Alert } = require('react-native');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     await mount(<PlanEditScreen />);
-    fireEvent.press(screen.getByTestId('saved-plan-p1'));
+    fireEvent.press(screen.getByTestId('plan-saved-plans'));
     await act(async () => {});
-    const menu = screen.getByTestId('saved-plan-menu');
-    expect(within(menu).getByText('Ramadan rotation')).toBeTruthy();
-    expect(flat(within(menu).getByText('Delete plan').props.style).color).toBe(palette.red);
-    fireEvent.press(within(menu).getByTestId('sheet-action-load'));
-    // The action runs once the menu has gone (iOS: the modal's dismissal).
-    const modal = screen.UNSAFE_getAllByType(Modal).find((m) => m.props.visible);
-    await act(async () => {
-      modal?.props.onDismiss?.();
-    });
-    expect(within(screen.getByTestId('plan-hero')).getByText('Repeats every 2 days')).toBeTruthy();
+    const sheet = screen.getByTestId('saved-plans-sheet');
+    expect(within(sheet).getByText('Ramadan rotation')).toBeTruthy();
+    expect(within(sheet).getByText('2-day cycle')).toBeTruthy();
+    expect(within(sheet).getByText('Save current plan…')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('saved-plan-delete-p1'));
+    expect(alert.mock.calls.at(-1)![0]).toBe('Delete "Ramadan rotation"?');
+    fireEvent.press(screen.getByTestId('saved-plan-load-p1'));
+    await act(async () => {});
+    expect(within(screen.getByTestId('plan-hero')).getByText('Every page comes round every 2 days')).toBeTruthy();
     expect(screen.getByTestId('plan-dirty')).toBeTruthy();
+    alert.mockRestore();
   });
 
   it('the plan builder: pill tabs for the kind, the preview days on hairlines with their dates', async () => {
@@ -436,12 +447,10 @@ describe('a new plan and today', () => {
 
   async function loadSavedPlanAndSave() {
     await mount(<PlanEditScreen />);
-    fireEvent.press(screen.getByTestId('saved-plan-p1'));
+    fireEvent.press(screen.getByTestId('plan-saved-plans'));
     await act(async () => {});
-    fireEvent.press(within(screen.getByTestId('saved-plan-menu')).getByTestId('sheet-action-load'));
-    await act(async () => {
-      screen.UNSAFE_getAllByType(Modal).find((m) => m.props.visible)?.props.onDismiss?.();
-    });
+    fireEvent.press(screen.getByTestId('saved-plan-load-p1'));
+    await act(async () => {});
     await act(async () => {
       fireEvent.press(screen.getByTestId('plan-save'));
     });
@@ -530,12 +539,10 @@ describe('the plan’s name in the header (SCHED-7)', () => {
   });
 
   async function loadSaved() {
-    fireEvent.press(screen.getByTestId('saved-plan-p1'));
+    fireEvent.press(screen.getByTestId('plan-saved-plans'));
     await act(async () => {});
-    fireEvent.press(within(screen.getByTestId('saved-plan-menu')).getByTestId('sheet-action-load'));
-    await act(async () => {
-      screen.UNSAFE_getAllByType(Modal).find((m) => m.props.visible)?.props.onDismiss?.();
-    });
+    fireEvent.press(screen.getByTestId('saved-plan-load-p1'));
+    await act(async () => {});
   }
   async function save() {
     await act(async () => {
@@ -543,19 +550,20 @@ describe('the plan’s name in the header (SCHED-7)', () => {
     });
   }
   async function saveCurrentAs(name: string) {
+    fireEvent.press(screen.getByTestId('plan-saved-plans'));
+    await act(async () => {});
     fireEvent.press(screen.getByTestId('plan-save-current'));
     fireEvent.changeText(screen.getByTestId('plan-name'), name);
     await act(async () => {
-      fireEvent.press(within(screen.getByTestId('gorhom-sheet')).getByText('Save'));
+      fireEvent.press(within(screen.getAllByTestId('gorhom-sheet').at(-1)!).getByText('Save'));
     });
   }
 
   it('[SCHED-7] a loaded saved plan is named in the header, and saving it keeps the name', async () => {
     await mount(<PlanEditScreen />);
-    expect(within(hero()).getByText('Automatic')).toBeTruthy();
+    expect(screen.queryByTestId('plan-name-line')).toBeNull();
     await loadSaved();
     expect(within(hero()).getByText('Ramadan rotation')).toBeTruthy();
-    expect(within(hero()).queryByText('Custom plan')).toBeNull();
     await save();
     expect(savedUser().customPlan).toMatchObject({ name: 'Ramadan rotation', days: [[1, 2], [3, 4]] });
   });
@@ -573,20 +581,26 @@ describe('the plan’s name in the header (SCHED-7)', () => {
     expect(savedUser().customPlan!.days).toHaveLength(4);
   });
 
-  it('[SCHED-7] a custom plan without a name is “Custom plan”', async () => {
+  it('[SCHED-7] a custom plan without a name has no name line: how much a day and how often, never “Custom plan”', async () => {
     mockApp.user = { ...baseUser, savedPlans: [saved], customPlan: live() };
     await mount(<PlanEditScreen />);
-    expect(within(hero()).getByText('Custom plan')).toBeTruthy();
+    expect(screen.queryByTestId('plan-name-line')).toBeNull();
+    expect(within(hero()).getByText('3 pages a day')).toBeTruthy();
+    expect(within(hero()).getByText('Every page comes round every 3 days')).toBeTruthy();
+    expect(within(hero()).queryByText('Custom plan')).toBeNull();
+    // Daily amount says the plan's days stay as they are.
+    fireEvent.press(screen.getByTestId('plan-quota'));
+    expect(screen.getByText('Your plan’s days stay as they are. To use this amount, choose “Create new plan”.')).toBeTruthy();
   });
 
-  it('[SCHED-7] “Create new plan” makes a plan with no name: “Custom plan”, saved without one', async () => {
+  it('[SCHED-7] “Create new plan” makes a plan with no name, saved without one', async () => {
     mockApp.user = { ...baseUser, savedPlans: [saved], customPlan: live('Weekdays') };
     await mount(<PlanEditScreen />);
     fireEvent.press(screen.getByTestId('plan-create'));
     await act(async () => {
       fireEvent.press(within(screen.getByTestId('gorhom-sheet')).getByText('Apply'));
     });
-    expect(within(hero()).getByText('Custom plan')).toBeTruthy();
+    expect(screen.queryByTestId('plan-name-line')).toBeNull();
     await save();
     expect(savedUser().customPlan).not.toHaveProperty('name');
   });
@@ -619,7 +633,7 @@ describe('the plan’s name in the header (SCHED-7)', () => {
     await mount(<PlanEditScreen />);
     await saveCurrentAs('Weekdays');
     expect(savedUser().customPlan).toBeNull();
-    expect(within(hero()).getByText('Automatic')).toBeTruthy();
+    expect(screen.queryByTestId('plan-name-line')).toBeNull();
     expect(screen.queryByTestId('plan-dirty')).toBeNull();
   });
 });
@@ -671,7 +685,7 @@ describe('memorized pages a custom plan doesn’t hold (MEM-6)', () => {
     await act(async () => {
       screen.UNSAFE_getAllByType(Modal).find((m) => m.props.visible)?.props.onDismiss?.();
     });
-    expect(within(screen.getByTestId('plan-hero')).getByText('Repeats every 4 days')).toBeTruthy();
+    expect(within(screen.getByTestId('plan-hero')).getByText('Every page comes round every 4 days')).toBeTruthy();
   });
 
   it('[MEM-6] not on the automatic schedule, which holds every memorized page', async () => {

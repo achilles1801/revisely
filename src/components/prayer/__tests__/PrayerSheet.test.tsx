@@ -29,6 +29,12 @@ jest.mock('expo-location', () => ({
   watchHeadingAsync: jest.fn(async () => ({ remove: jest.fn() })),
 }));
 
+// The athan is Revisely Dev's, on iPhone (lib/athan `athanEnabled`).
+const mockAthan = { enabled: true };
+jest.mock('../../../lib/athan', () => ({ athanEnabled: () => mockAthan.enabled }));
+jest.mock('../useChosenAthanVoice', () => ({ useChosenAthanVoice: () => ({ id: 'azzam-dweik', name: 'Azzam Dweik' }) }));
+jest.mock('../../../lib/prayer/soundPreview', () => ({ previewPrayerSound: jest.fn(async () => undefined) }));
+
 import { PrayerSheet } from '../PrayerSheet';
 import { DEFAULT_PRAYER_PREFS, getPrayerPrefs, resetPrayerPrefsForTests } from '../../../lib/prayer/prefs';
 import { countdown, dayTimes, formatTime } from '../../../lib/prayer/times';
@@ -53,8 +59,9 @@ afterEach(() => jest.useRealTimers());
 function open(tab: 'times' | 'qibla' = 'times') {
   const onTab = jest.fn();
   const onOpenCalculation = jest.fn();
-  render(<PrayerSheet visible tab={tab} onTab={onTab} onClose={jest.fn()} onOpenCalculation={onOpenCalculation} />);
-  return { onTab, onOpenCalculation };
+  const onOpenVoice = jest.fn();
+  render(<PrayerSheet visible tab={tab} onTab={onTab} onClose={jest.fn()} onOpenCalculation={onOpenCalculation} onOpenVoice={onOpenVoice} />);
+  return { onTab, onOpenCalculation, onOpenVoice };
 }
 
 describe('<PrayerSheet /> Times', () => {
@@ -113,6 +120,32 @@ describe('<PrayerSheet /> Times', () => {
     });
     expect(screen.getByText('Notifications are off for Revisely')).toBeTruthy();
     expect(screen.getByText('Open Settings')).toBeTruthy();
+  });
+
+  it('a prayer’s row opens its reminder and sound; set to the athan, Voice opens the picker for that prayer', async () => {
+    resetPrayerPrefsForTests({
+      ...DEFAULT_PRAYER_PREFS,
+      place: LONDON,
+      alerts: { ...DEFAULT_PRAYER_PREFS.alerts, maghrib: { on: true, before: 10, sound: 'standard', voice: null } },
+    });
+    const { onOpenVoice } = open();
+    await act(async () => {});
+    // A prayer that notifies says how; one that doesn't says nothing more. Sunrise has no sound to choose.
+    expect(within(screen.getByTestId('prayer-row-maghrib')).getByText('Standard tone · 10 min before')).toBeTruthy();
+    expect(within(screen.getByTestId('prayer-row-isha')).queryByText(/Standard tone/)).toBeNull();
+    expect(screen.queryByTestId('prayer-row-sunrise-sound')).toBeNull();
+    expect(screen.queryByTestId('prayer-alert-sheet')).toBeNull();
+    fireEvent.press(screen.getByTestId('prayer-row-maghrib-sound'));
+    const sheet = screen.getByTestId('prayer-alert-sheet');
+    fireEvent.press(within(sheet).getByTestId('prayer-sound-athan'));
+    expect(getPrayerPrefs().alerts.maghrib.sound).toBe('athan');
+    expect(within(screen.getByTestId('prayer-row-maghrib')).getByText('Athan · 10 min before')).toBeTruthy();
+    expect(within(screen.getByTestId('prayer-athan-voice')).getByText('Azzam Dweik')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('prayer-athan-voice'));
+    expect(onOpenVoice).toHaveBeenCalledWith('maghrib');
+    fireEvent.press(screen.getByTestId('prayer-row-isha-sound'));
+    fireEvent.press(within(screen.getByTestId('prayer-alert-sheet')).getByTestId('prayer-sound-silent'));
+    expect(getPrayerPrefs().alerts.isha.sound).toBe('silent');
   });
 
   it('Calculation shows the method and Asr, and opens its screen', async () => {

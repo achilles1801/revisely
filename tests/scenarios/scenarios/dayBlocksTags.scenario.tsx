@@ -52,7 +52,7 @@ describe('Tagged notes in the day (ACT-11)', () => {
           readings={[]}
           notes={notes}
           onEditReading={noop}
-          onOpenLog={noop}
+          onEditNote={noop} onDeleteNote={noop} onDeleteAllNotes={noop}
           revisedLog={null}
           onDeleteRevised={noop}
           onDeleteMemorized={noop}

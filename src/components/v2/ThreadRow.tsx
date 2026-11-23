@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, markV2, typeV2 } from '../../theme/v2';
 import { Tap } from './Tap';
+import { t } from '../../i18n';
 
 /**
  * One row of a feed, the way a post sits in a thread: a mark on the left, a
@@ -26,7 +27,7 @@ export function ThreadRow({
   figure,
   headerMaxScale,
   onMenu,
-  menuLabel = 'More',
+  menuLabel = t('common.more'),
   onLongPress,
   a11yActions,
   onA11yAction,
@@ -158,7 +159,8 @@ export function ThreadRow({
         </View>
         )}
         {meta && metaBelow ? (
-          <Text style={[typeV2.meta, styles.meta, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={headerMaxScale}>
+          // Under the name, flush with it: `styles.meta`'s margin is for the meta beside the name.
+          <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={headerMaxScale}>
             {meta}
           </Text>
         ) : null}
