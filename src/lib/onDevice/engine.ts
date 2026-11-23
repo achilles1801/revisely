@@ -2,8 +2,8 @@
 // uses, and where takes go. A build with the stub, or with no data pack yet, has no open engine, so takes stay on the
 // server (lib/reciteLive/where).
 //
-// What opens it today: a recorded take's frames at Documents/recite-replay/frames.jsonl, for a build that carries the
-// replay stand-in. The data pack (lib/recitePack, A3) opens it the same way once it is on the phone.
+// What opens it: Recite's pack once it is whole on this phone (packRun), decrypted natively and read in place; else, for
+// a build that carries the replay stand-in, a recorded take's frames at Documents/recite-replay/frames.jsonl.
 
 import { File, Paths } from 'expo-file-system';
 import type { LiveConnect, StartFrame } from '../reciteLive/feed';
@@ -13,6 +13,7 @@ import { chooseWhere, EngineInfo, parseEngineInfo, WhereAnswer } from '../recite
 import { reciteWhere } from '../reciteLive/whereSettings';
 import { logger } from '../logger';
 import { isDevVariant } from '../variant';
+import { coreLine } from './coreInfo';
 
 type EngineModule = typeof import('../../../modules-dev/recite-engine');
 type Native = NonNullable<EngineModule['default']>;
@@ -51,11 +52,30 @@ export function openEngineInfo(): EngineInfo | null {
 }
 
 let opening = false;
+/** A pack that didn't open this run for another reason than its data (memory, a model): not decrypted again until the next. */
+let refusedPack: string | null = null;
+const RC_ERR_DATA = -2;
 
-/** Opens the engine in the background if there is something to open it with. Never throws. */
-export function warmEngine(): void {
-  const m = native();
-  if (opening || !m?.engineOpenFiles || openEngineInfo()) return;
+/** Opens the engine from the pack when it is here. True once it is open. */
+async function openFromPack(m: Native): Promise<boolean> {
+  if (!m.enginePackOpen) return false;
+  const core = coreLine(m);
+  if (!core || core.stub || core.failed) return false; // the stub can't use it: don't decrypt the pack for nothing
+  const run = require('./packRun') as typeof import('./packRun');
+  await run.preparePack();
+  const pack = run.packForEngine();
+  if (!pack || pack.packId === refusedPack) return false;
+  const r = await m.enginePackOpen(pack.dir, pack.packId, pack.parts, '{}');
+  if (r.ok) return true;
+  logger.warn(`Recite engine: the pack didn't open (${r.code}): ${r.error ?? ''}`);
+  if (r.code === RC_ERR_DATA) await run.dropBadPack(pack.packId);
+  else refusedPack = pack.packId;
+  return false;
+}
+
+/** The replay stand-in's recorded frames, for a build that carries it. */
+async function openFromReplay(m: Native): Promise<void> {
+  if (!m.engineOpenFiles) return;
   let replay: File;
   try {
     replay = new File(Paths.document, 'recite-replay', 'frames.jsonl');
@@ -63,15 +83,29 @@ export function warmEngine(): void {
   } catch {
     return;
   }
+  const r = await m.engineOpenFiles([{ name: 'frames.jsonl', path: replay.uri }], '{}');
+  if (!r.ok) logger.warn(`Recite engine: didn't open (${r.code}): ${r.error ?? ''}`);
+}
+
+/** Opens the engine in the background if there is something to open it with. Never throws. */
+export function warmEngine(): void {
+  const m = native();
+  if (opening || !m || openEngineInfo()) return;
   opening = true;
-  m.engineOpenFiles([{ name: 'frames.jsonl', path: replay.uri }], '{}')
-    .then((r) => {
-      if (!r.ok) logger.warn(`Recite engine: didn't open (${r.code}): ${r.error ?? ''}`);
-    })
-    .catch((err: unknown) => logger.warn('Recite engine: open failed', err))
-    .finally(() => {
+  void (async () => {
+    try {
+      if (!(await openFromPack(m))) await openFromReplay(m);
+    } catch (err) {
+      logger.warn('Recite engine: open failed', err);
+    } finally {
       opening = false;
-    });
+    }
+  })();
+}
+
+export function __resetEngineForTests(): void {
+  opening = false;
+  refusedPack = null;
 }
 
 /**

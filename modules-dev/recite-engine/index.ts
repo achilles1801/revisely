@@ -138,6 +138,13 @@ declare class ReciteEngineModule extends NativeModule<ReciteEngineEvents> {
     items: { name: string; path: string }[],
     options: string,
   ): Promise<{ ok: boolean; code: number; error?: string; info?: string }>;
+  /** Opens the engine from Recite's pack (lib/onDevice/packRun's packForEngine), decrypted natively and read in place. */
+  enginePackOpen?(
+    dir: string,
+    packId: string,
+    parts: string[],
+    options: string,
+  ): Promise<{ ok: boolean; code: number; error?: string; info?: string }>;
   /** rc_info's JSON while the engine is open. */
   engineInfo?(): string | null;
   /** Starts a take from the contract's start frame: its number, or why not. */

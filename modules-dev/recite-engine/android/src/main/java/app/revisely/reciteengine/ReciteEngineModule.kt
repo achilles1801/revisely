@@ -12,6 +12,7 @@ import expo.modules.kotlin.modules.ModuleDefinition
 import expo.modules.kotlin.typedarray.Int16Array
 import java.io.File
 import java.io.FileInputStream
+import java.nio.ByteBuffer
 import java.security.MessageDigest
 import kotlin.concurrent.thread
 
@@ -60,6 +61,33 @@ class ReciteEngineModule : Module() {
     AsyncFunction("engineOpenFiles") { items: List<Map<String, String>>, options: String, promise: Promise ->
       val plain = items.map { item -> item["path"]?.let { item + ("path" to plainPath(it)) } ?: item }
       engine.open(plain, options) { promise.resolve(it) }
+    }
+
+    // Opens the engine from Recite's pack: decrypted and checked here (the key stays in native memory), then read in
+    // place by the engine, which holds the blobs until rc_release; they are wiped and freed then. Resolves {ok, code,
+    // error, info}; code -2 (RC_ERR_DATA) means the pack itself is bad.
+    AsyncFunction("enginePackOpen") { dir: String, packId: String, parts: List<String>, options: String, promise: Promise ->
+      thread(name = "recite-pack") {
+        if (!ReciteCoreNative.available) {
+          promise.resolve(mapOf("ok" to false, "code" to -3, "error" to "the native library didn't load"))
+          return@thread
+        }
+        val memory = ArrayList<ByteBuffer>()
+        val blobs = try {
+          RecitePackStore.open(plainPath(dir), packId, parts) { _, room ->
+            ReciteCoreNative.allocBlob(room)?.also { memory.add(it) }
+          }
+        } catch (e: Exception) {
+          memory.forEach { ReciteCoreNative.freeBlob(it) }
+          val text = e.message ?: "the pack didn't open"
+          promise.resolve(mapOf("ok" to false, "code" to if (text.startsWith("no memory")) -3 else -2, "error" to text))
+          return@thread
+        }
+        engine.openBlobs(blobs.map { it.name }, blobs.map { it.data }, options, {
+          blobs.forEach { it.wipe() }
+          memory.forEach { ReciteCoreNative.freeBlob(it) }
+        }) { promise.resolve(it) }
+      }
     }
 
     // rc_info's JSON while the engine is open.

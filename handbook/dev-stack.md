@@ -494,7 +494,7 @@ owner's `on-device-release.md`).
     `v5.onnx`, the marked `v5m-server-int8.onnx`, and `strict.bin`). Only marked models leave the Mac (hashes in the private
     repo's `checker/marks.json`). The names are `rc_blob`'s (`recite_core.h`). Tables are deflated; the weights stay stored.
   - **Phone:** `RecitePackReader` (Swift, Java) checks every chunk and blob; `RecitePackKey` holds the device key;
-    `src/lib/onDevice/packRun.ts` is the download. The transport opens it with `RecitePackStore.open`. `v7.weights.f16` gets
+    `src/lib/onDevice/packRun.ts` is the download. `warmEngine()` (`lib/onDevice/engine.ts`) opens it through the module's `enginePackOpen`, on the engine's thread; RC_ERR_DATA drops the pack (`dropBadPack`). `v7.weights.f16` gets
     a 64-byte aligned buffer of its `room` (fp32 size), and `rc_blob.size` is `room`.
   - **Check the readers** against the server's format, on a Mac with no simulator: `scripts/recite-pack-check/run.sh`.
   - Android keeps it out of backups through `plugins/withDevModules` (Dev only), so the store fingerprints don't move.

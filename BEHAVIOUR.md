@@ -1653,7 +1653,10 @@ shows up once and they must go through it and complete it … just the main stuf
   under the offline mushaf's rules: Wi-Fi unless "Download over mobile data" is on or one Download now allowed it. It
   stays sealed on disk and out of iCloud and Android backups. A new pack comes beside the old one, which stays in use
   until the new one's core part is whole. Remove deletes it all and keeps it off until Download now. An account the
-  team hasn't given access is told it isn't available yet.
+  team hasn't given access is told it isn't available yet. Once the core part is whole, a build with the real engine
+  opens it for takes that may run on the phone (ONDEV-4): decrypted only in native memory, wiped when the engine closes;
+  a build with the stub never decrypts it. A pack the engine refuses as bad data is deleted and that version isn't
+  fetched again until a new version or Download now, and takes stay on the server.
 
 ## Premium early access
 

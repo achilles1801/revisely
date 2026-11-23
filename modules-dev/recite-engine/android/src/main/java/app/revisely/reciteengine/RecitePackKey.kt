@@ -71,10 +71,10 @@ internal object RecitePackStore {
   }
 
   /**
-   * The parts' blobs in memory, for rc_open (the transport, A2). `allocate` gives a direct buffer, 64-byte aligned (the
-   * JNI glue's). Call each blob's wipe() after rc_release.
+   * The parts' blobs in memory, for rc_open (enginePackOpen). `allocate` gives a direct buffer, 64-byte aligned
+   * (ReciteCoreNative.allocBlob), or null without the memory. Call each blob's wipe() after rc_release.
    */
-  fun open(dir: String, packId: String, parts: List<String>, allocate: (String, Int) -> ByteBuffer): List<RecitePackReader.Blob> {
+  fun open(dir: String, packId: String, parts: List<String>, allocate: (String, Int) -> ByteBuffer?): List<RecitePackReader.Blob> {
     val key = RecitePackKey.unwrap(keyFile(dir).readBytes())
     val blobs = mutableListOf<RecitePackReader.Blob>()
     try {

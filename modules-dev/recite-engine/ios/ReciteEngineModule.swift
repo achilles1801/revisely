@@ -56,6 +56,24 @@ public class ReciteEngineModule: Module {
       RECEngine.shared.openFiles(plain, options: options) { promise.resolve($0) }
     }
 
+    /// Opens the engine from Recite's pack: decrypted and checked here (the key stays in native memory), then read in
+    /// place by the engine, which holds the blobs until rc_release; they are wiped and freed then. Resolves {ok, code,
+    /// error, info}; code -2 (RC_ERR_DATA) means the pack itself is bad.
+    AsyncFunction("enginePackOpen") { (dir: String, packId: String, parts: [String], options: String, promise: Promise) in
+      let path = ReciteEngineModule.plainPath(dir)
+      DispatchQueue.global(qos: .userInitiated).async {
+        do {
+          let blobs = try RecitePackStore.open(dir: path, packId: packId, parts: parts)
+          let items = blobs.map { RECEngineBlob(name: $0.name, bytes: $0.data, size: UInt($0.room)) }
+          // Swift's name for openBlobs:owner:options:done:
+          RECEngine.shared.open(items, owner: blobs, options: options) { promise.resolve($0) }
+        } catch {
+          let text = "\(error)"
+          promise.resolve(["ok": false, "code": text.hasPrefix("no memory") ? -3 : -2, "error": text])
+        }
+      }
+    }
+
     /// rc_info's JSON while the engine is open.
     Function("engineInfo") { () -> String? in RECEngine.shared.info }
 
