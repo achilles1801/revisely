@@ -374,24 +374,40 @@ export const settings = {
     run: 'Run',
     downloading: 'Downloading {{file}} of {{files}} · {{percent}}%',
     long: 'Long run',
-    longFooter: 'The first chosen run, a window every half second as a live take does, with the battery and the phone’s heat noted each minute. Unplug the phone, keep its brightness as it is, and leave it on this screen.',
+    longFooter: 'The first chosen run at a live take’s pace, with the battery and the phone’s heat noted each minute.',
+    longLength: 'Length',
+    longPace: 'How often the model runs',
+    /** Shown above the button: leaving the app suspends the run and spoils its battery and heat numbers. */
+    longStay: 'Unplug the phone and stay on this screen until it finishes. Leaving the app, even for a moment, spoils the run.',
+    /** Under the button: which run it takes. */
+    longPlan: 'Runs {{plan}}',
+    /** "Every 0.5 s": how often a long run starts a window. */
+    hopChoice: 'Every {{seconds}} s',
     minutes_one: '{{count}} minute',
     minutes_other: '{{count}} minutes',
     /** "Long run: v7-live-fp32 · CPU · 2 threads". */
-    longRun: 'Long run: {{plan}}',
+    /** "Start: 20 min, every 0.5 s". */
+    longRun: 'Start: {{minutes}} min, every {{hop}} s',
     /** "v7-live-fp32 · CPU · 2 threads: minute 3 of 20". */
     runningLong: '{{plan}}: minute {{done}} of {{total}}',
-    longTitle: '{{plan}} · {{minutes}} minutes',
+    longTitle: '{{plan}} · {{minutes}} minutes · every {{hop}} s',
     longCool: 'Never hot (hottest: {{heat}})',
     longHot: 'Got hot: {{heat}}',
     longSteady: 'Steady: the last minute {{percent}}% off the first',
     longDrift: 'Slowed down: the last minute {{percent}}% off the first',
     longBattery: 'Battery down {{drop}} points ({{perHour}} an hour)',
     longCharging: 'On a charger: nothing to say about the battery',
+    longBatteryAway: 'Battery: no rate, the app was away for part of the run',
+    /** The drop is under two of the phone's battery steps (iOS reports 5-point steps). */
+    longBatteryCoarse: 'Battery down {{drop}} points: too coarse for a rate',
     longLate_one: '{{count}} window started late',
     longLate_other: '{{count}} windows started late',
     /** "Minute 3 · 41.2 ms · p95 52.0 · 97.5% · nominal". */
     longMinute: 'Minute {{minute}} · {{p50}} ms · p95 {{p95}} · {{battery}} · {{heat}}',
+    /** A run the app left the foreground during: its numbers can't be trusted. */
+    interrupted_one: 'Interrupted: the app left the foreground once, for {{seconds}} s. The times below leave that out; longest clean stretch {{clean}} min.',
+    interrupted_other: 'Interrupted: the app left the foreground {{count}} times, for {{seconds}} s. The times below leave that out; longest clean stretch {{clean}} min.',
+    stalled: 'Interrupted: the phone held the run up for {{seconds}} s. The times below leave that out; longest clean stretch {{clean}} min.',
     /** "v7-live-fp32 · CPU · 2 threads: 34 of 60". */
     running: '{{plan}}: {{done}} of {{total}}',
     results: 'Results',

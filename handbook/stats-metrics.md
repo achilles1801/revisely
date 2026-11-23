@@ -30,16 +30,47 @@ Moved from CLAUDE.md word for word on Nov 22 2026. CLAUDE.md keeps the rules eve
   `stats/installs/installs_com.revisionbuddy.app_YYYYMM_overview.csv`, with secrets `PLAY_REPORTS_BUCKET` and
   `PLAY_REPORTS_SA_KEY`.
 
-## Metrics console (the owner's private page)
+## Revisely Console (staff only: metrics, Open Door, audit log)
 
-https://metrics.revisely.app (a Hosting custom domain; also https://revision-buddy-3a398.web.app) (Firebase
-Hosting, `admin/`): Revo per account with its conversations,
-spend against the caps, app health, downloads, retention (accounts active and coming back by sign-up week;
-`functions/scripts/retention.js` prints the same, read-only) and functions, read live. Only an account with the custom claim
-`admin: true` gets anything (`functions/scripts/set-admin.js <uid>`); the claim opens nothing else, since no
-rule reads it. Functions `adminMetrics`, `adminRevo` (conversations locked until `config/admin.conversations`)
-and `metricsTotals` (the hourly `metrics.yml` sends Sentry and App Store totals with its GitHub OIDC token, and
-posts new alarms on the "Metrics alerts" issue). Sign-in in an app's built-in browser works only on
-metrics.revisely.app: there the page is its own auth domain (`OWN_AUTH_DOMAIN_HOSTS` in `admin/console.js`); a
-host joins that list only once its `/__/auth/handler` is a redirect URI of the Web OAuth client and it is an
-authorized domain. Everything else: `scripts/metrics/README.md`.
+`admin/` on Firebase Hosting (Majd, Nov 14 2026: "a revisely dev dashboard like a real company"). **The one console
+is https://revisely-dev.web.app** (revisely-dev's Hosting, deployed by hand: `firebase deploy --only hosting --project
+revisely-dev`; nothing deploys Hosting by itself). It shows production and dev (below). https://metrics.revisely.app
+(and revision-buddy-3a398.web.app) only redirects there since Nov 14 2026 (`scripts/metrics/metrics-redirect/`, its
+README has the deploy and the undo); never deploy the root `firebase.json`'s hosting to production.
+- **Pages:** `/sign-in` (its own page: Google, or email and password; no sign-up; an account without a role sees "No
+  access" with Sign out, and nothing else), `/` Overview (the metrics, with Retention), `/open-door` and `/open-door/<uid>`, `/audit`.
+  Signed out, every address goes to `/sign-in?next=…` (`shell.js`). Hosting's `cleanUrls` and rewrites serve them.
+- **Roles** (`functions/src/console/roles.ts`, the one permission list): `owner` (everything, roles too), `admin`
+  (everything but roles), `reviewer` (Open Door read and decide; no revoke, metrics, Revo conversations or audit),
+  `dev` (metrics only). A custom claim `role`, given with `cd functions && GOOGLE_APPLICATION_CREDENTIALS=… node
+  scripts/set-role.js <email|uid> <role|none>` (`--list`, `--show`, `--roles`; refuses to remove the last owner), each
+  change recorded in `consoleAudit` (closed). Who has a role is never in the repository. The old `admin: true` claim
+  counts as owner until set-role replaces it (`set-admin.js` now only takes it away). The callables read claims live
+  from Auth (`staffClaims` in index.ts), so a role taken away stops at the next call. Rules open nothing to any role.
+- **Functions:** `adminMetrics` (metrics.read), `adminRevo` (revo.conversations; conversations locked until
+  `config/admin.conversations`), `adminConsole` (`me`, Open Door `od.*`, `audit.*`; App Check on every action but
+  `me`; Open Door only where `SUPPORT_PAGES` has the project), `metricsTotals` (the hourly `metrics.yml` with its
+  GitHub OIDC token; alarms on the "Metrics alerts" issue).
+- **Production and Dev in one console** (Majd, Nov 14 2026: one console with a switch; metrics.revisely.app to be
+  retired, "why would we need two separate dashboards"): the console's project asks the other project's
+  `consoleMetrics` (an HTTPS endpoint), proving who it is with a Google-signed ID token for its own service account from
+  the metadata server (no key). `functions/src/console/peer.ts` says who may read whom: production answers
+  revisely-dev's server only (`METRICS_READERS`).
+  - `metrics`: the Overview's numbers.
+  - `revo` (an account's conversations): also needs the staff member's own revisely-dev ID token (forwarded by
+    `adminRevo`), whose role must allow `revo.conversations`; production still applies `config/admin.conversations`
+    and logs each read as `revisely-dev/<uid>`.
+  - Trade-off: revisely-dev's functions deploy automatically from develop, so code merged there runs where a staff
+    member's ID token passes through while they use the console.
+  - `consoleMetrics` is deployed by hand in production (Nov 14 2026, by Majd's word); the dev one answers nobody.
+  - Dev's crash and App Store section stays empty: the hourly Metrics workflow sends those totals to production only.
+- **App Check on the page:** reCAPTCHA Enterprise, a key per project in `APP_CHECK_KEYS` (`admin/firebase.js`; site
+  keys are public). Production has none yet: add one before the console's Open Door or audit runs there.
+- **Sign-in in Safari and built-in browsers** works only where the page is its own auth domain
+  (`OWN_AUTH_DOMAIN_HOSTS` in `admin/firebase.js`: metrics.revisely.app, revisely-dev.web.app); a host joins only once
+  its `/__/auth/handler` is a redirect URI of the project's Web OAuth client and an authorized domain. Phones sign in
+  with a full-page redirect there.
+- **Testing locally:** the console runs against the emulators from any static server that serves `admin/` with the
+  rewrites and an `init.json` carrying `emulators` (`{auth, functionsHost, functionsPort}`; only a localhost page
+  reads it). `functions/src/__tests__/review.emulator.test.ts` runs in CI against the Auth and Firestore emulators.
+- Everything else about the metrics: `scripts/metrics/README.md`.

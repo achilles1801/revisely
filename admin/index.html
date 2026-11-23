@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
-<title>Revisely Metrics</title>
+<title>Revisely Console</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="console.css">
+<link rel="stylesheet" href="/console.css">
 <style>
 :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 html, body { margin: 0; }
@@ -18,26 +18,33 @@ html, body { margin: 0; }
 </head>
 <body>
 <header class="top">
-  <div class="top-in">
+  <div class="top-in" id="topIn">
     <div class="brand">
       <span class="mark" aria-hidden="true">R</span>
-      <h1>Revisely Metrics</h1>
+      <h1>Revisely Console</h1>
+      <span class="env" id="env" hidden></span>
       <span class="spacer"></span>
-      <span class="asof" id="asof">Loading…</span>
-      <button type="button" class="refresh" id="refreshBtn" disabled>Refresh</button>
+      <span class="asof" id="asof" hidden></span>
+      <button type="button" class="refresh" id="refreshBtn" hidden disabled>Refresh</button>
+      <span class="who" id="who"></span>
       <button type="button" class="btn" id="signOutBtn" hidden>Sign out</button>
     </div>
+    <nav class="tabs" id="tabs" aria-label="Sections" hidden>
+      <a href="/" data-view="overview" hidden><span class="k"></span>Overview</a>
+      <a href="/open-door" data-view="opendoor" hidden><span class="k"></span>Open Door <span class="badge" id="odBadge" hidden></span></a>
+      <a href="/audit" data-view="audit" hidden><span class="k"></span>Audit log</a>
+    </nav>
   </div>
 </header>
 
-<section class="gate" id="gate" hidden>
-  <span class="mark" aria-hidden="true">R</span>
-  <h2>Revisely Metrics</h2>
-  <p id="gateText">Sign in with the owner's Google account.</p>
-  <button type="button" class="btn primary" id="signInBtn">Sign in with Google</button>
-</section>
+<div class="boot" id="boot" aria-live="polite">Loading Revisely Console…</div>
 
 <main id="console" hidden>
+<section id="view-overview" hidden>
+  <div class="envbar" id="envBar" hidden>
+    <div class="seg seg-env" role="group" aria-label="Environment" id="envSeg"></div>
+    <span class="lbl" id="envNote"></span>
+  </div>
   <div class="conn" id="conn" hidden></div>
 
   <div class="hero" id="hero">
@@ -113,6 +120,23 @@ html, body { margin: 0; }
     </div>
   </div>
 
+  <div class="sec" id="sec-retention">
+    <div class="sec-h"><h2>Retention</h2><span class="sub" id="retSub">Accounts that revise, recite or log, and whether they come back</span></div>
+    <div class="tiles" id="retTiles"></div>
+    <div class="grid">
+      <div class="w" id="w-ret-active">
+        <div class="w-h"><h3>Active accounts</h3><span class="sub">Weekly and monthly, each week to Sunday</span></div>
+        <div class="legend"><span><i style="background:var(--s1)"></i>Active in the week</span><span><i style="background:var(--s2)"></i>Active in 30 days</span></div>
+        <div class="chart" id="c-retention"></div>
+      </div>
+      <div class="w" id="w-ret-cohorts">
+        <div class="w-h"><h3>Coming back, by sign-up week</h3><span class="sub">Active on day 1, 7 and 30 after signing up</span></div>
+        <div class="tbl-wrap"><table id="retTable"><thead><tr><th>Week of</th><th class="n">Signed up</th><th class="n">Onboarded</th><th class="n">Day 1</th><th class="n">Day 7</th><th class="n">Day 30</th><th class="n">Day 7+</th></tr></thead><tbody></tbody></table></div>
+        <p class="foot" id="retFoot"></p>
+      </div>
+    </div>
+  </div>
+
   <div class="sec" id="sec-app">
     <div class="sec-h"><h2>App</h2><span class="sub">Active people, crashes, updates, downloads</span>
       <div class="seg" role="group" aria-label="Channel" id="chan" style="margin-left:auto">
@@ -164,6 +188,51 @@ html, body { margin: 0; }
   </div>
 
   <p class="foot" id="sources" style="margin-top:22px"></p>
+</section>
+
+<section id="view-opendoor" hidden aria-labelledby="odTitle">
+  <div class="od-head">
+    <h2 id="odTitle">Applications</h2>
+    <span class="sub">Open Door · Premium for anyone who can’t pay</span>
+    <form class="search" id="odFind" role="search">
+      <span class="ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5" stroke-linecap="round"/></svg></span>
+      <input id="odQuery" type="search" placeholder="Find by email or account id" aria-label="Find an application by email or account id" autocomplete="off" spellcheck="false">
+      <span class="kbd" aria-hidden="true">/</span>
+    </form>
+  </div>
+  <div class="conn" id="odConn" hidden></div>
+  <div class="tiles od-tiles" id="odTiles"></div>
+  <div class="od">
+    <section class="queue" aria-label="Applications">
+      <div class="queue-h">
+        <div class="seg" role="group" aria-label="Show" id="odFilters">
+          <button type="button" data-filter="pending">Pending<span class="c"></span></button>
+          <button type="button" data-filter="approved">Approved<span class="c"></span></button>
+          <button type="button" data-filter="declined">Declined<span class="c"></span></button>
+          <button type="button" data-filter="revoked">Revoked<span class="c"></span></button>
+          <button type="button" data-filter="all">All</button>
+        </div>
+      </div>
+      <div class="qlist" id="odList" role="listbox" aria-label="Applications" tabindex="0"></div>
+      <div class="queue-f"><span id="odRange"></span><span class="sp"></span><button type="button" class="btn" id="odNewer" disabled>‹ Newer</button><button type="button" class="btn" id="odOlder" disabled>Older ›</button></div>
+    </section>
+    <section class="app" id="odApp" aria-label="Application" aria-live="polite"></section>
+  </div>
+</section>
+
+<section id="view-audit" hidden aria-labelledby="auditTitle">
+  <div class="od-head">
+    <h2 id="auditTitle">Audit log</h2>
+    <span class="sub">Every decision and role change: who, what, when. Never applicants’ answers.</span>
+    <div class="seg" role="group" aria-label="Show" id="auditKinds" style="margin-left:auto">
+      <button type="button" data-kind="decisions" aria-pressed="true">Open Door decisions</button>
+      <button type="button" data-kind="roles">Role changes</button>
+    </div>
+  </div>
+  <div class="conn" id="auditConn" hidden></div>
+  <div class="w"><div class="tbl-wrap"><table id="auditTable"><thead></thead><tbody></tbody></table></div>
+  <div class="queue-f" style="border:0;padding:10px 0 0"><span id="auditRange"></span><span class="sp"></span><button type="button" class="btn" id="auditNewer" disabled>‹ Newer</button><button type="button" class="btn" id="auditOlder" disabled>Older ›</button></div></div>
+</section>
 </main>
 
 <div class="panel" id="panel" hidden>
@@ -177,6 +246,16 @@ html, body { margin: 0; }
   </div>
 </div>
 
-<script type="module" src="console.js"></script>
+<div class="modal" id="modal" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h3 id="modalTitle"></h3>
+    <div id="modalBody"></div>
+    <div class="dialog-a" id="modalActions"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script type="module" src="/shell.js"></script>
 </body>
 </html>

@@ -32,9 +32,15 @@ side-session notes `apply-support.md`.
   Premium, account, Download, Donate or store links (App Store 3.1.1, Play's payments policy).
 - **Back end** (`functions/src/support`): `entitlements/{uid}` (`premium`, read by the app and the checker; `grants` per
   source), `supportApplication`, `devGrantPremium` / `devRevokePremium`. Each refuses in a project with no program page
-  (`SUPPORT_PAGES`), so nothing is collected in production. Majd decides with
-  `functions/scripts/support-applications.js` (a decision deletes the answers). No Claude session reads a real
-  application.
+  (`SUPPORT_PAGES`), so nothing is collected in production.
+- **Deciding:** Revisely Console's Open Door (`handbook/stats-metrics.md`), or `functions/scripts/support-applications.js`; both go through
+  `functions/src/support/review.ts`. Approve grants `grants.support` (no end date unless one is given) and deletes the
+  answers; decline waits 30 days; revoke takes the grant back and the application becomes `revoked`, also with the
+  30-day wait (the page shows it as declined). Each decision is one transaction with its audit entry
+  (`supportDecisions/<request id>`: who, when, the internal note; never answers; closed; deleted with the account),
+  idempotent by the page's request id. The console waits 5 seconds before sending a decision (Undo). A notifier
+  ("you've been approved") would hang off new `supportDecisions` documents; no email provider is chosen.
+  No Claude session reads a real application.
 
 ## Worker (revisely.app/api)
 

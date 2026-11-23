@@ -7,30 +7,19 @@
  *   cd functions && npm run build
  *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json node scripts/retention.js [--json]
  *
- * Left out: previewTester accounts, the App Review and screenshot accounts, and accounts with the
- * console's `admin` claim (the owner). Nothing about one account is printed: no uids, no emails.
+ * Left out: previewTester accounts, the App Review and screenshot accounts, and staff accounts (the
+ * console's `role` claim or the old `admin` claim), as the console does. Nothing about one account is printed: no uids, no emails.
  */
 const admin = require('firebase-admin');
-const { readActivity } = require('../lib/metrics/sources');
+const { readActivity, staffUids } = require('../lib/metrics/sources');
 const { retention, lastFullDay, RETENTION_DAYS } = require('../lib/metrics/retention');
 
 admin.initializeApp();
 
-async function adminUids() {
-  const out = new Set();
-  let token;
-  do {
-    const page = await admin.auth().listUsers(1000, token);
-    for (const u of page.users) if (u.customClaims && u.customClaims.admin === true) out.add(u.uid);
-    token = page.pageToken;
-  } while (token);
-  return out;
-}
-
 const pct = (c) => (c ? `${c.n}/${c.of} (${Math.round((100 * c.n) / c.of)}%)` : '–');
 
 (async () => {
-  const [rows, owners] = await Promise.all([readActivity(admin.firestore()), adminUids()]);
+  const [rows, owners] = await Promise.all([readActivity(admin.firestore()), staffUids(admin.auth())]);
   const left = { testers: 0, owner: 0, service: 0 };
   const people = [];
   for (const a of rows) {

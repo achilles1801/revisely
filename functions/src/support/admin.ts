@@ -1,27 +1,18 @@
 /**
  * Firestore for the support program and Premium (logic.ts has the rules). Times are Timestamps in Firestore and ms
  * in logic.ts. Used by the callables (index.ts) and by functions/scripts/support-applications.js (from lib/).
+ * Decisions (approve, decline, revoke) are made in review.ts, which also keeps their audit entries.
  *
  *   entitlements/<uid>          { premium?, grants? }            the owner may read; only the admin SDK writes
  *   supportApplications/<uid>   { uid, status, createdAt, … }    the owner may read; only the admin SDK writes
+ *   supportDecisions/<id>       { uid, action, at, by, note, … } closed (review.ts)
  *   supportCodes/<sha256>       { uid, expiresAt, createdAt }    closed
  *   supportLimits/<uid>         { day, links, applies }          closed
  */
 import type { Firestore, DocumentData } from 'firebase-admin/firestore';
 import { Timestamp } from 'firebase-admin/firestore';
 import { SupportStore } from './handler';
-import {
-  Application,
-  Entitlements,
-  Grant,
-  SOURCES,
-  Source,
-  SupportError,
-  SupportLimits,
-  decide,
-  effectivePremium,
-  withGrant,
-} from './logic';
+import { APPLICATION_STATUSES, Application, Entitlements, Grant, SOURCES, Source, SupportLimits, effectivePremium, withGrant } from './logic';
 
 const ms = (v: unknown): number | null => (v instanceof Timestamp ? v.toMillis() : typeof v === 'number' ? v : null);
 const ts = (v: number | null | undefined): Timestamp | null => (v == null ? null : Timestamp.fromMillis(v));
@@ -61,7 +52,7 @@ export function entitlementsTo(e: { grants?: Entitlements['grants']; premium: Gr
 }
 
 export function applicationFrom(d: DocumentData | undefined): Application | null {
-  if (!d || (d.status !== 'pending' && d.status !== 'approved' && d.status !== 'declined')) return null;
+  if (!d || !APPLICATION_STATUSES.includes(d.status)) return null;
   const app: Application = {
     status: d.status,
     createdAt: ms(d.createdAt) ?? 0,
@@ -74,7 +65,7 @@ export function applicationFrom(d: DocumentData | undefined): Application | null
   return app;
 }
 
-function applicationTo(uid: string, a: Application): DocumentData {
+export function applicationTo(uid: string, a: Application): DocumentData {
   const out: DocumentData = {
     uid,
     status: a.status,
@@ -158,43 +149,6 @@ export function adminSupportStore(
   };
 }
 
-/** The review script's decision: one transaction over the application and the account's entitlements. */
-export async function decideApplication(
-  db: Firestore,
-  uid: string,
-  decision: { approve: true; until?: number | null } | { approve: false },
-  now: number = Date.now(),
-): Promise<Application> {
-  const appRef = db.doc(`supportApplications/${uid}`);
-  const entRef = db.doc(`entitlements/${uid}`);
-  // Refuse before any transaction: a transaction that only reads and then throws keeps its locks for about two
-  // minutes, and the next decision on the account fails with "Too much contention" meanwhile.
-  const [app0, ent0] = await Promise.all([appRef.get(), entRef.get()]);
-  decide(applicationFrom(app0.data()), entitlementsFrom(ent0.data()), decision, now);
-  return db.runTransaction(async (tx) => {
-    const [app, ent] = await Promise.all([tx.get(appRef), tx.get(entRef)]);
-    const out = decide(applicationFrom(app.data()), entitlementsFrom(ent.data()), decision, now);
-    // set, not merge: the answers must go.
-    tx.set(appRef, applicationTo(uid, out.app));
-    if (out.ent) tx.set(entRef, entitlementsTo(out.ent));
-    return out.app;
-  });
-}
-
-/** Takes one source's grant away (the review script's revoke). */
-export async function revokeGrant(db: Firestore, uid: string, source: Source): Promise<Grant | null> {
-  const ref = db.doc(`entitlements/${uid}`);
-  const none = () => new SupportError('failed-precondition', `No ${source} grant on this account.`);
-  if (!entitlementsFrom((await ref.get()).data())?.grants?.[source]) throw none(); // before any transaction: see above
-  return db.runTransaction(async (tx) => {
-    const current = entitlementsFrom((await tx.get(ref)).data());
-    if (!current?.grants?.[source]) throw none();
-    const next = withGrant(current, source, null);
-    tx.set(ref, entitlementsTo(next));
-    return next.premium;
-  });
-}
-
 /** Premium from one source, or (null) none from it, keeping the other sources (testing on dev: the script's premium). */
 export async function setGrant(db: Firestore, uid: string, source: Source, grant: Grant | null): Promise<Grant | null> {
   const ref = db.doc(`entitlements/${uid}`);
@@ -205,11 +159,17 @@ export async function setGrant(db: Firestore, uid: string, source: Source, grant
   });
 }
 
-/** Everything of the support program and Premium for one account (account deletion, the script's clear). */
+/** Everything of the support program and Premium for one account, its audit entries included (account deletion, the script's clear). */
 export async function deleteSupportData(db: Firestore, uid: string): Promise<void> {
-  const codes = await db.collection('supportCodes').where('uid', '==', uid).get();
+  const [codes, decisions] = await Promise.all([
+    db.collection('supportCodes').where('uid', '==', uid).get(),
+    db.collection('supportDecisions').where('uid', '==', uid).get(),
+  ]);
+  // A handful each at most (one decision per application, a few links a day).
+  for (const doc of decisions.docs.slice(400)) await doc.ref.delete();
   const batch = db.batch();
   for (const doc of codes.docs) batch.delete(doc.ref);
+  for (const doc of decisions.docs.slice(0, 400)) batch.delete(doc.ref);
   batch.delete(db.doc(`supportApplications/${uid}`));
   batch.delete(db.doc(`entitlements/${uid}`));
   batch.delete(db.doc(`supportLimits/${uid}`));
