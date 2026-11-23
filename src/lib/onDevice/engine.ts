@@ -70,7 +70,8 @@ const RC_ERR_DATA = -2;
 async function openFromPack(m: Native): Promise<boolean> {
   if (!m.enginePackOpen) return false;
   const core = coreLine(m);
-  if (!core || core.stub || core.failed) return false; // the stub can't use it: don't decrypt the pack for nothing
+  // Neither the stub nor the replay stand-in can read a pack: it isn't decrypted for them, and they never get to call it bad.
+  if (!core || core.stub || core.replay || core.failed) return false;
   const run = require('./packRun') as typeof import('./packRun');
   await run.preparePack();
   const pack = run.packForEngine();

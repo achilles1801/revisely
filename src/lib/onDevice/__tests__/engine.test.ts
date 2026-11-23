@@ -98,6 +98,14 @@ describe('warmEngine', () => {
     expect(mockDrop).not.toHaveBeenCalled();
   });
 
+  it('never gives a pack to the replay stand-in, which would call a real pack bad', async () => {
+    mockModule.coreInfo.mockReturnValue(JSON.stringify({ version: 'recite-core 0.1.0 (replay)', abi: 1, headerAbi: 1, stub: false, selfTest: 'passed' }));
+    warmEngine();
+    await settle();
+    expect(mockModule.enginePackOpen).not.toHaveBeenCalled();
+    expect(mockDrop).not.toHaveBeenCalled();
+  });
+
   it('does nothing while an engine is open', async () => {
     mockModule.engineInfo.mockReturnValue('{"abi":1}');
     warmEngine();

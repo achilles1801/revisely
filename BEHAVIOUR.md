@@ -1669,8 +1669,9 @@ shows up once and they must go through it and complete it … just the main stuf
   until the new one's core part is whole. Remove deletes it all and keeps it off until Download now. An account the
   team hasn't given access is told it isn't available yet. Once the core part is whole, a build with the real engine
   opens it for takes that may run on the phone (ONDEV-4): decrypted only in native memory, wiped when the engine closes;
-  a build with the stub never decrypts it. A pack the engine refuses as bad data is deleted and that version isn't
-  fetched again until a new version or Download now, and takes stay on the server.
+  a build with the stub or the replay stand-in never decrypts it, so neither can call a pack bad. A pack the real engine
+  refuses as bad data is deleted and that version isn't fetched again until a new version, an app update with another
+  engine, or Download now, and takes stay on the server.
 
 ## Premium early access
 

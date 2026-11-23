@@ -15,6 +15,8 @@ interface CoreInfo {
 export interface CoreLine {
   version: string;
   stub: boolean;
+  /** The replay stand-in: it plays a recorded take's frames and can't read a real pack. */
+  replay: boolean;
   /** Why the engine can't be used, or null. */
   failed: string | null;
 }
@@ -29,12 +31,12 @@ export function coreLine(engine: { coreInfo?(): string } | null): CoreLine | nul
     return null;
   }
   if (!info || typeof info.version !== 'string') return null;
-  if (info.stub) return { version: info.version, stub: true, failed: null };
+  if (info.stub) return { version: info.version, stub: true, replay: false, failed: null };
   const failed =
     info.abi !== info.headerAbi
       ? `ABI ${info.abi}, app expects ${info.headerAbi}`
       : info.selfTest?.startsWith('failed: ')
         ? info.selfTest.slice('failed: '.length)
         : null;
-  return { version: info.version, stub: false, failed };
+  return { version: info.version, stub: false, replay: /replay/.test(info.version), failed };
 }

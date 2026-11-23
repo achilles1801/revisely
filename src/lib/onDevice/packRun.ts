@@ -23,6 +23,7 @@ import { logger } from '../logger';
 import { getMushafStatus, prepareMushafOffline, SPACE_MARGIN } from '../mushafOffline';
 import { networkState, onNetworkState } from '../networkState';
 import { benchEngine } from './benchRun';
+import { coreLine } from './coreInfo';
 import {
   mayDownloadPack,
   parsePackAnswer,
@@ -68,8 +69,10 @@ interface Saved {
   auto: boolean;
   have: PackOnPhone | null;
   checkedAt: number;
-  /** A pack the engine refused as bad data: it isn't fetched again, until a new id or "Download now". */
+  /** A pack the engine refused as bad data: it isn't fetched again, until a new id, a new engine or "Download now". */
   badPack?: string | null;
+  /** The engine that refused it: another one (an app update) may be able to read it. */
+  badPackEngine?: string | null;
 }
 
 let saved: Saved = { auto: true, have: null, checkedAt: 0 };
@@ -316,12 +319,18 @@ function roomFor(bytes: number): boolean {
   }
 }
 
+const engineVersion = (): string | null => coreLine(benchEngine())?.version ?? null;
+
 async function runOnce(): Promise<void> {
   if (!benchEngine()) {
     publish({ phase: 'unavailable' });
     return;
   }
   await preparePack();
+  if (saved.badPack && (saved.badPackEngine ?? null) !== engineVersion()) {
+    saved = { ...saved, badPack: null, badPackEngine: null, checkedAt: 0 };
+    await persist();
+  }
   const gen = generation;
   if (!saved.auto || !active || !auth.currentUser) return;
   if (holdsCore(saved.have) && !once && Date.now() - saved.checkedAt < CHECK_EVERY_MS) {
@@ -414,14 +423,14 @@ export async function downloadPackNow({ overMobileData = false } = {}): Promise<
   once = once || overMobileData;
   attempt = 0;
   clearRetry();
-  saved = { ...saved, auto: true, checkedAt: 0, badPack: null };
+  saved = { ...saved, auto: true, checkedAt: 0, badPack: null, badPackEngine: null };
   await persist();
   requestPackDownload();
 }
 
 /**
- * The engine refused this pack as bad data (RC_ERR_DATA from rc_open): it goes, takes stay on the server, and this id
- * isn't fetched again, or a phone would download a pack its engine can't read every day.
+ * The engine refused this pack as bad data (RC_ERR_DATA from rc_open): it goes, takes stay on the server, and this
+ * engine doesn't fetch this id again, or a phone would download a pack it can't read every day.
  */
 export async function dropBadPack(packId: string): Promise<void> {
   await preparePack();
@@ -429,7 +438,7 @@ export async function dropBadPack(packId: string): Promise<void> {
   generation += 1;
   clearRetry();
   stopDownload();
-  saved = { ...saved, have: null, checkedAt: Date.now(), badPack: packId };
+  saved = { ...saved, have: null, checkedAt: Date.now(), badPack: packId, badPackEngine: engineVersion() };
   await persist();
   try {
     const dir = new Directory(root(), packId);

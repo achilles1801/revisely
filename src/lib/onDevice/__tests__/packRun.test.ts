@@ -318,6 +318,23 @@ describe('Recite’s pack on the phone', () => {
     later.mockRestore();
   });
 
+  it('a pack one engine refused is fetched again once the app has another engine', async () => {
+    const carrying = (version: string) =>
+      Object.assign({}, engine, { coreInfo: () => JSON.stringify({ version, abi: 1, headerAbi: 1, stub: false, selfTest: 'skipped' }) });
+    mockEngine = carrying('recite-core 0.2.0');
+    await run();
+    await dropBadPack('v7m-1');
+    mockCall.mockClear();
+    await run(); // the same engine: not asked
+    expect(mockCall).not.toHaveBeenCalled();
+    expect(packForEngine()).toBeNull();
+
+    mockEngine = carrying('recite-core 0.3.0');
+    await run();
+    expect(mockCall).toHaveBeenCalledTimes(1);
+    expect(packForEngine()?.packId).toBe('v7m-1');
+  });
+
   it('Download now tries a refused pack again', async () => {
     await run();
     await dropBadPack('v7m-1');
