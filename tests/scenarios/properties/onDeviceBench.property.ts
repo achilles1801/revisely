@@ -65,7 +65,7 @@ describe('the on-device bench', () => {
         ),
         (path) => {
           const copy = JSON.parse(JSON.stringify(manifestJson));
-          copy.files.fp32.path = path;
+          copy.files.r16.path = path;
           expect(parseManifest(copy)).toBeNull();
         },
       ),

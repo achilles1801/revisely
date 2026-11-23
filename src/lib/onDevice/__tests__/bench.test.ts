@@ -5,18 +5,23 @@ import { checkVerdict, filesFor, GATE_P95_MS, longVerdict, parseManifest, perMin
 const raw = manifestJson as unknown as Record<string, unknown>;
 
 describe('the on-device bench’s manifest', () => {
-  it('reads the uploaded one: M’s models, the clip, the check window, runs per platform', () => {
+  it('reads the uploaded one: M’s watermarked models, the clip, the check window, runs per platform', () => {
     const m = parseManifest(raw);
     expect(m).not.toBeNull();
-    expect(m!.models.map((x) => x.id)).toEqual(['v7-live-fp32', 'v7-live-fp16', 'v7-live-int8', 'v7-live-fp32.ort', 'v7m-live-r16', 'v7-any-fp32']);
+    // The lead (Nov 23): only the watermarked files, never v7 in the clear.
+    expect(m!.models.map((x) => x.id)).toEqual(['v7m-live-r16', 'v7m-live-f16pack', 'v7m-any-r16']);
+    expect(Object.values(m!.files).filter((f) => f.path.endsWith('.onnx')).every((f) => f.path.startsWith('v7/v7m-'))).toBe(true);
     // The lead: memory with both of the engine's graphs, opened from memory as the real path will.
-    expect(m!.plans.ios.find((p) => p.fromMemory)).toEqual({ model: 'v7-live-fp32', provider: 'cpu', threads: 2, fromMemory: true, alsoModel: 'v7-any-fp32' });
+    expect(m!.plans.ios.find((p) => p.fromMemory)).toEqual({ model: 'v7m-live-r16', provider: 'cpu', threads: 2, fromMemory: true, alsoModel: 'v7m-any-r16' });
+    // The long run's: the shipping weights on the CPU, two threads.
+    expect(m!.plans.ios[0]).toEqual({ model: 'v7m-live-r16', provider: 'cpu', threads: 2 });
+    expect(m!.plans.android[0]).toEqual({ model: 'v7m-live-r16', provider: 'cpu', threads: 2 });
     expect(m!.check).toEqual({ pcm: 'take', mel: 'mel16', s0: 64000, end: 128000 });
     expect(m!.plans.ios.some((p) => p.provider === 'coreml' && p.options?.ModelFormat === 'MLProgram')).toBe(true);
     expect(m!.plans.android.every((p) => p.provider !== 'coreml')).toBe(true);
-    // M's ask: the CPU at one and two threads for fp32, fp16 and int8, on both platforms.
+    // The CPU at one and two threads for the fp32-speed file and the fp16 pack, on both platforms.
     for (const list of [m!.plans.ios, m!.plans.android]) {
-      for (const model of ['v7-live-fp32', 'v7-live-fp16', 'v7-live-int8']) {
+      for (const model of ['v7m-live-r16', 'v7m-live-f16pack']) {
         expect(list.filter((p) => p.model === model && p.provider === 'cpu').map((p) => p.threads)).toEqual(expect.arrayContaining([1, 2]));
       }
     }
@@ -31,13 +36,13 @@ describe('the on-device bench’s manifest', () => {
     };
     expect(parseManifest(null)).toBeNull();
     expect(bad((c) => (c.version = 2))).toBeNull();
-    expect(bad((c) => (c.files.fp32.path = '../secrets/x'))).toBeNull();
-    expect(bad((c) => (c.files.fp32.sha256 = 'abc'))).toBeNull();
-    expect(bad((c) => (c.files.fp32.bytes = 0))).toBeNull();
+    expect(bad((c) => (c.files.r16.path = '../secrets/x'))).toBeNull();
+    expect(bad((c) => (c.files.r16.sha256 = 'abc'))).toBeNull();
+    expect(bad((c) => (c.files.r16.bytes = 0))).toBeNull();
     expect(bad((c) => (c.models[0].file = 'missing'))).toBeNull();
     expect(bad((c) => (c.plans.ios[0].model = 'v9'))).toBeNull();
     expect(bad((c) => (c.plans.android[0].provider = 'gpu'))).toBeNull();
-    expect(bad((c) => (c.plans.ios[8].options = { ModelFormat: 1 }))).toBeNull();
+    expect(bad((c) => (c.plans.ios[5].options = { ModelFormat: 1 }))).toBeNull();
     expect(bad((c) => (c.check.end = c.check.s0))).toBeNull();
     expect(bad((c) => delete c.tolerance)).toBeNull();
     expect(bad((c) => (c.plans.ios[0].fromMemory = 'yes'))).toBeNull();
@@ -46,12 +51,12 @@ describe('the on-device bench’s manifest', () => {
 
   it('downloads only what the chosen runs need, each file once', () => {
     const m = parseManifest(raw)!;
-    const int8Only = filesFor(m, [{ model: 'v7-live-int8', provider: 'cpu', threads: 2 }]);
-    expect(int8Only.sort()).toEqual(['clip', 'hann', 'int8', 'mel16', 'melFilters', 'out16int8', 'take'].sort());
+    const packOnly = filesFor(m, [{ model: 'v7m-live-f16pack', provider: 'cpu', threads: 2 }]);
+    expect(packOnly.sort()).toEqual(['clip', 'f16pack', 'hann', 'mel16', 'melFilters', 'outF16pack', 'take'].sort());
     const ios = filesFor(m, m.plans.ios);
     expect(new Set(ios).size).toBe(ios.length);
-    expect(ios).not.toContain('fp32ort');
-    expect(filesFor(m, [{ model: 'v7-live-fp32', provider: 'cpu', threads: 2, alsoModel: 'v7-any-fp32' }])).toContain('any');
+    expect(filesFor(m, [{ model: 'v7m-live-r16', provider: 'cpu', threads: 2 }])).not.toContain('anyR16');
+    expect(filesFor(m, [{ model: 'v7m-live-r16', provider: 'cpu', threads: 2, alsoModel: 'v7m-any-r16' }])).toContain('anyR16');
   });
 
   it('names a run by everything that changes it', () => {

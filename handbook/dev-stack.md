@@ -430,6 +430,10 @@ owner's `on-device-release.md`).
   The first run in a platform's list is the long run's (5 or 20 minutes at the live cadence, battery and heat each
   minute: research's protocol); a run with `fromMemory` opens its model from bytes, as the real path will after
   decrypting it (the bench's files themselves are plain: Dev only, signed in; the real path's pack is encrypted).
-  Storage rules let signed-in accounts read `models/recite/`; only the admin SDK writes it. Each finished bench sends
+  Only watermarked models go there (the lead, Nov 23: never v7 in the clear; M's `v7m-*` files). Storage rules let
+  only accounts with the `onDeviceBench` custom claim read `models/recite/` (Revisely Dev is open to anyone with its
+  link, so signing in isn't enough): `GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-dev-admin.json node
+  scripts/set-bench-access.js <email> [--off] | --list` from `functions/`; the screen refreshes the token before it
+  reads, so a new claim counts at once. Only the admin SDK writes the folder. Each finished bench sends
   one record to Firestore `onDeviceBench` (create only: the phone, the build, each run's numbers; no uid, no audio);
   read them with the dev admin key.

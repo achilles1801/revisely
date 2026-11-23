@@ -54,15 +54,18 @@ describe('on-device bench: onDeviceBench and models/recite/', () => {
     await assertFails(setDoc(doc(db, 'onDeviceBench', 'x'), { ...record(), runs: Array.from({ length: 41 }, () => ({})) }));
   });
 
-  it('the model and the bench’s files: read when signed in, written only by the admin SDK', async () => {
+  it('the model and the bench’s files: read only with the onDeviceBench claim, written only by the admin SDK', async () => {
+    const path = 'models/recite/v7/v7m-live-r16.onnx';
     await env.withSecurityRulesDisabled(async (ctx) => {
-      await uploadBytes(ref(ctx.storage(), 'models/recite/v7/v7-live-int8.onnx'), new Uint8Array([1, 2, 3]));
+      await uploadBytes(ref(ctx.storage(), path), new Uint8Array([1, 2, 3]));
     });
-    await assertSucceeds(getBytes(ref(env.authenticatedContext(ALICE).storage(), 'models/recite/v7/v7-live-int8.onnx')));
-    await assertFails(getBytes(ref(env.unauthenticatedContext().storage(), 'models/recite/v7/v7-live-int8.onnx')));
-    await assertFails(
-      uploadBytes(ref(env.authenticatedContext(ALICE).storage(), 'models/recite/v7/v7-live-int8.onnx'), new Uint8Array([9])),
-    );
-    await assertFails(uploadBytes(ref(env.authenticatedContext(ALICE).storage(), 'models/recite/bench.json'), new Uint8Array([9])));
+    const bench = env.authenticatedContext(ALICE, { onDeviceBench: true }).storage();
+    await assertSucceeds(getBytes(ref(bench, path)));
+    // Revisely Dev is open to anyone with its link: signing in alone reads nothing.
+    await assertFails(getBytes(ref(env.authenticatedContext(ALICE).storage(), path)));
+    await assertFails(getBytes(ref(env.authenticatedContext(ALICE, { onDeviceBench: 'yes' }).storage(), path)));
+    await assertFails(getBytes(ref(env.unauthenticatedContext().storage(), path)));
+    await assertFails(uploadBytes(ref(bench, path), new Uint8Array([9])));
+    await assertFails(uploadBytes(ref(bench, 'models/recite/bench.json'), new Uint8Array([9])));
   });
 });

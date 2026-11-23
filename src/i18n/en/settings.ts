@@ -350,6 +350,8 @@ export const settings = {
     device: '{{model}} · {{cores}} cores · {{memory}} GB',
     reading: 'Reading the list of runs…',
     readFailed: 'Couldn’t read the list of runs: {{error}}',
+    /** The account lacks the team's bench access (storage.rules, the onDeviceBench claim). */
+    noAccess: 'this account can’t read the bench’s files. The Revisely team gives access to the accounts that run it.',
     tryAgain: 'Try again',
     windows: 'Windows a run',
     windowsFooter: 'A window is 4 seconds of recitation; Recite runs one every half second. Each run is checked on the checker’s own output first.',

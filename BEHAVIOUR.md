@@ -1561,8 +1561,9 @@ shows up once and they must go through it and complete it … just the main stuf
 - **ONDEV-1.** Settings → Testing → On-device model times Recite's model on this phone, the first step to checking
   recitation on the phone instead of the server (Majd, Nov 23 2026). It lists this platform's runs from the dev
   backend (each a model file, a processor (CPU, Core ML, XNNPACK or NNAPI) and a thread count; all chosen, any left
-  out), downloads what the chosen runs need once (signed in; each file checked by size and SHA-256, kept on the phone
-  out of backups) and runs them one after another with the screen kept on. Each run first checks the model on the
+  out), downloads what the chosen runs need once (only for accounts the team has given bench access: Revisely Dev is open
+  to anyone with its link; the models are the watermarked ones; each file checked by size and SHA-256, kept on the
+  phone out of backups; without access it says so) and runs them one after another with the screen kept on. Each run first checks the model on the
   checker's own output (the features within 0.0002, the model's output and its top sound per frame), then times 60,
   200 (the default) or 600 windows (4 seconds of recitation each) of a public recitation clip, and shows the model's
   time per window (median, p90, p95, worst; under or over 150 ms at p95), the features', the share of a half second

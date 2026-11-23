@@ -91,7 +91,7 @@ export default function OnDeviceBenchScreen() {
       .then((m) => live.current && setManifest(m))
       .catch((err) => {
         logger.warn('Bench list failed', err);
-        if (live.current) setReadError(message(err));
+        if (live.current) setReadError(err instanceof Error && err.name === 'NoBenchAccess' ? t('settings.bench.noAccess') : message(err));
       });
   }, []);
 

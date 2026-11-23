@@ -7,6 +7,7 @@ import { Platform } from 'react-native';
 import { Directory, File, Paths } from 'expo-file-system';
 import { createDownloadResumable } from 'expo-file-system/legacy';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import RecitationAudio from '../../../modules/recitation-audio';
 import type { BenchResult, DeviceInfo } from '../../../modules-dev/recite-engine';
 import { db } from '../firebase';
@@ -64,8 +65,19 @@ function mediaUrl(path: string): string {
   return `${objectUrl(bucketName(), path)}?alt=media`;
 }
 
+/** The account may read the bench's files: storage.rules wants the `onDeviceBench` claim (signing in isn't enough). */
+export class NoBenchAccess extends Error {
+  constructor() {
+    super('No bench access'); // i18n-ignore (an error for logs)
+    this.name = 'NoBenchAccess';
+  }
+}
+
 export async function readManifest(): Promise<BenchManifest> {
+  // A fresh token, so a claim given minutes ago (functions/scripts/set-bench-access.js) counts now.
+  await getAuth().currentUser?.getIdToken(true);
   const res = await fetch(mediaUrl(MANIFEST_PATH), { headers: await authHeaders() });
+  if (res.status === 403) throw new NoBenchAccess();
   if (!res.ok) throw new Error(`The bench's list answered ${res.status}`); // i18n-ignore (an error for logs)
   const manifest = parseManifest(await res.json());
   if (!manifest) throw new Error("The bench's list doesn't read"); // i18n-ignore (an error for logs)

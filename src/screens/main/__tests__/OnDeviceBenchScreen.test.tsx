@@ -117,8 +117,8 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
   it('names the phone and lists this platform’s runs from the dev backend, all chosen', async () => {
     await show();
     expect(screen.getByText('iPhone16,2 · 6 cores · 8.0 GB')).toBeTruthy();
-    expect(screen.getByText('v7-live-fp32 · CPU · 1 thread')).toBeTruthy();
-    expect(screen.getByText('v7-live-fp16 · Core ML · default threads')).toBeTruthy();
+    expect(screen.getByText('v7m-live-r16 · CPU · 1 thread')).toBeTruthy();
+    expect(screen.getByText('v7m-live-f16pack · Core ML · default threads')).toBeTruthy();
     expect(screen.getAllByRole('checkbox')).toHaveLength(mockManifest.plans.ios.length);
   });
 
@@ -128,14 +128,14 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
     runPlan.mockClear();
     // Leave out every run but the two fp32 ones on the CPU at one thread and on Core ML.
     for (const p of mockManifest.plans.ios) {
-      const keep = p.model === 'v7-live-fp32' && (p.provider === 'coreml' || p.threads === 1) && !p.fromMemory;
+      const keep = p.model === 'v7m-live-r16' && (p.provider === 'coreml' || p.threads === 1) && !p.fromMemory;
       if (!keep) fireEvent.press(screen.getByLabelText(require('../OnDeviceBenchScreen').planLabel(p)));
     }
     await act(async () => {
       fireEvent.press(screen.getByTestId('bench-run'));
     });
     expect(runPlan).toHaveBeenCalledTimes(2);
-    expect(screen.getByTestId('bench-result-v7-live-fp32-cpu-1')).toBeTruthy();
+    expect(screen.getByTestId('bench-result-v7m-live-r16-cpu-1')).toBeTruthy();
     expect(screen.getByText('Model 180.0 ms · p90 180.0 · p95 180.0 · worst 180.0')).toBeTruthy();
     expect(screen.getByText('Over the 150 ms mark at p95')).toBeTruthy();
     expect(screen.getByText('Model 4.0 ms · p90 4.0 · p95 4.0 · worst 4.0')).toBeTruthy();
@@ -144,7 +144,7 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
     expect(screen.getAllByText('Memory 215 MB with the model (95 MB for it)')).toHaveLength(2);
     expect(screen.getByTestId('bench-status').props.children).toBe('Sent to the dev backend');
     expect(runPlan.mock.calls.map((c) => c[4])).toEqual([{ windows: 200 }, { windows: 200 }]);
-    expect(mockBench.sent).toEqual([{ device: mockDevice, windows: 200, runs: ['v7-live-fp32', 'v7-live-fp32'] }]);
+    expect(mockBench.sent).toEqual([{ device: mockDevice, windows: 200, runs: ['v7m-live-r16', 'v7m-live-r16'] }]);
     expect(screen.getByTestId('bench-share')).toBeTruthy();
   });
 
@@ -152,14 +152,14 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
     await show();
     const runPlan = jest.requireMock('../../../lib/onDevice/benchRun').runPlan as jest.Mock;
     runPlan.mockClear();
-    expect(screen.getByText('Long run: v7-live-fp32 · CPU · 2 threads')).toBeTruthy();
+    expect(screen.getByText('Long run: v7m-live-r16 · CPU · 2 threads')).toBeTruthy();
     await act(async () => {
       fireEvent.press(screen.getByTestId('bench-long-run'));
     });
     expect(runPlan).toHaveBeenCalledTimes(1);
     expect(runPlan.mock.calls[0][2]).toEqual(mockManifest.plans.ios[0]);
     expect(runPlan.mock.calls[0][4]).toEqual({ durationSec: 1200 });
-    expect(screen.getByText('v7-live-fp32 · CPU · 2 threads · 20 minutes')).toBeTruthy();
+    expect(screen.getByText('v7m-live-r16 · CPU · 2 threads · 20 minutes')).toBeTruthy();
     expect(screen.getByText('Never hot (hottest: fair)')).toBeTruthy();
     expect(screen.getByText(/^Steady: the last minute (9|10)% off the first$/)).toBeTruthy();
     expect(screen.getByText('Battery down 5.0 points (15.0 an hour)')).toBeTruthy();
@@ -172,7 +172,7 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
   it('a run opened from memory, holding the any-length graph too, says so and gives the memory with both', async () => {
     const { planLabel } = require('../OnDeviceBenchScreen');
     const plan = mockManifest.plans.ios.find((p) => p.fromMemory)!;
-    expect(planLabel(plan)).toBe('v7-live-fp32 · CPU · 2 threads · from memory · with v7-any-fp32');
+    expect(planLabel(plan)).toBe('v7m-live-r16 · CPU · 2 threads · from memory · with v7m-any-r16');
     await show();
     for (const p of mockManifest.plans.ios) if (p !== plan) fireEvent.press(screen.getByLabelText(planLabel(p)));
     await act(async () => {
@@ -182,12 +182,12 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
   });
 
   it('a failed download says why and sends nothing', async () => {
-    mockBench.fail = 'v7/v7-live-fp32.onnx: checksum doesn’t match';
+    mockBench.fail = 'v7/v7m-live-r16.onnx: checksum doesn’t match';
     await show();
     await act(async () => {
       fireEvent.press(screen.getByTestId('bench-run'));
     });
-    expect(screen.getByTestId('bench-status').props.children).toBe('Failed: v7/v7-live-fp32.onnx: checksum doesn’t match');
+    expect(screen.getByTestId('bench-status').props.children).toBe('Failed: v7/v7m-live-r16.onnx: checksum doesn’t match');
     expect(mockBench.sent).toEqual([]);
   });
 });
