@@ -39,7 +39,7 @@ const lines = (...l: string[]) => l.join('\n');
 export const GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     title: 'Finding your way',
-    covers: ['NAME-1', 'REVO-25', 'TAB-2', 'HOME-1'],
+    covers: ['NAME-1', 'REVO-25', 'REVO-41', 'TAB-2', 'HOME-1'],
     routes: ['Dashboard', 'ReadIndex', 'Activity', 'Settings'],
     text: lines(
       '- The tab bar: Home, Activity, Read (swipe between them). Insights is in Activity; tapping Activity again goes back to its start.',
@@ -47,7 +47,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Home’s Today post: where today starts (e.g. "Starts at Al-Mujadila ›", or "Starts at Al-Hadid, ayah 4 ›" mid-surah) and how much it is. Tapping that line (its ›) opens a menu with “Jump to…” and “Edit schedule”. Under it, one button: “Start revision”, “Continue revision” or “Review session”. Then "… of the Quran memorized ›" with a dot per juz; its › opens the memorized pages. Then “Recent sessions” (the last three) and “See all”.',
       '- Read tab: “Search the Quran” under its title, “Recent pages”, then every surah, grouped by juz. Tap one to open the reader.',
       '- The app names parts of the Qur’an by surah and juz ("Al-Baqarah 84–101", "Juz 28"). Page numbers show only as a detail (the header of today’s › menu), in the reader and the session, and where pages are chosen by number (the Page tab of “Jump to…”).',
-      '- Revo: the round button at the bottom right of Home and of Activity (Overview, Insights, a day, See all, Pages by strength). There is no Revo on the Read tab (its list or the reader) or in a revision session.',
+      '- Revo: the round button in a bottom corner of Home and Activity (Overview, Insights, a day, See all, Pages by strength); drag it to the other corner and it stays. None on the Read tab or in a revision session.',
     ),
   },
   {

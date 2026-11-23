@@ -31,6 +31,10 @@ export const revo: NonNullable<ArStrings['revo']> = {
   button: {
     newReview: '⁨Revo⁩، ملخّص يوم جديد',
     hint: 'اسأل عن مراجعتك',
+    moveLeft: 'نقل إلى اليسار',
+    moveRight: 'نقل إلى اليمين',
+    movedLeft: 'نُقل إلى اليسار',
+    movedRight: 'نُقل إلى اليمين',
   },
   card: {
     reviseFirst: 'إضافة إلى خطتي',

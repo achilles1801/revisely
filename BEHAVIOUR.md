@@ -1320,8 +1320,8 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   showing its end keeps it in view as the list gets shorter or longer (an answer's chart and plan card included),
   unless the user has scrolled up to read.
 
-- **REVO-25.** Revo's button is a 44pt disc (the smallest touch target, with room around it to tap), bottom-right, 14
-  above the tab bar and the mini player. It shows on Home, Activity (Overview and Insights), a day in Activity, See
+- **REVO-25.** Revo's button is a 44pt disc (the smallest touch target, with room around it to tap), in a bottom corner
+  (REVO-41), 14 above the tab bar and the mini player. It shows on Home, Activity (Overview and Insights), a day in Activity, See
   all and Pages by strength, and nowhere else. There is no Revo on the Read tab (its list or the reader) or in a
   revision session, and their help sheets offer no "Ask Revo" (Majd, Nov 8 2026: "no revo in the revision
   sessions. there should also be no revo in the mushaf tab at all"); none in an editor or Settings either. The
@@ -1453,6 +1453,13 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   them. The app sends the patterns and the day facts only once config/app's `revoPatterns` is on (set after the
   functions that take them are deployed: older ones refuse fields they don't know); off, it sends what it sent
   before, and turning it off stops them with no deploy.
+- **REVO-41.** Revo's button can be dragged sideways between the bottom right and the bottom left (Majd, Nov 23 2026:
+  "let's make the revo icon bottom right be movable so a user can drag it to the other side so either just bottom right
+  or bottom left and that position is saved in memory meaning the app remembers it"). It follows the finger and settles
+  in the nearer corner (a flick counts where it was heading); a tap still opens Revo, and the end of a drag doesn't. The
+  corner is kept on that phone, per account, across launches. Until it's moved it sits at the end of the line: right, or
+  left in Arabic. VoiceOver and TalkBack have an action for it ("Move to the left", "Move to the right"), and say where
+  it went. Lists leave the same room at their end on either side.
 
 ## Memorizing
 

@@ -31,6 +31,11 @@ export const revo = {
   button: {
     newReview: 'Revo, a new Day in review',
     hint: 'Ask about your revision',
+    /** VoiceOver's and TalkBack's action for what a drag does (REVO-41), and what is said after it. */
+    moveLeft: 'Move to the left',
+    moveRight: 'Move to the right',
+    movedLeft: 'Moved to the left',
+    movedRight: 'Moved to the right',
   },
   /** The card under an answer with the one thing Revo suggests. */
   card: {
