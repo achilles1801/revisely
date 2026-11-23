@@ -125,8 +125,8 @@ export const activity = {
     recited: 'Recited',
     notes: 'Notes',
     deleteMemorizationTitle: 'Delete this memorization?',
-    /** "Al-Mulk 1–12 goes back to not memorized." */
-    backToNotMemorized: '{{ayahs}} goes back to not memorized.',
+    /** "Back to not memorized: Al-Mulk, 1st page · start." */
+    backToNotMemorized: 'Back to not memorized: {{ayahs}}.',
     /** A reading session with no time or pages, in "Edit session". */
     session: 'session',
     editThing: 'Edit {{label}}',
@@ -139,7 +139,7 @@ export const activity = {
     deletePagesTitle: 'Delete these pages?',
     deletePagesBody: '{{passage}} leaves the day’s Revised block.',
     noteAt: 'Note · {{time}}',
-    finishesPage: '{{ayahs}} finishes the page',
+    finishesPage: 'Rest of {{page}} to go',
     notInCustomPlan: 'Not in your custom plan yet',
     addToPlan: 'Add to your plan',
     reviseTomorrow: 'Revise them tomorrow',

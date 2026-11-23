@@ -16,7 +16,7 @@ import { PageStrip, StrengthCounts, StripSummary, WindowFooter } from './DayPart
 import { DayBlock, ItemLine, PageChip } from './DayBlockFrame';
 import { BlockMark, RevisedMark } from './BlockMark';
 import { creditLine, dayTitle, formatMinutesLong, windowFooter } from '../../lib/activityFormat';
-import { describePassage } from '../../lib/passages';
+import { describePassage, pageNameOfAyah } from '../../lib/passages';
 import { RecordingsList } from '../recordings/RecordingsList';
 import { RecitedMark, TakeDayRow, dayTakeLine, useQuranWordsWhen, type TakeMenuAction } from '../reciteMemory/TakeRows';
 import { ActionSheet } from '../v2/ActionSheet';
@@ -555,7 +555,7 @@ export function DayBlocks({
     ? (() => {
         const mine = new Set(memorizedAyahsOnPage(lastPartly));
         const rest = ayahsOnPage(lastPartly.pageNumber).filter((k) => !mine.has(k));
-        return rest.length > 0 ? t('activity.day.finishesPage', { ayahs: describeAyahs(rest, { form: 'ayahsCompact' }) }) : null;
+        return rest.length > 0 ? t('activity.day.finishesPage', { page: pageNameOfAyah(rest[0]) }) : null;
       })()
     : null;
   // A sitting whose pages were memorized that day stands under Memorized, not Read.

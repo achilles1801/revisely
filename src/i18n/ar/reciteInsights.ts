@@ -53,6 +53,8 @@ export const reciteInsights: NonNullable<ArStrings['reciteInsights']> = {
   lastRecited: '{{marked}} · آخر تسميع {{when}}',
   surahAyah: '{{surah}} {{ayah}}',
   slip: '{{from}} ← {{into}}',
+  slipWords: '«{{from}}» ← «{{into}}» · {{ref}}',
+  intoWords: '«{{words}}» في {{surah}} ({{ayah}})',
   timesLast: '{{times}}، آخرها {{when}}',
   ayahN: 'الآية {{n}}',
   endedItAs: 'ختمتها كما تُختم {{as}} · {{when}}',

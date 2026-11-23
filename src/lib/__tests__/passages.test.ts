@@ -6,11 +6,13 @@ import {
   describePassage,
   describeSession,
   firstWordsOfPage,
+  firstWordsOfPlace,
   firstVerseOfPage,
   lastVerseOfPage,
   NBHY,
   NBSP,
   pageInSurah,
+  pageNameOfAyah,
   pageRunEnds,
   partOfPage,
   partOfSurah,
@@ -20,6 +22,7 @@ import {
   plainText,
   spokenText,
   surahName,
+  withoutAmount,
 } from '../passages';
 import { boundsFile, versesOnPage } from '../ayahBounds';
 import { getJuzRange, getPagesForJuz, getSurah, getSurahDisplay } from '../quranData';
@@ -436,7 +439,7 @@ describe('[NAME-1] a place by its surah and page, never its ayah numbers', () =>
   });
 });
 
-describe('[NAME-1] a page by its first words', () => {
+describe('[NAME-2] a page by its first words', () => {
   it('the first words of the page as printed, up to four, whole', () => {
     expect(firstWordsOfPage(309, 'madani1405').split(' ')).toHaveLength(4);
     expect(firstWordsOfPage(2, 'madani1405')).toBe('الٓمٓ');
@@ -454,5 +457,25 @@ describe('[NAME-1] a page by its first words', () => {
         expect(firstWordsOfPage(page, edition)).toBe(words);
       }
     }
+  });
+});
+
+describe('[NAME-2] the words a place starts with', () => {
+  it('none when the page opens a surah or a juz; a page in the middle of a surah has them', () => {
+    expect(firstWordsOfPlace(542, 'madani1405')).toBe('');
+    expect(firstWordsOfPlace(22, 'madani1405')).toBe('');
+    expect(firstWordsOfPlace(309, 'madani1405')).toBe(firstWordsOfPage(309, 'madani1405'));
+  });
+
+  it('a sentence that has said how many pages drops the amount from the name', () => {
+    expect(withoutAmount('Al-Baqarah, first 28 pages')).toBe('Al-Baqarah');
+    expect(withoutAmount('Juz 2, last\u00a05\u00a0pages')).toBe('Juz 2');
+    expect(withoutAmount('Maryam, 5th page')).toBe('Maryam, 5th page');
+    expect(withoutAmount('البقرة، أول ٢٨ صفحة')).toBe('البقرة');
+  });
+
+  it('an ayah’s page by its surah, with nothing about where on it', () => {
+    expect(plainText(pageNameOfAyah(27025, 'madani1405'))).toBe('An-Naml, 3rd page');
+    expect(plainText(pageNameOfAyah(112001, 'madani1405'))).toBe('Al-Ikhlas');
   });
 });

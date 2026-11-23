@@ -1495,7 +1495,7 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   the sitting's minutes come with it. Whole pages and Surah are its other tabs; Whole pages keeps to the
   sitting's pages too, from the first not yet memorized to its last.
   - After adding, the sitting stands under Memorized. The block counts in ayahs when part of a page was
-    memorized ("20 ayahs"), and says what finishes the page ("Al-Mulk 21–26 finishes the page").
+    memorized ("20 ayahs"), and says what finishes the page ("Rest of Al-Mulk, 2nd page to go").
   - Undo puts every page back as it was and takes the ayahs out of the day (MEM-3).
   - Memorized today, the block says where the pages stand in the plan. On an automatic plan it says when
     they first come up, with Revise them tomorrow and Edit schedule. On a custom plan, which doesn't
@@ -1512,10 +1512,10 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 
 - **MEM-7.** The juz sheet shows a juz being learned (Activity). A page memorized in part is
   filled by the share of it that is memorized ("Part of a page" in the legend). A surah with ayahs
-  memorized on such a page reads what is memorized and what is to go ("Ayahs 1–20 · 21–30 to go"),
+  memorized on such a page reads what is memorized and what is to go ("Up to «…» · rest of the page to go"),
   and opens the reader where it goes on. The sheet says what is learned so far ("Al-Mulk, first 2 pages so far"):
   as its headline, "Being learned", while nothing of the juz has been revised yet, and on a line of its
-  own after that. Its button is Continue at the first ayah not memorized ("Continue at Al-Mulk 21").
+  own after that. Its button is Continue at the first ayah not memorized ("Continue at Al-Mulk, 2nd page · middle").
   A page marked in progress with no ayahs saved has nothing memorized, and reads as not memorized.
 
 - **MEM-8.** (Revisely Dev) The Memorized sheet chooses on the real mushaf page (Majd, Nov 23 2026: "tap where you stopped
@@ -1598,6 +1598,13 @@ shows up once and they must go through it and complete it … just the main stuf
   (the › sheet's "… · pp. 542–561"), inside the reader and the session, and where the user chooses by page (Jump to's Page
   tab, From and To). Ayah numbers stay only where a verse is cited or played: a held verse, search results, Audio Options
   and "Play from", and for now the Memorized sheet's picker, which is being rebuilt.
+- **NAME-2.** A place to start, a weak spot or a page chosen by number also shows how its page begins: its first words as
+  printed (up to four, never part of a word), between « », in the mushaf's script, on their own line, from the chosen print.
+  They show on Home's Today post (not when the page opens a surah or juz, which its name already says, nor on a part-memorized
+  page), Jump to's Page tab, Pages by strength and Weak spots. VoiceOver reads the name and skips them. An ayah is named the same
+  way where a page isn't enough: the juz sheet's "Up to «…»", and a similar ayah in Recite ("You continued with «…» in Luqman
+  (31:6), a similar ayah"), where the reference stays as a quiet detail. (Majd, Nov 23 2026: "third page of maryam and also ...
+  the first few words of that page".)
 
 ## Language and layout
 

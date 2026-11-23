@@ -192,6 +192,33 @@ const juzAyahs = (a: number, b: number, edition: MushafEditionId): AyahRun => ({
 /** Whether a form cites ayah numbers (a verse being cited or played). */
 const citesAyahs = (form: PassageForm) => form === 'ayahs' || form === 'ayahsCompact';
 
+/**
+ * The page an ayah is on, by its surah: "An-Naml, 3rd page" (a surah of a page or less, its name). For a place inside a
+ * take or a mark, where "· middle" would add nothing.
+ */
+export function pageNameOfAyah(key: number, edition: MushafEditionId = getMushafEdition()): string {
+  const sura = suraOf(key);
+  return inside(surahName(sura), pageWords(sura, pageOfAyah(key, edition), edition));
+}
+
+/**
+ * The first words of a place to start, for the line under its name (NAME-2): none when the page opens a surah or a juz,
+ * since that name already says where it begins.
+ */
+export function firstWordsOfPlace(page: number, edition: MushafEditionId = getMushafEdition()): string {
+  if (!validPage(page)) return '';
+  const first = firstAyahOfPage(page, edition);
+  return ayahOf(first) === 1 || juzStart(getJuzForPage(page)) === page ? '' : firstWordsOfPage(page, edition);
+}
+
+/**
+ * A name without the amount it carries ("Al-Baqarah, first 28 pages" → "Al-Baqarah"), for a sentence that has just said
+ * how many pages.
+ */
+export function withoutAmount(name: string): string {
+  return name.replace(/[,،][\s\u00a0]+(?:(?:first|last)[\s\u00a0]+\d+[\s\u00a0]+pages|(?:أول|آخر)[\s\u00a0]+(?:[٠-٩\d]+[\s\u00a0]+)?(?:صفحات|صفحة|صفحتين))$/u, '');
+}
+
 /** "1st", "2nd", "23rd" in English; Arabic says "الصفحة ٥", with no ordinal word. */
 function ordinal(n: number): string {
   if (currentLanguage() === 'ar') return formatNumber(n);

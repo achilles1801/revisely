@@ -134,7 +134,7 @@ appId: com.revisionbuddy.app
     id: timer-end
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
-    visible: "Saved to today: Al.Mulk, ayahs.1.12, [1-3].min"
+    visible: "Saved to today: Al.Mulk, 1st.page, [1-3].min"
     timeout: 15000
 - assertNotVisible:
     id: record-stop
@@ -174,10 +174,10 @@ appId: com.revisionbuddy.app
     visible: "Read, 1 page"
     timeout: 15000
 # The row is one button for VoiceOver: its name and what a tap does read together.
-- assertVisible: "Al.Mulk, ayahs.1.12(. Edit pages)?"
+- assertVisible: "Al.Mulk, 1st.page(. Edit pages)?"
 - assertVisible:
     id: recording-play-.*
-- assertVisible: "Al.Mulk, ayahs.1.12 isn’t memorized yet."
+- assertVisible: "Al.Mulk, 1st.page isn’t memorized yet."
 - runFlow:
     file: ../subflows/shot.yaml
     env:
@@ -245,7 +245,7 @@ appId: com.revisionbuddy.app
     timeout: 10000
 - assertVisible:
     id: activity-finishes-page
-    text: "Al.Mulk.*12 finishes the page"
+    text: "Rest of Al.Mulk.* to go"
 - takeScreenshot: 13-day-memorized
 
 # Taken off again (MEM-3): the ayahs come off; the Day has nothing memorized and offers the page.
@@ -276,11 +276,11 @@ appId: com.revisionbuddy.app
       - extendedWaitUntil:
           visible: "Delete this memorization\\?"
           timeout: 10000
-      - assertVisible: "Al.Mulk.1(.([2-9]|1[01]))? goes back to not memorized\\."
+      - assertVisible: "Back to not memorized: Al.Mulk.*"
       - tapOn: "Delete"
 - extendedWaitUntil:
     notVisible:
       id: activity-block-memorized
     timeout: 10000
 # Either way the page is as it was before the add, and offered again (MEM-3, ACT-7).
-- assertVisible: "Al.Mulk, ayahs.1.12 isn’t memorized yet."
+- assertVisible: "Al.Mulk, 1st.page isn’t memorized yet."

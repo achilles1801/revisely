@@ -615,7 +615,7 @@ describe('the card’s words', () => {
     expect(markTitle(unclear)).toBe('Not clear');
     expect(findingNote(unclear)).toBe('Say it more clearly. Not counted in the score.');
     // The title says it, so the place doesn't add "likely".
-    expect(plainText(markPlace(unclear))).toBe('An-Naml, ayah 23');
+    expect(plainText(markPlace(unclear))).toBe('An-Naml, 3rd page');
     expect(markTitle(mark({ kind: 'letter', sure: 'likely' }))).toBe('Not clear');
     // Clear harakat and letters, and every word mark, keep their names.
     expect(markTitle(mark({ kind: 'harakat', sure: 'clear' }))).toBe('Wrong haraka');
@@ -625,8 +625,8 @@ describe('the card’s words', () => {
   });
 
   it('names the ayah by its surah, and says when a mark is only likely', () => {
-    expect(plainText(markPlace(mark({})))).toBe('An-Naml, ayah 23');
-    expect(plainText(markPlace(mark({ sure: 'likely' })))).toBe('An-Naml, ayah 23 · likely');
+    expect(plainText(markPlace(mark({})))).toBe('An-Naml, 3rd page');
+    expect(plainText(markPlace(mark({ sure: 'likely' })))).toBe('An-Naml, 3rd page · likely');
   });
 
   it('Expected and Recited: two words either side, the word swapped for what was said', () => {
@@ -731,13 +731,13 @@ describe('`into`: where a slip into a similar ayah went (contract draft 6, final
   it('reads as a line on the card: the ayah gone on with, surah first; a swapped ending by its ayah', () => {
     const luqman = plainText(surahName(31));
     const m = { ...base, into: { w: 3500, ayah: [31, 6] as [number, number] } };
-    expect(plainText(intoLine(m, 'ayah 5'))).toBe(`You continued with ${luqman} 31:6, a similar ayah`);
-    expect(plainText(intoLine({ ...m, into: { ...m.into, also: [[2, 7]] } }, 'ayah 5'))).toBe(`You continued with ${luqman} 31:6, a similar ayah (and 1 other)`);
-    expect(plainText(intoLine({ ...m, into: { ...m.into, also: [[2, 7], [3, 9]] } }, 'ayah 5'))).toBe(`You continued with ${luqman} 31:6, a similar ayah (and 2 others)`);
+    expect(plainText(intoLine(m))).toBe(`You continued with ${luqman} 31:6, a similar ayah`);
+    expect(plainText(intoLine({ ...m, into: { ...m.into, also: [[2, 7]] } }))).toBe(`You continued with ${luqman} 31:6, a similar ayah (and 1 other)`);
+    expect(plainText(intoLine({ ...m, into: { ...m.into, also: [[2, 7], [3, 9]] } }))).toBe(`You continued with ${luqman} 31:6, a similar ayah (and 2 others)`);
     const ending = { ...base, ayah: [113, 5] as [number, number], into: { w: 9, ayah: [113, 3] as [number, number], ending: true as const } };
-    expect(plainText(intoLine(ending, 'ayah 5'))).toBe('You ended ayah 5 as ayah 3 ends');
+    expect(plainText(intoLine(ending))).toBe('You ended ayah 5 as ayah 3 ends');
     // VoiceOver hears the surah and ayah in words, not "31:6".
-    expect(spokenIntoLine(m, 'ayah 5')).toBe(`You continued with ${surahName(31)}, ayah 6, a similar ayah`);
+    expect(spokenIntoLine(m)).toBe(`You continued with ${surahName(31)}, ayah 6, a similar ayah`);
   });
 
   it('after the final answer (draft 8): `into` joins each mark by id, shown, taken off or in the final answer', () => {

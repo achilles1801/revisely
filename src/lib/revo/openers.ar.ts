@@ -4,7 +4,7 @@
 // agreement (src/i18n/ar-glossary.md). Passages, surah names, the hello, the asides and "twice" come from the app's
 // own Arabic (lib/passages, lib/revo/greeting, lib/recency).
 
-import { placeOfPage } from '../passages';
+import { placeOfPage, withoutAmount } from '../passages';
 import { shiftDay } from '../journal';
 import { timesWord } from '../recency';
 import { daysBetween } from './facts';
@@ -101,7 +101,7 @@ export function dayLine(f: Extract<PlaceFacts, { kind: 'day' }>, ctx: RevoContex
   let lead: string;
   let chips: (string | null)[];
   if (dayPlan && dayPlan.pages > 0) {
-    const name = passageLong(f.plan);
+    const name = withoutAmount(passageLong(f.plan));
     const done = dayPlan.pages - dayPlan.notDone;
     if (dayPlan.notDone === 0 && dayPlan.onDay === dayPlan.pages) {
       lead = `${when.on} راجعت كل ما في الخطة: ${count(dayPlan.pages, PAGE)}، ${name}${mins}${wrote}.`;

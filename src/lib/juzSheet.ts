@@ -8,7 +8,8 @@ import { ayahOf, ayahsOnPage, pageOfAyah, suraOf } from './ayahKeys';
 import { memorizedAyahsOnPage, pageShare } from './memorizedAyahs';
 import { coverageRecency, coverageSince, daysSince, lastRevisedWords, recencyLine, timesWord } from './recency';
 import { describeSurahs } from './pageRanges';
-import { describeAyahs, pageRunEnds, surahName } from './passages';
+import { describeAyahs, pageRunEnds, partOfSurah, placeOfAyah, surahName } from './passages';
+import { firstWordsOfAyah } from './recite/quranWords';
 import { strengthOf, type Strength } from './activityDayParts';
 import { t } from '../i18n';
 
@@ -99,21 +100,9 @@ export function recencyOf(lastDay: string | null | undefined, today: string, sin
   return where === 'stale' ? 'older' : where;
 }
 
-/** Ayah numbers' first run: "17–24" ("5"), and ", …" when more follow. */
-function firstRun(nums: number[]): { text: string; one: boolean } {
-  const sorted = [...new Set(nums)].sort((a, b) => a - b);
-  let end = 0;
-  while (end + 1 < sorted.length && sorted[end + 1] === sorted[end] + 1) end++;
-  const more = end + 1 < sorted.length ? ', …' : '';
-  return sorted[0] === sorted[end] ? { text: `${sorted[0]}${more}`, one: true } : { text: `${sorted[0]}–${sorted[end]}${more}`, one: false };
-}
-
-/** The ayahs of some pages inside one surah, as "Ayahs 17–24" ("Ayah 5"); a second run is "…". */
+/** Some pages inside one surah, by which of its pages: "Last page", "3rd to 5th page". */
 function ayahsIn(sura: number, pages: number[]): string {
-  const keys = pages.flatMap((p) => ayahsOnPage(p)).filter((k) => suraOf(k) === sura).map(ayahOf);
-  if (keys.length === 0) return '';
-  const run = firstRun(keys);
-  return run.one ? t('lib.juzSheet.ayah', { list: run.text }) : t('lib.juzSheet.ayahs', { list: run.text });
+  return partOfSurah(sura, pages);
 }
 
 const ORDER: Record<Strength, number> = { weak: 0, moderate: 1, strong: 2 };
@@ -181,7 +170,7 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
     const mine = new Set(ayahsHere(p));
     const next = ayahsOnPage(p).find((k) => !mine.has(k));
     if (next != null) {
-      continueAt = { page: p, label: t('lib.juzSheet.surahAyah', { surah: surahName(suraOf(next)), ayah: ayahOf(next) }) };
+      continueAt = { page: p, label: placeOfAyah(next) };
       break;
     }
   }
@@ -242,10 +231,12 @@ export function juzSheetModel(input: JuzSheetInput): JuzSheetModel {
       const all = [...new Set(pages.flatMap((p) => ayahsOnPage(p)).filter((k) => suraOf(k) === sura))].sort((a, b) => a - b);
       const done = all.filter((k) => learned.has(k));
       const toGo = all.filter((k) => !learned.has(k));
-      const doneRun = firstRun(done.map(ayahOf));
+      // Up to the ayah they reached, by its words once the word data has loaded (NAME-2).
+      const last = done[done.length - 1];
+      const upTo = last != null ? firstWordsOfAyah(suraOf(last), ayahOf(last)) : null;
       const text = [
-        doneRun.one ? t('lib.juzSheet.ayah', { list: doneRun.text }) : t('lib.juzSheet.ayahs', { list: doneRun.text }),
-        toGo.length > 0 ? t('lib.juzSheet.toGo', { list: firstRun(toGo.map(ayahOf)).text }) : null,
+        upTo ? t('lib.juzSheet.upTo', { words: upTo }) : t('lib.juzSheet.partLearned'),
+        toGo.length > 0 ? t('lib.juzSheet.restToGo') : null,
       ]
         .filter(Boolean)
         .join(' · ');

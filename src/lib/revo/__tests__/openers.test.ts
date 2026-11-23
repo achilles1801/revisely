@@ -108,7 +108,7 @@ describe('Revo opened from a day in Activity (REVO-38)', () => {
     };
     const recent: PlaceFacts = { kind: 'day', day: '2026-11-05', today: TODAY, facts, plan: Array.from({ length: 28 }, (_, i) => 2 + i), revised: [] };
     const o = revoOpener(null, ctx, recent);
-    expect(plainText(o.text)).toBe(`Assalamu alaikum. Thursday’s 28 pages, Al-Baqarah, first 28 pages, weren’t revised. ${TODAY_NEXT}`);
+    expect(plainText(o.text)).toBe(`Assalamu alaikum. Thursday’s 28 pages, Al-Baqarah, weren’t revised. ${TODAY_NEXT}`);
     expect(o.chips.map(plainText)[0]).toBe('Can I still catch up Thursday?');
   });
 

@@ -20,7 +20,7 @@
 import { getJuzForPage, getSurahsForPage } from './quranData';
 import type { PageRun } from './pageRanges';
 import type { Leftovers } from './carryOver';
-import { describePagesToRevise, NBHY, NBSP, pagesNote, placeOfPageToRevise, spokenText, surahNameIn, type PartialPages } from './passages';
+import { describePagesToRevise, firstWordsOfPlace, NBHY, NBSP, pagesNote, placeOfPageToRevise, spokenText, surahNameIn, type PartialPages } from './passages';
 import { suraOf } from './ayahKeys';
 import { t } from '../i18n';
 
@@ -55,6 +55,8 @@ export type TodayStatus = 'not_started' | 'partial' | 'completed';
 export interface TodayLines {
   /** Line 1, in ink: the words, a done dot before them, a › after them. */
   title: { text: string; dot: boolean; chevron: boolean };
+  /** Under the title, how the page you open to begins (NAME-2); none when it opens a surah or juz, or is part-memorized. */
+  words?: string;
   /** Line 2: grey words, or how far today is (a thin bar and "6 of 20"). */
   detail: { kind: 'text'; text: string } | { kind: 'progress'; done: number; total: number };
   /** The › sheet's header: the exact pages and surahs. */
@@ -89,6 +91,7 @@ const lastSurah = (p: number, partial: PartialPages = NONE) => {
 };
 /** Where reading a page begins: its first ayah, or a partly memorized page's first memorized one. */
 const placeOf = (p: number, partial: PartialPages) => placeOfPageToRevise(p, partial);
+const wordsOf = (p: number, partial: PartialPages) => (partial.has(p) ? undefined : firstWordsOfPlace(p) || undefined);
 
 /** Runs of consecutive pages, in the order given (the session's order). */
 export function runsInOrder(list: number[]): PageRun[] {
@@ -200,6 +203,7 @@ export function todayLines(
     const title = t('lib.today.continueAt', { place: placeOf(next, partial) });
     return {
       title: { text: title, dot: false, chevron: true },
+      words: wordsOf(next, partial),
       detail: { kind: 'progress', done: doneHere, total },
       ranges,
       label: spoken(t('lib.today.progressLabel', { title, done: doneHere, total })),
@@ -231,6 +235,7 @@ export function todayLines(
   }
   return {
     title: { text: title, dot: false, chevron: true },
+    words: wordsOf(start, partial),
     detail: { kind: 'text', text: detail },
     ranges,
     label: spoken(t('lib.today.titleDetail', { title, detail })),

@@ -32,6 +32,8 @@ export const reciteInsights = {
   surahAyah: '{{surah}} {{ayah}}',
   /** A slip into a similar ayah: "Al-Baqarah 48 → 123". */
   slip: '{{from}} → {{into}}',
+  slipWords: '«{{from}}» → «{{into}}» · {{ref}}',
+  intoWords: '«{{words}}» in {{surah}} ({{ayah}})',
   timesLast: '{{times}}, last {{when}}',
   ayahN: 'ayah {{n}}',
   endedItAs: 'You ended it as {{as}} ends · {{when}}',

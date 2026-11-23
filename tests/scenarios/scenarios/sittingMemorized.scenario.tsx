@@ -73,7 +73,7 @@ describe('a sitting memorized from the Day (MEM-1, MEM-3, MEM-5)', () => {
     await app.until(() => app.screen.queryAllByLabelText(/^Memorized, 20 ayahs/).length > 0, 'Memorized, 20 ayahs');
     await app.until(() => app.screen.queryByTestId('activity-finishes-page') != null, 'what finishes the page');
     const finishes = app.screen.getByTestId('activity-finishes-page').props.children as string;
-    expect(plain(finishes)).toBe('Al-Mulk 21–26 finishes the page');
+    expect(plain(finishes)).toBe('Rest of Al-Mulk, 2nd page to go');
     expect(app.screen.queryByTestId('activity-block-read')).toBeNull();
 
     // Undo sits on the screen, not at the end of the day's scrolling list (where a long day hid it).

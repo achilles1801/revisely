@@ -215,6 +215,8 @@ export const reciteLive = {
     placeLikely: '{{place}} · likely',
     /** Where a slip went: "Luqman 31:6". */
     there: '{{surah}} {{sura}}:{{ayah}}',
+    /** A similar ayah by its first words, its reference a quiet detail after them. */
+    thereWords: '«{{words}}» in {{surah}} ({{sura}}:{{ayah}})',
     ayahN: 'ayah {{n}}',
     endedAs: 'You ended {{place}} as {{as}} ends',
     continued: 'You continued with {{there}}, a similar ayah',

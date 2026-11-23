@@ -7,7 +7,7 @@ import { Sheet } from '../v2/Sheet';
 import { ActionSheet } from '../v2/ActionSheet';
 import { PillButton } from '../v2/PillButton';
 import { Tap } from '../v2/Tap';
-import { describeAyahs, spokenText } from '../../lib/passages';
+import { describeAyahs, pageNameOfAyah, spokenText } from '../../lib/passages';
 import { ayahKey } from '../../lib/ayahKeys';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { Mark, MarkInto } from '../../lib/reciteLive/contract';
@@ -40,9 +40,9 @@ const ARABIC_MAX = 1.6;
 /** From this text size a finding's Arabic word goes under its title, so it never squeezes the title away. */
 export const STACK_FINDINGS_AT = 1.3;
 
-/** Where a finding is: "ayah 23", or with its surah when the take ran into another ("Al-Qasas, ayah 1"). */
-export function findingPlace(mark: Mark, manySurahs: boolean): string {
-  return manySurahs ? describeAyahs([ayahKey(mark.ayah[0], mark.ayah[1])]) : t('reciteLive.summary.ayahN', { n: mark.ayah[1] });
+/** Where a finding is, by its page: "An-Naml, 3rd page". The word itself is on its row. */
+export function findingPlace(mark: Mark): string {
+  return pageNameOfAyah(ayahKey(mark.ayah[0], mark.ayah[1]));
 }
 
 /** "An-Naml, ayahs 23–31" for the words of a take. */
@@ -202,7 +202,6 @@ export function TakeSummarySheet({
       { text: t('common.delete'), style: 'destructive', onPress: onDelete },
     ]);
   const passage = words && from != null && to != null && to >= from ? passageOf(words, from, to) : '';
-  const manySurahs = words != null && from != null && to != null && to >= from && words.ref(from).sura !== words.ref(to).sura;
   // "Not clear" marks never count (Majd, Nov 15 2026), so they come last.
   const mistakes = marks.filter((m) => m.kind !== 'tajweed' && !isUnclear(m)).length;
   // A long take (2 pages or more) says its mistakes per page beside the count, where a % alone hides how many there
@@ -338,19 +337,18 @@ export function TakeSummarySheet({
       {check && onInto
         ? intoMarks(marks).map((m, i) => {
             // A slip into a similar ayah, or a swapped ending (the checker's `into`): where it went, a tap away.
-            const place = findingPlace(m, manySurahs);
             return (
               <Tap
                 key={`into-${m.id}`}
                 onPress={() => onInto(m.into)}
                 style={[styles.row, { borderTopColor: palette.separator }, i === 0 && styles.firstRow]}
                 accessibilityRole="button"
-                accessibilityLabel={t('reciteLive.summary.intoLabel', { line: spokenIntoLine(m, place) })}
+                accessibilityLabel={t('reciteLive.summary.intoLabel', { line: spokenIntoLine(m) })}
                 testID="take-summary-into"
               >
                 <Ionicons name={m.into.ending ? 'return-down-back-outline' : 'git-compare-outline'} size={20} color={palette.secondary} />
                 <Text style={[typeV2.body, styles.rowText, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX}>
-                  {intoLine(m, place)}
+                  {intoLine(m)}
                 </Text>
                 <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
               </Tap>
@@ -362,7 +360,7 @@ export function TakeSummarySheet({
             // The page's highlight (Majd, Nov 15 2026: no red text or round marks): a flat swatch by the kind's name, and
             // the word in ink on its colour.
             const fill = markFill(palette, m);
-            const place = findingPlace(m, manySurahs);
+            const place = findingPlace(m);
             // A wrong word, haraka or letter with what was heard: Expected and Recited, each the phrase around it, as the
             // mark's card shows them (RECITE-24; Tarteel's two lines; Majd, Nov 22 2026: "recommended is fine").
             const recited = (m.kind === 'word' || m.kind === 'harakat' || m.kind === 'letter') && !isUnclear(m) ? recitedPhrase(words, m) : null;
@@ -412,7 +410,7 @@ export function TakeSummarySheet({
         : null}
       {words
         ? peeked.map((p, i) => {
-            const place = manySurahs ? describeAyahs([ayahKey(p.ayah[0], p.ayah[1])]) : t('reciteLive.summary.ayahN', { n: p.ayah[1] });
+            const place = pageNameOfAyah(ayahKey(p.ayah[0], p.ayah[1]));
             const arabic = p.words.map((w) => words.uthmani(w)).join(' ');
             return (
               <Tap
@@ -464,7 +462,7 @@ export function TakeSummarySheet({
                     <View style={styles.titleRow}>
                       <View style={[styles.swatch, { backgroundColor: markFill(palette, m) }]} />
                       <Text style={[typeV2.name, styles.title, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
-                        {t('reciteLive.summary.findingTitle', { title: markTitle(m), place: findingPlace(m, manySurahs) })}
+                        {t('reciteLive.summary.findingTitle', { title: markTitle(m), place: findingPlace(m) })}
                       </Text>
                     </View>
                   </View>
@@ -473,7 +471,7 @@ export function TakeSummarySheet({
                     hitSlop={6}
                     style={[styles.putBack, { borderColor: palette.outline }]}
                     accessibilityRole="button"
-                    accessibilityLabel={t('reciteLive.summary.putBackLabel', { title: markTitle(m), place: spokenText(findingPlace(m, manySurahs)) })}
+                    accessibilityLabel={t('reciteLive.summary.putBackLabel', { title: markTitle(m), place: spokenText(findingPlace(m)) })}
                     testID="take-summary-put-back"
                   >
                     <Text style={[styles.putBackText, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX}>
