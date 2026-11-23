@@ -147,7 +147,14 @@ const speed = speedKeeper({
   cancel: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
   log: (message) => logger.log(message),
 });
-if (isDevVariant()) void speed.load();
+
+/** The stored result, read once, the first time a Dev screen or take asks (never as this file is imported). */
+let speedLoaded = false;
+function loadSpeed(): void {
+  if (speedLoaded) return;
+  speedLoaded = true;
+  void speed.load();
+}
 
 /** What the engine opens with: the threads, and this phone's hop once it has been measured. */
 export function engineOptions(): string {
@@ -163,11 +170,13 @@ const TYPICAL: StartFrame = {
 
 /** Where a typical take would run now, and why (Settings → Testing). */
 export function whereNow(): WhereAnswer {
+  loadSpeed();
   return chooseWhere({ ...reciteWhere(), engine: openEngineInfo(), fastEnough: speed.fastEnough(), demoted: speed.demoted(), start: TYPICAL });
 }
 
 /** Revisely Dev's takes: each to the phone or the server. */
 export function deviceConnect(server: LiveConnect): LiveConnect {
+  loadSpeed();
   return routedFeed({
     server,
     engine: engineBridge,
