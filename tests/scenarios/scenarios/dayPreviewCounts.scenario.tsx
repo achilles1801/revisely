@@ -2,7 +2,7 @@
 // "not sure what 2 of 0 even means"). It counts the day's plan: pages beyond it never take the figure past it, and a day
 // with no plan says what was revised.
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { render, screen, within } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { CalendarMonth } from '../../../src/components/activity/CalendarMonth';
 import { dayMarks } from '../../../src/lib/activityInsights';
@@ -45,6 +45,13 @@ describe('a day’s Revised figure (ACT-32)', () => {
     show([item([5, 6])], 'week');
     expect(screen.getByText(/Revised 2 pages/)).toBeTruthy();
     expect(screen.queryByText(/ of 0/)).toBeNull();
+  });
+
+  it('[ACT-5] a day with only logged pages is a revised day: its ring is whole and it counts in Revised N days', () => {
+    const logged = [item([5, 6])];
+    expect(dayMarks(DAY, data(logged)).ring).toBe(1);
+    show(logged);
+    expect(within(screen.getByTestId('calendar-total-revised')).getByText('1 day')).toBeTruthy();
   });
 
   it('[ACT-32] pages beyond the plan never take the figure past it, or fill the ring', () => {

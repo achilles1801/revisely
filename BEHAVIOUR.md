@@ -976,11 +976,12 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   untouched longest).
 
 - **ACT-5.** The day's + offers, for today and yesterday, Revised elsewhere, Memorized and Note (Majd, Nov 7
-  2026: "yes trim it"). There is no Read (the reader logs reading by itself) and no free choice of pages to
-  mark revised. Revised elsewhere lists the day's scheduled pages (its session's assignment, or the plan's)
-  that are memorized and not revised for it yet, each ticked; untick the ones not done, and Add logs the
-  rest for that day by hand, with no strength and no minutes. A page already revised for the day is never
-  offered again; with none left it says so. Memorized opens its own sheet: From and To, or a surah, and
+  2026: "yes trim it"). There is no Read (the reader logs reading by itself). Revised elsewhere lists the day's scheduled pages (its
+  session's assignment, or the plan's) that are memorized and not revised for it yet, each ticked; untick the ones not
+  done. "Add other pages" adds any other memorized pages, From and To (Majd, Nov 23 2026: "independent of the schedule
+  and what a user needs to revise that day"). Add logs them for that day by hand, with no strength and no minutes. A
+  page already revised for the day is never offered again. A day with any pages logged is a revised day: it has its
+  calendar ring and counts in "Revised N days". Memorized opens its own sheet: From and To, or a surah, and
   optional minutes. From and To are rows that open wheels, the same on its Ayahs and Whole pages tabs
   (Majd, Nov 8 2026): a surah and an ayah wheel, or one wheel of pages whose rows name the surah each page
   starts in ("542 · Al-Mujadila"). To is never before From, and each opens on the first ayah or page not
@@ -1049,8 +1050,9 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   whose scheduled pages are all credited to it is done, and a day restored within its grace window counts on
   time), on Home's today ("N of 20", Done) and in its catch-up offer (a day's pages logged are not left
   over). Home shows them when it next comes into view, offline too. A page counts once a day, whether a
-  session or a log revised it. Pages logged by hand never stand for what a day had scheduled: that stays
-  its session's assignment, or the plan. (Nov 7 2026: a missed day caught up by hand stayed missed.)
+  session or a log revised it. A logged page on the day's schedule ticks it off, so it is never asked for again; any
+  other logged page never changes the schedule or "N of 20". Pages logged by hand never stand for what a day had
+  scheduled: that stays its session's assignment, or the plan. (Nov 7 2026: a missed day caught up by hand stayed missed.)
 - **ACT-17.** A day before yesterday offers only a note: its + opens the Note sheet at once, so old history
   and streaks can't be rewritten. What is already logged there can still be seen and deleted. (Majd,
   Nov 7 2026.)

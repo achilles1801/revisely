@@ -362,6 +362,11 @@ export const activity = {
     untick: 'Untick any of {{day}}’s pages you didn’t revise.',
     tick: 'Tick the pages you revised.',
     adds: 'Adds {{pages}}: {{day}} becomes {{done}} of {{due}}.',
+    addsNoPlan: 'Adds {{pages}} to {{day}}.',
+    /** Any memorized pages, beyond the day's schedule (ACT-5). */
+    addOther: 'Add other pages',
+    otherPages: 'Other memorized pages',
+    otherNone: 'No memorized pages left to log here.',
   },
   addMenu: {
     /** {{day}}: "today", "yesterday" or the day's name. */

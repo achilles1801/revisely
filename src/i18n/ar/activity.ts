@@ -445,6 +445,10 @@ export const activity: NonNullable<ArStrings['activity']> = {
     untick: 'ألغِ تحديد أي صفحة من صفحات {{day}} لم تراجعها.',
     tick: 'حدّد الصفحات التي راجعتها.',
     adds: 'يضيف {{pages}}: يصبح {{day}} {{done}} من {{due}}.',
+    addsNoPlan: 'يضيف {{pages}} إلى {{day}}.',
+    addOther: 'إضافة صفحات أخرى',
+    otherPages: 'صفحات محفوظة أخرى',
+    otherNone: 'لا صفحات محفوظة متبقية لتسجيلها هنا.',
   },
   addMenu: {
     title: 'إضافة إلى {{day}}',

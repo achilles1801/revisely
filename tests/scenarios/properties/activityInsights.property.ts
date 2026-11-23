@@ -10,7 +10,7 @@ const pagesArb = fc.uniqueArray(fc.integer({ min: 1, max: 604 }), { minLength: 0
 const revisedArb = fc.record({ day: dayArb, countsFor: dayArb, pages: pagesArb, minutes: fc.option(fc.integer({ min: 0, max: 200 }), { nil: null }) });
 
 describe('the calendar marks (ACT-3)', () => {
-  it('[ACT-3] the ring is a share between 0 and 1 (none without assigned pages); memorized and read dots follow the items of that day', () => {
+  it('[ACT-3] the ring is a share between 0 and 1 (none with no plan and no pages); memorized and read dots follow the items of that day', () => {
     fc.assert(
       fc.property(fc.array(revisedArb, { maxLength: 8 }), dayArb, fc.array(dayArb, { maxLength: 4 }), (revised, day, memDays) => {
         const memorized = memDays.map((d) => ({ day: d, pages: [1] }));
