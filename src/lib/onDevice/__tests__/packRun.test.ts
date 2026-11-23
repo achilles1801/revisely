@@ -5,6 +5,7 @@ import { setNetworkState, __resetNetworkStateForTests } from '../../networkState
 import {
   __resetPackForTests,
   downloadPackNow,
+  dropBadPack,
   getPackStatus,
   packForEngine,
   preparePack,
@@ -287,6 +288,42 @@ describe('Recite’s pack on the phone', () => {
     await preparePack();
     expect(packForEngine()).toBeNull();
     expect(getPackStatus().phase).toBe('idle');
+  });
+
+  it('a pack the engine refuses is dropped and not fetched again, until a new id or Download now', async () => {
+    await run();
+    await dropBadPack('v7m-1');
+    expect(getPackStatus().phase).toBe('unavailable');
+    expect(packForEngine()).toBeNull();
+    expect(mockFiles.size).toBe(0);
+
+    mockCall.mockClear();
+    mockDownload.mockClear();
+    await run(); // within the day: not even asked
+    expect(mockCall).not.toHaveBeenCalled();
+
+    const now = Date.now();
+    const later = jest.spyOn(Date, 'now').mockReturnValue(now + 25 * 60 * 60 * 1000);
+    mockCall.mockResolvedValue({ result: { ...answer().result, expiresAt: now + 26 * 60 * 60 * 1000 } });
+    await run(); // the next day, the same id: asked, not downloaded
+    expect(mockCall).toHaveBeenCalledTimes(1);
+    expect(mockDownload).not.toHaveBeenCalled();
+    expect(getPackStatus().phase).toBe('unavailable');
+
+    mockCall.mockResolvedValue({ result: { ...answer('v7m-2').result, expiresAt: now + 26 * 60 * 60 * 1000 } });
+    later.mockReturnValue(now + 50 * 60 * 60 * 1000);
+    mockCall.mockResolvedValue({ result: { ...answer('v7m-2').result, expiresAt: now + 51 * 60 * 60 * 1000 } });
+    await run(); // a new pack is fetched
+    expect(packForEngine()?.packId).toBe('v7m-2');
+    later.mockRestore();
+  });
+
+  it('Download now tries a refused pack again', async () => {
+    await run();
+    await dropBadPack('v7m-1');
+    await downloadPackNow();
+    await settle();
+    expect(packForEngine()?.packId).toBe('v7m-1');
   });
 
   it('Remove deletes it all and keeps it off until Download now', async () => {

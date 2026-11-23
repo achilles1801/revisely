@@ -68,6 +68,8 @@ interface Saved {
   auto: boolean;
   have: PackOnPhone | null;
   checkedAt: number;
+  /** A pack the engine refused as bad data: it isn't fetched again, until a new id or "Download now". */
+  badPack?: string | null;
 }
 
 let saved: Saved = { auto: true, have: null, checkedAt: 0 };
@@ -326,6 +328,10 @@ async function runOnce(): Promise<void> {
     publish(restingStatus());
     return;
   }
+  if (!holdsCore(saved.have) && saved.badPack && !once && Date.now() - saved.checkedAt < CHECK_EVERY_MS) {
+    publish({ phase: 'unavailable' });
+    return;
+  }
   if (!mayUseNetwork()) {
     if (holdsCore(saved.have)) publish(restingStatus());
     else publish({ phase: networkState()?.connected ? 'waiting-for-wifi' : 'offline' });
@@ -341,6 +347,11 @@ async function runOnce(): Promise<void> {
     return;
   }
 
+  if (answer.packId === saved.badPack && !once) {
+    await persist();
+    publish({ phase: 'unavailable' });
+    return;
+  }
   const total = answer.parts.reduce((n, p) => n + p.bytes, 0);
   const same = saved.have?.packId === answer.packId;
   const fresh: PackOnPhone = same ? { packId: answer.packId, parts: { ...saved.have!.parts } } : { packId: answer.packId, parts: {} };
@@ -403,9 +414,30 @@ export async function downloadPackNow({ overMobileData = false } = {}): Promise<
   once = once || overMobileData;
   attempt = 0;
   clearRetry();
-  saved = { ...saved, auto: true, checkedAt: 0 };
+  saved = { ...saved, auto: true, checkedAt: 0, badPack: null };
   await persist();
   requestPackDownload();
+}
+
+/**
+ * The engine refused this pack as bad data (RC_ERR_DATA from rc_open): it goes, takes stay on the server, and this id
+ * isn't fetched again, or a phone would download a pack its engine can't read every day.
+ */
+export async function dropBadPack(packId: string): Promise<void> {
+  await preparePack();
+  if (saved.have?.packId !== packId) return;
+  generation += 1;
+  clearRetry();
+  stopDownload();
+  saved = { ...saved, have: null, checkedAt: Date.now(), badPack: packId };
+  await persist();
+  try {
+    const dir = new Directory(root(), packId);
+    if (dir.exists) dir.delete();
+  } catch (err) {
+    logger.warn('Could not delete a bad pack', err);
+  }
+  publish({ phase: 'unavailable', packId: null, bytes: 0, totalBytes: 0 });
 }
 
 /** "Remove from this phone": everything of it, and the download stays off until "Download now". */
