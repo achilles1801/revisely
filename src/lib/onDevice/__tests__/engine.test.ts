@@ -1,6 +1,6 @@
 // The engine opening from Recite's pack (ONDEV-3, ONDEV-4): only a real engine decrypts it, and a pack it refuses isn't
 // decrypted again. The native side (decrypting, aligned buffers, wiping after release) runs on a phone.
-import { __resetEngineForTests, deviceConnect, engineSelfCheck, warmEngine } from '../engine';
+import { __resetEngineForTests, deviceConnect, engineSelfCheck, engineStrictTest, warmEngine } from '../engine';
 import { routedFeed } from '../../reciteLive/route';
 
 const mockModule = {
@@ -8,6 +8,13 @@ const mockModule = {
   engineInfo: jest.fn((): string | null => null),
   enginePackOpen: jest.fn(async () => ({ ok: true, code: 0 }) as { ok: boolean; code: number; error?: string; info?: string }),
   engineRelease: jest.fn(async () => undefined),
+  engineStart: jest.fn(async () => ({ code: -3, error: 'strict refused' }) as { take?: number; code?: number; error?: string }),
+  engineFeed: jest.fn(),
+  engineControl: jest.fn(),
+  engineFinish: jest.fn(),
+  engineClose: jest.fn(),
+  addListener: jest.fn(() => ({ remove: jest.fn() })),
+  memoryPeakMb: jest.fn(() => 400),
   engineOpenFiles: jest.fn(async () => ({ ok: true, code: 0 })),
 };
 jest.mock('../../../../modules-dev/recite-engine', () => ({
@@ -188,5 +195,26 @@ describe('[ONDEV-1] engineSelfCheck', () => {
   it('has nothing to report with no pack on the phone', async () => {
     mockPack = null;
     expect(await engineSelfCheck()).toBeNull();
+  });
+});
+
+describe('[ONDEV-1] engineStrictTest', () => {
+  const REAL = JSON.stringify({ version: 'recite-core 0.2.0', hop: 0.5, self_check: { ran: true, ok: true } });
+
+  it('runs on the real engine, and closes an engine it opened', async () => {
+    mockModule.enginePackOpen.mockImplementationOnce(async () => {
+      mockModule.engineInfo.mockReturnValue(REAL);
+      return { ok: true, code: 0, info: REAL };
+    });
+    const run = await engineStrictTest(new Int16Array(1600), () => true);
+    expect(mockModule.engineStart).toHaveBeenCalledTimes(1);
+    expect(run).toMatchObject({ ok: false, error: 'strict refused', hop: 0.5, peakAfterMb: 400 });
+    expect(mockModule.engineRelease).toHaveBeenCalledTimes(1);
+  });
+
+  it('never runs on the replay stand-in', async () => {
+    mockModule.engineInfo.mockReturnValue(JSON.stringify({ version: 'recite-core replay 0.1.0' }));
+    expect(await engineStrictTest(new Int16Array(1600), () => true)).toBeNull();
+    expect(mockModule.engineStart).not.toHaveBeenCalled();
   });
 });

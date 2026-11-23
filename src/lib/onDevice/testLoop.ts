@@ -9,7 +9,8 @@ import { Platform } from 'react-native';
 import { File } from 'expo-file-system';
 import { logger } from '../logger';
 import { parseManifest } from './bench';
-import { benchEngine, benchRecord, runPlan, type BenchRun } from './benchRun';
+import { benchEngine, benchRecord, readPcm, runPlan, type BenchRun } from './benchRun';
+import type { EngineTestRun } from './engineTest';
 import { selfCheckFromOpen, type SelfCheck } from './selfCheck';
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
@@ -24,10 +25,11 @@ export async function runTestLoopIfAsked(): Promise<void> {
   const runs: BenchRun[] = [];
   let windows = 1;
   let selfCheck: SelfCheck | null = null;
+  let engineTest: EngineTestRun | null = null;
   const write = (status: string, error?: string) =>
     engine.writeTestLoopResult!(
       results,
-      JSON.stringify({ status, ...(error ? { error } : {}), ...(selfCheck ? { selfCheck } : {}), ...benchRecord(engine.deviceInfo(), windows, runs) }),
+      JSON.stringify({ status, ...(error ? { error } : {}), ...(selfCheck ? { selfCheck } : {}), ...(engineTest ? { engineTest } : {}), ...benchRecord(engine.deviceInfo(), windows, runs) }),
     );
   try {
     const dir = await engine.unpackObb();
@@ -45,7 +47,13 @@ export async function runTestLoopIfAsked(): Promise<void> {
     if (wanted) {
       if (!engine.engineOpenRooms) throw new Error("This build can't open the engine from the OBB"); // i18n-ignore (a log)
       const items = wanted.blobs.map((b) => ({ name: b.name, path: files[b.file], room: b.room }));
-      selfCheck = selfCheckFromOpen(await engine.engineOpenRooms(items, JSON.stringify({ threads: 2 })), wanted.packId);
+      const opened = await engine.engineOpenRooms(items, JSON.stringify({ threads: 2 }));
+      selfCheck = selfCheckFromOpen(opened, wanted.packId);
+      await write('running');
+      if (opened.ok) {
+        const { engineStrictTest } = require('./engine') as typeof import('./engine');
+        engineTest = await engineStrictTest(readPcm(files[manifest.audio]), () => true);
+      }
       await engine.engineRelease?.(); // before the runs, whose memory figures shouldn't carry it
       await write('running');
     }

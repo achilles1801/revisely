@@ -11,7 +11,7 @@ const mockState = {
   loop: null as { scenario: number; results: string | null } | null,
   obb: {} as Record<string, unknown>,
   shaWrong: null as string | null,
-  writes: [] as { status: string; error?: string; runs: string[]; selfCheck?: Record<string, unknown> }[],
+  writes: [] as { status: string; error?: string; runs: string[]; selfCheck?: Record<string, unknown>; engineTest?: Record<string, unknown> }[],
   finished: 0,
   plans: [] as unknown[],
   opened: [] as unknown[],
@@ -57,6 +57,7 @@ jest.mock('../benchRun', () => {
   };
   return {
     benchEngine: () => engine,
+    readPcm: () => new Int16Array(4),
     runPlan: jest.fn(async (_e: unknown, _m: unknown, plan: PlanSpec, files: Record<string, string>, length: unknown) => {
       mockState.plans.push({ plan: plan.model, threads: plan.threads, length, model: files.r16 });
       return { plan, result: { ok: true }, summary: null };
@@ -64,6 +65,10 @@ jest.mock('../benchRun', () => {
     benchRecord: (_d: unknown, windows: number, runs: { plan: PlanSpec }[]) => ({ windows, runs: runs.map((r) => `${r.plan.model}/${r.plan.threads}`) }),
   };
 });
+
+jest.mock('../engine', () => ({
+  engineStrictTest: jest.fn(async () => ({ mode: 'engineTest', ok: true, hops: 180, lateHops: 0, peakAfterMb: 400 })),
+}));
 
 import { runTestLoopIfAsked } from '../testLoop';
 
@@ -136,6 +141,7 @@ describe('[ONDEV-1] the bench on Test Lab’s phones (game loop)', () => {
     const last = mockState.writes[mockState.writes.length - 1];
     expect(last.status).toBe('done');
     expect(last.selfCheck).toMatchObject({ ok: true, packId: 'v7m-1', v7: { maxDiff: 0.00004, topDiff: 0 } });
+    expect(last.engineTest).toMatchObject({ mode: 'engineTest', ok: true, hops: 180, peakAfterMb: 400 });
     expect(mockState.finished).toBe(1);
   });
 });
