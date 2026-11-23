@@ -1,6 +1,7 @@
 // The engine opening from Recite's pack (ONDEV-3, ONDEV-4): only a real engine decrypts it, and a pack it refuses isn't
 // decrypted again. The native side (decrypting, aligned buffers, wiping after release) runs on a phone.
-import { __resetEngineForTests, engineSelfCheck, warmEngine } from '../engine';
+import { __resetEngineForTests, deviceConnect, engineSelfCheck, warmEngine } from '../engine';
+import { routedFeed } from '../../reciteLive/route';
 
 const mockModule = {
   coreInfo: jest.fn(() => JSON.stringify({ version: '0.2.0', abi: 1, headerAbi: 1, stub: false, selfTest: 'passed' })),
@@ -147,6 +148,30 @@ describe('[ONDEV-1] engineSelfCheck', () => {
     await settle();
     expect(await engineSelfCheck()).toMatchObject({ ok: true, packId: 'v7m-1' });
     expect(mockModule.engineRelease).not.toHaveBeenCalled();
+  });
+
+  it('never closes the engine under a take that started while it was opening', async () => {
+    jest.useFakeTimers();
+    try {
+      deviceConnect((() => undefined) as never);
+      const deps = (routedFeed as jest.Mock).mock.calls[0][0] as { onTakeOpen: () => void; onTakeClose: () => void };
+      mockModule.enginePackOpen.mockImplementationOnce(async () => {
+        deps.onTakeOpen();
+        mockModule.engineInfo.mockReturnValue(INFO);
+        return { ok: true, code: 0, info: INFO };
+      });
+      expect(await engineSelfCheck()).toMatchObject({ ok: true });
+      expect(mockModule.engineRelease).not.toHaveBeenCalled();
+
+      deps.onTakeClose(); // with the take over, the next check closes what it opened
+      mockModule.engineInfo.mockReturnValue(null);
+      opensWithInfo();
+      await engineSelfCheck();
+      expect(mockModule.engineRelease).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.clearAllTimers();
+      jest.useRealTimers();
+    }
   });
 
   it('reports a refused open with its code and error', async () => {

@@ -60,6 +60,8 @@ export function openEngineInfo(): EngineInfo | null {
 }
 
 let opening: Promise<void> | null = null;
+/** Takes open now, wherever they run: releasing the engine closes every take, so the self-check never does it under one. */
+let openTakes = 0;
 /** What the last open of a pack came to: the bench records its self-check, a refused open included. */
 let lastPackOpen: { packId: string; opened: { ok: boolean; code: number; error?: string; info?: string } } | null = null;
 /** A pack that didn't open this run for another reason than its data (memory, a model): not decrypted again until the next. */
@@ -126,7 +128,7 @@ export function warmEngine(): void {
 
 /**
  * The self-check of the pack on this phone, for the bench's record (ONDEV-1); null with no pack. An engine this opened
- * is closed again, so the bench's memory figures don't carry it.
+ * is closed again, so the bench's memory figures don't carry it, unless a take has started on it meanwhile.
  */
 export async function engineSelfCheck(): Promise<SelfCheck | null> {
   const m = native();
@@ -134,7 +136,7 @@ export async function engineSelfCheck(): Promise<SelfCheck | null> {
   const wasOpen = !!openEngineInfo();
   await openNow();
   const last = lastPackOpen;
-  if (!wasOpen && openEngineInfo()) await m.engineRelease?.();
+  if (!wasOpen && openTakes === 0 && openEngineInfo()) await m.engineRelease?.();
   // Damaged files say nothing about how the models run on this phone.
   return last && last.opened.code !== PACK_DAMAGED ? selfCheckFromOpen(last.opened, last.packId) : null;
 }
@@ -142,6 +144,7 @@ export async function engineSelfCheck(): Promise<SelfCheck | null> {
 export function __resetEngineForTests(): void {
   opening = null;
   lastPackOpen = null;
+  openTakes = 0;
   refusedPack = null;
 }
 
@@ -229,8 +232,14 @@ export function deviceConnect(server: LiveConnect): LiveConnect {
         later: (fn, ms) => setTimeout(fn, ms),
         cancel: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
       }),
-    onTakeOpen: speed.takeOpened,
-    onTakeClose: speed.takeClosed,
+    onTakeOpen: () => {
+      openTakes += 1;
+      speed.takeOpened();
+    },
+    onTakeClose: () => {
+      openTakes = Math.max(0, openTakes - 1);
+      speed.takeClosed();
+    },
     onPhoneEnd: (end) => {
       const info = openEngineInfo();
       const steps = speed.steps();
