@@ -1,4 +1,4 @@
-// components/revision, screens/revision and the session pieces in components/ (BulkActionsModal, EditSessionModal, WeaknessRating).
+// components/revision, screens/revision and the session pieces in components/ (EditSessionModal, WeaknessRating).
 export const revision = {
   menuTitle: 'Session',
   end: {
@@ -19,18 +19,17 @@ export const revision = {
     rateAskLabel: 'Rate Revisely',
     rateAskDismiss: "Don't ask again",
   },
-  /** The sheet that marks a session's pages in bulk. */
-  bulk: {
-    title: 'Manage pages',
-    complete: '{{done}} of {{total}} complete',
-    byJuz: 'By juz',
-    allPages: 'All pages',
+  /** A session's Pages sheet: its pages by number, to go to or mark. */
+  pages: {
+    title: 'Pages',
+    here: 'You are here',
+    hereLabel: 'Page {{n}}, you are here',
+    goTo: 'Go to page {{n}}',
+    mark: 'Mark page {{n}} as revised',
+    unmark: 'Unmark page {{n}}',
+    markAll: 'Mark all revised',
     unmarkAll: 'Unmark all',
-    markAllDone: 'Mark all done',
-    juzPages: '{{done}} of {{total}} pages',
-    juzLabel: 'Juz {{juz}}, {{done}} of {{total}} pages. Mark all done',
-    pageLabel: '{{what}}, page {{page}}',
-    pageLabelRevised: '{{what}}, page {{page}}, revised',
+    help: 'Help',
   },
   /** Editing a past session in the mushaf. */
   edit: {
@@ -60,8 +59,8 @@ export const revision = {
     loadFailed: "Couldn't load your session",
     loading: 'Loading…',
     ratePageStrength: 'Rate page strength',
-    bulk: 'Jump or mark in bulk',
-    help: 'How a session works',
+    /** Beside the page's number, once it is marked. */
+    revised: 'Revised',
     hidden: 'Hidden',
     /** "From Insights: Al-Mulk". */
     fromInsights: 'From Insights: {{what}}',

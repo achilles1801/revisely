@@ -96,6 +96,25 @@ export function surahName(sura: number): string {
   return surahNameIn(sura).split('-').join(NBHY).split(' ').join(NBSP);
 }
 
+/** The surahs pages hold, in the order the pages come. */
+export function surahsOfPages(pages: Iterable<number>, edition: MushafEditionId = getMushafEdition()): number[] {
+  const surahs = new Set<number>();
+  for (const page of pages) {
+    if (!validPage(page)) continue;
+    const last = lastVerseOfPage(page, edition).sura;
+    for (let s = firstVerseOfPage(page, edition).sura; s <= last; s++) surahs.add(s);
+  }
+  return [...surahs];
+}
+
+/**
+ * What a page holds by surah name alone, no ayah numbers: "An-Naml", "Al-Falaq and An-Nas". A session's header (Majd,
+ * Nov 23 2026: "remove the ayah count from the title -- too many numbers and most users don't care about ayah numbers").
+ */
+export function surahNamesOfPage(page: number, edition: MushafEditionId = getMushafEdition()): string {
+  return andList(surahsOfPages([page], edition).map(surahName));
+}
+
 /** A surah's name in the app's language, as written (not held together): "Al-Baqarah", «البقرة». */
 export function surahNameIn(sura: number): string {
   const surah = getSurah(sura);

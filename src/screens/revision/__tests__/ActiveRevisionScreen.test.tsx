@@ -4,7 +4,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import ActiveRevisionScreen from '../ActiveRevisionScreen';
-import { BulkActionsModal } from '../../../components/BulkActionsModal';
+import { PagesSheet } from '../../../components/revision/PagesSheet';
 import { getCurrentRevisionDay } from '../../../lib/algorithm';
 import { dateToLocalISODay } from '../../../lib/schedulePlans';
 import type { RevisionLog, User, UserPage } from '../../../types';
@@ -259,6 +259,14 @@ beforeEach(() => {
   mockRecordings = [];
 });
 
+// The Pages sheet (SESS-1) is how a page is marked by hand: its circle for the page on screen.
+const pagesSheet = () => screen.UNSAFE_getByType(PagesSheet);
+const hereIsMarked = (): boolean => pagesSheet().props.done.has(pagesSheet().props.current);
+const toggleHere = () =>
+  act(() => {
+    pagesSheet().props.onToggle(pagesSheet().props.current);
+  });
+
 describe('ActiveRevisionScreen — unchecking saved pages', () => {
   it('removes an unchecked page from today’s session on exit', async () => {
     // Everything saved already, so the screen opens on the first page (331).
@@ -266,7 +274,7 @@ describe('ActiveRevisionScreen — unchecking saved pages', () => {
     render(<ActiveRevisionScreen />);
     expect(screen.getByText(/10\/10/)).toBeTruthy();
 
-    fireEvent.press(screen.getByLabelText('Unmark current page'));
+    toggleHere();
     expect(screen.getByText(/9\/10/)).toBeTruthy();
 
     await act(async () => {
@@ -288,7 +296,7 @@ describe('ActiveRevisionScreen — unchecking saved pages', () => {
     render(<ActiveRevisionScreen />);
     // Opens on 331 (first unrevised); show the controls, mark it and leave.
     fireEvent.press(screen.getByLabelText('The page'));
-    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    toggleHere();
     await act(async () => {
       fireEvent.press(screen.getByLabelText('Back'));
     });
@@ -306,7 +314,7 @@ describe('ActiveRevisionScreen — every way out saves', () => {
     setup([332, 333]);
     const { unmount } = render(<ActiveRevisionScreen />);
     fireEvent.press(screen.getByLabelText('The page'));
-    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    toggleHere();
     expect(mockApp.addLog).not.toHaveBeenCalled();
     await act(async () => {
       unmount();
@@ -319,7 +327,7 @@ describe('ActiveRevisionScreen — every way out saves', () => {
   it('closed without Back: a saved page unchecked comes out of the session', async () => {
     const log = setup(DAY_PAGES);
     const { unmount } = render(<ActiveRevisionScreen />);
-    fireEvent.press(screen.getByLabelText('Unmark current page'));
+    toggleHere();
     await act(async () => {
       unmount();
     });
@@ -334,7 +342,7 @@ describe('ActiveRevisionScreen — every way out saves', () => {
     setup([332, 333]);
     const { unmount } = render(<ActiveRevisionScreen />);
     fireEvent.press(screen.getByLabelText('The page'));
-    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    toggleHere();
     await act(async () => {
       fireEvent.press(screen.getByLabelText('Back'));
     });
@@ -385,7 +393,7 @@ describe('ActiveRevisionScreen — reading and the controls', () => {
     expect(byTestId('reader-header').props.accessibilityElementsHidden).toBe(true);
     expect(byTestId('reader-footer').props.pointerEvents).toBe('none');
     expect(screen.getByText('331')).toBeTruthy();
-    expect(screen.queryByLabelText('Mark current page as revised')).toBeNull();
+    expect(screen.queryByLabelText('Pages')).toBeNull();
   });
 
   it('a tap on the page shows the controls; turning the page hides them', () => {
@@ -420,8 +428,8 @@ describe('ActiveRevisionScreen — reading and the controls', () => {
     setup([332, 333]);
     render(<ActiveRevisionScreen />);
     fireEvent.press(screen.getByLabelText('The page'));
-    fireEvent.press(screen.getByLabelText('Session menu'));
-    expect(screen.getByText('Jump or mark in bulk')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Pages'));
+    expect(screen.getByText('Mark all revised')).toBeTruthy();
     expect(screen.queryByText('Save and exit')).toBeNull();
     expect(screen.queryByText('End session')).toBeNull();
   });
@@ -580,7 +588,7 @@ describe('ActiveRevisionScreen — swiping off the last page', () => {
     setup([331, 332, 333, 334, 335, 336, 337, 338, 339]);
     render(<ActiveRevisionScreen />);
     await finish();
-    expect(screen.getByText(/^Al.Hajj.65–72 · Juz 17 · Hizb \d+$/)).toBeTruthy();
+    expect(screen.getByText(/^Al.Hajj · Juz 17 · Hizb \d+$/)).toBeTruthy();
     expect(screen.queryByText('Submit')).toBeNull();
     await act(async () => {
       fireEvent.press(screen.getByLabelText('Back'));
@@ -614,7 +622,7 @@ describe('ActiveRevisionScreen — the session completes on its last page', () =
     act(() => mockPager.onPageChange?.(340));
     fireEvent.press(screen.getByLabelText('The page'));
     await act(async () => {
-      fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+      toggleHere();
     });
     expect(mockApp.addLog).toHaveBeenCalledTimes(1);
     expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [340] }));
@@ -663,9 +671,9 @@ describe('ActiveRevisionScreen — the session completes on its last page', () =
       mockPager.onReachEnd?.(340, true);
     });
     act(() => mockPager.onPageChange?.(340));
-    fireEvent.press(screen.getByLabelText('Unmark current page'));
+    toggleHere();
     await act(async () => {
-      fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+      toggleHere();
     });
     expect(mockApp.addLog).toHaveBeenCalledTimes(1);
     expect(recorder.finish).toHaveBeenCalledTimes(2);
@@ -711,7 +719,7 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
 
     // One page of the next day, checked, then leave.
-    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    toggleHere();
     await act(async () => {
       unmount();
     });
@@ -738,8 +746,8 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     expect(mockPager.initialPage).toBe(DAY_PAGES[0]);
     expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
     // The same pages, to revise again: none is checked.
-    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    expect(hereIsMarked()).toBe(false);
+    toggleHere();
     await act(async () => {
       unmount();
     });
@@ -755,8 +763,8 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     mockRouteParams = { aheadDay: tomorrow(), round: true };
     const { unmount } = render(<ActiveRevisionScreen />);
     expect(mockPager.pages).toEqual(DAY_PAGES);
-    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('Mark current page as revised'));
+    expect(hereIsMarked()).toBe(false);
+    toggleHere();
     await act(async () => {
       unmount();
     });
@@ -819,17 +827,16 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     // screen is tomorrow's: its check reflects tomorrow, not today.
     expect(mockPager.initialPage).toBe(NEXT[0]);
     expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
-    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
+    expect(hereIsMarked()).toBe(false);
   });
 
-  it('in a later day’s session, mark in bulk works on that day’s pages and leaves today’s as they were', async () => {
+  it('in a later day’s session, Mark all revised works on that day’s pages and leaves today’s as they were', async () => {
     setupTwoDays(DAY_PAGES);
     mockRouteParams = { aheadDay: tomorrow() };
     const { unmount } = render(<ActiveRevisionScreen />);
-    const bulk = () => screen.UNSAFE_getByType(BulkActionsModal);
-    expect(bulk().props.pages.map((p: { pageNumber: number }) => p.pageNumber)).toEqual(NEXT);
+    expect(pagesSheet().props.pages).toEqual(NEXT);
     act(() => {
-      bulk().props.onMarkAllComplete();
+      pagesSheet().props.onMarkAll();
     });
     await act(async () => {
       unmount();
@@ -860,7 +867,7 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
     render(<ActiveRevisionScreen />);
     // The done page is not in the session: it opens on the next one, unchecked.
     expect(mockPager.initialPage).toBe(NEXT[1]);
-    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
+    expect(hereIsMarked()).toBe(false);
   });
 
   it('Keep going moves the page on screen to the next day’s first page', async () => {
@@ -870,7 +877,7 @@ describe('ActiveRevisionScreen — keep going (revise ahead, #168)', () => {
       mockPager.onReachEnd?.(340, true);
     });
     fireEvent.press(screen.getByTestId('session-end-keep-going'));
-    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
+    expect(hereIsMarked()).toBe(false);
     expect(screen.getByText(/^Revising ahead/)).toBeTruthy();
   });
 });
@@ -917,7 +924,7 @@ describe('ActiveRevisionScreen — Recite (Revisely Dev)', () => {
     expect(screen.queryByLabelText('Record your recitation')).toBeNull();
     // One eye: the bar's (the header keeps Back, the title, ✓ and ⋯).
     expect(screen.getAllByLabelText('Hide the page')).toHaveLength(1);
-    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
+    expect(hereIsMarked()).toBe(false);
   });
 
   it('[RECITE-9] holding the mic: Record, Recite and Mark mistakes, but no Test me (the reader’s)', async () => {
@@ -945,7 +952,7 @@ describe('ActiveRevisionScreen — Recite (Revisely Dev)', () => {
     await event({ type: 'at', w: words.pageRange(381)[0] + 3 });
     expect(mockPager.scrolled).toEqual([380]);
     // Nothing marked revised: page 380 isn't checked, and Back saves nothing (SESS-3).
-    expect(screen.getByLabelText('Mark current page as revised')).toBeTruthy();
+    expect(hereIsMarked()).toBe(false);
     await act(async () => {
       fireEvent.press(screen.getByLabelText('Back'));
     });

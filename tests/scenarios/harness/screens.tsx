@@ -378,13 +378,41 @@ export class Session {
     await this.app.idle(30);
   }
 
-  /** The check: marks the page on screen as revised (or unmarks it). */
+  /** The Pages sheet's circle for the page on screen, as a user reaches it: Pages, the circle, a tap outside. */
+  private async toggleHere(): Promise<void> {
+    const { fireEvent } = this.app.mods.rtl;
+    await this.openPages();
+    await this.app.act(async () => {
+      fireEvent.press(this.app.screen.getByTestId('session-pages-toggle-here'));
+    });
+    await this.closePages();
+  }
+
+  /** Opens the Pages sheet (SESS-1). */
+  async openPages(): Promise<void> {
+    await this.press('Pages');
+    await this.app.until(() => this.app.screen.queryByTestId('session-pages-toggle-here') != null, 'the Pages sheet');
+  }
+
+  /** Closes it with a tap on its backdrop. */
+  async closePages(): Promise<void> {
+    const { fireEvent } = this.app.mods.rtl;
+    await this.app.act(async () => {
+      fireEvent.press(this.app.screen.getByTestId('backdrop'));
+    });
+    await this.app.until(() => this.app.screen.queryByTestId('session-pages-toggle-here') == null, 'the Pages sheet to close');
+    await this.app.idle(30);
+  }
+
+  /** Marks the page on screen as revised, in the Pages sheet. */
   async check(): Promise<void> {
-    await this.press('Mark current page as revised');
+    if (await this.isChecked()) throw new Error('the page on screen is already marked');
+    await this.toggleHere();
   }
 
   async uncheck(): Promise<void> {
-    await this.press('Unmark current page');
+    if (!(await this.isChecked())) throw new Error('the page on screen is not marked');
+    await this.toggleHere();
   }
 
   /** A swipe to the next page (the pager's own callbacks, in its order); past the last page, the end card. */
@@ -494,12 +522,9 @@ export class Session {
     return el ? flatText(el) : '';
   }
 
-  /** Whether the page on screen is checked (its check reads "Unmark current page"). */
+  /** Whether the page on screen is marked: "Revised" beside its number, shown or waiting behind the controls. */
   async isChecked(): Promise<boolean> {
-    if (!this.app.screen.queryByLabelText('Unmark current page') && !this.app.screen.queryByLabelText('Mark current page as revised')) {
-      await this.tapPage();
-    }
-    return this.app.screen.queryByLabelText('Unmark current page') != null;
+    return this.app.screen.queryByTestId('session-page-revised', { includeHiddenElements: true }) != null;
   }
 
   /** Back to Home (the session saves as it goes). */

@@ -156,7 +156,7 @@ until its part is set up.
     screen gives it `showPage` (its pager's `scrollToPage`, false for a page it doesn't hold) and puts `bar`,
     `controls`, `activity`, `pager` and `sheets` where they go.
     - A take never marks a session's page revised: its page turns are `scrollToPage`, which never reports an advance,
-      so only a swipe or ✓ marks one (SESS-1). A take past the session's last page leaves the page where it is.
+      so only a swipe or the Pages sheet marks one (SESS-1). A take past the session's last page leaves the page where it is.
     - A place the session doesn't hold (a similar ayah, a slip's ayah, a past take) opens the reader over it
       (`navigation.push('QuranReader', …)`); Back comes back. Test me is the reader's only (`testMe: false`).
     - The old hidden recite mode (the eye at the top of a session, `reciteModeEnabled`, on-device word following and
