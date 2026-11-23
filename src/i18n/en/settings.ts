@@ -405,6 +405,12 @@ export const settings = {
     selfCheckModel: '{{model}}: largest difference {{diff}}, {{top}} of {{frames}} frames with another top sound',
     selfCheckNoModel: '{{model}}: no check in this pack',
     selfCheckNotSent: 'Not sent: {{error}}',
+    /** A Strict take of the bench's recording, at the live pace: the real engine's speed and peak memory. */
+    engineTestRunning: 'Testing a Strict take on a recording… {{done}} of {{total}} s. Stay on this screen.',
+    engineTestPreparing: 'Getting the recording for a Strict take…',
+    engineTestResult: 'Strict take: {{late}} of {{hops}} checks late, slowest {{worst}} ms, peak memory {{peak}} MB',
+    engineTestFailed: 'The Strict take didn’t finish: {{error}}',
+    engineTestLeft: 'The Strict take stopped when the screen was left. It runs again next time.',
     reading: 'Reading the list of runs…',
     readFailed: 'Couldn’t read the list of runs: {{error}}',
     /** The account lacks the team's bench access (storage.rules, the onDeviceBench claim). */

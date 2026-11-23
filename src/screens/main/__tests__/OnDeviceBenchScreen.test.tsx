@@ -32,6 +32,7 @@ const mockBench = {
   sent: [] as unknown[],
   fail: null as string | null,
   selfCheck: null as object | null,
+  engineTest: null as object | null,
 };
 
 function mockRun(plan: PlanSpec, ms: number, durationSec?: number, cadenceMs = 500): BenchRun {
@@ -87,6 +88,8 @@ jest.mock('../../../lib/onDevice/benchRun', () => {
       mockRun(plan, plan.provider === 'coreml' ? 4 : 180, length.durationSec, length.cadenceMs),
     ),
     recordSelfCheck: jest.fn(async () => mockBench.selfCheck),
+    recordEngineTest: jest.fn(async () => mockBench.engineTest),
+    benchClip: jest.fn(async () => new Int16Array(2)),
     benchRecord: (device: object, windows: number, runs: BenchRun[]) => ({ device, windows, runs: runs.map((r) => r.plan.model) }),
     sendBenchRecord: jest.fn(async (rec: unknown) => {
       mockBench.sent.push(rec);
@@ -107,6 +110,7 @@ beforeEach(() => {
   mockBench.sent = [];
   mockBench.fail = null;
   mockBench.selfCheck = null;
+  mockBench.engineTest = null;
 });
 
 describe('[ONDEV-1] Settings → Testing → On-device model', () => {
@@ -262,5 +266,20 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
     expect(screen.getByTestId('bench-self-check').props.children).toBe(
       'Self-check passed\nv7: largest difference 0.000042, 0 of 240 frames with another top sound\nv5: no check in this pack',
     );
+  });
+
+  it('shows the Strict take on the recording once the self-check has run', async () => {
+    const none = { ran: false, ok: null, maxDiff: null, topDiff: null, frames: null, notFinite: null, tol: null, prepacking: null };
+    mockBench.selfCheck = {
+      check: { ran: true, ok: true, pack: 'pack-v3', packContent: 'c7ae', packId: 'v7m-2', ort: '1.31.1', openCode: null, openError: null, v5: none, v7: none },
+      sendError: null,
+    };
+    mockBench.engineTest = {
+      run: { mode: 'engineTest', level: 'strict', ok: true, error: null, interrupted: false, hops: 180, lateHops: 2, worstHopMs: 310, peakAfterMb: 412.4 },
+      sendError: null,
+    };
+    await show();
+    await act(async () => {});
+    expect(screen.getByTestId('bench-engine-test').props.children).toBe('Strict take: 2 of 180 checks late, slowest 310 ms, peak memory 412 MB');
   });
 });

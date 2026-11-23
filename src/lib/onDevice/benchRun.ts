@@ -31,6 +31,7 @@ import {
   type PlanSpec,
   type RunSummary,
 } from './bench';
+import type { EngineTestRun } from './engineTest';
 import { selfCheckRun, type SelfCheck } from './selfCheck';
 
 export const MANIFEST_PATH = 'models/recite/bench.json';
@@ -313,12 +314,20 @@ export function selfCheckRecord(device: DeviceInfo, check: SelfCheck) {
   return { ...benchRecord(device, 1, []), runs: [selfCheckRun(check)] };
 }
 
-export async function sendBenchRecord(record: BenchRecord | ReturnType<typeof selfCheckRecord>): Promise<string> {
+/** A record of the Strict take on a recording (engineTest.ts), as a run entry of its own. */
+export function engineTestRecord(device: DeviceInfo, run: EngineTestRun) {
+  return { ...benchRecord(device, 1, []), runs: [run] };
+}
+
+export async function sendBenchRecord(
+  record: BenchRecord | ReturnType<typeof selfCheckRecord> | ReturnType<typeof engineTestRecord>,
+): Promise<string> {
   const ref = await addDoc(collection(db, 'onDeviceBench'), { ...record, createdAt: serverTimestamp() });
   return ref.id;
 }
 
 const SELF_CHECK_SENT = '@revisely_bench_self_check_sent';
+const ENGINE_TEST_DONE = '@revisely_bench_engine_test';
 
 export interface SelfCheckResult {
   check: SelfCheck;
@@ -341,5 +350,56 @@ export async function recordSelfCheck(device: DeviceInfo): Promise<SelfCheckResu
   } catch (err) {
     logger.warn('Self-check record not sent', err);
     return { check, sendError: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** A file of 16-bit little-endian samples. */
+export function readPcm(uri: string): Int16Array {
+  const b = new File(uri).bytesSync();
+  const whole = b.byteLength - (b.byteLength % 2);
+  return b.byteOffset % 2 === 0 ? new Int16Array(b.buffer, b.byteOffset, whole / 2) : new Int16Array(b.slice(0, whole).buffer);
+}
+
+/** The bench's recording, downloaded and checked if it isn't here yet. */
+export async function benchClip(engine: Engine, manifest: BenchManifest): Promise<Int16Array> {
+  const files = await ensureFiles(engine, manifest, [], () => undefined);
+  return readPcm(files[manifest.audio]);
+}
+
+export interface EngineTestResult {
+  run: EngineTestRun;
+  sendError: string | null;
+}
+
+/**
+ * The Strict take on a recording, once per pack and app update: later visits show the saved result. A take cut short by
+ * leaving the screen is neither sent nor saved, so the next visit runs it again. Null with no real engine.
+ */
+export async function recordEngineTest(
+  device: DeviceInfo,
+  packId: string,
+  readClip: () => Promise<Int16Array>,
+  keepGoing: () => boolean,
+  onProgress: (doneSec: number, totalSec: number) => void,
+): Promise<EngineTestResult | null> {
+  const release = currentRelease();
+  const key = [packId, release.build ?? '', release.updateId ?? ''].join('|');
+  try {
+    const saved = JSON.parse((await AsyncStorage.getItem(ENGINE_TEST_DONE)) ?? 'null') as { key?: string; run?: EngineTestRun } | null;
+    if (saved?.key === key && saved.run) return { run: saved.run, sendError: null };
+  } catch {
+    // run it again
+  }
+  const { engineStrictTest } = require('./engine') as typeof import('./engine');
+  const run = await engineStrictTest(await readClip(), keepGoing, onProgress);
+  if (!run) return null;
+  if (run.interrupted) return { run, sendError: null };
+  try {
+    await sendBenchRecord(engineTestRecord(device, run));
+    await AsyncStorage.setItem(ENGINE_TEST_DONE, JSON.stringify({ key, run }));
+    return { run, sendError: null };
+  } catch (err) {
+    logger.warn('Engine test record not sent', err);
+    return { run, sendError: err instanceof Error ? err.message : String(err) };
   }
 }

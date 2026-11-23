@@ -14,13 +14,16 @@ import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
 import { checkVerdict, longVerdict, planKey, type BenchManifest, type PlanSpec, type Provider } from '../../lib/onDevice/bench';
 import {
   benchEngine,
+  benchClip,
   benchRecord,
   ensureFiles,
   platformPlans,
   readManifest,
   runPlan,
+  recordEngineTest,
   recordSelfCheck,
   sendBenchRecord,
+  type EngineTestResult,
   type SelfCheckResult,
   type BenchRun,
 } from '../../lib/onDevice/benchRun';
@@ -96,6 +99,20 @@ function selfCheckText({ check, sendError }: SelfCheckResult): string {
   return lines.join('\n');
 }
 
+function engineTestText({ run, sendError }: EngineTestResult): string {
+  const line = run.interrupted
+    ? t('settings.bench.engineTestLeft')
+    : run.ok
+      ? t('settings.bench.engineTestResult', {
+          late: run.lateHops ?? '–',
+          hops: run.hops ?? '–',
+          worst: run.worstHopMs ?? '–',
+          peak: run.peakAfterMb > 0 ? fixed(run.peakAfterMb) : '–',
+        })
+      : t('settings.bench.engineTestFailed', { error: run.error ?? '' });
+  return sendError ? `${line}\n${t('settings.bench.selfCheckNotSent', { error: sendError })}` : line;
+}
+
 /**
  * Settings → Testing → On-device model (Revisely Dev; BEHAVIOUR.md ONDEV-1): times Recite's model on this phone, run by
  * run (a model, a provider, a thread count) from the dev backend's list, each checked on the checker's own output
@@ -122,10 +139,14 @@ export default function OnDeviceBenchScreen() {
   // The engine's self-check runs as the screen opens; the runs wait for it, so their memory figures don't carry the engine.
   const [checking, setChecking] = useState(!!engine && !!device);
   const [selfCheck, setSelfCheck] = useState<SelfCheckResult | null>(null);
+  // Then a Strict take of the recording, once per pack and app update; the runs wait for that too.
+  const [testing, setTesting] = useState<{ done: number; total: number } | null>(null);
+  const [engineTest, setEngineTest] = useState<EngineTestResult | null>(null);
+  const testStarted = useRef(false);
   const live = useRef(true);
   const busy = status.kind === 'downloading' || status.kind === 'running' || status.kind === 'sending';
-  const locked = busy || checking;
-  useKeepScreenOn(busy);
+  const locked = busy || checking || testing !== null;
+  useKeepScreenOn(busy || testing !== null);
 
   const load = useCallback(() => {
     setReadError(null);
@@ -157,6 +178,23 @@ export default function OnDeviceBenchScreen() {
       on = false;
     };
   }, [device]);
+
+  const packId = selfCheck?.check.openCode === null ? selfCheck.check.packId : null;
+  useEffect(() => {
+    if (!engine || !device || !manifest || !packId || testStarted.current) return;
+    testStarted.current = true;
+    setTesting({ done: 0, total: 0 });
+    recordEngineTest(device, packId, () => benchClip(engine, manifest), () => live.current, (done, total) => {
+      if (live.current) setTesting({ done, total });
+    })
+      .then((r) => {
+        if (live.current) setEngineTest(r);
+      })
+      .catch((err) => logger.warn('Engine test failed', err))
+      .finally(() => {
+        if (live.current) setTesting(null);
+      });
+  }, [engine, device, manifest, packId]);
 
   const plans = manifest ? platformPlans(manifest) : [];
   const chosen = plans.filter((p) => !off.has(planKey(p)));
@@ -263,6 +301,15 @@ export default function OnDeviceBenchScreen() {
             {checking || selfCheck ? (
               <Text style={[typeV2.meta, styles.note, { color: palette.secondary }]} testID="bench-self-check">
                 {selfCheck ? selfCheckText(selfCheck) : t('settings.bench.selfCheckRunning')}
+              </Text>
+            ) : null}
+            {testing || engineTest ? (
+              <Text style={[typeV2.meta, styles.note, { color: palette.secondary }]} testID="bench-engine-test">
+                {testing
+                  ? testing.total > 0
+                    ? t('settings.bench.engineTestRunning', { done: testing.done, total: testing.total })
+                    : t('settings.bench.engineTestPreparing')
+                  : engineTestText(engineTest!)}
               </Text>
             ) : null}
             {readError ? (

@@ -1641,7 +1641,10 @@ shows up once and they must go through it and complete it … just the main stuf
   failed. With Recite's pack on the phone it opens the engine once, shows the load-time self-check (for each of v7 and v5,
   the largest difference and the frames with another top sound), closes the engine before any run so the runs' memory
   doesn't carry it, and sends the result once per pack and app update, a failed check or a refused open included, with
-  the pack's id, the chip, ONNX Runtime's version and whether each model loaded with prepacking. It lists this platform's runs from the dev
+  the pack's id, the chip, ONNX Runtime's version and whether each model loaded with prepacking. With the real engine it
+  then runs one Strict take of the bench's recording at the live pace, with the runs locked until it ends, and shows and
+  sends how many checks ran late, the slowest, and the app's peak memory, once per pack and app update; leaving the
+  screen stops it, sends nothing, and it runs again next time. It lists this platform's runs from the dev
   backend (each a model file, a processor (CPU, Core ML, XNNPACK or NNAPI) and a thread count; all chosen, any left
   out), downloads what the chosen runs need once (only for accounts the team has given bench access: Revisely Dev is open
   to anyone with its link; the models are the watermarked ones; each file checked by size and SHA-256, kept on the

@@ -16,7 +16,8 @@ jest.mock('../../variant', () => ({ isDevVariant: () => true }));
 jest.mock('../../../../modules/recitation-audio', () => ({ __esModule: true, default: null }));
 jest.mock('../../../../modules-dev/recite-engine', () => ({ __esModule: true, default: null }));
 const mockSelfCheck = jest.fn();
-jest.mock('../engine', () => ({ engineSelfCheck: () => mockSelfCheck() }));
+const mockStrict = jest.fn();
+jest.mock('../engine', () => ({ engineSelfCheck: () => mockSelfCheck(), engineStrictTest: (...a: unknown[]) => mockStrict(...a) }));
 const mockStored = new Map<string, string>();
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
@@ -27,7 +28,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import { addDoc } from 'firebase/firestore';
-import { benchRecord, recordSelfCheck, runPlan } from '../benchRun';
+import { benchRecord, recordEngineTest, recordSelfCheck, runPlan } from '../benchRun';
 import { benchRunning } from '../benchBusy';
 import { selfCheckFromFailedOpen, selfCheckFromInfo } from '../selfCheck';
 
@@ -154,6 +155,55 @@ describe('[ONDEV-1] the self-check’s record', () => {
   it('sends nothing with no pack on the phone', async () => {
     mockSelfCheck.mockResolvedValue(null);
     expect(await recordSelfCheck(device)).toBeNull();
+    expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe('[ONDEV-1] the Strict take’s record', () => {
+  const device = { platform: 'ios', model: 'iPhone19,3', os: '26.1', cores: 6, memoryMb: 8192, thermal: 'nominal' } as never;
+  const finished = { mode: 'engineTest', ok: true, interrupted: false, hops: 180, lateHops: 0, peakAfterMb: 400 };
+  const send = addDoc as unknown as jest.Mock;
+  const clip = jest.fn(async () => new Int16Array(4));
+  const test = (pack = 'v7m-2') => recordEngineTest(device, pack, clip, () => true, () => undefined);
+
+  beforeEach(() => {
+    mockStored.clear();
+    send.mockReset();
+    send.mockResolvedValue({ id: 'r' });
+    clip.mockClear();
+    mockStrict.mockReset();
+    mockStrict.mockResolvedValue(finished);
+  });
+
+  it('runs and sends once per pack and app update, then shows the saved result', async () => {
+    expect((await test())?.run).toEqual(finished);
+    expect((await test())?.run).toEqual(finished);
+    expect(mockStrict).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][1]).toMatchObject({ windows: 1, runs: [{ mode: 'engineTest', hops: 180 }] });
+    await test('v7m-3');
+    expect(mockStrict).toHaveBeenCalledTimes(2);
+  });
+
+  it('a take cut short is neither sent nor saved, so the next visit runs it again', async () => {
+    mockStrict.mockResolvedValueOnce({ ...finished, ok: false, interrupted: true });
+    expect((await test())?.run.interrupted).toBe(true);
+    expect(send).not.toHaveBeenCalled();
+    await test();
+    expect(mockStrict).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('a record that didn’t send is tried again with a new run', async () => {
+    send.mockRejectedValueOnce(new Error('offline'));
+    expect((await test())?.sendError).toBe('offline');
+    await test();
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it('has nothing to show without a real engine', async () => {
+    mockStrict.mockResolvedValue(null);
+    expect(await test()).toBeNull();
     expect(send).not.toHaveBeenCalled();
   });
 });

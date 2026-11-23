@@ -13,7 +13,7 @@ import type { LiveConnect, StartFrame } from '../reciteLive/feed';
 import type { EngineBridge } from '../reciteLive/localFeed';
 import { clipSender } from '../reciteLive/clipSender';
 import { routedFeed } from '../reciteLive/route';
-import { chooseWhere, EngineInfo, parseEngineInfo, WhereAnswer } from '../reciteLive/where';
+import { chooseWhere, EngineInfo, isReplayEngine, parseEngineInfo, WhereAnswer } from '../reciteLive/where';
 import { reciteWhere } from '../reciteLive/whereSettings';
 import { benchRunning } from './benchBusy';
 import { speedKeeper } from './speedCheck';
@@ -22,6 +22,7 @@ import { logger } from '../logger';
 import { knownOffline } from '../networkState';
 import { isDevVariant } from '../variant';
 import { coreLine } from './coreInfo';
+import { runEngineTest, type EngineTestRun } from './engineTest';
 import { selfCheckFromOpen, type SelfCheck } from './selfCheck';
 
 type EngineModule = typeof import('../../../modules-dev/recite-engine');
@@ -141,6 +142,46 @@ export async function engineSelfCheck(): Promise<SelfCheck | null> {
   if (!wasOpen && openTakes === 0 && openEngineInfo()) await m.engineRelease?.();
   // Damaged files say nothing about how the models run on this phone.
   return last && last.opened.code !== PACK_DAMAGED ? selfCheckFromOpen(last.opened, last.packId) : null;
+}
+
+/**
+ * A Strict take of a recording on this phone's real engine, for the bench (engineTest.ts); null with no real engine, or
+ * with a take already running. It counts as a take, so the speed check stays out of it, and an engine this opened closes
+ * again afterwards.
+ */
+export async function engineStrictTest(
+  pcm: Int16Array,
+  keepGoing: () => boolean,
+  onProgress?: (doneSec: number, totalSec: number) => void,
+): Promise<EngineTestRun | null> {
+  const m = native();
+  const bridge = engineBridge();
+  if (!m || !bridge || openTakes > 0) return null;
+  const wasOpen = !!openEngineInfo();
+  await openNow();
+  const info = openEngineInfo();
+  if (!info || isReplayEngine(info) || openTakes > 0) {
+    if (!wasOpen && openTakes === 0 && info) await m.engineRelease?.();
+    return null;
+  }
+  openTakes += 1;
+  speed.takeOpened();
+  try {
+    return await runEngineTest({
+      bridge,
+      pcm,
+      hop: info.hop ?? null,
+      peakMb: () => m.memoryPeakMb?.() ?? 0,
+      now: () => Date.now(),
+      sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+      keepGoing: () => AppState.currentState === 'active' && keepGoing(),
+      onProgress,
+    });
+  } finally {
+    openTakes = Math.max(0, openTakes - 1);
+    speed.takeClosed();
+    if (!wasOpen && openTakes === 0 && openEngineInfo()) await m.engineRelease?.();
+  }
 }
 
 export function __resetEngineForTests(): void {
