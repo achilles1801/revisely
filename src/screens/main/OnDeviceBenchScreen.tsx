@@ -11,7 +11,7 @@ import { PillTabs } from '../../components/v2/PillTabs';
 import { GroupedSection } from '../../components/plan/Grouped';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
-import { checkVerdict, longVerdict, planKey, type BenchManifest, type PlanSpec, type Provider } from '../../lib/onDevice/bench';
+import { GATE_P95_MS, checkVerdict, longVerdict, planKey, type BenchManifest, type PlanSpec, type Provider } from '../../lib/onDevice/bench';
 import {
   benchEngine,
   benchClip,
@@ -110,7 +110,10 @@ function engineTestText({ run, sendError }: EngineTestResult): string {
           peak: run.peakAfterMb > 0 ? fixed(run.peakAfterMb) : '–',
         })
       : t('settings.bench.engineTestFailed', { error: run.error ?? '' });
-  return sendError ? `${line}\n${t('settings.bench.selfCheckNotSent', { error: sendError })}` : line;
+  const lines: string[] = [line];
+  if (run.ok && run.wouldStepDown) lines.push(t('settings.bench.engineTestStepDown'));
+  if (sendError) lines.push(t('settings.bench.selfCheckNotSent', { error: sendError }));
+  return lines.join('\n');
 }
 
 /**
@@ -443,7 +446,7 @@ function RunCard({ run, manifest }: { run: BenchRun; manifest: BenchManifest }) 
   } else {
     lines.push(
       t('settings.bench.model', { p50: fixed(summary.runP50, 1), p90: fixed(summary.runP90, 1), p95: fixed(summary.runP95, 1), max: fixed(summary.runMax, 1) }),
-      summary.underGate ? t('settings.bench.gateUnder') : t('settings.bench.gateOver'),
+      summary.underGate ? t('settings.bench.gateUnder', { ms: GATE_P95_MS }) : t('settings.bench.gateOver', { ms: GATE_P95_MS }),
       t('settings.bench.features', { ms: fixed(summary.featureP50, 1), factor: fixed(summary.realTime, 2) }),
       t('settings.bench.load', { load: fixed(result.loadMs / 1000, 1), again: fixed(result.reloadMs / 1000, 1), first: fixed(result.firstRunMs) }),
       t('settings.bench.memory', { loaded: fixed(result.memoryLoadedMb), added: fixed(result.memoryLoadedMb - result.memoryBeforeMb) }),

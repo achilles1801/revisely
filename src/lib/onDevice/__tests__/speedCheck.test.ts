@@ -43,9 +43,10 @@ function phone(times: number[] | ((i: number) => number), over: Partial<SpeedDep
 describe('hopFor', () => {
   it.each([
     [71, 0.5],
-    [149.9, 0.5],
-    [150, 1],
-    [228, 1],
+    [168, 0.5],
+    [249.9, 0.5],
+    [250, 1],
+    [334, 1],
     [400, 1],
     [400.1, null],
     [650, null],
@@ -84,9 +85,9 @@ describe('[ONDEV-4] runSpeedCheck', () => {
   });
 
   it('warms up past a slow start', async () => {
-    const p = phone((i) => (i < 12 ? 420 : 220));
+    const p = phone((i) => (i < 12 ? 420 : 300));
     const r = await runSpeedCheck(p.deps);
-    expect(r).toMatchObject({ kept: true, p95: 220, hop: 1 });
+    expect(r).toMatchObject({ kept: true, p95: 300, hop: 1 });
   });
 
   it('a phone that never settles keeps no result', async () => {
@@ -96,9 +97,9 @@ describe('[ONDEV-4] runSpeedCheck', () => {
   });
 
   it('a high first reading is timed three more times, and the last block decides', async () => {
-    // Settled in its warm-up at 450, 450 for two blocks, then 230.
-    const p = phone((i) => (i < 12 + 48 ? 450 : 230));
-    expect(await runSpeedCheck(p.deps)).toEqual({ kept: true, p95: 230, hop: 1, calls: 12 + 96 });
+    // Settled in its warm-up at 450, 450 for two blocks, then 300.
+    const p = phone((i) => (i < 12 + 48 ? 450 : 300));
+    expect(await runSpeedCheck(p.deps)).toEqual({ kept: true, p95: 300, hop: 1, calls: 12 + 96 });
   });
 
   it('one lucky block among high ones does not clear a slow phone', async () => {
@@ -157,7 +158,7 @@ describe('what is kept', () => {
   });
 
   it('reads a stored result back, and nothing else', () => {
-    expect(parseSpeedRecord(JSON.stringify({ key: 'k', p95: 228, hop: 0.5 }))).toEqual({ key: 'k', p95: 228, hop: 1 });
+    expect(parseSpeedRecord(JSON.stringify({ key: 'k', p95: 300, hop: 0.5 }))).toEqual({ key: 'k', p95: 300, hop: 1 });
     expect(parseSpeedRecord('not json')).toBeNull();
     expect(parseSpeedRecord(JSON.stringify({ key: 'k' }))).toBeNull();
     expect(parseSpeedRecord(JSON.stringify({ key: 'k', p95: -1 }))).toBeNull();
@@ -321,7 +322,7 @@ describe('[ONDEV-4] speedKeeper', () => {
   });
 
   it('a phone measured at 1 s reopens the engine at that hop, once', async () => {
-    const t = setup({}, 220);
+    const t = setup({}, 300);
     t.k.schedule();
     await t.idle();
     expect(t.k.hop()).toBe(1);

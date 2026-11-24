@@ -191,8 +191,12 @@ function median(values: readonly number[]): number {
   return quantile([...values].sort((a, b) => a - b), 0.5);
 }
 
-/** The plan's gate (on-device-plan.md §15): one model call under about 150 ms at p95 on the phone. */
-export const GATE_P95_MS = 150;
+/**
+ * One model call under half a hop at p95 keeps a phone on the 0.5 s hop (the lead, Nov 24 2026). It was 150 ms, a guess from
+ * before any phone had run 20 minutes; a Nothing Phone (4a) Pro then held 168 ms for 20 minutes at 36% of each hop, with no
+ * late window, no drift and no heat. A take that falls behind still steps down (speedCheck `fellBehind`).
+ */
+export const GATE_P95_MS = 250;
 
 export interface RunSummary {
   windows: number;

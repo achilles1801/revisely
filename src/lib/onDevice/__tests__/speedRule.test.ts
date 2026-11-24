@@ -61,11 +61,17 @@ describe('[ONDEV-4] the speed check on real runs, scaled around the 400 ms line'
     expect({ good, slow, goodSent, slowKept }).toEqual({ good: 48, slow: 48, goodSent: 1, slowKept: 6 });
   });
 
-  it('reads every unscaled run on the hop its settled speed calls for', async () => {
+  it('reads the unscaled runs on their settled hop, and a noisy one only ever on the slower hop', async () => {
+    const slower: string[] = [];
     for (const r of runs) {
       const reading = await readingOn(r.calls);
       const settled = settledP95(r.calls);
-      expect([r.device, r.run, reading.hop]).toEqual([r.device, r.run, settled > SPEED.serverOverMs ? null : settled < SPEED.halfHopUnderMs ? 0.5 : 1]);
+      const hop = settled > SPEED.serverOverMs ? null : settled < SPEED.halfHopUnderMs ? 0.5 : 1;
+      if (reading.hop === hop) continue;
+      expect([hop, reading.hop]).toEqual([0.5, 1]);
+      slower.push(`${r.device}/${r.run}`);
     }
+    // This A15 run settles at 228 ms, but its first timed block reads 348: it takes the 1 s hop, on the phone.
+    expect(slower).toEqual(['SM-A155M/0']);
   });
 });

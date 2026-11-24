@@ -5,6 +5,7 @@
 
 import type { StartFrame } from '../reciteLive/feed';
 import type { EngineBridge } from '../reciteLive/localFeed';
+import { fellBehind } from './speedCheck';
 
 /** Strict, anywhere on page 7 of the mushaf (2:38–2:48 in both prints), where the clip is. */
 export const TEST_START: StartFrame = {
@@ -57,6 +58,8 @@ export interface EngineTestRun {
   lateHops: number | null;
   worstHopMs: number | null;
   maxLagS: number | null;
+  /** The in-take safety net's own rule on this take. The test changes nothing: a real take would step down next time. */
+  wouldStepDown: boolean;
   thermalStart: number | null;
   thermalEnd: number | null;
   peakBeforeMb: number;
@@ -163,6 +166,7 @@ export async function runEngineTest(d: EngineTestDeps): Promise<EngineTestRun> {
     lateHops: num(m.late_hops),
     worstHopMs: num(m.worst_hop_ms),
     maxLagS: num(m.max_lag_s),
+    wouldStepDown: fellBehind(meter),
     thermalStart: num(m.thermal_start),
     thermalEnd: num(m.thermal_end),
     peakBeforeMb: round(peakBeforeMb),
