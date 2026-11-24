@@ -77,7 +77,9 @@ it('[RMEM-5] [RMEM-6] after Reset my data, a take on Thursday evening is in Over
   await app.act(async () => nav(app).current.navigate('Activity'));
   await app.until(() => app.screen.queryByTestId('preview-row-recited') != null, 'Thursday’s Recited row in the preview');
   const value = String(app.screen.getByTestId('preview-value-recited').props.children);
-  expect(value).toMatch(/^Yusuf.* · 1 take$/);
+  // Revisely Dev's day entry (ACT-34): the place, then how many.
+  expect(value).toMatch(/^Yusuf/);
+  expect(String(app.screen.getByTestId('preview-tail-recited').props.children)).toContain('1 take');
   // The take from before the reset went with it, on this phone too, once the phone knows of the reset; Thursday's stays.
   const store = app.mods.require<typeof import('../../../src/lib/reciteMemory/store')>('src/lib/reciteMemory/store');
   await app.until(() => store.memoryRecords(app.uid).map((r) => r.id).join() === 'take-thu', 'only Thursday’s take on the phone');
@@ -85,7 +87,7 @@ it('[RMEM-5] [RMEM-6] after Reset my data, a take on Thursday evening is in Over
   // The row opens Thursday at its takes: the take itself, with its time, length, mistakes and Not clear.
   await tap(app, 'preview-row-recited');
   await app.until(() => nav(app).current.getCurrentRoute()?.name === 'ActivityDay', 'Thursday');
-  expect(nav(app).current.getCurrentRoute()?.params).toMatchObject({ date: '2026-11-19', focusBlock: 'recited' });
+  expect(nav(app).current.getCurrentRoute()?.params).toMatchObject({ date: '2026-11-19' });
   await app.until(() => app.screen.queryByTestId('activity-take-head') != null, 'the take, in the day');
   expect(app.screen.getByTestId('activity-take-line').props.children).toBe('9:41 PM · 4 min · 1 mistake · 2 not clear · page hidden');
   expect(app.screen.getByTestId('activity-take-score').props.children).toBe('99.0%');

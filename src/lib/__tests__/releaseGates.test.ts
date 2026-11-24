@@ -23,6 +23,19 @@ jest.mock('../recite/micSource', () => ({ isMicStreamAvailable: () => true }));
 const APP_STORE = [{}, { previewTester: false }] as const;
 const TESTER = { previewTester: true };
 
+describe('the journal’s new look: one switch (ACT-33, ACT-34, HOME-2)', () => {
+  const { journalDesignEnabled, JOURNAL_DESIGN_RELEASED, setJournalDesignReleasedForTests } =
+    require('../release/journalDesign') as typeof import('../release/journalDesign');
+  afterEach(() => setJournalDesignReleasedForTests(undefined));
+
+  it('[ACT-33] [ACT-34] [HOME-2] is Revisely Dev’s until released, then everyone’s', () => {
+    expect(JOURNAL_DESIGN_RELEASED).toBe(false);
+    expect(journalDesignEnabled()).toBe(false);
+    setJournalDesignReleasedForTests(true);
+    expect(journalDesignEnabled()).toBe(true);
+  });
+});
+
 describe('everyone’s from the November 2026 release', () => {
   it.each(APP_STORE)('[ACT-2] [ACT-3] the Activity blocks, for %o', (user) => {
     expect(activityBlocksEnabled(user)).toBe(true);

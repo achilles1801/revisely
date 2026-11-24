@@ -45,6 +45,8 @@ import { HEADER_MAX_SCALE, TodayPost, memorizedText } from '../../components/hom
 import { SessionPost } from '../../components/home/feed/SessionPost';
 import { KahfPost } from '../../components/home/feed/KahfPost';
 import { RecentSection } from '../../components/activity/ActivityItemRow';
+import { TodayJournalRow } from '../../components/home/feed/TodayJournalRow';
+import { useJournalDesign } from '../../lib/release/journalDesign';
 import { RunningTimerChip } from '../../components/timer/RunningTimerChip';
 import { HeroGlow } from '../../components/v2/HeroGlow';
 import { RamadanHome, WithCrescent } from '../../components/ramadan';
@@ -104,6 +106,7 @@ export default function DashboardScreen() {
   const { user, pages, logs, addLog, updateLog, deleteLog, loadData, error, saveUser, pendingChanges } = useApp();
   const { firebaseUser } = useAuth();
   const { day: revisionDay, date: revisionDate } = useRevisionDay(user);
+  const journalDesign = useJournalDesign();
 
   const homePrefs = useHomePrefs();
   // Room for the tab bar (and the mini player) and for Revo's button.
@@ -598,6 +601,10 @@ export default function DashboardScreen() {
           }
           help={<HelpButton screen="home" size={20} color={palette.secondary} maxFontSizeMultiplier={HEADER_MAX_SCALE} />}
         />
+
+        {journalDesign ? (
+          <TodayJournalRow day={revisionDay} onOpen={() => navigation.navigate('ActivityDay', { date: revisionDay })} />
+        ) : null}
 
         {showKahfCard && (
           <KahfPost

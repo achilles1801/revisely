@@ -112,6 +112,12 @@ export function legacyJournalNotes(
   return [{ id: LEGACY_NOTE_ID, at, kind, text, minutes: minutesSum }];
 }
 
+/** The day's first note with words in it, on one line; null without one. */
+export function firstNoteText(entry: JournalEntry | null | undefined): string | null {
+  const note = (entry?.entries ?? []).find((n) => n.kind === 'note' && n.text.trim() !== '');
+  return note ? note.text.trim().replace(/\s+/g, ' ') : null;
+}
+
 export function isJournalNoteEmpty(note: JournalNote): boolean {
   return note.text.trim() === '' && note.minutes == null;
 }

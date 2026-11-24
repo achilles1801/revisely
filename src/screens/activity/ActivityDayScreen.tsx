@@ -173,6 +173,16 @@ export default function ActivityDayScreen() {
   const [timedMenu, setTimedMenu] = useState<ReadingSession | null>(null);
   // The + (blocks): add to this day (mock d5).
   const [addOpen, setAddOpen] = useState(false);
+  // The day entry's Add a note (ACT-34): the Note sheet at once, whichever day it is, once the screen has come in.
+  const [noteFirst, setNoteFirst] = useState(false);
+  const addNote = route.params.addNote;
+  useEffect(() => {
+    if (!addNote) return;
+    navigation.setParams({ addNote: undefined });
+    setNoteFirst(true);
+    const opening = setTimeout(() => setAddOpen(true), 350);
+    return () => clearTimeout(opening);
+  }, [addNote, navigation]);
 
   // Only the newest load's answer is shown: loads overlap when a note joins the outbox and then
   // reaches the server, and an older read could land last without it.
@@ -645,13 +655,16 @@ export default function ActivityDayScreen() {
       {blocks && (
         <AddToDaySheet
           visible={addOpen}
-          onClose={() => setAddOpen(false)}
+          onClose={() => {
+            setAddOpen(false);
+            setNoteFirst(false);
+          }}
           day={date}
           dayName={date === today ? 'today' : date === previousIsoDay(today) ? 'yesterday' : heading.title}
           logs={logs}
           // Today and yesterday take Revised elsewhere, Memorized and a note; an older day only a
           // note, so its history and the streak can't be rewritten (ACT-17).
-          noteOnly={date !== today && date !== previousIsoDay(today)}
+          noteOnly={noteFirst || (date !== today && date !== previousIsoDay(today))}
           noteCount={shownNotes.length}
         />
       )}

@@ -363,6 +363,16 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
  */
 export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   {
+    title: 'Revised elsewhere, a day’s entry and Today’s journal',
+    covers: ['ACT-33', 'ACT-34', 'HOME-2'],
+    routes: ['Dashboard', 'Activity'],
+    text: lines(
+      '- A day’s + → “Revised elsewhere”: a search for a surah or juz above the 30 juz. A tap chooses a juz; a hold opens it for its halves or parts. Extra pages never change the day’s schedule.',
+      '- Under Overview’s calendar, the picked day is one entry: tap it to open the day, or “Add a note” to write one.',
+      '- Home: the “Today’s journal” row under Today opens today’s journal.',
+    ),
+  },
+  {
     // The Memorized picker (Majd, Nov 23 2026): Revisely Dev until it ships.
     title: 'Choosing what you memorized on the page',
     covers: ['MEM-8'],

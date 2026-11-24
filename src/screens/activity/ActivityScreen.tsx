@@ -32,7 +32,7 @@ import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { buildActivityDays } from '../../lib/activity';
-import { journalFirstDay, shiftDay } from '../../lib/journal';
+import { firstNoteText, journalFirstDay, shiftDay } from '../../lib/journal';
 import { addToPlanParams, firstTomorrowPages, putFirstTomorrow } from '../../lib/weakSpotActions';
 import { revisablePages } from '../../lib/memorizedAyahs';
 import { describePassage } from '../../lib/passages';
@@ -125,6 +125,9 @@ export default function ActivityScreen() {
     () => new Set((journal ?? []).filter((d) => d.entries.some((n) => n.kind === 'note' && n.text.trim() !== '')).map((d) => d.date)),
     [journal],
   );
+  // Each day's note, for its entry under the calendar (ACT-34).
+  const noteTexts = useMemo(() => new Map((journal ?? []).map((d) => [d.date, firstNoteText(d)])), [journal]);
+  const noteOf = useCallback((day: string) => noteTexts.get(day) ?? null, [noteTexts]);
   const blocks = activityBlocksEnabled(user);
   const [view, setView] = useState<ViewKind>('calendar');
   // Revo opened from here starts on the tab on show (REVO-38).
@@ -179,6 +182,8 @@ export default function ActivityScreen() {
             <ActivityBlocksViews
               today={today}
               noteDays={noteDays}
+              noteOf={noteOf}
+              onAddNote={(date) => navigation.navigate('ActivityDay', { date, addNote: true })}
               onOpenDay={openDay}
               onReviseTomorrow={reviseTomorrow}
               firstTomorrow={firstTomorrow}

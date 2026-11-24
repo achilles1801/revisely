@@ -182,6 +182,9 @@ export const activity = {
     zeroMin: '0 min',
     note: 'Note',
     openTheDay: 'Open the day',
+    /** A day's entry under the calendar (ACT-34). */
+    entryAddNote: 'Add a note',
+    entryNothing: 'Nothing logged this day.',
     open: 'Open',
     week: 'Week',
     month: 'Month',
@@ -367,6 +370,37 @@ export const activity = {
     addOther: 'Add other pages',
     otherPages: 'Other memorized pages',
     otherNone: 'No memorized pages left to log here.',
+  },
+  /** Revised elsewhere's search and juz grid (ACT-33). */
+  picker: {
+    search: 'Search a surah or juz',
+    clearSearch: 'Clear the search',
+    orTap: 'Or tap a juz · hold for part of it',
+    holdAction: 'Choose part of it',
+    noResults: 'Nothing memorized to log there.',
+    nothing: 'Nothing chosen yet',
+    /** {{day}}: "today" or "yesterday". */
+    neverChanges: 'Extra pages never change {{day}}’s {{due}}',
+    stays: '{{pages}} · {{day}} stays {{done}} of {{due}}',
+    becomes: '{{pages}} · {{day}} becomes {{done}} of {{due}}',
+    addPages: 'Add {{pages}}',
+    allJuz: 'All juz',
+    firstHalf: 'First half',
+    secondHalf: 'Second half',
+    wholeJuz: 'Whole juz',
+    halfOf: 'half of Juz {{n}}',
+    partOf: 'part of Juz {{n}}',
+    partOfJuz: 'Part of Juz {{n}}',
+    firstHalfOf: 'First half of Juz {{n}}',
+    secondHalfOf: 'Second half of Juz {{n}}',
+    hizbDetail: '{{pages}} · Hizb {{n}}',
+    surahDetail: 'Surah · {{pages}}',
+    juzHas: 'Has {{name}}’s {{part}}',
+    juzHasAll: 'Has all of {{name}}',
+    /** "Juz 18, Juz 20 and half of Juz 19". */
+    and: '{{list}} and {{last}}',
+    more_one: '{{list}} and {{count}} more',
+    more_other: '{{list}} and {{count}} more',
   },
   addMenu: {
     /** {{day}}: "today", "yesterday" or the day's name. */

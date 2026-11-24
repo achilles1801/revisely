@@ -56,6 +56,8 @@ export const home: NonNullable<ArStrings['home']> = {
     delete: 'حذف الجلسة',
   },
   screen: {
+    journal: 'سجل اليوم',
+    journalAddNote: 'أضف ملاحظة',
     loadFailed: 'تعذّر تحميل بياناتك',
     saveFailed: 'تعذّر الحفظ',
     carryFailed: 'تعذّر تحديث جلسة اليوم',

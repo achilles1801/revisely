@@ -23,7 +23,21 @@ export function juzCellSize(screenWidth: number): number {
  * The thirty juz, a tap on each (ONBOARD-4). A juz held only in part (a surah chosen from the list, Al-Fatihah to begin
  * with) has the quiet accent fill and an outline, so colour isn't the only thing that says so.
  */
-export function JuzGrid({ states, onToggle }: { states: readonly JuzState[]; onToggle: (juz: number) => void }) {
+export function JuzGrid({
+  states,
+  onToggle,
+  onHold,
+  holdLabel,
+  disabled,
+}: {
+  states: readonly JuzState[];
+  onToggle: (juz: number) => void;
+  /** A hold on a juz (Revised elsewhere: part of it, ACT-33); VoiceOver and TalkBack get it as the action `holdLabel`. */
+  onHold?: (juz: number) => void;
+  holdLabel?: string;
+  /** The juz with nothing to choose: faded, and a tap does nothing. */
+  disabled?: readonly boolean[];
+}) {
   const { palette } = useTheme();
   const haptics = useHaptics();
   const { width } = useWindowDimensions();
@@ -40,6 +54,8 @@ export function JuzGrid({ states, onToggle }: { states: readonly JuzState[]; onT
             const state = states[juz - 1] ?? 'none';
             const fill = state === 'all' ? palette.primary : state === 'part' ? palette.accentSubtle : palette.fill;
             const ink = state === 'all' ? palette.onPrimary : state === 'part' ? palette.accentText : palette.text;
+            const off = disabled?.[juz - 1] ?? false;
+            const hold = onHold && !off ? () => onHold(juz) : undefined;
             return (
               <Tap
                 key={juz}
@@ -49,11 +65,17 @@ export function JuzGrid({ states, onToggle }: { states: readonly JuzState[]; onT
                 }}
                 accessibilityRole="checkbox"
                 accessibilityLabel={t('common.juzN', { n: juz })}
-                accessibilityState={{ checked: state === 'all' ? true : state === 'part' ? 'mixed' : false }}
+                accessibilityState={{ checked: state === 'all' ? true : state === 'part' ? 'mixed' : false, disabled: off }}
+                disabled={off}
+                onLongPress={hold}
+                delayLongPress={350}
+                accessibilityActions={hold && holdLabel ? [{ name: 'longpress', label: holdLabel }] : undefined}
+                onAccessibilityAction={hold ? (e) => e.nativeEvent.actionName === 'longpress' && hold() : undefined}
                 style={[
                   styles.cell,
                   { width: size, height: size, backgroundColor: fill },
                   state === 'part' && { borderWidth: 1.5, borderColor: palette.accentText },
+                  off && styles.off,
                 ]}
                 testID={`juz-cell-${juz}`}
               >
@@ -80,4 +102,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between' },
   cell: { borderRadius: radiusV2.full, alignItems: 'center', justifyContent: 'center' },
   number: { fontSize: 16 },
+  off: { opacity: 0.35 },
 });

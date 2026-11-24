@@ -1,0 +1,102 @@
+# The journal's new look (ACT-33, ACT-34, HOME-2), one pass in the theme on show, from Home. The seeded account has Juz 1–6,
+# 21–28 and 30 memorized.
+#   env THEME: light or dark
+appId: com.revisionbuddy.app
+---
+- extendedWaitUntil:
+    visible:
+      id: today-journal
+    timeout: 15000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 23-home-${THEME}
+
+# The day's entry, under the calendar.
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn:
+          id: tab-ActivityTab
+          optional: true
+      - extendedWaitUntil:
+          visible:
+            id: activity-blocks-views
+          timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: preview-open
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 23-entry-${THEME}
+
+# Revised elsewhere: the grid, a juz held for part of it, what's chosen, the search.
+- runFlow: open-day.yaml
+- tapOn:
+    id: day-add
+- extendedWaitUntil:
+    visible:
+      id: activity-add-menu
+    timeout: 10000
+- tapOn:
+    id: sheet-action-revised
+- extendedWaitUntil:
+    visible:
+      id: juz-cell-30
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 23-grid-${THEME}
+- tapOn:
+    id: juz-cell-21
+- tapOn:
+    id: juz-cell-23
+- longPressOn:
+    id: juz-cell-22
+- extendedWaitUntil:
+    visible:
+      id: elsewhere-juz
+    timeout: 10000
+- tapOn:
+    id: elsewhere-half-second
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 23-inside-${THEME}
+- tapOn:
+    id: elsewhere-juz-done
+- extendedWaitUntil:
+    visible:
+      id: juz-cell-30
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 23-chosen-${THEME}
+- tapOn:
+    id: elsewhere-search
+- inputText: ahzab
+- extendedWaitUntil:
+    visible:
+      id: elsewhere-result-surah-33
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 23-search-${THEME}
+- tapOn:
+    id: elsewhere-search-clear
+# The field's search key puts the keyboard away.
+- pressKey: Enter
+- waitForAnimationToEnd
+- runFlow: close-sheet.yaml
+- extendedWaitUntil:
+    notVisible:
+      id: add-revised-sheet
+    timeout: 10000
+- runFlow: back-home.yaml
