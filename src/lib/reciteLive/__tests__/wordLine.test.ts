@@ -69,6 +69,15 @@ describe('[RECITE-29] the line is what was said', () => {
     expect(s.visits).toHaveLength(3);
   });
 
+  it('a word said twice stays two visits even where they touch or overlap at their edges', () => {
+    const touching = begin(word(1, 0, 1, 1.4), word(1, 1, 1.4, 1.8));
+    expect(touching.visits).toHaveLength(2);
+    expect(line(touching)).toEqual([1, 1]);
+    expect(begin(word(1, 0, 1, 1.5), word(1, 1, 1.4, 1.9)).visits).toHaveLength(2);
+    // The same id again is the same visit, its edges moved.
+    expect(begin(word(1, 0, 1, 1.4), word(1, 0, 1.1, 1.5)).visits).toHaveLength(1);
+  });
+
   it('a word the checker takes back comes off the line', () => {
     const s = begin(word(0, 0, 1, 1.4), word(1, 1, 1.5, 1.9), { type: 'unword', w: A + 1, v: 1 });
     expect(line(s)).toEqual([0]);

@@ -34,12 +34,17 @@ export interface WordVisit {
   settled: boolean;
 }
 
-/** The same word over any of the same samples is the same visit (its edges move, and a resume sends it again). */
-const sameVisit = (x: WordVisit, w: number, s: number, e: number) => x.w === w && x.s <= e && s <= x.e;
+/**
+ * Whether a frame is this visit again. On one connection its id says so: a word said twice can touch or overlap at its
+ * edges (22 and 8 of 686 repeats in the checker's first `golden/words`), and those are two visits. After a resume the ids
+ * may be another instance's, so the same word over the same samples is the same visit.
+ */
+const sameVisit = (x: WordVisit, e: Extract<LiveEvent, { type: 'word' }>, epoch: number) =>
+  x.epoch === epoch ? x.v === e.v : x.w === e.w && ((x.s < e.e && e.s < x.e) || (x.s === e.s && x.e === e.e));
 
 /** The line with this visit in its place, by first sample. */
 export function withVisit(visits: readonly WordVisit[], e: Extract<LiveEvent, { type: 'word' }>, epoch: number): WordVisit[] {
-  const had = visits.find((x) => sameVisit(x, e.w, e.s, e.e));
+  const had = visits.find((x) => sameVisit(x, e, epoch));
   const entry: WordVisit = { w: e.w, v: e.v, s: e.s, e: e.e, epoch, sub: e.sub === true, settled: had?.settled ?? false };
   const rest = had ? visits.filter((x) => x !== had) : [...visits];
   const at = rest.findIndex((x) => x.s > entry.s);
