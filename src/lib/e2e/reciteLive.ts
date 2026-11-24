@@ -180,7 +180,8 @@ function placeTake(start: StartFrame): ReplayLog | null {
   let t = 4.1;
   for (let w = first; w <= last; w++, t += step) {
     events.push({ t, type: 'at', w });
-    if (w - 1 >= first) events.push({ t: t + 0.1, type: 'said', upTo: w - 1 });
+    // Half a step on, so each `said` comes before the next word's and they stay in order.
+    if (w - 1 >= first) events.push({ t: t + step / 2, type: 'said', upTo: w - 1 });
   }
   events.push({ t, type: 'said', upTo: last });
   events.push({
