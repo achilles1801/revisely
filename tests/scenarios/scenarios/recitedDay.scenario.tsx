@@ -98,3 +98,29 @@ it('[RMEM-5] [RMEM-6] after Reset my data, a take on Thursday evening is in Over
   expect(nav(app).current.getCurrentRoute()?.params).toMatchObject({ pageNumber: 246, showTake: 'take-thu' });
   await app.close();
 });
+
+it('[ACT-34] a spot test is its own block in the day, apart from Recited, saying it stopped early', async () => {
+  setZone(ZONES.chicago);
+  setNow('2026-11-19 20:00');
+  const phone = new Phone('phone');
+  let app = await newAccount(phone, { memorized: pagesRange(240, 250), user: { dailyPageCapacity: 5 } });
+  await markPreviewTester(app.uid);
+  await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
+  const { remember } = app.mods.require<typeof import('../../../src/lib/reciteMemory/store')>('src/lib/reciteMemory/store');
+  await app.act(() => remember(app.uid, take('take-plain', Date.now() - 60_000, '2026-11-19')));
+  await app.act(() => remember(app.uid, take('take-test', Date.now(), '2026-11-19', { spotTest: { pages: 0.5, finished: false } })));
+  await app.untilSynced();
+  await app.close();
+
+  app = await phone.open(stack);
+  await app.untilLoaded();
+  await app.act(async () => nav(app).current.navigate('Activity'));
+  await app.until(() => app.screen.queryByTestId('preview-row-spot') != null, 'the spot test’s line');
+  expect(String(app.screen.getByTestId('preview-tail-spot').props.children)).toContain('Stopped early');
+  expect(String(app.screen.getByTestId('preview-tail-recited').props.children)).toContain('1 take');
+  await tap(app, 'preview-open');
+  await app.until(() => app.screen.queryByTestId('activity-block-spot') != null, 'the spot test’s block');
+  expect(app.screen.getByTestId('activity-block-recited')).toBeTruthy();
+  expect(app.screen.getAllByText(/Stopped early/).length).toBeGreaterThan(0);
+  await app.close();
+});

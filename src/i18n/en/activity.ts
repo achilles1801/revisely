@@ -162,6 +162,12 @@ export const activity = {
     quranShareInAll: '{{share}} of the Quran in all',
     pagesMemorizedInAll_one: '{{count}} pages memorized in all',
     pagesMemorizedInAll_other: '{{count}} pages memorized in all',
+    /** A spot test: its own kind of entry (ACT-34). */
+    spotTest: 'Spot test',
+    spotTests_one: '{{count}} test',
+    spotTests_other: '{{count}} tests',
+    spotStopped_one: '{{count}} stopped early',
+    spotStopped_other: '{{count}} stopped early',
     takes_one: '{{count}} take',
     takes_other: '{{count}} takes',
     allTakes_one: 'All {{count}} takes',

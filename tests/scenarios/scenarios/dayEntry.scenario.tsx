@@ -16,7 +16,7 @@ const DAY = '2026-11-22';
 const METRICS = { frame: { x: 0, y: 0, width: 393, height: 852 }, insets: { top: 59, left: 0, right: 0, bottom: 34 } };
 const revised: Revised = { day: DAY, countsFor: DAY, pages: [5, 6], assigned: [5, 6], minutes: 31 } as Revised;
 
-function show(opts: { items?: Revised[]; note?: string | null; memorized?: { day: string; pages: number[] }[] } = {}) {
+function show(opts: { items?: Revised[]; note?: string | null; memorized?: { day: string; pages: number[] }[]; spot?: { tests: number; stopped: number; pages: number[] } } = {}) {
   const onOpen = jest.fn();
   const onAddNote = jest.fn();
   render(
@@ -34,6 +34,7 @@ function show(opts: { items?: Revised[]; note?: string | null; memorized?: { day
         onOpen={onOpen}
         noteOf={() => opts.note ?? null}
         onAddNote={onAddNote}
+        spotTests={opts.spot ? new Map([[DAY, opts.spot]]) : undefined}
       />
     </SafeAreaProvider>,
   );
@@ -74,6 +75,21 @@ describe('a day’s entry under the calendar', () => {
     expect(String(value.props.children).length).toBeLessThanOrEqual(30);
     expect(value.props.children).toMatch(/and \d+ more$/);
     expect(String(screen.getByTestId('preview-tail-revised').props.children)).toContain('6 pages');
+  });
+
+  it('[ACT-34] a spot test is its own line, saying how it went, however many there are', () => {
+    show({ spot: { tests: 1, stopped: 1, pages: [2] } });
+    expect(screen.getByTestId('preview-row-spot')).toBeTruthy();
+    expect(screen.queryByTestId('preview-row-recited')).toBeNull();
+    expect(String(screen.getByTestId('preview-tail-spot').props.children)).toContain('Stopped early');
+  });
+
+  it('[ACT-34] many spot tests stay one short line', () => {
+    show({ spot: { tests: 3, stopped: 1, pages: [2, 322, 500] } });
+    const value = screen.getByTestId('preview-value-spot');
+    expect(value.props.adjustsFontSizeToFit).toBeUndefined();
+    expect(String(value.props.children).length).toBeLessThanOrEqual(30);
+    expect(String(screen.getByTestId('preview-tail-spot').props.children)).toContain('3 tests · 1 stopped early');
   });
 
   it('[ACT-34] a day with nothing says so, and can still take a note', () => {

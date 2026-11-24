@@ -22,6 +22,7 @@ import { ChoiceChip } from './ChoiceChip';
 import { dayMarks, dayPreview } from '../../lib/activityInsights';
 import { useJournalDesign } from '../../lib/release/journalDesign';
 import { DayEntry, type DayEntryLine } from './DayEntry';
+import { spotTestsTail, type SpotTestsDay } from '../../lib/spotTests';
 import { formatDayLong, formatMinutesLong } from '../../lib/activityFormat';
 import { describePassage, fewPlaces } from '../../lib/passages';
 import { describeSurahRuns, pageRuns } from '../../lib/pageRanges';
@@ -85,6 +86,7 @@ export function CalendarMonth({
   onOpen,
   noteOf,
   onAddNote,
+  spotTests,
   recordings,
   recited,
   sections = DEFAULT_SECTIONS.overview,
@@ -110,6 +112,8 @@ export function CalendarMonth({
   noteOf?: (day: string) => string | null;
   /** The entry's Add a note (ACT-34). */
   onAddNote?: (day: string) => void;
+  /** Spot tests by day: their own line in the entry (ACT-34). */
+  spotTests?: Map<string, SpotTestsDay>;
   /** Recordings by day: the preview's mic and count beside the block they belong to. */
   recordings?: Map<string, RecordingCounts>;
   /** Recite takes by day (Revisely Dev): the preview's Recited row (RMEM-5). */
@@ -214,6 +218,11 @@ export function CalendarMonth({
   if (takes && takes.takes > 0) {
     const count = t('activity.day.takes', { count: takes.takes });
     entryLines.push({ key: 'recited', label: t('activity.day.recited'), value: takes.pages.length > 0 ? fewPlaces(takes.pages) : count, tail: takes.pages.length > 0 ? count : undefined });
+  }
+  const tests = spotTests?.get(shownDay);
+  if (tests && tests.tests > 0) {
+    const tail = spotTestsTail(tests);
+    entryLines.push({ key: 'spot', label: t('activity.day.spotTest'), value: tests.pages.length > 0 ? fewPlaces(tests.pages) : tail, tail: tests.pages.length > 0 ? tail : undefined });
   }
   if (preview.notes) previewRows.push({ key: 'notes', kind: 'notes', label: t('activity.day.notes'), value: t('activity.calendar.oneNote') });
 

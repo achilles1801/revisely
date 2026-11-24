@@ -6,6 +6,7 @@ import { layoutV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import { getQuranWords, loadQuranWords, type QuranWords } from '../../lib/recite/quranWords';
 import { formatAccuracy, mistakesLabel, scoreLevel } from '../../lib/reciteLive/score';
+import { spotTestOutcome } from '../../lib/spotTests';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
 import { takeClock, takeWhen } from '../../lib/reciteMemory/describe';
 import { wasChecked } from '../../lib/reciteMemory/pastTake';
@@ -103,6 +104,7 @@ function takeResult(take: TakeRecord): string {
 export function dayTakeLine(take: TakeRecord, cleared: number): string {
   return [
     clockTime(take.createdAt),
+    take.spotTest ? spotTestOutcome(take.spotTest) : null,
     formatMinutesLong(Math.max(1, Math.round(take.secs / 60))),
     takeResult(take),
     take.unclear > 0 ? t('reciteMemory.rows.unclear', { count: take.unclear }) : null,

@@ -22,6 +22,8 @@ import { RecitedMark, TakeDayRow, dayTakeLine, useQuranWordsWhen, type TakeMenuA
 import { ActionSheet } from '../v2/ActionSheet';
 import { passageOf } from '../reciteLive/TakeSummarySheet';
 import { RecitedSheet } from '../reciteMemory/RecitedSheet';
+import { journalDesignEnabled } from '../../lib/release/journalDesign';
+import { spotTestsTail } from '../../lib/spotTests';
 import { deleteTake } from '../../lib/reciteMemory/apart';
 import { useTakeRecordings } from '../../lib/reciteMemory/takeAudio';
 import { takeAttachment } from '../../lib/revo/recitation';
@@ -301,7 +303,10 @@ export function DayBlocks({
     () => memoryRecords.filter((r): r is TakeRecord => r.kind === 'take' && !r.deleted && r.day === day).sort((a, b) => a.createdAt - b.createdAt),
     [memoryRecords, day],
   );
-  const newestTakes = useMemo(() => [...dayTakes].reverse(), [dayTakes]);
+  // A spot test is its own block (ACT-34), apart from the day's Recited takes.
+  const spotTakes = useMemo(() => (journalDesignEnabled() ? dayTakes.filter((x) => x.spotTest) : []), [dayTakes]);
+  const recitedTakes = useMemo(() => (spotTakes.length > 0 ? dayTakes.filter((x) => !x.spotTest) : dayTakes), [dayTakes, spotTakes]);
+  const newestTakes = useMemo(() => [...recitedTakes].reverse(), [recitedTakes]);
   const takeRecordings = useMemo(() => new Set(dayTakes.map((t) => t.recordingId).filter((id): id is string => id != null)), [dayTakes]);
   const notTake = useCallback((r: RecordingMeta) => !takeRecordings.has(r.id), [takeRecordings]);
   const takeWords = useQuranWordsWhen(dayTakes.length > 0);
@@ -857,19 +862,19 @@ export function DayBlocks({
           testID="activity-block-read"
         />
       )}
-      {dayTakes.length > 0 && (
+      {recitedTakes.length > 0 && (
         // The day's takes, each a row (RMEM-5): apart from its recordings (RMEM-6), but there to see.
         <DayBlock
           mark={<RecitedMark />}
           title={t('activity.day.recited')}
-          figure={t('activity.day.takes', { count: dayTakes.length })}
+          figure={t('activity.day.takes', { count: recitedTakes.length })}
           subline={subline([
-            takeWords ? surahsOf(dayTakes.map((t) => takeWords.pageOf(t.from))) : null,
-            formatMinutesLong(Math.max(1, Math.round(dayTakes.reduce((n, t) => n + t.secs, 0) / 60))),
+            takeWords ? surahsOf(recitedTakes.map((t) => takeWords.pageOf(t.from))) : null,
+            formatMinutesLong(Math.max(1, Math.round(recitedTakes.reduce((n, t) => n + t.secs, 0) / 60))),
           ])}
           items={[
             // Newest first, as the take's summary leaves it: the one just recited is at the top.
-            ...(dayTakes.length > TAKES_SHOWN ? newestTakes.slice(0, TAKES_SHOWN - 1) : newestTakes).map((t) => (
+            ...(recitedTakes.length > TAKES_SHOWN ? newestTakes.slice(0, TAKES_SHOWN - 1) : newestTakes).map((t) => (
               <TakeDayRow
                 key={t.id}
                 take={t}
@@ -882,11 +887,11 @@ export function DayBlocks({
                 actions={takeActions(t)}
               />
             )),
-            ...(dayTakes.length > TAKES_SHOWN
+            ...(recitedTakes.length > TAKES_SHOWN
               ? [
                   <Tap key="all-takes" onPress={() => setRecitedOpen(true)} accessibilityRole="button" hitSlop={6} testID="activity-takes-all">
                     <Text style={[typeV2.body, { color: palette.link }]} maxFontSizeMultiplier={1.4}>
-                      {t('activity.day.allTakes', { count: dayTakes.length })}
+                      {t('activity.day.allTakes', { count: recitedTakes.length })}
                     </Text>
                   </Tap>,
                 ]
@@ -894,6 +899,29 @@ export function DayBlocks({
           ]}
           onLayout={layoutFor('recited')}
           testID="activity-block-recited"
+        />
+      )}
+      {spotTakes.length > 0 && (
+        // Spot tests, each a row saying whether it finished or stopped early (ACT-34).
+        <DayBlock
+          mark={<RecitedMark />}
+          title={t('activity.day.spotTest')}
+          figure={spotTestsTail({ tests: spotTakes.length, stopped: spotTakes.filter((x) => !x.spotTest?.finished).length, pages: [] })}
+          subline={subline([takeWords ? surahsOf(spotTakes.map((x) => takeWords.pageOf(x.from))) : null])}
+          items={[...spotTakes].reverse().map((x) => (
+            <TakeDayRow
+              key={x.id}
+              take={x}
+              words={takeWords}
+              cleared={clearedBy(memoryRecords, x).length}
+              playable={x.recordingId != null && takeAudio.has(x.recordingId)}
+              onShow={showTake}
+              onPlay={onOpenRecording}
+              onHold={() => setHeldTake(x)}
+              actions={takeActions(x)}
+            />
+          ))}
+          testID="activity-block-spot"
         />
       )}
       {dayTakes.length > 0 ? (

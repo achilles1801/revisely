@@ -35,6 +35,8 @@ import { listRecordings, onRecordingsChanged } from '../../lib/recordings';
 import { sortTakeAudio } from '../../lib/reciteMemory/apart';
 import { coverageSince } from '../../lib/recency';
 import type { PreviewBlock, RecitedDay, RecordingCounts } from './CalendarMonth';
+import { journalDesignEnabled } from '../../lib/release/journalDesign';
+import type { SpotTestsDay } from '../../lib/spotTests';
 import { useMemoryRecords } from '../../lib/reciteMemory/store';
 import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { useQuranWordsWhen } from '../reciteMemory/TakeRows';
@@ -196,18 +198,28 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
   // Recite's takes by day (Revisely Dev): the picked day's Recited row (RMEM-5), its passages once the words are in.
   const memory = useMemoryRecords(user?.id, reciteLiveForAccount(user));
   const takeWords = useQuranWordsWhen(memory.length > 0);
-  const recited = useMemo(() => {
+  const { recited, spotTests } = useMemo(() => {
     const out = new Map<string, RecitedDay>();
+    const tests = new Map<string, SpotTestsDay>();
     for (const r of memory) {
       if (r.kind !== 'take' || r.deleted) continue;
-      const d = out.get(r.day) ?? { takes: 0, pages: [] };
-      d.takes += 1;
+      // A spot test is its own kind of entry (ACT-34), not one of the day's Recited takes.
+      const test = journalDesignEnabled() ? r.spotTest : undefined;
+      const d: { pages: number[] } = test ? (tests.get(r.day) ?? { tests: 0, stopped: 0, pages: [] }) : (out.get(r.day) ?? { takes: 0, pages: [] });
       if (takeWords) {
         for (let p = takeWords.pageOf(r.from); p <= takeWords.pageOf(r.to); p++) if (!d.pages.includes(p)) d.pages.push(p);
       }
-      out.set(r.day, d);
+      if (test) {
+        const day = d as SpotTestsDay;
+        day.tests += 1;
+        if (!test.finished) day.stopped += 1;
+        tests.set(r.day, day);
+      } else {
+        (d as RecitedDay).takes += 1;
+        out.set(r.day, d as RecitedDay);
+      }
     }
-    return out;
+    return { recited: out, spotTests: tests };
   }, [memory, takeWords]);
 
   // Swipe between weeks or months (a horizontal drag on the calendar).
@@ -373,6 +385,7 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
             gap={gapMark}
             recordings={recordings}
             recited={recited}
+            spotTests={spotTests}
             sections={sections.overview}
           />
         </RNView>
