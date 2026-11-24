@@ -1,26 +1,28 @@
-// The real engine's speed and memory on a phone (Revisely Dev; BEHAVIOUR.md ONDEV-1): a take of the bench's recorded clip
-// (Husary, page 7), fed at the live pace: Strict, or words and harakat on a phone whose engine has no Strict level. Nobody recites, so every phone runs the same take through the
-// whole pipeline. The record holds the host's meter, the app's peak memory and how many frames of each kind came:
-// no audio and no words.
+// The real engine on a phone (Revisely Dev; BEHAVIOUR.md ONDEV-1): a take of the bench's recorded clip, fed at the live
+// pace: Strict, or words and harakat on a phone whose engine has no Strict level. The clip is the first 90 s (1,440,000
+// samples) of the lab's golden/bench-v0-on/husary.p7.clean.clean: Al-Husary from An-Naba 78:1 ("p7" is the item's name,
+// not a mushaf page), so the Python can run the same samples and the marks can be compared one by one. Nobody recites, so every phone runs the same take through the
+// whole pipeline. The record holds the host's meter, memory, the marks, the score and how many frames of each kind came:
+// never any audio.
 
 import type { StartFrame } from '../reciteLive/feed';
 import type { EngineBridge } from '../reciteLive/localFeed';
 import { fellBehind } from './speedCheck';
 
-/** Strict, anywhere on page 7 of the mushaf (2:38–2:48 in both prints), where the clip is. */
+/** That golden's own start frame (its take.json): An-Naba 78:1–30, with Strict's tajweed set per run. */
 export const TEST_START: StartFrame = {
   type: 'start',
-  s: 2,
-  a: 38,
-  s2: null,
-  a2: null,
+  s: 78,
+  a: 1,
+  s2: 78,
+  a2: 30,
   mon: 4,
   mot: 4,
   aar: 0,
   letters: true,
   tajweed: true,
   keep: false,
-  startBy: [2, 48],
+  namesAfter: true,
 };
 
 const RATE = 16_000;
@@ -31,6 +33,8 @@ export const ANSWER_MS = 60_000;
 /** The meter comes with the answer, or just after it. */
 export const METER_MS = 2_000;
 const POLL_MS = 50;
+/** Enough for any real take; a runaway one can't outgrow its record. */
+const MAX_KEPT = 200;
 
 export type EngineTestLevel = 'strict' | 'harakat';
 
@@ -41,6 +45,11 @@ export interface EngineTestDeps {
   /** The engine's hop, as it opened. */
   hop: number | null;
   peakMb(): number;
+  /** The app's memory now, in MB, on builds that can say (null otherwise). Read about once a second during the take. */
+  memoryNow?(): number | null;
+  /** The same, just before and just after the engine opened. */
+  beforeOpenMb?: number | null;
+  afterOpenMb?: number | null;
   now(): number;
   sleep(ms: number): Promise<void>;
   /** False once the app has left the foreground or the screen has gone: the timing would mean nothing. */
@@ -67,12 +76,69 @@ export interface EngineTestRun {
   thermalEnd: number | null;
   peakBeforeMb: number;
   peakAfterMb: number;
+  /** Null until a build can read the app's memory now. The engine's share is afterOpen less beforeOpen. */
+  memoryMb: { beforeOpen: number | null; afterOpen: number | null; takeMax: number | null };
   /** How many frames of each type the take produced: proof it ran end to end. */
   frames: Record<string, number>;
+  /** The final answer, to compare mark for mark with the Python on the same samples. */
+  result: EngineTestAnswer | null;
+  /** Each live mark as it came, and how many samples had been fed then. */
+  liveMarks: (KeptMark & { atSample: number })[];
+  unmarks: { id: string; why: string | null; atSample: number }[];
+}
+
+export interface KeptMark {
+  id: string;
+  w: number | null;
+  ayah: number[] | null;
+  kind: string | null;
+  detail: string | null;
+  sure: string | null;
+  t: number[] | null;
+}
+
+export interface EngineTestAnswer {
+  from: number | null;
+  to: number | null;
+  secs: number | null;
+  start: number | null;
+  why: string | null;
+  score: Record<string, number> | null;
+  marks: KeptMark[];
 }
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const round = (v: number) => Math.round(v * 10) / 10;
+
+const text = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+const numbers = (v: unknown): number[] | null =>
+  Array.isArray(v) && v.every((x) => typeof x === 'number' && Number.isFinite(x)) ? (v as number[]) : null;
+
+function keptMark(raw: unknown): KeptMark | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const m = raw as Record<string, unknown>;
+  if (typeof m.id !== 'string') return null;
+  return {
+    id: m.id,
+    w: num(m.w),
+    ayah: numbers(m.ayah),
+    kind: text(m.kind),
+    detail: text(m.detail),
+    sure: text(m.sure),
+    t: numbers(m.t),
+  };
+}
+
+function keptAnswer(raw: unknown): EngineTestAnswer | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const score =
+    r.score && typeof r.score === 'object'
+      ? Object.fromEntries(Object.entries(r.score).filter((e): e is [string, number] => typeof e[1] === 'number'))
+      : null;
+  const marks = Array.isArray(r.marks) ? r.marks.map(keptMark).filter((m): m is KeptMark => m !== null) : [];
+  return { from: num(r.from), to: num(r.to), secs: num(r.secs), start: num(r.start), why: text(r.why), score, marks: marks.slice(0, MAX_KEPT) };
+}
 
 function parsed(raw: string): Record<string, unknown> | null {
   try {
@@ -93,6 +159,15 @@ export async function runEngineTest(d: EngineTestDeps): Promise<EngineTestRun> {
   let failure: string | null = null;
   let interrupted = false;
   let take: number | null = null;
+  let fed = 0;
+  let takeMax: number | null = null;
+  let result: EngineTestAnswer | null = null;
+  const liveMarks: EngineTestRun['liveMarks'] = [];
+  const unmarks: EngineTestRun['unmarks'] = [];
+  const noteMemory = () => {
+    const now = d.memoryNow?.() ?? null;
+    if (now !== null && (takeMax === null || now > takeMax)) takeMax = now;
+  };
 
   const off = d.bridge.onFrames((e) => {
     if (take !== null && e.take !== take) return;
@@ -102,7 +177,17 @@ export async function runEngineTest(d: EngineTestDeps): Promise<EngineTestRun> {
       const type = String(x.type);
       frames[type] = (frames[type] ?? 0) + 1;
       if (type === 'meter') meter = x;
-      if (type === 'done') answered = true;
+      if (type === 'done') {
+        answered = true;
+        result = keptAnswer(x.result);
+      }
+      if (type === 'mark' && liveMarks.length < MAX_KEPT) {
+        const mark = keptMark(x.mark);
+        if (mark) liveMarks.push({ ...mark, atSample: fed });
+      }
+      if (type === 'unmark' && unmarks.length < MAX_KEPT && typeof x.id === 'string') {
+        unmarks.push({ id: x.id, why: text(x.why), atSample: fed });
+      }
       if (type === 'error') {
         failure = typeof x.reason === 'string' ? x.reason : 'error';
         answered = true;
@@ -133,16 +218,20 @@ export async function runEngineTest(d: EngineTestDeps): Promise<EngineTestRun> {
           interrupted = true;
           break;
         }
-        d.bridge.feed(take, d.pcm.slice(at, at + CHUNK));
+        const chunk = d.pcm.slice(at, at + CHUNK);
+        d.bridge.feed(take, chunk);
+        fed += chunk.length;
         const second = Math.floor(at / RATE);
         if (second !== lastSecond) {
           lastSecond = second;
+          noteMemory();
           d.onProgress?.(second, Math.round(totalSec));
         }
       }
       if (!interrupted && !failure) {
         d.bridge.finish(take);
         await waitFor(() => answered, ANSWER_MS);
+        noteMemory();
         if (!d.keepGoing()) interrupted = true;
         else if (!answered) failure = 'no answer after the last audio';
         else await waitFor(() => meter !== null, METER_MS);
@@ -174,6 +263,14 @@ export async function runEngineTest(d: EngineTestDeps): Promise<EngineTestRun> {
     thermalEnd: num(m.thermal_end),
     peakBeforeMb: round(peakBeforeMb),
     peakAfterMb: round(d.peakMb()),
+    memoryMb: {
+      beforeOpen: d.beforeOpenMb ?? null,
+      afterOpen: d.afterOpenMb ?? null,
+      takeMax: takeMax === null ? null : round(takeMax),
+    },
     frames,
+    result,
+    liveMarks,
+    unmarks,
   };
 }
