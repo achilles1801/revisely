@@ -4,6 +4,7 @@
 // a snapshot or by id: a mark replaces the mark with its id, an unknown unmark does nothing, and the cursor, `said`
 // and the score are whatever came last. The final answer (`done`) replaces every live mark.
 
+import { settledUpTo, withoutVisit, withVisit, type WordVisit } from './wordLine';
 import {
   countsAsMistake,
   isUnclear,
@@ -63,6 +64,12 @@ export interface LiveState {
    * on `w`. `from`: the cursor when it came, so going back clears it. Never a mark, never counted.
    */
   off: { w: number; from: number | null } | null;
+  /** This take's checker sends `word` frames (`ready.words`): the bar's line is drawn from `visits` (RECITE-29). */
+  wordFrames?: boolean;
+  /** The words said, each visit once, in the order said. */
+  visits?: readonly WordVisit[];
+  /** Which connection's numbering new visits are in (each `ready` starts one). */
+  visitEpoch?: number;
   /** The checker's guess at where the reciter is, while it looks (protocol 9, `guess`); never a start or a cursor time. */
   guess?: number | null;
 }
@@ -204,6 +211,9 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
         failure: null,
         protocol,
         voiceSaid: e.said === 'voice',
+        // A checker that doesn't send them (a rollback, an older phone engine): today's bar, for this connection.
+        ...(e.words || state.wordFrames ? { wordFrames: e.words === true } : {}),
+        ...(state.visits?.length ? { visitEpoch: (state.visitEpoch ?? 0) + 1 } : {}),
       };
       // A checker that doesn't look for the start begins at the page's first ayah, as before: no waiting.
       return ready.seeking && protocol < LOOKS_FOR_START ? startedUnlocked(ready) : ready;
@@ -230,7 +240,12 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
       if (state.seeking) return { ...startedUnlocked(state), cursor: e.w };
       return state.cursor === e.w ? state : { ...state, cursor: e.w };
     case 'said':
-      return state.saidUpTo === e.upTo ? state : { ...state, saidUpTo: e.upTo };
+      if (state.saidUpTo === e.upTo) return state;
+      return { ...state, saidUpTo: e.upTo, ...(state.visits ? { visits: settledUpTo(state.visits, e.upTo) } : {}) };
+    case 'word':
+      return state.wordFrames ? { ...state, visits: withVisit(state.visits ?? [], e, state.visitEpoch ?? 0) } : state;
+    case 'unword':
+      return state.visits ? { ...state, visits: withoutVisit(state.visits, e.v, state.visitEpoch ?? 0) } : state;
     case 'mark': {
       if (state.status === 'done' || state.dismissed.includes(e.mark.id) || beforeStart(e.mark, state.start)) return state;
       return { ...state, marks: { ...state.marks, [e.mark.id]: e.mark } };

@@ -41,6 +41,8 @@ export interface StartFrame {
   startIn?: 'quran';
   /** Protocol 9: send `guess` events before `locked` (older checkers ignore it). */
   guess?: boolean;
+  /** Send `word` frames, each word as it finishes (contract draft 16; `ready.words` says whether this take will). */
+  words?: boolean;
   /** Send the audio as IMA-ADPCM blocks if the checker's `ready` agrees (contract "ADPCM uplink"); raw PCM otherwise. */
   audio?: 'adpcm';
   /** The engine's own key (recite_core.h): emit `clip` frames for the teacher. Never sent to the server. */

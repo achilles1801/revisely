@@ -1050,7 +1050,7 @@ export function useReciteLayer({
           clock={live.clock}
           recording={live.recording && live.mic === 'on'}
           // A test, once done, says how it ended in the words' place.
-          words={testEnded != null ? [] : barWords(live.state, qw, { check: checkTake, startWord: live.startWord, upTo: hidden ? liveInfo.saidUpTo : undefined, held: heldCursor })}
+          words={testEnded != null ? [] : barWords(live.state, qw, { check: checkTake, startWord: live.startWord, upTo: hidden ? liveInfo.saidUpTo : undefined, held: heldCursor, now: live.seconds })}
           status={barStatus}
           phase={barPhase}
           paused={live.paused}

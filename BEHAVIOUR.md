@@ -622,7 +622,7 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   once it has been said in full (the checker has decided it), the next word has begun, or it has been the word being
   said about as long as it takes to say (its letters at the reciter's pace, a held madd longer; 0.7–2.5 s; with a
   checker whose `said` follows the voice, only as a late backstop for a noisy room, 2.5 times as long, 1.5–4 s), never a
-  word ahead, and the bar names no more than the page shows (Majd, Nov 21 2026: "we shouldn't
+  word ahead, and the bar names only what has been said (RECITE-28, RECITE-29) (Majd, Nov 21 2026: "we shouldn't
   be showing the full word until the user maybe either starts the next word or we get a full match"; Nov 22: "it should
   be under one second max that it shows up"). Nothing is drawn on the word being said, still hidden (Majd's Dev take,
   Nov 22 2026: marking it showed where the next word was and how long, before it was said); the newest word shown is in
@@ -785,6 +785,15 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   earlier and gone back to waits the same way. Once the take has stopped, the line ends on the word it stopped on. The
   newest word named is in the following ink. The page's own following (RECITE-19, RECITE-20, the hidden page) doesn't
   change.
+- **RECITE-29.** (Revisely Dev) With a checker that sends each word as it finishes (`ready.words`), the live words in the
+  take's bar are what the reciter said, each written once it has finished, in the order said, on the server and on the
+  phone alike (Majd, Nov 24 2026: "It should just be exactly what is that user saying", "the word is only getting written
+  down in the text when the word finishes"). A word said again, or gone back to, is written again. A word not heard as
+  the page's word isn't printed as it at once: nothing shows for it, on any page, until a mark names it (then as heard),
+  `said` passes it, or 4 s have gone by since its last sound with no mark (then as the page's word, as a hidden page shows
+  a word once passed, redrawn if a mark comes later); it takes its place. The take's end shows each word as its answer
+  says. A word the checker takes back comes off the line. Without those
+  frames, or outside Revisely Dev, the bar is RECITE-28's.
 
 What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).
 

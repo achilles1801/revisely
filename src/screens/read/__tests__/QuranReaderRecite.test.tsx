@@ -7,6 +7,7 @@ import QuranReaderScreen from '../QuranReaderScreen';
 import { Sheet } from '../../../components/v2/Sheet';
 import { resetReciteCheckSettingsForTests, setReciteCheckSettings } from '../../../lib/reciteCheck/settings';
 import { HASBUK_MS } from '../../../components/reciteLive/HasbukNote';
+import { setWordLineForTests } from '../../../lib/reciteLive/wordLine';
 import type { LiveEvent } from '../../../lib/reciteLive/contract';
 import { STOP_TRACE_KEY } from '../../../lib/reciteLive/stopTrace';
 import { revealDelay, wordLetters } from '../../../lib/reciteLive/state';
@@ -721,6 +722,35 @@ describe('mistakes are highlights (Majd, Nov 15 2026: “only things we should s
     await event({ type: 'mark', mark: { id: 'x', w: A23 + 2, ayah: [27, 23], kind: 'added', sure: 'clear', heard: 'وَ' } });
     expect(bg('live-highlight-word')).toBe(p.markWord);
     expect(screen.getByTestId('live-mark-added').props.accessibilityLabel).toBe(`Extra word, after ${words.uthmani(A23 + 2)}`);
+  });
+
+  it('[RECITE-29] off (outside Revisely Dev): the start frame doesn’t ask for word frames', async () => {
+    setWordLineForTests(false);
+    try {
+      await startTake('recite');
+      expect(mockLive.start?.words).toBeUndefined();
+    } finally {
+      setWordLineForTests();
+    }
+  });
+
+  it('[RECITE-29] on: it asks, and with `ready.words` the bar writes each word as it finishes, not as the cursor lands', async () => {
+    setWordLineForTests(true);
+    try {
+      await startTake('recite');
+      expect(mockLive.start?.words).toBe(true);
+      await event({ type: 'ready', take: 't1', protocol: 10, words: true } as LiveEvent);
+      const barSays = () => screen.getByTestId('recite-middle').props.accessibilityLabel as string;
+      await event({ type: 'at', w: A23 + 2 });
+      expect(barSays()).not.toContain(words.uthmani(A23 + 1));
+      await event({ type: 'word', w: A23 + 1, v: 0, s: 16000, e: 24000 } as LiveEvent);
+      expect(barSays()).toContain(words.uthmani(A23 + 1));
+      expect(barSays()).not.toContain(words.uthmani(A23 + 2));
+      await event({ type: 'word', w: A23 + 2, v: 1, s: 25000, e: 30000, sub: true } as LiveEvent);
+      expect(barSays()).not.toContain(words.uthmani(A23 + 2));
+    } finally {
+      setWordLineForTests();
+    }
   });
 
   it('[RECITE-28] the page shown: the word being said waits in the bar, and joins when the reciter pauses', async () => {
