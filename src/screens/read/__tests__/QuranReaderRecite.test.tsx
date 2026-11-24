@@ -469,20 +469,27 @@ describe('a checker whose said follows the voice, and a slow connection (Nov 22 
       await new Promise((r) => setTimeout(r, ms));
     });
 
+  /** Where the hidden page's newest shown word is, and where word `w` would put it. */
+  const pageInk = () => flatStyle(screen.getByTestId('live-follow-ink')).left as number;
+  const inkOn = (w: number) => (require('../../../lib/reciteLive/geometry').wordBox(words, w).x0 - 1) * 0.38;
+
   it('[RECITE-6] a checker whose said follows the voice (ready.said "voice"): the word being said waits only as a late backstop (1.5–4 s)', async () => {
     await beginReady({ protocol: 9, said: 'voice' });
     const w = words.uthmani(A23 + 1);
     await wait(revealDelay(wordLetters(w), null) + 100);
-    expect(barSays()).not.toContain(w);
+    expect(pageInk()).toBeCloseTo(inkOn(A23));
     await wait(revealDelay(wordLetters(w), null, true) - revealDelay(wordLetters(w), null));
-    expect(barSays()).toContain(w);
+    expect(pageInk()).toBeCloseTo(inkOn(A23 + 1));
+    // The page's timer is the page's: the bar still waits for the word to be said (RECITE-28).
+    expect(barSays()).not.toContain(w);
   });
 
   it('[RECITE-6] protocol 9 without it (a rollback) keeps the ordinary wait', async () => {
     await beginReady({ protocol: 9 });
     const w = words.uthmani(A23 + 1);
     await wait(revealDelay(wordLetters(w), null) + 100);
-    expect(barSays()).toContain(w);
+    expect(pageInk()).toBeCloseTo(inkOn(A23 + 1));
+    expect(barSays()).not.toContain(w);
   });
 
   it('[RECITE-5] the bar says "Slow connection" once the checker is 3 s behind and falling behind, and stops once it catches up', async () => {
@@ -722,11 +729,11 @@ describe('mistakes are highlights (Majd, Nov 15 2026: “only things we should s
     expect(screen.getByTestId('live-mark-added').props.accessibilityLabel).toBe(`Extra word, after ${words.uthmani(A23 + 2)}`);
   });
 
-  it('the bar: a mistake is the page’s highlight behind the word in ink; blue is only the word being said', async () => {
+  it('the bar: a mistake is the page’s highlight behind the word in ink; the following ink is only the newest word said', async () => {
     await startTake('check');
     await event({ type: 'said', upTo: UTIYAT });
     await event({ type: 'mark', mark: { id: 'a', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'وَأُوهِيَتْ', heardExact: false } });
-    await event({ type: 'at', w: UTIYAT + 1 });
+    await event({ type: 'at', w: UTIYAT + 2 });
     const wrong = flatStyle(screen.getByTestId('recite-word-wrong'));
     expect(wrong.backgroundColor).toBe(p.markWord);
     expect(wrong.color).toBe(p.text);
@@ -891,6 +898,9 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     // The page shown: the band behind the ayah found and the box on its word.
     expect(screen.queryAllByTestId('live-ayah-band').length).toBeGreaterThan(0);
     expect(screen.getByTestId('live-word-box')).toBeTruthy();
+    // The bar names it once it has been said (RECITE-28).
+    expect(screen.queryByTestId('recite-words')).toBeNull();
+    await event({ type: 'at', w: A25 + 1 });
     expect(screen.getByTestId('recite-words')).toBeTruthy();
     expect(screen.getByTestId('recite-score')).toBeTruthy();
     expect(announce).toHaveBeenCalledWith('Started at An-Naml, 3rd page · middle');
@@ -1170,14 +1180,19 @@ describe('no word shows before it is said (Majd, Nov 21 2026)', () => {
     // Decided in full (said), it shows though the cursor hasn't moved on.
     await event({ type: 'said', upTo: A23 + 3 });
     expect(barSays()).toContain(words.uthmani(A23 + 3));
-    // Under the cursor about as long as it takes to say (Majd, Nov 22 2026: "under one second max"), it shows too.
+    // Under the cursor about as long as it takes to say (Majd, Nov 22 2026: "under one second max"), the page shows it.
+    const inkOn = (w: number) => (require('../../../lib/reciteLive/geometry').wordBox(words, w).x0 - 1) * 0.38;
     await event({ type: 'at', w: A23 + 4 });
     expect(barSays()).not.toContain(words.uthmani(A23 + 4));
     await act(async () => {
       await new Promise((r) => setTimeout(r, revealDelay(wordLetters(words.uthmani(A23 + 4)), null) + 100));
     });
-    expect(barSays()).toContain(words.uthmani(A23 + 4));
+    expect(flatStyle(screen.getByTestId('live-follow-ink')).left).toBeCloseTo(inkOn(A23 + 4));
     expect(screen.queryByTestId('live-cover-current')).toBeNull();
+    // The bar waits until it has been said: the next word has begun (RECITE-28).
+    expect(barSays()).not.toContain(words.uthmani(A23 + 4));
+    await event({ type: 'at', w: A23 + 5 });
+    expect(barSays()).toContain(words.uthmani(A23 + 4));
   });
 });
 
@@ -1204,6 +1219,9 @@ describe('the guess before the lock (contract draft 11, protocol 9; Majd: the cu
     await event({ type: 'locked', w: A23 + 5, s: 27, a: 23 });
     await event({ type: 'guess', w: A23 + 1 } as LiveEvent);
     expect(screen.queryAllByTestId('live-ayah-band').length).toBeGreaterThan(0);
+    // The word it locked on has only begun: the bar names it once the next one starts (RECITE-28).
+    expect(screen.getByTestId('recite-status').props.children).toBe('Listening…');
+    await event({ type: 'at', w: A23 + 6 });
     expect(screen.queryByTestId('recite-status')).toBeNull();
   });
 
@@ -1854,6 +1872,7 @@ describe('Recite the mistakes again (Majd, Nov 15 2026: one take from the first 
     await event({ type: 'ready', take: 't2', protocol: 6 });
     expect(screen.getByTestId('recite-score')).toHaveTextContent('100%');
     await event({ type: 'at', w: A23 });
+    await event({ type: 'at', w: A23 + 1 });
     expect(screen.getByTestId('recite-words')).toBeTruthy();
   });
 
@@ -2590,9 +2609,11 @@ describe('long takes (Nov 20 2026): Stop always ends in a summary, and the take 
     await event({ type: 'said', upTo: A23 + 1 });
     expect(screen.getByTestId('recite-words')).toBeTruthy();
     const bar = () => screen.getByTestId('recite-middle').props.accessibilityLabel as string;
-    expect(bar()).toContain(words.uthmani(A23 + 1));
+    // The first at once (its word before the cursor is said); the rest together.
+    expect(bar()).toContain(words.uthmani(A23));
+    expect(bar()).not.toContain(words.uthmani(A23 + 1));
+    await settle(() => expect(bar()).toContain(words.uthmani(A23 + 1)));
     expect(bar()).not.toContain(words.uthmani(A23 + 2));
-    await settle(() => expect(bar()).toContain(words.uthmani(A23 + 2)));
   });
 });
 
@@ -2602,21 +2623,21 @@ describe('a resume the checker didn’t hold (long takes, Nov 20 2026)', () => {
     await event({ type: 'at', w: A23 + 8, t: 30 });
     await event({ type: 'said', upTo: A23 + 7 });
     const bar = () => screen.getByTestId('recite-middle').props.accessibilityLabel as string;
-    expect(bar()).toContain(words.uthmani(A23 + 8));
+    expect(bar()).toContain(words.uthmani(A23 + 7));
     // Another instance: it holds nothing, and checks the take again from its start.
     await event({ type: 'ready', take: 't1', protocol: 8, from: 0 });
     await event({ type: 'locked', w: A23, s: 27, a: 23, t: 0.8 });
     await event({ type: 'at', w: A23 + 1, t: 2 });
     await event({ type: 'said', upTo: A23 });
     await event({ type: 'score', reached: 1, mistakes: 0, tajweed: 0, accuracy: 1 } as never);
-    expect(bar()).toContain(words.uthmani(A23 + 8));
+    expect(bar()).toContain(words.uthmani(A23 + 7));
     expect(bar()).not.toContain(words.uthmani(A23 + 1));
     // A mark it finds again applies (by id).
     await event({ type: 'mark', mark: { id: `${A23 + 4}:word:sound`, w: A23 + 4, ayah: [27, 23], kind: 'word', heard: 'وَأُوهِيَتْ', sure: 'clear' } as never });
     expect(screen.getAllByTestId('live-mark-word').length).toBe(1);
     // Past where the page was: it follows again.
     await event({ type: 'at', w: A23 + 9, t: 31 });
-    expect(bar()).toContain(words.uthmani(A23 + 9));
+    expect(bar()).toContain(words.uthmani(A23 + 8));
   });
 });
 

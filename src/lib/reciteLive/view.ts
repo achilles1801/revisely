@@ -3,11 +3,11 @@
 import type { QuranWords } from '../recite/quranWords';
 import type { WordFollow } from '../recite/hiddenPage';
 import { isUnclear, strongestByWord, type Mark } from './contract';
-import { furthestWord, LiveState, LiveStatus, mistakeCount } from './state';
+import { barUpTo, furthestWord, LiveState, LiveStatus, mistakeCount } from './state';
 import { formatAccuracy, pageAccuracy, ScoreLevel, scoreLevel } from './score';
 
 /**
- * A word in the bar: the one being said (blue), one already said, one said wrong (as heard, on red), one with a wrong
+ * A word in the bar: the newest one said (`current`, in the following ink), one said before it, one said wrong (as heard, on red), one with a wrong
  * haraka or letter (tone `slip`, on amber; `part` says which) or a tajweed note (on violet): the page's highlights (Majd,
  * Nov 15 2026; components/reciteLive/markColours' `toneFill`). The colours never follow the accent.
  */
@@ -20,16 +20,17 @@ export interface BarWord {
 }
 
 /**
- * The words heard, for the bar: the last two up to the cursor (newest last). Check shows a wrong word as heard. `upTo`
- * (a hidden page): no further than the page shows, so the bar never gives away the word being said (RECITE-6).
+ * The words heard, for the bar: the last two said (newest last), never the word being said (RECITE-28). Check shows a
+ * wrong word as heard. `upTo` (a hidden page): no further than the page shows (RECITE-6).
  */
 export function barWords(
   state: LiveState,
   words: QuranWords,
   opts: { check: boolean; startWord: number | null; upTo?: number | null },
 ): BarWord[] {
-  if (state.cursor == null) return [];
-  const top = opts.upTo !== undefined ? Math.min(state.cursor, opts.upTo ?? -1) : state.cursor;
+  const said = barUpTo(state);
+  if (said == null) return [];
+  const top = opts.upTo !== undefined ? Math.min(said, opts.upTo ?? -1) : said;
   const wrong = new Map<number, Mark>();
   const skipped = new Set<number>();
   const slipped = new Map<number, 'harakat' | 'letter'>();
@@ -54,7 +55,7 @@ export function barWords(
         ? { w, text: m.heard ?? words.uthmani(w), tone: 'wrong' }
         : part
           ? { w, text: words.uthmani(w), tone: 'slip', part }
-          : { w, text: words.uthmani(w), tone: tajweed.has(w) ? 'tajweed' : w === state.cursor ? 'current' : 'said' },
+          : { w, text: words.uthmani(w), tone: tajweed.has(w) ? 'tajweed' : out.length === 0 ? 'current' : 'said' },
     );
   }
   return out;

@@ -710,7 +710,7 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   in place in its own ink. Nothing over or under a marker shows while the word beside it on that side is hidden (a
   sajdah's overline did beside page 379's ۲٤, Nov 22 2026). Nothing of it fills in afterwards (Majd's Dev take, Nov 22 2026: "it should just appear ready
   from the start like it was before"). During a take the newest word shown is in the following colour (green, the same as the word being
-  said in the bar) and the words before it in the page's own ink; it moves on with each word shown, never to a word
+  newest word in the bar) and the words before it in the page's own ink; it moves on with each word shown, never to a word
   still covered. A word with a mark keeps its wash and the page's ink instead: the mark says more than where the reciter
   is. Mistakes' washes show on a hidden word's place as on a shown word, behind the ink. With the page shown nothing is
   inked (RECITE-19). (Majd, Nov 22 2026, of Tarteel's hidden page: "i dont see the words being a different color as its
@@ -768,6 +768,13 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   in partway through an ayah needs the next one whole, or those 9 words. (Majd, Nov 23 2026: "atleast one verse has to
   be recited".)
 ## Recite insights
+- **RECITE-28.** The take's bar names a word only once it has been said: when the cursor has moved on from it, or `said`
+  reaches it at a pause, on the server and on the phone alike (Majd, Nov 23 2026: "i would basically start reciting a word
+  (didn't finish saying it yet) and it shows me the whole word already on the bottom tracker thing as if i already said
+  it"; the cursor lands on a word as it begins, a median 0.45 s in and before its end 94% of the time). The word being
+  said is never in the bar, the page shown or hidden. A word said earlier and gone back to isn't named again until it is
+  said again. Once the take has stopped, the bar ends on the word it stopped on. The newest word named is in the following
+  ink.
 
 What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).
 

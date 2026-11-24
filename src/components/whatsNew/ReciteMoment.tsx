@@ -85,12 +85,14 @@ export function ReciteMoment({
   }, [straightToEnd, length]);
 
   const frame = momentAt(at, take);
+  // As the real bar: the last two words said, never the one being said (RECITE-28).
+  const lastSaid = frame.cursor == null ? null : frame.ended ? frame.cursor : frame.cursor - 1;
   const barWords =
-    frame.cursor == null
+    lastSaid == null || lastSaid < take.order[0]
       ? []
       : [
-          ...(frame.cursor - 1 >= take.order[0] ? [{ w: frame.cursor - 1, text: textOf(frame.cursor - 1), tone: 'said' as const }] : []),
-          { w: frame.cursor, text: textOf(frame.cursor), tone: 'current' as const },
+          ...(lastSaid - 1 >= take.order[0] ? [{ w: lastSaid - 1, text: textOf(lastSaid - 1), tone: 'said' as const }] : []),
+          { w: lastSaid, text: textOf(lastSaid), tone: 'current' as const },
         ];
 
   return (

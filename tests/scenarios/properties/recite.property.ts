@@ -49,7 +49,7 @@ import { AT_LAG, clipRange, endsPhrase, LEAD, MAX_SECONDS, phraseOf, SHORT_WORDS
 import { pagesReached, perPageLabel, PER_PAGE_FROM } from '../../../src/lib/reciteLive/score';
 import { expectedPhrase, recitedPhrase } from '../../../src/lib/reciteLive/describe';
 import { socketFeed, CATCHUP_SLICE_SAMPLES, CATCHUP_TICK_MS, KEEPALIVE_MS, WATCHDOG_MS, type SocketLike } from '../../../src/lib/reciteLive/socket';
-import { scoreTapOpens } from '../../../src/lib/reciteLive/view';
+import { barWords, scoreTapOpens } from '../../../src/lib/reciteLive/view';
 import type { StartFrame } from '../../../src/lib/reciteLive/feed';
 import { meanScore } from '../../../src/lib/reciteInsights/insights';
 import { passageTakes } from '../../../src/lib/reciteMemory/progress';
@@ -567,6 +567,33 @@ describe('[RECITE-8] Test me: places at random in what is memorized, and how eac
         if (score > 0) return expect(r.outcome).toBe('mistakes');
         const reached = Math.max(s.cursor ?? -1, s.saidUpTo ?? -1) >= place.last;
         expect(r.outcome).toBe(!reached ? 'unfinished' : peeked > 0 ? 'helped' : 'clean');
+      }),
+      { numRuns: runs(200) },
+    );
+  });
+});
+
+
+describe('[RECITE-28] the bar names a word only once it has been said', () => {
+  const frame = fc.oneof(
+    fc.integer({ min: 0, max: 40 }).map((d) => ({ type: 'at' as const, d })),
+    fc.integer({ min: 0, max: 40 }).map((d) => ({ type: 'said' as const, d })),
+  );
+
+  it('while the take runs, the word under the cursor is there only when `said` is exactly on it, whatever the order of frames', () => {
+    const start = words.verseFirstWord(2, 255);
+    fc.assert(
+      fc.property(fc.array(frame, { minLength: 1, maxLength: 40 }), fc.boolean(), (frames, check) => {
+        let s = applyEvent(liveConnecting(), { type: 'ready', take: 't', protocol: 6 });
+        s = applyEvent(s, { type: 'locked', w: start, s: 2, a: 255 });
+        for (const f of frames) {
+          s = f.type === 'at' ? applyEvent(s, { type: 'at', w: start + f.d }) : applyEvent(s, { type: 'said', upTo: start + f.d });
+          const shown = barWords(s, words, { check, startWord: start }).map((b) => b.w);
+          const cursor = s.cursor as number;
+          if (s.saidUpTo !== cursor) expect(shown).not.toContain(cursor);
+          for (const w of shown) expect(w).toBeLessThanOrEqual(cursor);
+          if (shown.length) expect(shown[shown.length - 1]).toBe(s.saidUpTo === cursor ? cursor : cursor - 1);
+        }
       }),
       { numRuns: runs(200) },
     );

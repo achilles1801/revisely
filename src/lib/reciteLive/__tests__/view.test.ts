@@ -11,21 +11,42 @@ const mark = (over: Partial<Mark>): Mark => ({ id: 'm', w: UTIYAT, ayah: [27, 23
 const at = (s: LiveState, w: number) => applyEvent(s, { type: 'at', w });
 
 describe('the words heard in the bar', () => {
-  it('the last two up to the cursor, the newest last and marked current', () => {
+  it('the last two said, the newest last and marked current; never the word under the cursor [RECITE-28]', () => {
     const s = at(liveConnecting(), A23 + 3);
     expect(barWords(s, words, { check: false, startWord: A23 })).toEqual([
-      { w: A23 + 2, text: words.uthmani(A23 + 2), tone: 'said' },
-      { w: A23 + 3, text: words.uthmani(A23 + 3), tone: 'current' },
+      { w: A23 + 1, text: words.uthmani(A23 + 1), tone: 'said' },
+      { w: A23 + 2, text: words.uthmani(A23 + 2), tone: 'current' },
     ]);
+  });
+
+  it('[RECITE-28] the word under the cursor joins once `said` reaches it at a pause', () => {
+    const s = applyEvent(at(liveConnecting(), A23 + 3), { type: 'said', upTo: A23 + 3 });
+    expect(barWords(s, words, { check: false, startWord: A23 }).map((b) => [b.w - A23, b.tone])).toEqual([
+      [2, 'said'],
+      [3, 'current'],
+    ]);
+  });
+
+  it('[RECITE-28] gone back: a word said earlier waits to be said again', () => {
+    let s = applyEvent(at(liveConnecting(), A23 + 8), { type: 'said', upTo: A23 + 8 });
+    s = at(s, A23 + 4);
+    expect(barWords(s, words, { check: false, startWord: A23 }).map((b) => b.w - A23)).toEqual([2, 3]);
+  });
+
+  it('[RECITE-28] once the take has stopped, the bar ends on the word it stopped on', () => {
+    const s: LiveState = { ...at(liveConnecting(), A23 + 3), status: 'checking' };
+    expect(barWords(s, words, { check: false, startWord: A23 }).map((b) => b.w - A23)).toEqual([2, 3]);
   });
 
   it('nothing before the cursor is found, and never before the take began', () => {
     expect(barWords(liveConnecting(), words, { check: false, startWord: A23 })).toEqual([]);
-    expect(barWords(at(liveConnecting(), A23), words, { check: false, startWord: A23 }).map((b) => b.w)).toEqual([A23]);
+    // The first word, only just begun: nothing yet.
+    expect(barWords(at(liveConnecting(), A23), words, { check: false, startWord: A23 })).toEqual([]);
+    expect(barWords(at(liveConnecting(), A23 + 1), words, { check: false, startWord: A23 }).map((b) => b.w)).toEqual([A23]);
   });
 
   it('Check: a wrong word shows as heard; a skipped one is left out. Recite shows the text as written', () => {
-    let s = at(liveConnecting(), A23 + 6);
+    let s = at(liveConnecting(), A23 + 7);
     s = applyEvent(s, { type: 'mark', mark: mark({ id: 'a', heard: 'وَأُوهِيَتْ', heardExact: false }) });
     s = applyEvent(s, { type: 'mark', mark: mark({ id: 'b', w: A23 + 5, kind: 'skipped' }) });
     expect(barWords(s, words, { check: true, startWord: A23 }).map((b) => [b.w - A23, b.tone, b.tone === 'wrong' ? b.text : ''])).toEqual([
@@ -36,7 +57,7 @@ describe('the words heard in the bar', () => {
   });
 
   it('Check: a word with a slip (a haraka, a letter) is amber, a tajweed note violet, the current one too; Recite marks none', () => {
-    let s = at(liveConnecting(), A23 + 8);
+    let s = at(liveConnecting(), A23 + 9);
     s = applyEvent(s, { type: 'mark', mark: mark({ id: 'h', w: A23 + 7, kind: 'harakat', sure: 'clear', slip: { expected: 'ٍ', heard: 'ٌّ' } }) });
     s = applyEvent(s, { type: 'mark', mark: mark({ id: 't', w: A23 + 8, kind: 'tajweed', rule: 'qalqalah' }) });
     expect(barWords(s, words, { check: true, startWord: A23 }).map((b) => [b.w - A23, b.tone])).toEqual([
@@ -47,7 +68,7 @@ describe('the words heard in the bar', () => {
   });
 
   it('a wrong haraka or letter says which, for a screen reader (a mistake like a wrong word, RECITE-2)', () => {
-    let s = at(liveConnecting(), A23 + 8);
+    let s = at(liveConnecting(), A23 + 9);
     s = applyEvent(s, { type: 'mark', mark: mark({ id: 'h', w: A23 + 7, kind: 'harakat', sure: 'clear' }) });
     s = applyEvent(s, { type: 'mark', mark: mark({ id: 'l', w: A23 + 8, kind: 'letter', sure: 'clear' }) });
     expect(barWords(s, words, { check: true, startWord: A23 }).map((b) => [b.w - A23, b.tone, b.part])).toEqual([
@@ -60,7 +81,7 @@ describe('the words heard in the bar', () => {
   });
 
   it('a “not clear” haraka (past the normal bar only) isn’t shown as a slip: it wasn’t heard as wrong', () => {
-    let s = at(liveConnecting(), A23 + 8);
+    let s = at(liveConnecting(), A23 + 9);
     s = applyEvent(s, { type: 'mark', mark: mark({ id: 'h', w: A23 + 7, kind: 'harakat', sure: 'likely' }) });
     expect(barWords(s, words, { check: true, startWord: A23 }).map((b) => [b.w - A23, b.tone])).toEqual([
       [7, 'said'],
