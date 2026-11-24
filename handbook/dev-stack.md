@@ -461,10 +461,11 @@ owner's `on-device-release.md`).
 - **The engine's self-check per device** (ONDEV-1): the bench records it as a `runs` entry `{mode: 'selfCheck', …}` in
   `onDeviceBench`, once per pack and app update (`recordSelfCheck`). Test Lab: `testLab.selfCheck` in the OBB's `bench.json`
   (`packId`, `blobs: [{name, file, room}]`) opens plain watermarked blobs, and the results file gets a `selfCheck` key.
-  With the real engine the bench and Test Lab then run a Strict take of the 90 s clip at the live pace (`engineTest.ts`): a
-  `{mode: 'engineTest'}` run with late hops, the slowest hop and peak memory (iOS footprint peak, Android VmHWM).
+  With the real engine the bench and Test Lab then run a take of the 90 s clip at the live pace (`engineTest.ts`), from that
+  golden's own start frame (78:1–30): a `{mode: 'engineTest'}` run with late hops, the slowest hop, memory, the final marks and
+  score, and each live mark with its sample position, so the same samples can be compared mark for mark with the Python.
 - **The on-device bench** (Settings → Testing → On-device model, BEHAVIOUR.md ONDEV-1): its list of runs, the models,
-  the clip (EveryAyah, Husary, page 7, 90 s) and M's vectors live on the dev bucket under `models/recite/`
+  the clip (EveryAyah, Husary, An-Naba from 78:1, 90 s: the start of the lab's `golden/bench-v0-on/husary.p7.clean.clean`, where "p7" is the item's name, not a mushaf page) and M's vectors live on the dev bucket under `models/recite/`
   (`bench.json` is the manifest: files with sizes and SHA-256, runs per platform, M's pass marks). Changing the runs or
   adding a model is an upload, not a build: put the file there with the dev admin key and add it to `bench.json`.
   The first run in a platform's list is the long run's (5 or 20 minutes at the live cadence, battery and heat each

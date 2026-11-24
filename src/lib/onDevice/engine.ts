@@ -162,7 +162,15 @@ export async function engineStrictTest(
   const bridge = engineBridge();
   if (!m || !bridge || openTakes > 0) return null;
   const wasOpen = !!openEngineInfo();
+  // A build from engine 0.2.1 on can read the app's memory now; before it, these stay null.
+  const memoryNow = (): number | null => {
+    const read = (m as Native & { memoryNowMb?: () => number }).memoryNowMb;
+    const mb = read?.call(m);
+    return typeof mb === 'number' && mb > 0 ? Math.round(mb * 10) / 10 : null;
+  };
+  const beforeOpenMb = wasOpen ? null : memoryNow();
   await openNow();
+  const afterOpenMb = wasOpen ? null : memoryNow();
   const info = openEngineInfo();
   if (!info || isReplayEngine(info) || openTakes > 0) {
     if (!wasOpen && openTakes === 0 && info) await m.engineRelease?.();
@@ -177,6 +185,9 @@ export async function engineStrictTest(
       pcm,
       hop: info.hop ?? null,
       peakMb: () => m.memoryPeakMb?.() ?? 0,
+      memoryNow,
+      beforeOpenMb,
+      afterOpenMb,
       now: () => Date.now(),
       sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
       keepGoing: () => AppState.currentState === 'active' && keepGoing(),

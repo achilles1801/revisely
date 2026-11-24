@@ -55,6 +55,42 @@ describe('[ONDEV-1] the Strict take on a recording', () => {
     });
   });
 
+  it('starts where the clip starts: An-Naba from 78:1, the golden’s own frame', () => {
+    expect(TEST_START).toMatchObject({ s: 78, a: 1, s2: 78, a2: 30, namesAfter: true, letters: true, mon: 4, mot: 4, aar: 0 });
+    expect(TEST_START.startBy).toBeUndefined();
+  });
+
+  it('keeps the final marks and score, and each live mark with the samples fed by then', async () => {
+    const mark = { id: '75163:letter:', w: 75163, ayah: [78, 14], kind: 'letter', sure: 'likely', heard: 'x', t: [1.5, 2] };
+    const h = harness({}, (e) =>
+      e(
+        { type: 'done', result: { from: 75121, to: 75160, secs: 90, why: 'end', score: { reached: 40, mistakes: 1, accuracy: 0.97 }, marks: [mark] } },
+        { type: 'meter', hops: 6, late_hops: 0, worst_hop_ms: 100, max_lag_s: 0.1 },
+      ),
+    );
+    h.bridge.feed.mockImplementationOnce((_t: number, _p: Int16Array) => undefined);
+    h.bridge.feed.mockImplementationOnce(() => {
+      h.emit({ type: 'at', w: 75150 }, { type: 'at', w: 75158 }, { type: 'mark', mark }, { type: 'unmark', id: mark.id, why: 'corrected' });
+      return undefined;
+    });
+    const run = await runEngineTest(h.deps);
+    expect(run.result).toEqual({
+      from: 75121, to: 75160, secs: 90, start: null, why: 'end', score: { reached: 40, mistakes: 1, accuracy: 0.97 },
+      marks: [{ id: '75163:letter:', w: 75163, ayah: [78, 14], kind: 'letter', detail: null, sure: 'likely', t: [1.5, 2] }],
+    });
+    expect(run.liveMarks).toEqual([{ id: '75163:letter:', w: 75163, ayah: [78, 14], kind: 'letter', detail: null, sure: 'likely', t: [1.5, 2], atSample: 1600 }]);
+    expect(run.unmarks).toEqual([{ id: '75163:letter:', why: 'corrected', atSample: 1600 }]);
+    expect(run.lastAt).toBe(75158);
+    expect(JSON.stringify(run)).not.toContain('undefined');
+  });
+
+  it('reads the app’s memory through the take where the build can, and stays null where it can’t', async () => {
+    let mb = 300;
+    const can = harness({ beforeOpenMb: 240, afterOpenMb: 300, memoryNow: () => (mb += 5) });
+    expect((await runEngineTest(can.deps)).memoryMb).toEqual({ beforeOpen: 240, afterOpen: 300, takeMax: 320 });
+    expect((await runEngineTest(harness().deps)).memoryMb).toEqual({ beforeOpen: null, afterOpen: null, takeMax: null });
+  });
+
   it('runs words and harakat, and says so, on an engine with no Strict level', async () => {
     const { deps, bridge } = harness({ level: 'harakat' });
     const run = await runEngineTest(deps);
