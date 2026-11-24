@@ -531,6 +531,25 @@ describe('Show on the page', () => {
     expect(screen.getByTestId('past-highlight-word')).toBeTruthy();
   });
 
+  it('[RECITE-7] a take saved from the removed option opens and reads like any other, with no way to recite just its mistakes', async () => {
+    const was = mockState.dev;
+    mockState.dev = true;
+    try {
+      await open();
+      fireEvent.press(screen.getByTestId('shown-take-open'));
+      await flush();
+      expect(screen.getByTestId('take-summary-when')).toBeTruthy();
+      expect(screen.getByTestId('take-summary-passage')).toBeTruthy();
+      expect(screen.getByText('1 wrong word')).toBeTruthy();
+      expect(screen.queryByTestId('take-summary-drill')).toBeNull();
+      expect(screen.queryByTestId('take-summary-before')).toBeNull();
+      expect(screen.queryByTestId('take-summary-again')).toBeNull();
+      expect(screen.getByTestId('take-summary-done')).toBeTruthy();
+    } finally {
+      mockState.dev = was;
+    }
+  });
+
   it('[RECITE-25] its card is the footer, in the room the page leaves under it, never over the page’s last lines', async () => {
     await open();
     // Majd, Nov 22 2026: the card sat over the bottom verses, "which is unacceptable". The page is laid out above the

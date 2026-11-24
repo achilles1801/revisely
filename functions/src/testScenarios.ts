@@ -1345,7 +1345,7 @@ function buildHeavy(b: Builder): void {
     ['user', 'How did my recitation go this week?'],
     [
       'revo',
-      'Steady: most takes were at or above 99%. Al-Kahf, ayah 75 is the one that keeps slipping, where you go on as ayah 72. Recite the mistakes again from its page once a day.',
+      'Steady: most takes were at or above 99%. Al-Kahf, ayah 75 is the one that keeps slipping, where you go on as ayah 72. Recite that page again once a day.',
       ['Which words are still marked?'],
     ],
   ]);

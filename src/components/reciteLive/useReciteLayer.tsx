@@ -2,9 +2,9 @@
 // MushafPager. The reader has it on every page; a revision session on its day's pages (Majd, Nov 17 2026: "add the
 // mistake detection and mic functionality same as mushaf to the revision sessions themselves").
 //
-// What it holds: the mic and its held menu (Record, Recite, Mark mistakes, Recite your N mistakes here, Test me), the
+// What it holds: the mic and its held menu (Record, Recite, Mark mistakes, Test me), the
 // take's bar, the page's layers (the cursor, the marks, the hidden view, peeked words, past mistakes, a past take shown),
-// the mark and word cards, the summary, Recite the mistakes again, Test me, the AI notice and the Premium page.
+// the mark and word cards, the summary, Test me, the AI notice and the Premium page.
 //
 // What the screen keeps: its pager, header, player, recorder and timer. It gives the pager `pager`'s props, puts `bar`
 // in its footer during a take (else its player, with `controls` in the record slot while the recorder is idle), and
@@ -24,7 +24,6 @@ import { CAPSULE_HEIGHT } from '../reader/PlayerCapsule';
 import { UndoToast } from '../revision/UndoToast';
 import { isATake } from '../../lib/reciteLive/takeEnough';
 import { toAyahRef } from '../../lib/verses';
-import { ayahKey, ayahsBetween } from '../../lib/ayahKeys';
 import type { AyahRef } from '../../lib/ayahBounds';
 import { useMushafEdition } from '../../lib/mushafEdition';
 import { openWebPage } from '../../lib/openWebPage';
@@ -60,7 +59,7 @@ import {
   scoreTapOpens,
   wordShown,
 } from '../../lib/reciteLive/view';
-import { NOTHING_PEEKED, Peeked, peekedByAyah, peekedLine } from '../../lib/reciteLive/peeked';
+import { NOTHING_PEEKED, Peeked, peekedByAyah } from '../../lib/reciteLive/peeked';
 import { LiveMode, useLiveRecitation } from './useLiveRecitation';
 import { ReciteMic, ReciteMicMode } from './ReciteMic';
 import { ReciteMenuMode, ReciteModeMenu } from './ReciteModeMenu';
@@ -75,12 +74,10 @@ const NO_VERSES: ReadonlySet<string> = new Set();
 import { ReciteNoticeSheet } from './ReciteNoticeSheet';
 import { MarkCard } from './MarkCard';
 import { SimilarPhrasesSheet } from './SimilarPhrasesSheet';
-import { findingsLine, TakeSummarySheet } from './TakeSummarySheet';
+import { TakeSummarySheet } from './TakeSummarySheet';
 import { say, undoMs, useScreenReaderOn } from './a11y';
 import { navigateToActivityDay } from '../../navigation/navigationRef';
 import { markTitle } from '../../lib/reciteLive/describe';
-import { drillMarks, drillRange, openDrill } from '../../lib/reciteLive/drill';
-import { describeAyahs } from '../../lib/passages';
 import { TakeSpan } from '../../lib/reciteLive/span';
 import { pickTest, type SpotTest, testFinished, testJuz, testLengthLabel } from '../../lib/reciteLive/testMe';
 import { memorizedAyahs } from '../../lib/memorizedAyahs';
@@ -282,7 +279,7 @@ export function useReciteLayer({
   const [tooShort, setTooShort] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [revealed, setRevealed] = useState<Revealed>(NOTHING_SHOWN);
-  // Words shown by hand during the take (‹, ‹‹): kept in quiet grey on the page, listed in the summary, drilled, and kept
+  // Words shown by hand during the take (‹, ‹‹): kept in quiet grey on the page, listed in the summary, and kept
   // with the take's record for its summary later (RMEM-8).
   const [peeked, setPeeked] = useState<Peeked>(NOTHING_PEEKED);
   // Test me (RECITE-8; Majd, Nov 23 2026; lib/reciteLive/testMe): one spot test at a time. A Mark mistakes take with the
@@ -408,8 +405,6 @@ export function useReciteLayer({
     wasRunning.current = takeRunning;
   }, [takeRunning]);
 
-  // Recite the mistakes again: what the take before found in the stretch, for its summary ("Before: …").
-  const [drillBefore, setDrillBefore] = useState<string | null>(null);
   const startMode = useCallback(
     (mode: ReciteMicMode, span: TakeSpan | null = null, reveal: Revealed = NOTHING_SHOWN) => {
       if (mode === 'record') {
@@ -427,46 +422,10 @@ export function useReciteLayer({
       }
       setRevealed(reveal);
       setPeeked(NOTHING_PEEKED);
-      setDrillBefore(null);
       void live.start(mode, span);
     },
     [recorder, owned, reciteSettings.noticeSeen, live],
   );
-  // Recite your N mistakes here (the held mic, with Premium): the page's words still to fix in Recite's memory, as one
-  // take over the stretch that holds them, stopping by itself at its end. Worked out only while the menu is open.
-  // Not with Settings → Mushaf and Recite → "Show past mistakes" off: the page doesn't show them then (RMEM-3).
-  const pageDrill = useMemo(
-    () =>
-      modeMenu && liveOn && owned && qw && reciteSettings.showPast && memoryRecords.length > 0
-        ? openDrill(memoryRecords, qw, currentPage)
-        : null,
-    [modeMenu, liveOn, owned, qw, reciteSettings.showPast, memoryRecords, currentPage],
-  );
-  const menuDrill = useMemo(
-    () =>
-      pageDrill
-        ? {
-            count: pageDrill.count,
-            place: describeAyahs(
-              ayahsBetween(ayahKey(pageDrill.range.from[0], pageDrill.range.from[1]), ayahKey(pageDrill.range.to[0], pageDrill.range.to[1])),
-            ),
-          }
-        : null,
-    [pageDrill],
-  );
-  const drillHere = useCallback(() => {
-    if (!pageDrill) return;
-    setModeMenu(false);
-    setRevealed(NOTHING_SHOWN);
-    setPeeked(NOTHING_PEEKED);
-    // The summary's "Before: …": what those words were last time.
-    setDrillBefore(findingsLine(pageDrill.marks));
-    if (!reciteSettings.noticeSeen) {
-      setNoticeFor({ mode: 'check', span: pageDrill.range, reveal: NOTHING_SHOWN });
-      return;
-    }
-    void live.start('check', pageDrill.range);
-  }, [pageDrill, reciteSettings.noticeSeen, live]);
   // A spot test: the page hidden but for its starting verse, and a take from there to the length chosen.
   const startTest = useCallback(
     (juz: number | null) => {
@@ -731,24 +690,6 @@ export function useReciteLayer({
     // pastNow moves every render; the rest says when to work it out again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pastSummaryOn, pastOpen, shownTake, qw, memoryRecords, historyOn]);
-  // Recite the mistakes again from a past take's summary: one take over the stretch from the ayah before its first
-  // mistake to its last (and the ayat of the words it peeked), as right after the take.
-  const drillPast = (take: TakeRecord) => {
-    if (!qw) return;
-    const peekedAyahs = take.peeked?.length ? peekedByAyah(qw, new Set(take.peeked)).map((p) => p.ayah) : [];
-    const range = drillRange(take.marks, peekedAyahs);
-    if (!range) return;
-    endShowing();
-    setCardAt(null);
-    setRevealed(NOTHING_SHOWN);
-    setPeeked(NOTHING_PEEKED);
-    setDrillBefore([findingsLine(drillMarks(take.marks)), take.peeked?.length ? peekedLine(take.peeked.length) : ''].filter(Boolean).join(', '));
-    if (!reciteSettings.noticeSeen) {
-      setNoticeFor({ mode: 'check', span: range, reveal: NOTHING_SHOWN });
-      return;
-    }
-    void live.start('check', range);
-  };
   // A new take may get the id of the one before (E2E's recorded takes all do): its summary must still show.
   useEffect(() => {
     if (live.state.status === 'connecting') {
@@ -1204,8 +1145,6 @@ export function useReciteLayer({
           }
           testReady={testableJuz.length > 0}
           onClose={() => setModeMenu(false)}
-          drill={menuDrill}
-          onDrill={drillHere}
         />
         <TestMeScopeSheet
           visible={testPick}
@@ -1408,26 +1347,6 @@ export function useReciteLayer({
           }}
           againLabel={test ? t('reciteLive.test.again') : undefined}
           spotTest={test && test.finished != null ? { pages: test.spot.pages, finished: test.finished } : null}
-          onDrill={() => {
-            const marks = Object.values(live.state.marks);
-            const peekedAyahs = qw ? peekedByAyah(qw, peeked).map((p) => p.ayah) : [];
-            const range = drillRange(marks, peekedAyahs);
-            if (!range) return;
-            setSummaryShown(null);
-            setCardAt(null);
-            // Reciting the mistakes again isn't the test: the page goes back to how it was before it.
-            const run = testRef.current;
-            if (run) {
-              setTest(null);
-              setHidden(run.hiddenBefore);
-            }
-            live.clear();
-            setRevealed(NOTHING_SHOWN);
-            setDrillBefore([findingsLine(drillMarks(marks)), peeked.size ? peekedLine(peeked.size) : ''].filter(Boolean).join(', '));
-            setPeeked(NOTHING_PEEKED);
-            void live.start('check', range);
-          }}
-          before={drillBefore}
           memory={checkTake ? summaryMemory : null}
           onProgress={() => {
             if (!takeRecord) return;
@@ -1497,8 +1416,6 @@ export function useReciteLayer({
             else if (showPage(target.page) !== false) onInto(target);
           }}
           onCheck={() => undefined}
-          // With Premium, as right after the take; without it, no such button.
-          onDrill={owned && past ? () => drillPast(past.take) : undefined}
           memory={past?.memory ?? null}
           onProgress={() => {
             if (!past) return;
@@ -1555,8 +1472,6 @@ export function useReciteLayer({
             }
           }}
           onClose={() => {
-            // A stretch's take that never started (Recite your mistakes here) leaves no "Before:" behind.
-            if (noticeFor?.span) setDrillBefore(null);
             setNoticeFor(null);
           }}
         />

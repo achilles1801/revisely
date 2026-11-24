@@ -56,23 +56,19 @@
     "RECITE-4": "513d0ce716bbf002"
   },
   "recite.after": {
-    "RECITE-7": "f7ca3a916a566009",
     "RMEM-6": "59619cdefc24bef0"
   },
   "reciteTake.page": {},
   "reciteTake.hidden": {
-    "RECITE-6": "f03197f68d4f5bb5"
+    "RECITE-6": "d4884044903f55bd"
   },
   "reciteTake.peeked": {
-    "RECITE-6": "f03197f68d4f5bb5"
+    "RECITE-6": "d4884044903f55bd"
   },
   "reciteTake.pause": {},
   "reciteMemory.page": {
     "RMEM-2": "d099ae1a78157e30",
     "RMEM-3": "0acdad49f616daa5"
-  },
-  "reciteMemory.drill": {
-    "RECITE-7": "f7ca3a916a566009"
   },
   "reciteMemory.progress": {
     "RMEM-4": "a81a2f21197bbc1e"

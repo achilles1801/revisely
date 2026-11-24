@@ -55,9 +55,6 @@ export const reciteLive = {
     choose: 'Choose Record or Recite',
   },
   menu: {
-    /** The drill row: "Recite your 3 mistakes here". */
-    drill_one: 'Recite your {{count}} mistake here',
-    drill_other: 'Recite your {{count}} mistakes here',
     record: 'Record',
     recordSub: 'Just record your recitation',
     recite: 'Recite',
@@ -116,7 +113,6 @@ export const reciteLive = {
     deleteBody: 'Its marks and its recording are deleted. This can’t be undone.',
     title: 'Your recitation',
     deleteTake: 'Delete this take',
-    drill: 'Recite the mistakes again',
     again: 'Recite again',
     recitedLabel: 'In today’s Recited, in Activity',
     recited: 'In today’s Recited',
@@ -124,7 +120,6 @@ export const reciteLive = {
     recitedDayLabel: 'The day of this take, in Activity',
     recitedDay: 'Its day in Activity',
     score: 'Score {{score}}, {{mistakes}}',
-    before: 'Before: {{before}}',
     intoLabel: '{{line}}. Show it in the reader',
     findingLabel: '{{title}}, {{place}}. Show it on the page',
     /** A finding's title: "Wrong word · ayah 23". */

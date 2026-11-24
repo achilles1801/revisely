@@ -1,6 +1,6 @@
 // Peeked words (Majd, Nov 15 2026: approved; Tarteel keeps them too): words shown by hand during a take, with ‹ or ‹‹
 // on the hidden page. A peek is a word not recalled, so the page keeps it in quiet grey ink (even once it has been
-// recited), the summary lists them by ayah, and Recite the mistakes again takes in their ayahs. They never count in the
+// recited), the summary lists them by ayah. They never count in the
 // score (the checker counts them as `helped`). The words Test me shows to start a place aren't peeks.
 
 import type { QuranWords } from '../recite/quranWords';
