@@ -419,6 +419,10 @@ export const settings = {
     engineTestResult: 'Strict take: {{late}} of {{hops}} checks late, slowest {{worst}} ms, peak memory {{peak}} MB',
     engineTestResultWords: 'Words and harakat take (no Strict here): {{late}} of {{hops}} checks late, slowest {{worst}} ms, peak memory {{peak}} MB',
     engineTestFailed: 'The Strict take didn’t finish: {{error}}',
+    /** The speed check that decides the hop, after the test takes. */
+    engineTestSpeed: 'Speed check: p95 {{p95}} ms, so the {{hop}} s hop',
+    engineTestSpeedServer: 'Speed check: p95 {{p95}} ms, too slow: takes go to the server',
+    engineTestSpeedNone: 'Speed check: no result ({{why}})',
     engineTestStepDown: 'A take like this would step down to the 1 s hop.',
     engineTestLeft: 'The Strict take stopped when the screen was left. It runs again next time.',
     reading: 'Reading the list of runs…',

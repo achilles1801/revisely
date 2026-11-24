@@ -31,7 +31,9 @@ import {
   type PlanSpec,
   type RunSummary,
 } from './bench';
+import type { EngineTestClip } from './engine';
 import type { EngineTestRun } from './engineTest';
+import type { SpeedRun } from './speedCheck';
 import { selfCheckRun, type SelfCheck } from './selfCheck';
 
 export const MANIFEST_PATH = 'models/recite/bench.json';
@@ -117,8 +119,9 @@ export async function ensureFiles(
   manifest: BenchManifest,
   plans: readonly PlanSpec[],
   onProgress: (p: DownloadProgress) => void,
+  extra: readonly string[] = [],
 ): Promise<Record<string, string>> {
-  const keys = filesFor(manifest, plans);
+  const keys = [...new Set([...filesFor(manifest, plans), ...extra])];
   const out: Record<string, string> = {};
   const missing = keys.filter((k) => {
     const have = verifiedPath(manifest, k);
@@ -315,8 +318,8 @@ export function selfCheckRecord(device: DeviceInfo, check: SelfCheck) {
 }
 
 /** A record of the Strict take on a recording (engineTest.ts), as a run entry of its own. */
-export function engineTestRecord(device: DeviceInfo, run: EngineTestRun) {
-  return { ...benchRecord(device, 1, []), runs: [run] };
+export function engineTestRecord(device: DeviceInfo, runs: readonly EngineTestRun[], speed: SpeedRun | null) {
+  return { ...benchRecord(device, 1, []), runs: [...runs, ...(speed ? [{ mode: 'speedCheck' as const, ...speed }] : [])] };
 }
 
 export async function sendBenchRecord(
@@ -361,13 +364,17 @@ export function readPcm(uri: string): Int16Array {
 }
 
 /** The bench's recording, downloaded and checked if it isn't here yet. */
-export async function benchClip(engine: Engine, manifest: BenchManifest): Promise<Int16Array> {
-  const files = await ensureFiles(engine, manifest, [], () => undefined);
-  return readPcm(files[manifest.audio]);
+/** The engine test's clips from the manifest (or its one clip), each downloaded and checked the first time it's read. */
+export function benchClips(engine: Engine, manifest: BenchManifest): EngineTestClip[] {
+  const takes = manifest.takes ?? [{ file: manifest.audio, start: undefined }];
+  let files: Promise<Record<string, string>> | null = null;
+  const all = () => (files ??= ensureFiles(engine, manifest, [], () => undefined, takes.map((t) => t.file)));
+  return takes.map((t) => ({ key: t.file, ...(t.start ? { start: t.start } : {}), read: async () => readPcm((await all())[t.file]) }));
 }
 
 export interface EngineTestResult {
-  run: EngineTestRun;
+  runs: EngineTestRun[];
+  speed: SpeedRun | null;
   sendError: string | null;
 }
 
@@ -378,28 +385,29 @@ export interface EngineTestResult {
 export async function recordEngineTest(
   device: DeviceInfo,
   packId: string,
-  readClip: () => Promise<Int16Array>,
+  clips: readonly EngineTestClip[],
   keepGoing: () => boolean,
   onProgress: (doneSec: number, totalSec: number) => void,
 ): Promise<EngineTestResult | null> {
   const release = currentRelease();
   const key = [packId, release.build ?? '', release.updateId ?? ''].join('|');
   try {
-    const saved = JSON.parse((await AsyncStorage.getItem(ENGINE_TEST_DONE)) ?? 'null') as { key?: string; run?: EngineTestRun } | null;
-    if (saved?.key === key && saved.run) return { run: saved.run, sendError: null };
+    const saved = JSON.parse((await AsyncStorage.getItem(ENGINE_TEST_DONE)) ?? 'null') as { key?: string; runs?: EngineTestRun[]; speed?: SpeedRun | null } | null;
+    if (saved?.key === key && saved.runs) return { runs: saved.runs, speed: saved.speed ?? null, sendError: null };
   } catch {
     // run it again
   }
-  const { engineStrictTest } = require('./engine') as typeof import('./engine');
-  const run = await engineStrictTest(await readClip(), keepGoing, onProgress);
-  if (!run) return null;
-  if (run.interrupted) return { run, sendError: null };
+  const { engineTests } = require('./engine') as typeof import('./engine');
+  const done = await engineTests(clips, keepGoing, onProgress);
+  if (!done || done.runs.length === 0) return null;
+  const { runs, speed } = done;
+  if (runs.some((r) => r.interrupted)) return { runs, speed, sendError: null };
   try {
-    await sendBenchRecord(engineTestRecord(device, run));
-    await AsyncStorage.setItem(ENGINE_TEST_DONE, JSON.stringify({ key, run }));
-    return { run, sendError: null };
+    await sendBenchRecord(engineTestRecord(device, runs, speed));
+    await AsyncStorage.setItem(ENGINE_TEST_DONE, JSON.stringify({ key, runs, speed }));
+    return { runs, speed, sendError: null };
   } catch (err) {
     logger.warn('Engine test record not sent', err);
-    return { run, sendError: err instanceof Error ? err.message : String(err) };
+    return { runs, speed, sendError: err instanceof Error ? err.message : String(err) };
   }
 }

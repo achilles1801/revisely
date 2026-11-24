@@ -11,7 +11,7 @@ const mockState = {
   loop: null as { scenario: number; results: string | null } | null,
   obb: {} as Record<string, unknown>,
   shaWrong: null as string | null,
-  writes: [] as { status: string; error?: string; runs: string[]; selfCheck?: Record<string, unknown>; engineTest?: Record<string, unknown> }[],
+  writes: [] as { status: string; error?: string; runs: string[]; selfCheck?: Record<string, unknown>; engineTests?: Record<string, unknown>[]; speedCheck?: Record<string, unknown> }[],
   finished: 0,
   plans: [] as unknown[],
   opened: [] as unknown[],
@@ -67,7 +67,10 @@ jest.mock('../benchRun', () => {
 });
 
 jest.mock('../engine', () => ({
-  engineStrictTest: jest.fn(async () => ({ mode: 'engineTest', ok: true, hops: 180, lateHops: 0, peakAfterMb: 400 })),
+  engineTests: jest.fn(async (clips: { key: string }[]) => ({
+    runs: clips.map((c) => ({ mode: 'engineTest', clip: c.key, ok: true, hops: 180, lateHops: 0, peakAfterMb: 400 })),
+    speed: { kept: true, p95: 230, hop: 0.5, calls: 36 },
+  })),
 }));
 
 import { runTestLoopIfAsked } from '../testLoop';
@@ -141,7 +144,8 @@ describe('[ONDEV-1] the bench on Test Lab’s phones (game loop)', () => {
     const last = mockState.writes[mockState.writes.length - 1];
     expect(last.status).toBe('done');
     expect(last.selfCheck).toMatchObject({ ok: true, packId: 'v7m-1', v7: { maxDiff: 0.00004, topDiff: 0 } });
-    expect(last.engineTest).toMatchObject({ mode: 'engineTest', ok: true, hops: 180, peakAfterMb: 400 });
+    expect(last.engineTests).toEqual([expect.objectContaining({ mode: 'engineTest', clip: 'clip', ok: true, hops: 180, peakAfterMb: 400 })]);
+    expect(last.speedCheck).toMatchObject({ kept: true, p95: 230, hop: 0.5 });
     expect(mockState.finished).toBe(1);
   });
 });

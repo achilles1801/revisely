@@ -89,7 +89,7 @@ jest.mock('../../../lib/onDevice/benchRun', () => {
     ),
     recordSelfCheck: jest.fn(async () => mockBench.selfCheck),
     recordEngineTest: jest.fn(async () => mockBench.engineTest),
-    benchClip: jest.fn(async () => new Int16Array(2)),
+    benchClips: jest.fn(() => []),
     benchRecord: (device: object, windows: number, runs: BenchRun[]) => ({ device, windows, runs: runs.map((r) => r.plan.model) }),
     sendBenchRecord: jest.fn(async (rec: unknown) => {
       mockBench.sent.push(rec);
@@ -274,11 +274,12 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
       sendError: null,
     };
     mockBench.engineTest = {
-      run: { mode: 'engineTest', level: 'strict', ok: true, error: null, interrupted: false, hops: 180, lateHops: 2, worstHopMs: 310, peakAfterMb: 412.4, wouldStepDown: false },
+      runs: [{ mode: 'engineTest', level: 'strict', clip: 'clip', ok: true, error: null, interrupted: false, hops: 180, lateHops: 2, worstHopMs: 310, peakAfterMb: 412.4, wouldStepDown: false }],
+      speed: { kept: true, p95: 211, hop: 0.5, calls: 36 },
       sendError: null,
     };
     await show();
     await act(async () => {});
-    expect(screen.getByTestId('bench-engine-test').props.children).toBe('Strict take: 2 of 180 checks late, slowest 310 ms, peak memory 412 MB');
+    expect(screen.getByTestId('bench-engine-test').props.children).toBe('Strict take: 2 of 180 checks late, slowest 310 ms, peak memory 412 MB\nSpeed check: p95 211 ms, so the 0.5 s hop');
   });
 });

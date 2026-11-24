@@ -1680,7 +1680,8 @@ shows up once and they must go through it and complete it … just the main stuf
   the pack's id, the chip, ONNX Runtime's version and whether each model loaded with prepacking. With the real engine it
   then runs one Strict take of the bench's recording at the live pace (words and harakat, and labelled so, when the engine
   has no Strict level), with the runs locked until it ends, and shows and
-  sends how many checks ran late, the slowest, whether a take like it would step down, the app's peak memory, and the take's marks and score (never any audio), once per pack and app update; leaving the
+  sends how many checks ran late, the slowest, whether a take like it would step down, the app's peak memory, and the take's marks and score (never any audio), for each clip the list names, then the speed
+  check's p95 and the hop it gives, once per pack and app update; leaving the
   screen stops it, sends nothing, and it runs again next time. It lists this platform's runs from the dev
   backend (each a model file, a processor (CPU, Core ML, XNNPACK or NNAPI) and a thread count; all chosen, any left
   out), downloads what the chosen runs need once (only for accounts the team has given bench access: Revisely Dev is open
