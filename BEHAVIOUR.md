@@ -1107,7 +1107,9 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   as if they're separate clicks + there's an Open button and they all do the same thing"; "i dont think we need to put
   journal for each entry"). Its date and one line for each thing that happened (Revised, Memorized, Read, Recited), the
   note last when there is one, are one button that opens the day. With no note it offers Add a note, which opens that day's
-  Note sheet; a day with nothing says so. The calendar and the rest of Overview don't change.
+  Note sheet; a day with nothing says so. The calendar and the rest of Overview don't change. A spot test is its own kind
+  of entry, apart from Recited (Majd, Nov 23 2026: "its own thing like recited or memorized"): its own line here and its own
+  block in the day, each saying Finished or Stopped early. No line ever shrinks or lists its places: a few words and how much.
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
   strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
   stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,

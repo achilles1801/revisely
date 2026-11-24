@@ -368,7 +368,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['Dashboard', 'Activity'],
     text: lines(
       '- A day’s + → “Revised elsewhere”: a search for a surah or juz above the 30 juz. A tap chooses a juz; a hold opens it for its halves or parts. Extra pages never change the day’s schedule.',
-      '- Under Overview’s calendar, the picked day is one entry: tap it to open the day, or “Add a note” to write one.',
+      '- Under Overview’s calendar, the picked day is one entry: tap it to open the day, or “Add a note” to write one. Spot tests have their own line and their own block in the day, marked “Finished” or “Stopped early”.',
       '- Home: the “Today’s journal” row under Today opens today’s journal.',
     ),
   },
