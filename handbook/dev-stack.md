@@ -495,7 +495,7 @@ owner's `on-device-release.md`).
     scripts/recite-pack-make.js --lab` (`--dry` first; `--hold` uploads it without offering it to phones, and `--make-current <id>` offers it later). It refuses a table that isn't its manifest's and a model without its
     ownership mark, and the id comes from the files' hashes, so a changed file is a new version and nothing is ever
     overwritten. Phones move to it at their next daily check; the app only fetches the version the callable names.
-  - **Parts:** `core` (48.7 MB: `v7.graph.onnx`, `v7.weights.f16`, `v7.weights.json`, `v7.check`, the engine's load-time self-check, and the tables) and `strict` (from pack-v4, about 46 MB:
+  - **Parts:** `core` (48.9 MB: `v7.graph.onnx`, `v7.weights.f16`, `v7.weights.json`, `v7.check`, the engine's load-time self-check, and the tables) and `strict` (from pack-v4, 42.8 MB:
     `v5.graph.onnx`, `v5.weights.f16` and `v5.weights.json`, the marked full-precision v5, with `v5.check` and `strict.bin`). Only marked models leave the Mac (hashes in the private
     repo's `checker/marks.json`). The names are `rc_blob`'s (`recite_core.h`). Tables are deflated; the weights stay stored.
   - **Phone:** `RecitePackReader` (Swift, Java) checks every chunk and blob; `RecitePackKey` holds the device key;
