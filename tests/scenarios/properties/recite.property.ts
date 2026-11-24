@@ -588,6 +588,31 @@ describe('[RECITE-28] the bar names a word only once it has been said', () => {
 });
 
 
+describe('[RECITE-29] the bar’s line from `word` frames', () => {
+  const start = words.verseFirstWord(2, 255);
+  const frame = fc.record({ d: fc.integer({ min: 0, max: 20 }), at: fc.integer({ min: 0, max: 400 }), len: fc.integer({ min: 1, max: 30 }), sub: fc.boolean() });
+
+  it('is in the order said, whatever order the frames came in, and never prints an unsettled sub word', () => {
+    fc.assert(
+      fc.property(fc.array(frame, { minLength: 1, maxLength: 25 }), (frames) => {
+        let s = applyEvent(liveConnecting({ start }), { type: 'ready', take: 't', protocol: 10, words: true });
+        s = applyEvent(s, { type: 'locked', w: start, s: 2, a: 255 });
+        frames.forEach((f, v) => {
+          s = applyEvent(s, { type: 'word', w: start + f.d, v, s: f.at * 160, e: (f.at + f.len) * 160, ...(f.sub ? { sub: true as const } : {}) });
+          const visits = s.visits ?? [];
+          for (let i = 1; i < visits.length; i++) expect(visits[i].s).toBeGreaterThanOrEqual(visits[i - 1].s);
+          const shown = barWords(s, words, { check: true, startWord: start }).map((b) => b.w);
+          const allowed = visits.filter((x) => !x.sub).map((x) => x.w);
+          for (const w of shown) expect(allowed).toContain(w);
+          expect(shown.length).toBeLessThanOrEqual(2);
+        });
+      }),
+      { numRuns: runs(200) },
+    );
+  });
+});
+
+
 // ---------------------------------------------------------------------------------------------------- long takes
 
 /** A socket the tests answer for, and timers they run (lib/reciteLive/socket). */

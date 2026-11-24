@@ -17,6 +17,7 @@ import type { QuranWords } from '../recite/quranWords';
 import { countsAsMistake, isUnclear, type FinalResult, type LiveScore, type Mark } from './contract';
 import { furthestWord, settleUnfinished, type LiveState, type Removed } from './state';
 import { endsPhrase } from './phrase';
+import { SAMPLE_RATE } from '../recite/segmenter';
 
 /** The checker's cap on a take's audio (s): `MAX_SECONDS` in its live.py. */
 export const CAP_S = 15 * 60;
@@ -230,6 +231,13 @@ export function chainView(prior: readonly ChainLink[], cur: ChainLink): LiveStat
         : c.status === 'idle'
           ? 'idle'
           : 'checking';
+  // The words said, in each link's order (no sample goes to two links), past a cut link's `upTo` left out: the word in flight.
+  const visits = links.flatMap((l) =>
+    (l.state.visits ?? [])
+      .filter((x) => l.upTo == null || x.w <= l.upTo)
+      .map((x) => (l.offset ? { ...x, s: x.s + l.offset * SAMPLE_RATE, e: x.e + l.offset * SAMPLE_RATE } : x)),
+  );
+  const wordFrames = states.some((s) => s.wordFrames);
   const score = chainScore(states);
   // The first take's, so the recitation keeps one id (its summary, the reveal's pace); each link's own is in `chainTakes`.
   const take = first.take ?? c.take ?? last.take;
@@ -254,6 +262,7 @@ export function chainView(prior: readonly ChainLink[], cur: ChainLink): LiveStat
     voiceSaid: c.voiceSaid ?? last.voiceSaid,
     off: located ? c.off : null,
     guess: null,
+    ...(wordFrames ? { wordFrames, visits } : {}),
   };
   if (status !== 'done') return view;
   const finals = states.map((s) => s.final).filter((f): f is FinalResult => f != null);

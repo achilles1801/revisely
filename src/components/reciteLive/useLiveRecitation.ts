@@ -12,6 +12,7 @@ import { ayahKey } from '../../lib/ayahKeys';
 import { placeOfAyah, spokenText } from '../../lib/passages';
 import { AudioSource, decodePcm, startMicStream } from '../../lib/recite/micSource';
 import { SAMPLE_RATE } from '../../lib/recite/segmenter';
+import { wordLineOn } from '../../lib/reciteLive/wordLine';
 import { getQuranWords, loadQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import { checkLevel, type ReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { sendLabel, warmUpReciteCheck } from '../../lib/reciteCheck/service';
@@ -83,7 +84,7 @@ export function setStopBudgetForTests(ms: number = STOP_BUDGET_MS): void {
  * behind what the page shows): its cursor and what follows it, ignored until the re-check passes where the page was
  * (the checker session's ask, Nov 20 2026). Marks still apply, by id.
  */
-const REPLAYED = new Set(['at', 'said', 'off', 'ayah', 'score', 'locked']);
+const REPLAYED = new Set(['at', 'said', 'off', 'ayah', 'score', 'locked', 'word', 'unword']);
 
 /** Failures a take ends on without what it found being kept: the checker's gate (the Premium page opens instead). */
 const GATE_FAILURES = new Set(['check_locked', 'premium_required']);
@@ -186,6 +187,8 @@ export function startFrameFor(
     ...(startBy && !span && START_IN_QURAN ? { startIn: 'quran' as const } : {}),
     // The checker's guess before it's sure (protocol 9; older checkers ignore the field).
     ...(startBy ? { guess: true } : {}),
+    // Each word as it finishes, for the bar's line (RECITE-29); off until the frames are on Dev.
+    ...(wordLineOn() ? { words: true } : {}),
     // The audio 4:1 (contract "ADPCM uplink"), if the checker's `ready` agrees; Revisely Dev only until Majd's word.
     ...(isDevVariant() ? { audio: 'adpcm' as const } : {}),
   };

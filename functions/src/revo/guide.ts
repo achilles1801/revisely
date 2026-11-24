@@ -409,7 +409,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     // Mistake detection reached the store app with 1.0.5 (its lines are in GUIDE_SECTIONS). Strict stays Revisely Dev's
     // until it has a release of its own (Majd, Nov 17 2026).
     title: 'Only in Revisely Dev',
-    covers: ['SESS-8', 'LANG-2', 'RECITE-7', 'RECITE-26', 'RECITE-27', 'RECITE-28', 'SET-5', 'ONBOARD-5'],
+    covers: ['SESS-8', 'LANG-2', 'RECITE-7', 'RECITE-26', 'RECITE-27', 'RECITE-28', 'RECITE-29', 'SET-5', 'ONBOARD-5'],
     routes: ['Settings'],
     text: lines(
       '- Settings → Testing → “Preview onboarding”: the first setup’s screens on a blank account. It saves nothing.',

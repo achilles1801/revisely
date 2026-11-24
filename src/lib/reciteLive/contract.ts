@@ -129,6 +129,8 @@ export type LiveEvent =
       protocol?: number;
       /** "voice": `said` also comes as the reciter's voice stops (recite-check-00115 and later; absent on rollbacks). */
       said?: 'voice';
+      /** This take sends `word` frames (contract draft 16): the bar's line is drawn from them (RECITE-29). */
+      words?: true;
       /** The checker beats every this many seconds (contract draft 9): its silence then means a dead socket. */
       beat?: number;
       /** "adpcm": the checker decodes the IMA-ADPCM blocks the start frame asked to send (contract "ADPCM uplink"). */
@@ -143,6 +145,14 @@ export type LiveEvent =
    */
   | { type: 'locked'; w: number; s: number; a: number; t?: number; where?: 'page' | 'quran' }
   | { type: 'at'; w: number; t?: number }
+  /**
+   * A word finished being said (contract draft 16; only with the start frame's `words`, confirmed by `ready.words`): one
+   * visit to it on the path. `v` is the visit's id, never the order said; `s` and `e` its first and last sound, in samples
+   * of the take's audio. `sub`: not heard as the page's word, so the line holds it back until a mark or `said` settles it.
+   */
+  | { type: 'word'; w: number; v: number; s: number; e: number; t?: number; sub?: true }
+  /** The path changed its mind about visit `v`, sent under 3 s ago: it comes off the line. */
+  | { type: 'unword'; w: number; v: number; t?: number }
   /**
    * Protocol 9 (contract draft 11): before `locked`, the checker's best guess at where the reciter is on the page shown,
    * at most once a hop and only when it changes. Shown as the cursor, never a start, mark or `said`; none after `locked`.
@@ -286,6 +296,8 @@ export function parseFinal(raw: unknown): FinalResult | null {
 }
 
 /** One message from the server (a JSON text frame, already parsed or as text), or null when it isn't one. */
+const isVisitId = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
+
 export function parseEvent(raw: unknown): LiveEvent | null {
   let e: unknown = raw;
   if (typeof raw === 'string') {
@@ -307,6 +319,7 @@ export function parseEvent(raw: unknown): LiveEvent | null {
         ...(isNum(x.from) ? { from: x.from } : {}),
         ...(isNum(x.protocol) ? { protocol: x.protocol } : {}),
         ...(x.said === 'voice' ? { said: 'voice' as const } : {}),
+        ...(x.words === true ? { words: true as const } : {}),
         ...(isNum(x.beat) && x.beat > 0 ? { beat: x.beat } : {}),
         ...(x.audio === 'adpcm' ? { audio: 'adpcm' as const } : {}),
         ...(x.pause === true ? { pause: true as const } : {}),
@@ -327,6 +340,12 @@ export function parseEvent(raw: unknown): LiveEvent | null {
       return isWord(x.w) ? { type: 'at', w: x.w, ...(isNum(x.t) ? { t: x.t } : {}) } : null;
     case 'guess':
       return isWord(x.w) ? { type: 'guess', w: x.w, ...(isNum(x.t) ? { t: x.t } : {}) } : null;
+    case 'word':
+      return isWord(x.w) && isVisitId(x.v) && isNum(x.s) && isNum(x.e) && x.s >= 0 && x.e >= x.s
+        ? { type: 'word', w: x.w, v: x.v, s: x.s, e: x.e, ...(isNum(x.t) ? { t: x.t } : {}), ...(x.sub === true ? { sub: true as const } : {}) }
+        : null;
+    case 'unword':
+      return isWord(x.w) && isVisitId(x.v) ? { type: 'unword', w: x.w, v: x.v, ...(isNum(x.t) ? { t: x.t } : {}) } : null;
     case 'off':
       return isWord(x.w) ? { type: 'off', w: x.w, ...(isNum(x.t) ? { t: x.t } : {}) } : null;
     case 'said':
