@@ -62,6 +62,9 @@ class ReciteEngineModule : Module() {
     // The highest the app's resident memory has been since it started, in MB (VmHWM); 0 where it can't be read.
     Function("memoryPeakMb") { peakMemoryMb() }
 
+    // The app's resident memory now, in MB (VmRSS, the measure VmHWM is the peak of); 0 where it can't be read.
+    Function("memoryNowMb") { procStatusMb("VmRSS:") }
+
     // The engine (recite_core.h) on its own thread: EngineHost. A take's frames come back as onEngineFrames.
 
     // Opens the engine from named files ({name, path}), read into memory. Resolves {ok, code, error, info}.
@@ -390,8 +393,10 @@ class ReciteEngineModule : Module() {
   /** The process's proportional set size in MB (its share of the memory it touches). */
   private fun memoryMb(): Double = Debug.getPss() / 1024.0
 
-  private fun peakMemoryMb(): Double = try {
-    File("/proc/self/status").useLines { lines -> lines.firstOrNull { it.startsWith("VmHWM:") } }
+  private fun peakMemoryMb(): Double = procStatusMb("VmHWM:")
+
+  private fun procStatusMb(field: String): Double = try {
+    File("/proc/self/status").useLines { lines -> lines.firstOrNull { it.startsWith(field) } }
       ?.trim()?.split(Regex("\\s+"))?.getOrNull(1)?.toDoubleOrNull()?.div(1024.0) ?: 0.0
   } catch (e: Exception) {
     0.0
