@@ -92,6 +92,18 @@ describe('a take’s record', () => {
     expect(r.removed).toEqual([lookalike]);
   });
 
+  it('[RECITE-8] a spot test keeps its length and how it ended, there and back; an ordinary take has no such field', () => {
+    const r = recordFromTake(doneState([lookalike]), words, ctx({ spotTest: { pages: 0.5, finished: false } })) as TakeRecord;
+    expect(r.spotTest).toEqual({ pages: 0.5, finished: false });
+    expect(toStored(r).spotTest).toEqual({ pages: 0.5, finished: false });
+    expect((fromStored(r.id, toStored(r)) as TakeRecord).spotTest).toEqual({ pages: 0.5, finished: false });
+    const plain = recordFromTake(doneState([lookalike]), words, ctx({})) as TakeRecord;
+    expect('spotTest' in plain).toBe(false);
+    expect('spotTest' in toStored(plain)).toBe(false);
+    // Damaged: the take stays, an ordinary one.
+    expect('spotTest' in (fromStored(r.id, { ...toStored(r), spotTest: { pages: 'x', finished: true } }) as TakeRecord)).toBe(false);
+  });
+
   it('[RMEM-8] keeps the words peeked, in order; none, and nothing removed, leave the fields out', () => {
     const r = recordFromTake(doneState([lookalike]), words, ctx({ peeked: new Set([31421, 31420]) })) as TakeRecord;
     expect(r.peeked).toEqual([31420, 31421]);

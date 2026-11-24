@@ -13,7 +13,7 @@ import { furthestWord, type LiveState } from './state';
 export const LONG_AYAH_WORDS = 9;
 
 /** The cursor runs a moment behind the voice: an ayah of 3 words or more counts with its last word not yet reached. */
-const reachedEnd = (a0: number, a1: number, last: number): boolean => last >= a1 - 1 - (a1 - a0 >= 3 ? 1 : 0);
+export const reachedEnd = (a0: number, a1: number, last: number): boolean => last >= a1 - 1 - (a1 - a0 >= 3 ? 1 : 0);
 
 /** Words `first` to `last` hold a whole ayah, or a long ayah's good stretch. */
 export function recitedEnough(words: QuranWords, first: number, last: number): boolean {

@@ -74,8 +74,8 @@ export const WHATS_NEW_AR: Readonly<Record<string, ArabicHelpText>> = {
   },
   '1.0.5/more/test': {
     title: 'اختبرني',
-    text: 'اضغط مطوّلًا على [[mic]] واختر {{اختبرني}}: خمسة مواضع عشوائية مما حفظته.',
-    from: 'c6412fe3b7c8ee12',
+    text: 'اضغط مطوّلًا على [[mic]] واختر {{اختبرني}}: آية عشوائية مما حفظته، ثم أكمل منها.',
+    from: 'f212bf829de52a49',
   },
   '1.0.5/more/recitation': {
     title: 'تسميعك في الإحصاءات',

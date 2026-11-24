@@ -74,6 +74,16 @@ export interface TakeRecord {
    * Insights or Revo), so the summary opened again later lists them with Put back (RMEM-8). Absent for none.
    */
   removed?: Mark[];
+  /**
+   * A spot test (RECITE-8, Revisely Dev): the length it was set to in pages, and whether it reached it (Hasbuk) or was
+   * stopped early. Absent on an ordinary take.
+   */
+  spotTest?: SpotTestRecord;
+}
+
+export interface SpotTestRecord {
+  pages: number;
+  finished: boolean;
 }
 
 /** "Clear now" on a word: its remembered mistake of `group` goes, as if said right enough times. */
@@ -255,6 +265,8 @@ export function toStored(r: MemoryRecord): Record<string, unknown> {
     // Only when there are some (RMEM-8), so a take without them is written as before.
     ...(r.peeked?.length ? { peeked: r.peeked.slice(0, MAX_PEEKED) } : {}),
     ...(r.removed?.length ? { removed: r.removed.slice(0, MAX_REMOVED).map(storedMark) } : {}),
+    // Only on a spot test (RECITE-8).
+    ...(r.spotTest ? { spotTest: { pages: r.spotTest.pages, finished: r.spotTest.finished } } : {}),
   };
 }
 
@@ -309,7 +321,16 @@ export function fromStored(id: string, raw: unknown): MemoryRecord | null {
     ...linksFromStored(d.links),
     ...peekedFromStored(d.peeked),
     ...removedFromStored(d.removed),
+    ...spotTestFromStored(d.spotTest),
   };
+}
+
+/** A spot test's length and how it ended, from the document (dropped when damaged: the take stays an ordinary one). */
+function spotTestFromStored(raw: unknown): { spotTest?: SpotTestRecord } {
+  if (!raw || typeof raw !== 'object') return {};
+  const { pages, finished } = raw as { pages?: unknown; finished?: unknown };
+  const n = num(pages);
+  return n != null && n > 0 && typeof finished === 'boolean' ? { spotTest: { pages: n, finished } } : {};
 }
 
 /** The words peeked, from the document (RMEM-8): whole numbers only, in order. */

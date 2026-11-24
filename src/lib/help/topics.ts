@@ -394,8 +394,8 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'shuffle',
         title: 'Test me',
         text:
-          'Hold [[mic]] → {{Test me}}: up to five random places in what you’ve memorized, or in one juz. ' +
-          'Each shows an ayah’s first two words; carry on from there.',
+          'Hold [[mic]] → {{Test me}}: one verse at random from what you’ve memorized, or from one juz. ' +
+          'Choose how far, then carry on from that verse.',
         covers: ['RECITE-8'],
         when: 'liveRecite',
       },
@@ -403,7 +403,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         id: 'reciteTest.result',
         icon: 'list-outline',
         title: 'How it went',
-        text: 'The bar says how each place went, and [[next]] moves on. At the end: how many you continued cleanly, and {{Test me again}}.',
+        text: 'Reach the end and you’ll see {{Hasbuk}}. Stop sooner and it’s kept as {{Stopped early}}. The bar’s result opens the summary, with {{Test me again}}.',
         covers: ['RECITE-8'],
         when: 'liveRecite',
       },

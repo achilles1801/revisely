@@ -3,6 +3,7 @@ import { logger } from '../../lib/logger';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import { settleUnfinished, startNotFound, type LiveState } from '../../lib/reciteLive/state';
 import { isATake } from '../../lib/reciteLive/takeEnough';
+import { testFinished } from '../../lib/reciteLive/testMe';
 import type { WhereAnswer } from '../../lib/reciteLive/where';
 import { recordFromTake, sameTake } from '../../lib/reciteMemory/fromTake';
 import { openWordsBetween } from '../../lib/reciteMemory/memory';
@@ -49,6 +50,7 @@ export function useRememberTake({
   level,
   records,
   peeked = null,
+  spotTest = null,
 }: {
   uid: string | null | undefined;
   enabled: boolean;
@@ -61,6 +63,8 @@ export function useRememberTake({
   records: readonly MemoryRecord[];
   /** The words shown by hand during this take (RMEM-8: kept, so its summary lists them when opened again). */
   peeked?: ReadonlySet<number> | null;
+  /** The spot test this take is (RECITE-8): its length and last word. */
+  spotTest?: { pages: number; last: number } | null;
 }): { noteRecording: (saved: { recordingId: string }) => void; forget: () => void; current: TakeRecord | null } {
   const status = live.state.status;
   // This take: its record's id and start, whether the page was hidden, its recording, what was written last.
@@ -72,6 +76,7 @@ export function useRememberTake({
     recordingId: string | null;
     written: TakeRecord | null;
     left?: boolean;
+    spotTest: { pages: number; last: number } | null;
   } | null>(null);
   // The take as last rendered, for the screen's way out (useRememberTake's own cleanup runs after the live take's).
   const liveRef = useRef(live);
@@ -106,7 +111,7 @@ export function useRememberTake({
     if (status !== 'connecting') return;
     flush();
     prev.current = take.current;
-    take.current = { id: memoryId(), createdAt: Date.now(), hidden, recordingId: null, written: null };
+    take.current = { id: memoryId(), createdAt: Date.now(), hidden, recordingId: null, written: null, spotTest };
     setCurrent(null);
     // Only when a take starts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -139,6 +144,7 @@ export function useRememberTake({
       links: view.links,
       peeked,
       ranWhere: view.ranWhere,
+      spotTest: t.spotTest ? { pages: t.spotTest.pages, finished: testFinished(words, t.spotTest, state) } : null,
     });
   }, [enabled, live, day, level, records, peeked]);
 

@@ -82,9 +82,10 @@ import { markTitle } from '../../lib/reciteLive/describe';
 import { drillMarks, drillRange, openDrill } from '../../lib/reciteLive/drill';
 import { describeAyahs } from '../../lib/passages';
 import { TakeSpan } from '../../lib/reciteLive/span';
-import { TestPlace, testJuz, testPlaces, TestResult, testResult } from '../../lib/reciteLive/testMe';
+import { pickTest, type SpotTest, testFinished, testJuz, testLengthLabel } from '../../lib/reciteLive/testMe';
 import { memorizedAyahs } from '../../lib/memorizedAyahs';
-import { outcomeText, TestMeScopeSheet, TestSummarySheet } from './TestMeSheets';
+import { HasbukNote } from './HasbukNote';
+import { TestMeScopeSheet } from './TestMeSheets';
 import { CheckIntroPage } from './CheckIntroPage';
 import { TakeActivity } from './TakeActivity';
 import { markAt, wordBox } from '../../lib/reciteLive/geometry';
@@ -284,6 +285,13 @@ export function useReciteLayer({
   // Words shown by hand during the take (‹, ‹‹): kept in quiet grey on the page, listed in the summary, drilled, and kept
   // with the take's record for its summary later (RMEM-8).
   const [peeked, setPeeked] = useState<Peeked>(NOTHING_PEEKED);
+  // Test me (RECITE-8; Majd, Nov 23 2026; lib/reciteLive/testMe): one spot test at a time. A Mark mistakes take with the
+  // page hidden but for its starting verse, that stops by itself at the length chosen. `finished`: null until it ends.
+  const [test, setTest] = useState<{ juz: number | null; spot: SpotTest; hiddenBefore: boolean; finished: boolean | null } | null>(null);
+  const testRef = useRef(test);
+  testRef.current = test;
+  // Goes up each time a test reaches its end: Hasbuk.
+  const [hasbuk, setHasbuk] = useState(0);
   const remembering = useRememberTake({
     uid: user?.id,
     enabled: liveOn,
@@ -293,6 +301,7 @@ export function useReciteLayer({
     level: checkLevel(reciteSettings),
     records: memoryRecords,
     peeked,
+    spotTest: test?.spot ?? null,
   });
   noteTakeRecording.current = remembering.noteRecording;
   const takeRecord = remembering.current;
@@ -331,22 +340,9 @@ export function useReciteLayer({
   // What a tap on the mic starts: Record, or Recite, marking mistakes when the switch is on and the account has it.
   const markMistakes = owned && reciteSettings.markMistakes;
   const micMode: ReciteMicMode = reciteSettings.mode === 'record' ? 'record' : markMistakes ? 'check' : 'recite';
-  // Test me (Majd, Nov 15 2026; lib/reciteLive/testMe): five random places in what's memorized, or in one juz. Each is a
-  // Mark mistakes take with the page hidden but for its first two words; the bar says how it went, with Next and ✕.
   const [testPick, setTestPick] = useState(false);
-  const [test, setTest] = useState<{
-    juz: number | null;
-    places: TestPlace[];
-    at: number;
-    results: TestResult[];
-    hiddenBefore: boolean;
-  } | null>(null);
-  const testRef = useRef(test);
-  testRef.current = test;
-  const [testSummary, setTestSummary] = useState<{ juz: number | null; results: TestResult[] } | null>(null);
   const memorized = useMemo(() => (liveOn ? memorizedAyahs(pages ?? []) : []), [liveOn, pages]);
   const testableJuz = useMemo(() => (liveOn && qw ? testJuz(memorized, qw) : []), [liveOn, qw, memorized]);
-  const testPlace = test ? test.places[test.at] : null;
   // The word under the cursor, once it has been there about as long as it takes to say (revealDelay: its letters at the
   // reciter's pace, 0.7–2.5 s) while the take listens: a hidden page shows it then (Majd, Nov 22 2026: "under one second
   // max"), and a held madd isn't shown before its end.
@@ -382,11 +378,11 @@ export function useReciteLayer({
       // What the hidden page shows (RECITE-6): what's decided or left behind, and the word being said once it has been
       // under the cursor REVEAL_AFTER_MS.
       saidUpTo: shownUpTo(live.state, heldCursor),
-      // Before the checker has found the start of a test's place: from the place (‹ shows its third word, not the page's first).
-      startWord: live.startWord ?? testPlace?.cue[0] ?? null,
+      // Before the checker has found a test's start: from its verse (‹ shows the word after it, not the page's first).
+      startWord: live.startWord ?? test?.spot.cue[0] ?? null,
       cursor: live.state.cursor,
     }),
-    [live.state, live.startWord, testPlace, heldCursor],
+    [live.state, live.startWord, test?.spot, heldCursor],
   );
   // Switched to hidden after a take, the page hides everything, the take's recited words too (RECITE-21; Majd, Nov 22
   // 2026, of Tarteel's: "do the same"); a new take starts from that again. While it runs, its recited words show.
@@ -471,52 +467,34 @@ export function useReciteLayer({
     }
     void live.start('check', pageDrill.range);
   }, [pageDrill, reciteSettings.noticeSeen, live]);
-  // A test's place: the page hidden but for the place's first two words, and a take over its ayahs.
-  const beginPlace = useCallback(
-    (place: TestPlace) => {
-      setCardAt(null);
-      setHidden(true);
-      startMode('check', place.span, new Set(place.cue));
-    },
-    [startMode],
-  );
+  // A spot test: the page hidden but for its starting verse, and a take from there to the length chosen.
   const startTest = useCallback(
     (juz: number | null) => {
       setTestPick(false);
-      setTestSummary(null);
       if (!qw) return;
-      const places = testPlaces(memorized, qw, { juz });
-      if (places.length === 0) return;
-      setTest({ juz, places, at: 0, results: [], hiddenBefore: testRef.current?.hiddenBefore ?? hidden });
-      beginPlace(places[0]);
-    },
-    [qw, memorized, hidden, beginPlace],
-  );
-  const nextPlace = useCallback(() => {
-    const run = testRef.current;
-    if (!run || run.at + 1 >= run.places.length) return;
-    live.clear();
-    setTest({ ...run, at: run.at + 1 });
-    beginPlace(run.places[run.at + 1]);
-  }, [live, beginPlace]);
-  /** The test ends (its last place, or ✕): the take goes, the page as it was, and the summary if a place was done. */
-  const endTest = useCallback(
-    (results: TestResult[]) => {
-      const run = testRef.current;
-      live.clear();
+      const spot = pickTest(memorized, qw, { juz, pages: reciteSettings.testPages });
+      if (!spot) return;
+      setTest({ juz, spot, finished: null, hiddenBefore: testRef.current?.hiddenBefore ?? hidden });
       setCardAt(null);
-      setRevealed(NOTHING_SHOWN);
-      setTest(null);
-      if (run) setHidden(run.hiddenBefore);
-      if (run && results.length > 0) setTestSummary({ juz: run.juz, results });
+      setHidden(true);
+      startMode('check', spot.span, new Set(spot.cue));
     },
-    [live],
+    [qw, memorized, reciteSettings.testPages, hidden, startMode],
   );
+  /** The test is over (✕, or nothing of it to keep): the take goes, and the page is as it was. */
+  const endTest = useCallback(() => {
+    const run = testRef.current;
+    live.clear();
+    setCardAt(null);
+    setRevealed(NOTHING_SHOWN);
+    setTest(null);
+    if (run) setHidden(run.hiddenBefore);
+  }, [live]);
   // A test whose take never started (the notice closed, the microphone refused, Premium refused): it ends, so the next
-  // take isn't counted as one of its places. Between places the microphone is already starting.
+  // take isn't taken for it.
   const testStalled = test != null && live.state.status === 'idle' && live.mic !== 'starting' && noticeFor == null;
   useEffect(() => {
-    if (testStalled && testRef.current) endTest(testRef.current.results);
+    if (testStalled && testRef.current) endTest();
     // endTest is stable enough: only when the test stalls.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [testStalled]);
@@ -782,17 +760,20 @@ export function useReciteLayer({
     if (live.state.status !== 'done' || !takeId || summaryFor === takeId) return;
     setSummaryFor(takeId);
     setSoFar(false);
-    // A test's place: how it went is kept, and the bar says so with Next (or the test's summary after its last place).
+    // A spot test: finished (Hasbuk) or stopped early, in the bar, and its record says which. Under an ayah, or with no
+    // start found, there's no test to keep (RECITE-27): it ends, and the take goes the way any such take does.
     const run = testRef.current;
     if (run) {
-      stopTrace.end();
-      // Less than an ayah (RECITE-27): this place wasn't recited, and nothing of it is kept.
-      const place = run.places[run.at];
-      const result = qw && !isATake(live.state, qw, live.links) ? { place, outcome: 'missed' as const, marks: [], peeked: peeked.size } : testResult(place, live.state, peeked.size);
-      const results = [...run.results.slice(0, run.at), result];
-      if (run.at + 1 >= run.places.length) endTest(results);
-      else setTest({ ...run, results });
-      return;
+      if (qw && isATake(live.state, qw, live.links)) {
+        stopTrace.end();
+        const finished = testFinished(qw, run.spot, live.state);
+        setTest({ ...run, finished });
+        if (finished) setHasbuk((n) => n + 1);
+        if (screenReader) say(finished ? t('reciteLive.test.hasbukSpoken') : t('reciteLive.test.stoppedEarly'));
+        return;
+      }
+      endTest();
+      if (!qw) return;
     }
     // The checker never found where the reciter started: it fails silently (Majd, Nov 14 2026). No summary or
     // message; Stop just ends the take. With VoiceOver or TalkBack one line is said, the microphone already off (Majd,
@@ -1062,15 +1043,15 @@ export function useReciteLayer({
           : liveStatus === 'done'
             ? t('reciteLive.layer.done')
             : t('reciteLive.layer.listening');
-  // In a test: which place it is, and once it's done, how it went ("Clean · 2 of 5").
-  const placeResult = test && liveStatus === 'done' ? test.results[test.at] : undefined;
-  // Short, for a crowded bar (an SE at the largest text): while listening which place it is; once done, how it went
-  // (Next says which place comes).
+  // In a test: its length while it runs; once done, how it ended (the result's words, when the bar has a result).
+  const testEnded = test && liveStatus === 'done' ? test.finished : null;
   const barStatus = test
-    ? placeResult
-      ? outcomeText(placeResult)
+    ? testEnded != null
+      ? testEnded
+        ? t('reciteLive.test.finished')
+        : t('reciteLive.test.stoppedEarly')
       : liveStatus === 'listening' || liveStatus === 'connecting'
-        ? t('common.nOfTotal', { n: test.at + 1, total: test.places.length })
+        ? testLengthLabel(test.spot.pages)
         : baseStatus
     : baseStatus;
 
@@ -1123,12 +1104,12 @@ export function useReciteLayer({
           onToggleHidden={toggleHidden}
           onNextWord={showNextWord}
           onWholeAyah={showWholeAyah}
-          // A test's place says how it went in words: no score pill (it crowded the bar out).
+          // A test has no score while it runs: its result comes at the end.
           score={checkTake && !test ? scorePill(live.state, qw, live.startWord) : null}
           clock={live.clock}
           recording={live.recording && live.mic === 'on'}
-          // A test's place, once done, says how it went in the words' place.
-          words={placeResult ? [] : barWords(live.state, qw, { check: checkTake, startWord: live.startWord, upTo: hidden ? liveInfo.saidUpTo : undefined, held: heldCursor })}
+          // A test, once done, says how it ended in the words' place.
+          words={testEnded != null ? [] : barWords(live.state, qw, { check: checkTake, startWord: live.startWord, upTo: hidden ? liveInfo.saidUpTo : undefined, held: heldCursor })}
           status={barStatus}
           phase={barPhase}
           paused={live.paused}
@@ -1137,8 +1118,11 @@ export function useReciteLayer({
           onResume={() => void live.resume()}
           onStop={live.stop}
           result={
-            quietEnd && barPhase === 'done' && takeId && !test
-              ? { text: takeResultText(live.state, qw, live.startWord, checkTake), onPress: () => setSummaryShown(takeId) }
+            (quietEnd || test) && barPhase === 'done' && takeId
+              ? {
+                  text: test?.finished === false ? t('reciteLive.test.stoppedEarly') : takeResultText(live.state, qw, live.startWord, checkTake),
+                  onPress: () => setSummaryShown(takeId),
+                }
               : null
           }
           // Not a mistake's Undo, in the words' place: never a note over the page (RECITE-25).
@@ -1161,18 +1145,13 @@ export function useReciteLayer({
           }}
           onClose={() => {
             if (test) {
-              endTest(test.results);
+              endTest();
               return;
             }
             setCardAt(null);
             setSummaryShown(null);
             live.clear();
           }}
-          next={
-            test && placeResult && test.at + 1 < test.places.length
-              ? { label: t('reciteLive.layer.nextPlace', { n: test.at + 2, total: test.places.length }), onPress: nextPlace }
-              : undefined
-          }
           surface={{ background: palette.control, border: palette.divider }}
         />
       ) : null,
@@ -1228,18 +1207,15 @@ export function useReciteLayer({
           drill={menuDrill}
           onDrill={drillHere}
         />
-        <TestMeScopeSheet visible={testPick} juz={testableJuz} onStart={startTest} onClose={() => setTestPick(false)} />
-        <TestSummarySheet
-          visible={testSummary != null}
-          results={testSummary?.results ?? []}
-          onPlace={(r) => {
-            setTestSummary(null);
-            setHidden(false);
-            if (qw) goTo(qw.pageOf(r.place.cue[0]));
-          }}
-          onAgain={() => startTest(testSummary?.juz ?? null)}
-          onDone={() => setTestSummary(null)}
+        <TestMeScopeSheet
+          visible={testPick}
+          juz={testableJuz}
+          pages={reciteSettings.testPages}
+          onPages={(testPages) => setReciteCheckSettings(user?.id, { testPages })}
+          onStart={startTest}
+          onClose={() => setTestPick(false)}
         />
+        <HasbukNote trigger={hasbuk} bottom={insets.bottom + spacing.sm + CAPSULE_HEIGHT + spacing.sm} />
         {qw ? (
           <MarkCard
             marks={cardMarks}
@@ -1422,11 +1398,16 @@ export function useReciteLayer({
           }}
           onAgain={() => {
             const mode = live.mode;
+            const run = testRef.current;
             setSummaryShown(null);
             setCardAt(null);
             live.clear();
-            if (mode) startMode(mode);
+            // A spot test's Again is a new test, from the same scope and at the same length.
+            if (run) startTest(run.juz);
+            else if (mode) startMode(mode);
           }}
+          againLabel={test ? t('reciteLive.test.again') : undefined}
+          spotTest={test && test.finished != null ? { pages: test.spot.pages, finished: test.finished } : null}
           onDrill={() => {
             const marks = Object.values(live.state.marks);
             const peekedAyahs = qw ? peekedByAyah(qw, peeked).map((p) => p.ayah) : [];
@@ -1434,6 +1415,12 @@ export function useReciteLayer({
             if (!range) return;
             setSummaryShown(null);
             setCardAt(null);
+            // Reciting the mistakes again isn't the test: the page goes back to how it was before it.
+            const run = testRef.current;
+            if (run) {
+              setTest(null);
+              setHidden(run.hiddenBefore);
+            }
             live.clear();
             setRevealed(NOTHING_SHOWN);
             setDrillBefore([findingsLine(drillMarks(marks)), peeked.size ? peekedLine(peeked.size) : ''].filter(Boolean).join(', '));
@@ -1496,6 +1483,7 @@ export function useReciteLayer({
           checkOwned
           when={past?.when ?? null}
           unfinished={past?.take.unfinished === true}
+          spotTest={past?.take.spotTest ?? null}
           onFinding={(m) => {
             setPastOpen(false);
             if (!qw) return;

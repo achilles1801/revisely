@@ -44,7 +44,7 @@ import {
   LIVE_IDLE,
   type LiveState,
 } from '../../../src/lib/reciteLive/state';
-import { isATake, LONG_AYAH_WORDS, recitedEnough } from '../../../src/lib/reciteLive/takeEnough';
+import { isATake, LONG_AYAH_WORDS, reachedWord, recitedEnough } from '../../../src/lib/reciteLive/takeEnough';
 import { AT_LAG, clipRange, endsPhrase, LEAD, MAX_SECONDS, phraseOf, SHORT_WORDS, TAIL, WORDS_AFTER, WORDS_BEFORE } from '../../../src/lib/reciteLive/phrase';
 import { pagesReached, perPageLabel, PER_PAGE_FROM } from '../../../src/lib/reciteLive/score';
 import { expectedPhrase, recitedPhrase } from '../../../src/lib/reciteLive/describe';
@@ -60,10 +60,11 @@ import { markTitle } from '../../../src/lib/reciteLive/describe';
 import { coverHighlights, NOTHING_SHOWN, revealAyah, revealNextWord, wordShown } from '../../../src/lib/reciteLive/view';
 import { createMistakeCue, cuesMark, CUE_GAP_MS } from '../../../src/lib/reciteLive/mistakeCue';
 import { drillRange, lastWordOf, openDrill } from '../../../src/lib/reciteLive/drill';
-import { CUE_WORDS, TEST_AYAHS, TEST_PLACES, testPlaces, testResult } from '../../../src/lib/reciteLive/testMe';
+import { pickTest, testFinished, testStarts, wordPagesOn } from '../../../src/lib/reciteLive/testMe';
+import { TEST_LENGTHS } from '../../../src/lib/reciteLive/testLength';
 import { recordFromTake } from '../../../src/lib/reciteMemory/fromTake';
 import type { TakeRecord } from '../../../src/lib/reciteMemory/record';
-import { ayahKey, ayahsBetween, ayahCount, suraOf, ayahOf, type AyahKey } from '../../../src/lib/ayahKeys';
+import { ayahKey, ayahsBetween, ayahCount, nextAyah, suraOf, ayahOf, type AyahKey } from '../../../src/lib/ayahKeys';
 import { getJuzForPage } from '../../../src/lib/quranData';
 import { runs } from './fixtures';
 import { ayahBand, cursorBox, markHighlight, wordBox } from '../../../src/lib/reciteLive/geometry';
@@ -516,57 +517,66 @@ describe('[RECITE-7] Recite the mistakes again: from the ayah before the first m
 const surahKeys = (n: number) => ayahsBetween(ayahKey(n, 1), ayahKey(n, ayahCount(n)));
 const juzOfKey = (k: AyahKey) => getJuzForPage(words.pageOf(words.verseFirstWord(suraOf(k), ayahOf(k))));
 
-describe('[RECITE-8] Test me: places at random in what is memorized, and how each went', () => {
-  it('up to five places, no two sharing an ayah, each in memorized ayahs of one surah, its first two words shown', () => {
+describe('[RECITE-8] Test me: one spot test from a verse at random, to the length chosen', () => {
+  const seeded = (seed: number) => {
+    let x = seed;
+    return () => ((x = (x * 1103515245 + 12345) % 2147483648), x / 2147483648);
+  };
+
+  it('starts in a memorized verse with the next ayah of its surah memorized, shows that verse, and stays in what is memorized', () => {
     fc.assert(
       fc.property(
         fc.uniqueArray(fc.integer({ min: 1, max: 114 }), { minLength: 1, maxLength: 6 }),
         fc.option(fc.integer({ min: 1, max: 30 }), { nil: null }),
+        fc.constantFrom(...TEST_LENGTHS),
         fc.integer({ min: 1, max: 2 ** 30 }),
-        (surahs, juz, seed) => {
+        (surahs, juz, pages, seed) => {
           const memorized = surahs.flatMap(surahKeys);
-          let x = seed;
-          const random = () => ((x = (x * 1103515245 + 12345) % 2147483648), x / 2147483648);
-          const places = testPlaces(memorized, words, { juz, random });
           const held = new Set(memorized);
-          expect(places.length).toBeLessThanOrEqual(TEST_PLACES);
-          const used = new Set<AyahKey>();
-          for (const p of places) {
-            const from = ayahKey(p.span.from[0], p.span.from[1]);
-            const to = ayahKey(p.span.to![0], p.span.to![1]);
-            const ayahs = ayahsBetween(from, to);
-            expect(ayahs.length).toBeLessThanOrEqual(TEST_AYAHS);
-            expect(new Set(ayahs.map(suraOf)).size).toBe(1);
-            for (const k of ayahs) {
-              expect(held.has(k)).toBe(true);
-              expect(used.has(k)).toBe(false);
-              used.add(k);
-            }
-            if (juz != null) expect(juzOfKey(from)).toBe(juz);
-            const [a, b] = words.verseRange(suraOf(from), ayahOf(from));
-            expect(b - a).toBeGreaterThanOrEqual(CUE_WORDS + 2);
-            expect(p.cue).toEqual([a, a + 1]);
-            expect(p.last).toBe(words.verseRange(suraOf(to), ayahOf(to))[1] - 1);
+          const test = pickTest(memorized, words, { juz, pages, random: seeded(seed) });
+          if (test == null) return expect(testStarts(memorized, words, juz)).toEqual([]);
+          const from = ayahKey(test.span.from[0], test.span.from[1]);
+          const to = ayahKey(test.span.to![0], test.span.to![1]);
+          const next = nextAyah(from)!;
+          expect(suraOf(next)).toBe(suraOf(from));
+          expect(test.span.startBy).toEqual([suraOf(next), ayahOf(next)]);
+          expect(to).toBeGreaterThanOrEqual(next);
+          for (const k of ayahsBetween(from, to)) {
+            expect(held.has(k)).toBe(true);
+            if (juz != null) expect(juzOfKey(k)).toBe(juz);
           }
+          const [a, b] = words.verseRange(suraOf(from), ayahOf(from));
+          expect(test.cue).toEqual(Array.from({ length: b - a }, (_, i) => a + i));
+          expect(test.last).toBe(words.verseRange(suraOf(to), ayahOf(to))[1] - 1);
+          expect(test.pages).toBe(pages);
         },
       ),
       { numRuns: runs(150) },
     );
   });
 
-  it('a place is clean, helped (peeked), unfinished, with mistakes, or not continued; tajweed and Not clear never count against it', () => {
+  it('holds the whole length whenever what is memorized runs on far enough from its start', () => {
     fc.assert(
-      fc.property(takeArb, fc.nat(3), fc.boolean(), (t, peeked, found) => {
-        const [, to] = words.pageRange(t.page);
-        const place = { span: { from: [1, 1] as [number, number] }, cue: [], last: Math.min(to - 1, t.lock + 3) };
-        const s = found ? played(t) : { ...played(t), start: null };
-        const r = testResult(place, s, peeked);
-        if (!found) return expect(r.outcome).toBe('missed');
-        const counted = Object.values(s.marks).filter((m) => countsAsMistake(m) && !isUnclear(m)).length;
-        const score = s.score ? mistakeCount(s) : counted;
-        if (score > 0) return expect(r.outcome).toBe('mistakes');
-        const reached = Math.max(s.cursor ?? -1, s.saidUpTo ?? -1) >= place.last;
-        expect(r.outcome).toBe(!reached ? 'unfinished' : peeked > 0 ? 'helped' : 'clean');
+      fc.property(fc.integer({ min: 1, max: 590 }), fc.constantFrom(...TEST_LENGTHS), fc.integer({ min: 1, max: 2 ** 30 }), (page, pages, seed) => {
+        // Every ayah from this page to the end of the Qur'an is memorized.
+        const memorized = ayahsBetween(ayahKey(words.ref(words.pageRange(page)[0]).sura, words.ref(words.pageRange(page)[0]).ayah), ayahKey(114, 6));
+        const test = pickTest(memorized, words, { pages, random: seeded(seed) })!;
+        expect(test.last).toBeGreaterThanOrEqual(wordPagesOn(words, test.cue[0], pages));
+      }),
+      { numRuns: runs(60) },
+    );
+  });
+
+  it('finished means the take reached its last word, or a word short of it in an ayah of three or more', () => {
+    fc.assert(
+      fc.property(takeArb, (t) => {
+        const s = played(t);
+        const reached = reachedWord(furthestWord(s), Object.values(s.marks));
+        const last = Math.min(words.count - 1, t.lock + 3);
+        const r = words.ref(last);
+        const [a0, a1] = words.verseRange(r.sura, r.ayah);
+        const needed = a1 - 1 - (a1 - a0 >= 3 ? 1 : 0);
+        expect(testFinished(words, { last }, s)).toBe(reached != null && reached >= needed);
       }),
       { numRuns: runs(200) },
     );

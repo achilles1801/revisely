@@ -38,7 +38,7 @@ const view = (state: LiveState, mode: 'check' | 'recite' = 'check'): LiveTakeVie
   wordTime: () => null,
 });
 
-type Props = { live: LiveTakeView; hidden: boolean; enabled: boolean };
+type Props = { live: LiveTakeView; hidden: boolean; enabled: boolean; spotTest?: { pages: number; last: number } | null };
 function setup(initial: Props) {
   return renderHook((p: Props) => useRememberTake({ uid: 'u1', day: '2026-11-15', level: 'words', records: [], ...p }), {
     initialProps: initial,
@@ -77,6 +77,23 @@ describe('remembering a take', () => {
     h.rerender({ live: view(state), hidden: false, enabled: true });
     settle();
     expect(mockRemember.mock.calls[2][1]).toMatchObject({ id: first.id, mistakes: 2 });
+  });
+
+  it('[RECITE-8] a spot test’s record says its length and whether it reached the end', () => {
+    // done() reaches word 31458: past the end of the ayah before it, short of the end of the one after.
+    const at = words.ref(31458);
+    const before = words.verseRange(at.sura, at.ayah)[0] - 1;
+    const after = words.verseRange(at.sura, at.ayah + 1)[1] - 1;
+    for (const [last, finished] of [[before, true], [after, false]] as const) {
+      mockRemember.mockClear();
+      const spotTest = { pages: 2, last };
+      const h = setup({ live: view(connecting), hidden: true, enabled: true, spotTest });
+      h.rerender({ live: view(listening), hidden: true, enabled: true, spotTest });
+      h.rerender({ live: view(done([])), hidden: true, enabled: true, spotTest });
+      settle();
+      expect(mockRemember.mock.calls[0][1].spotTest).toEqual({ pages: 2, finished });
+      h.unmount();
+    }
   });
 
   it('the take’s recording joins its record, even when Recite again has started the next take', () => {

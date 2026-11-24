@@ -196,7 +196,7 @@ export const RELEASES: readonly WhatsNewRelease[] = [
             id: 'test',
             icon: 'shuffle-outline',
             title: 'Test me',
-            text: 'Hold [[mic]] and pick {{Test me}}: five places at random in what you’ve memorized.',
+            text: 'Hold [[mic]] and pick {{Test me}}: one verse at random from what you’ve memorized, then carry on from it.',
             covers: ['RECITE-8'],
             needs: 'recite',
           },

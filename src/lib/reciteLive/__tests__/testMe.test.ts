@@ -1,35 +1,24 @@
 import { quranWords } from '../../recite/__fixtures__/quranWords';
-import { ayahKey, ayahsBetween, ayahCount } from '../../ayahKeys';
-import { plainText } from '../../passages';
+import { ayahKey, ayahCount, ayahsBetween } from '../../ayahKeys';
 import type { Mark } from '../contract';
 import { applyEvent, liveConnecting, LiveState } from '../state';
-import { CUE_WORDS, TEST_PLACES, testHeadline, testJuz, testPlaceName, testPlaces, testResult, testStarts } from '../testMe';
+import { pickTest, spotTestLine, testFinished, testJuz, testLengthLabel, testStarts, wordPagesOn } from '../testMe';
 
 const words = quranWords();
-/** A random source that gives the same numbers each run. */
-function seeded(seed: number) {
-  let s = seed;
-  return () => {
-    s = (s * 1103515245 + 12345) % 2147483648;
-    return s / 2147483648;
-  };
-}
 const surah = (n: number) => ayahsBetween(ayahKey(n, 1), ayahKey(n, ayahCount(n)));
 /** Juz 30 (An-Naba' to An-Nas) and Al-Mulk. */
 const JUZ30 = Array.from({ length: 114 - 78 + 1 }, (_, i) => 78 + i).flatMap(surah);
 const MEMORIZED = [...surah(67), ...JUZ30];
+const first = () => 0;
 
-describe('Test me: where it starts (Majd, Nov 15 2026)', () => {
-  it('in a memorized ayah long enough to carry on after the two words shown', () => {
+describe('Test me: where a spot test starts (RECITE-8)', () => {
+  it('in a memorized verse with the next ayah of its surah memorized too: never a surah’s last', () => {
     const starts = testStarts(MEMORIZED, words);
-    expect(starts.length).toBeGreaterThan(0);
-    for (const k of starts) {
-      const [from, to] = words.verseRange(Math.floor(k / 1000), k % 1000);
-      expect(to - from).toBeGreaterThanOrEqual(CUE_WORDS + 2);
-      expect(MEMORIZED).toContain(k);
-    }
-    // Al-Kawthar 1 has three words: never a start.
-    expect(starts).not.toContain(ayahKey(108, 1));
+    expect(starts).toContain(ayahKey(108, 1));
+    expect(starts).not.toContain(ayahKey(67, 30));
+    expect(starts).not.toContain(ayahKey(114, 6));
+    // The next ayah isn't memorized.
+    expect(testStarts([ayahKey(67, 1), ayahKey(67, 3)], words)).toEqual([]);
   });
 
   it('a juz picked: only there', () => {
@@ -39,81 +28,89 @@ describe('Test me: where it starts (Majd, Nov 15 2026)', () => {
     expect(testJuz(MEMORIZED, words).map((j) => j.juz)).toEqual([29, 30]);
   });
 
-  it('five places, each its ayah and the two after it, none sharing an ayah', () => {
-    const places = testPlaces(MEMORIZED, words, { random: seeded(7) });
-    expect(places).toHaveLength(TEST_PLACES);
-    const seen = new Set<number>();
-    for (const p of places) {
-      const from = ayahKey(...p.span.from);
-      const to = ayahKey(...p.span.to!);
-      expect(p.span.startBy).toEqual(p.span.from);
-      expect(Math.floor(to / 1000)).toBe(Math.floor(from / 1000));
-      expect(to - from).toBeLessThanOrEqual(2);
-      for (const k of ayahsBetween(from, to)) {
-        expect(seen.has(k)).toBe(false);
-        seen.add(k);
-      }
-      expect(p.cue).toEqual([words.verseFirstWord(...p.span.from), words.verseFirstWord(...p.span.from) + 1]);
-      expect(p.last).toBe(words.verseRange(...p.span.to!)[1] - 1);
-    }
+  it('one test: the whole verse shown, the checker looking in it and the next', () => {
+    const t = pickTest(surah(67), words, { random: first })!;
+    const [a, b] = words.verseRange(67, 1);
+    expect(t.span.from).toEqual([67, 1]);
+    expect(t.span.startBy).toEqual([67, 2]);
+    expect(t.cue).toEqual(Array.from({ length: b - a }, (_, i) => a + i));
+    expect(t.pages).toBe(1);
   });
 
-  it('never past what is memorized, nor into the next surah', () => {
-    // Al-Mulk 1–4 memorized: a place at 3 covers 3 and 4 only.
-    const mem = ayahsBetween(ayahKey(67, 1), ayahKey(67, 4));
-    const random = () => 0.99;
-    const [p] = testPlaces(mem, words, { places: 1, random });
-    expect(p.span.from).toEqual([67, 4]);
-    expect(p.span.to).toEqual([67, 4]);
-    // A surah's last ayah: alone.
-    const [q] = testPlaces([ayahKey(67, 30), ayahKey(68, 1)], words, { places: 1, random: () => 0 });
-    expect(q.span).toEqual({ from: [67, 30], startBy: [67, 30], to: [67, 30] });
-  });
-
-  it('fewer places when less is memorized; none with nothing', () => {
-    expect(testPlaces(ayahsBetween(ayahKey(67, 1), ayahKey(67, 6)), words, { random: seeded(3) }).length).toBeLessThanOrEqual(2);
-    expect(testPlaces([], words)).toEqual([]);
-  });
-
-  it('names the place by its surah and ayahs', () => {
-    const [p] = testPlaces(surah(67), words, { places: 1, random: () => 0 });
-    expect(plainText(testPlaceName(p))).toBe('Al-Mulk, 1st page · start');
+  it('nothing to start from: no test', () => {
+    expect(pickTest([], words)).toBeNull();
+    expect(pickTest([ayahKey(67, 30)], words)).toBeNull();
   });
 });
 
-describe('Test me: how a place went', () => {
-  const [place] = testPlaces(surah(67), words, { places: 1, random: () => 0 });
-  const first = place.cue[0];
+describe('Test me: how far it goes', () => {
+  it('a page on is the same place on the next page, less a word', () => {
+    const [p0, p1] = words.pageRange(562);
+    expect(wordPagesOn(words, p0, 1)).toBe(p1 - 1);
+    const [q0] = words.pageRange(564);
+    expect(wordPagesOn(words, p0, 2)).toBe(q0 - 1);
+    expect(wordPagesOn(words, words.count - 5, 3)).toBe(words.count - 1);
+  });
+
+  it('ends at the end of the ayah about that far on, and a longer length goes further', () => {
+    const lengths = ([0.5, 1, 2, 3] as const).map((pages) => pickTest(surah(67).concat(surah(68)), words, { pages, random: first })!);
+    for (const t of lengths) expect(t.last).toBe(words.verseRange(...t.span.to!)[1] - 1);
+    for (let i = 1; i < lengths.length; i++) expect(lengths[i].last).toBeGreaterThan(lengths[i - 1].last);
+  });
+
+  it('runs across a surah’s end when the next one is memorized', () => {
+    const t = pickTest([...surah(113), ...surah(114)], words, { pages: 1, random: first })!;
+    expect(t.span.from).toEqual([113, 1]);
+    expect(t.span.to).toEqual([114, 6]);
+  });
+
+  it('never past what is memorized, or the juz picked', () => {
+    const held = ayahsBetween(ayahKey(67, 1), ayahKey(67, 4));
+    expect(pickTest(held, words, { pages: 3, random: first })!.span.to).toEqual([67, 4]);
+    // Al-Mursalat (juz 29) runs on into An-Naba' (juz 30): picked in juz 29, it stops at the surah's end.
+    const t = pickTest([...surah(77), ...surah(78)], words, { juz: 29, pages: 3, random: () => 0.99 })!;
+    expect(t.span.to![0]).toBe(77);
+  });
+
+  it('takes a start with room for the whole length when there is one', () => {
+    // Drawn last to first: the late starts can't hold a page, so it keeps drawing until one can.
+    const t = pickTest(surah(67), words, { pages: 1, random: () => 0.99 })!;
+    expect(t.last).toBeGreaterThanOrEqual(wordPagesOn(words, t.cue[0], 1));
+  });
+
+  it('says its length in words', () => {
+    expect(testLengthLabel(0.5)).toBe('½ page');
+    expect(testLengthLabel(1)).toBe('1 page');
+    expect(testLengthLabel(3)).toBe('3 pages');
+    expect(spotTestLine(1, false)).toBe('Test · 1 page · Stopped early');
+    expect(spotTestLine(2, true)).toBe('Test · 2 pages · Finished');
+  });
+});
+
+describe('Test me: finished or stopped early', () => {
+  const spot = pickTest(surah(67), words, { random: first })!;
+  const start = spot.cue[0];
   const take = (...events: Parameters<typeof applyEvent>[1][]): LiveState =>
-    events.reduce((s, e) => applyEvent(s, e), liveConnecting({ anywhereFrom: first }));
+    events.reduce((s, e) => applyEvent(s, e), liveConnecting({ anywhereFrom: start }));
   const ready = { type: 'ready', take: 't', protocol: 6 } as const;
-  const locked = { type: 'locked', w: first + 2, s: 67, a: 1 } as const;
-  const wrong: Mark = { id: 'x', w: first + 4, ayah: [67, 1], kind: 'word', sure: 'clear', heard: 'x', heardExact: false };
+  const locked = { type: 'locked', w: start, s: 67, a: 1 } as const;
+  const skipped = (w: number): Mark => ({ id: `${w}:skipped`, w, ayah: [67, 12], kind: 'skipped', sure: 'clear' });
 
-  it('clean: on to its last word with no mistake', () => {
-    expect(testResult(place, take(ready, locked, { type: 'said', upTo: place.last })).outcome).toBe('clean');
+  it('reached its last word: finished', () => {
+    expect(testFinished(words, spot, take(ready, locked, { type: 'said', upTo: spot.last }))).toBe(true);
   });
 
-  it('a mistake on the way: its marks', () => {
-    const r = testResult(place, take(ready, locked, { type: 'mark', mark: wrong }, { type: 'said', upTo: place.last }));
-    expect(r.outcome).toBe('mistakes');
-    expect(r.marks).toEqual([wrong]);
+  it('a word short of it counts: the cursor runs a moment behind the voice', () => {
+    expect(testFinished(words, spot, take(ready, locked, { type: 'said', upTo: spot.last - 1 }))).toBe(true);
   });
 
-  it('to the end with no mistake but words peeked: helped, not clean (a peek is a word not recalled)', () => {
-    const r = testResult(place, take(ready, locked, { type: 'said', upTo: place.last }), 2);
-    expect(r.outcome).toBe('helped');
-    expect(r.peeked).toBe(2);
+  it('short of that, or never begun: stopped early', () => {
+    expect(testFinished(words, spot, take(ready, locked, { type: 'said', upTo: spot.last - 6 }))).toBe(false);
+    expect(testFinished(words, spot, take(ready))).toBe(false);
   });
 
-  it('stopped before the end, or never begun', () => {
-    expect(testResult(place, take(ready, locked, { type: 'said', upTo: first + 6 })).outcome).toBe('unfinished');
-    expect(testResult(place, take(ready)).outcome).toBe('missed');
-  });
-
-  it('the headline counts the clean ones', () => {
-    const r = (outcome: 'clean' | 'mistakes') => ({ place, outcome, marks: [], peeked: 0 });
-    expect(testHeadline([r('clean'), r('mistakes'), r('clean')])).toBe('2 of 3 continued cleanly');
-    expect(testHeadline([r('clean'), r('clean')])).toBe('All 2 continued cleanly');
+  it('a skipped word at the end says nothing was heard there', () => {
+    const s = take(ready, locked, { type: 'said', upTo: start + 6 }, { type: 'mark', mark: skipped(spot.last) });
+    expect(testFinished(words, spot, s)).toBe(false);
   });
 });

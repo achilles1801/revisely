@@ -111,6 +111,19 @@ describe("Recite's memory: users/<uid>/reciteTakes", () => {
     await assertFails(setDoc(doc(alice, path(ALICE, 't6')), take({ links: 'take-a,take-b' })));
   });
 
+  it('a spot test keeps its length and whether it finished (RECITE-8), and nothing else in that field', async () => {
+    const alice = env.authenticatedContext(ALICE).firestore();
+    await assertSucceeds(setDoc(doc(alice, path(ALICE, 'st1')), take({ spotTest: { pages: 1, finished: true } })));
+    await assertSucceeds(setDoc(doc(alice, path(ALICE, 'st2')), take({ spotTest: { pages: 0.5, finished: false } })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 'st3')), take({ spotTest: { pages: 0, finished: true } })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 'st3')), take({ spotTest: { pages: 31, finished: true } })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 'st3')), take({ spotTest: { pages: '1', finished: true } })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 'st3')), take({ spotTest: { pages: 1 } })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 'st3')), take({ spotTest: { pages: 1, finished: 'yes' } })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 'st3')), take({ spotTest: { pages: 1, finished: true, extra: 1 } })));
+    await assertFails(setDoc(doc(alice, path(ALICE, 'st3')), take({ spotTest: true })));
+  });
+
   it('a take keeps the words peeked (1 to 300) and the marks called Not a mistake (1 to 100), for its summary later', async () => {
     const alice = env.authenticatedContext(ALICE).firestore();
     const removed = [{ ...mark, id: '31450:harakat:fatha', w: 31450, kind: 'harakat' }];

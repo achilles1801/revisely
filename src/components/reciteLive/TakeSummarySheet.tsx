@@ -22,6 +22,8 @@ import { CheckMark } from './ReciteMic';
 import { Sparkline } from '../reciteMemory/AccuracyChart';
 import { peekedLine } from '../../lib/reciteLive/peeked';
 import type { HistoryRow } from '../../lib/reciteMemory/history';
+import type { SpotTestRecord } from '../../lib/reciteMemory/record';
+import { spotTestLine } from '../../lib/reciteLive/testMe';
 import { t } from '../../i18n';
 import { chevron } from '../../i18n/direction';
 
@@ -109,6 +111,8 @@ export function TakeSummarySheet({
   onInto,
   onCheck,
   onAgain,
+  againLabel,
+  spotTest = null,
   onDrill,
   before = null,
   memory = null,
@@ -154,6 +158,10 @@ export function TakeSummarySheet({
   onCheck: () => void;
   /** Recite again (the same mode, at once). Absent for a past take's summary (RMEM-8): no such button. */
   onAgain?: () => void;
+  /** The Again button's words, when it isn't Recite again (a spot test's: Test me again). */
+  againLabel?: string;
+  /** The take was a spot test (RECITE-8): its length, and whether it finished or was stopped early. */
+  spotTest?: SpotTestRecord | null;
   /** Recite the mistakes again (Check, with something to drill): one take from the first mistake to the last. */
   onDrill?: () => void;
   /** This take recited the mistakes of the one before: what that one found there ("1 wrong word, 1 not clear"). */
@@ -244,7 +252,7 @@ export function TakeSummarySheet({
       {drillable ? <PillButton title={t('reciteLive.summary.drill')} size="lg" onPress={onDrill} testID="take-summary-drill" /> : null}
       {onAgain ? (
         <PillButton
-          title={t('reciteLive.summary.again')}
+          title={againLabel ?? t('reciteLive.summary.again')}
           size="lg"
           variant={drillable ? 'outline' : undefined}
           onPress={onAgain}
@@ -313,6 +321,11 @@ export function TakeSummarySheet({
         >
           {[passage, clock(seconds)].filter(Boolean).join(' · ')}
         </Text>
+        {spotTest ? (
+          <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX} testID="take-summary-spot-test">
+            {spotTestLine(spotTest.pages, spotTest.finished)}
+          </Text>
+        ) : null}
         {check && marks.length ? (
           <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX}>
             {findingsLine(marks)}
