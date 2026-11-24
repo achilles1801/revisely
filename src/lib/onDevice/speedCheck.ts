@@ -12,7 +12,7 @@
 //   11 of 48 good phones to the server and kept 5 of 48 slow ones; the best of four 1 and 8; the median 6 and 5; the
 //   last 1 and 6. This rests on one noisy A15 run, so the figure is a starting point, not a measurement of every phone.
 
-import { cleanWindows, quantile } from './bench';
+import { cleanWindows, GATE_P95_MS, quantile } from './bench';
 
 export const SPEED = {
   spacingMs: 500,
@@ -21,7 +21,7 @@ export const SPEED = {
   maxWarmup: 40,
   timed: 24,
   serverBlocks: 4,
-  halfHopUnderMs: 150,
+  halfHopUnderMs: GATE_P95_MS,
   serverOverMs: 400,
 } as const;
 

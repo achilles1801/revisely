@@ -84,7 +84,7 @@ describe('a run’s summary', () => {
     expect(quantile([], 0.5)).toBeNaN();
   });
 
-  it('the model’s time, the share of a hop it takes, heat, and the 150 ms gate', () => {
+  it('the model’s time, the share of a hop it takes, heat, and the 250 ms gate', () => {
     const runMs = [...Array(20).fill(40), ...Array(20).fill(60)];
     const featureMs = Array(40).fill(10);
     const s = summarize(runMs, featureMs, 8000)!;

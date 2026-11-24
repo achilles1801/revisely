@@ -497,7 +497,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['ONDEV-1'],
     routes: ['Settings', 'OnDeviceBench'],
     text: lines(
-      '- Settings → Testing → “On-device model” is the Revisely team’s bench: it times Recite’s model on this phone (per 4-second window; the mark is under 150 ms at p95), with memory and heat, and “Long run” adds battery.',
+      '- Settings → Testing → “On-device model” is the Revisely team’s bench: it times Recite’s model on this phone (per 4-second window; the mark is under 250 ms at p95), with memory and heat, and “Long run” adds battery.',
       '- “Stub” under the phone’s name means this build has no on-device engine. Results go to the team without their account or audio.',
       '- With Recite’s pack on the phone, the screen also shows a “Self-check” line: whether the models compute the expected numbers on this phone. It then tests a Strict take on a recording for about a minute and a half, so stay on the screen; nothing is recorded from the microphone. Both go to the team once per pack and app update.',
     ),

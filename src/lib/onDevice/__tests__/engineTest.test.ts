@@ -54,6 +54,13 @@ describe('[ONDEV-1] the Strict take on a recording', () => {
     });
   });
 
+  it('says when a take like this would step down, and changes nothing', async () => {
+    const { deps } = harness({}, (e) => e({ type: 'done' }, { type: 'meter', hops: 100, late_hops: 6, worst_hop_ms: 700, max_lag_s: 0.4 }));
+    expect(await runEngineTest(deps)).toMatchObject({ ok: true, lateHops: 6, wouldStepDown: true });
+    const steady = harness();
+    expect(await runEngineTest(steady.deps)).toMatchObject({ ok: true, wouldStepDown: false });
+  });
+
   it('reports a take the engine refuses', async () => {
     const { deps, bridge } = harness();
     bridge.start.mockResolvedValueOnce({ code: -3, error: 'v5 failed its check' });

@@ -1649,7 +1649,7 @@ shows up once and they must go through it and complete it … just the main stuf
   doesn't carry it, and sends the result once per pack and app update, a failed check or a refused open included, with
   the pack's id, the chip, ONNX Runtime's version and whether each model loaded with prepacking. With the real engine it
   then runs one Strict take of the bench's recording at the live pace, with the runs locked until it ends, and shows and
-  sends how many checks ran late, the slowest, and the app's peak memory, once per pack and app update; leaving the
+  sends how many checks ran late, the slowest, whether a take like it would step down, and the app's peak memory, once per pack and app update; leaving the
   screen stops it, sends nothing, and it runs again next time. It lists this platform's runs from the dev
   backend (each a model file, a processor (CPU, Core ML, XNNPACK or NNAPI) and a thread count; all chosen, any left
   out), downloads what the chosen runs need once (only for accounts the team has given bench access: Revisely Dev is open
@@ -1657,7 +1657,7 @@ shows up once and they must go through it and complete it … just the main stuf
   phone out of backups; without access it says so) and runs them one after another with the screen kept on. Each run first checks the model on the
   checker's own output (the features within 0.0002, the model's output and its top sound per frame), then times 60,
   200 (the default) or 600 windows (4 seconds of recitation each) of a public recitation clip, and shows the model's
-  time per window (median, p90, p95, worst; under or over 150 ms at p95), the features', the share of a half second
+  time per window (median, p90, p95, worst; under or over 250 ms at p95), the features', the share of a half second
   both take, load and second-load times, memory, and the first and last windows' times with the phone's heat. A run
   can open its model from bytes in memory instead of its file, as the real path will after decrypting it, and hold the
   engine's second (any-length) graph beside it, for the memory with both. A long run
@@ -1682,7 +1682,7 @@ shows up once and they must go through it and complete it … just the main stuf
   on the server tells its take line why. A take on the phone sends one health line after it ends, numbers only, and
   with Keep my recitations as test data on, its audio and result once its final answer has come; a failure there is
   never shown and never retried. `auto` uses the phone only after its speed check: one model call at a live take's pace,
-  warmed up, on an idle, cool phone with no power saving, kept per pack, engine, device and threads. Under about 150 ms
+  warmed up, on an idle, cool phone with no power saving, kept per pack, engine, device and threads. Under 250 ms
   at p95 it runs the 0.5 s hop, up to about 400 ms the 1 s hop, over that the server. A take that falls behind (over 5%
   of its hops late, or over 2 s of lag) is never changed itself: the next take runs one step slower, until a clean check
   on a later launch. An engine that asks for it gets the teacher's second opinion as marks appear: its clips go to the

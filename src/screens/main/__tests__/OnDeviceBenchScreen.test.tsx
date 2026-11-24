@@ -152,7 +152,7 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
     }
   });
 
-  it('runs the chosen ones, shows each result against the 150 ms mark and the checker, and sends the record', async () => {
+  it('runs the chosen ones, shows each result against the 250 ms mark and the checker, and sends the record', async () => {
     await show();
     const runPlan = jest.requireMock('../../../lib/onDevice/benchRun').runPlan as jest.Mock;
     runPlan.mockClear();
@@ -167,9 +167,8 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
     expect(runPlan).toHaveBeenCalledTimes(2);
     expect(screen.getByTestId('bench-result-v7m-live-r16-cpu-1')).toBeTruthy();
     expect(screen.getByText('Model 180.0 ms · p90 180.0 · p95 180.0 · worst 180.0')).toBeTruthy();
-    expect(screen.getByText('Over the 150 ms mark at p95')).toBeTruthy();
     expect(screen.getByText('Model 4.0 ms · p90 4.0 · p95 4.0 · worst 4.0')).toBeTruthy();
-    expect(screen.getByText('Under the 150 ms mark at p95')).toBeTruthy();
+    expect(screen.getAllByText('Under the 250 ms mark at p95')).toHaveLength(2);
     expect(screen.getAllByText('Matches the checker’s output')).toHaveLength(2);
     expect(screen.getAllByText('Memory 215 MB with the model (95 MB for it)')).toHaveLength(2);
     expect(screen.getByTestId('bench-status').props.children).toBe('Sent to the dev backend');
