@@ -3,6 +3,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setNetworkState, __resetNetworkStateForTests } from '../../networkState';
 import {
+  AUTO_CALLS_A_DAY,
   __resetPackForTests,
   downloadPackNow,
   dropBadPack, refetchDamagedPack,
@@ -102,6 +103,8 @@ const engine = {
 };
 let mockEngine: typeof engine | null = engine;
 jest.mock('../benchRun', () => ({ benchEngine: () => mockEngine }));
+
+import { describePack, packMenuActions } from '../packUi';
 
 const SHA = { core: 'a'.repeat(64), strict: 'b'.repeat(64) };
 const url = (id: string, part: string) => `https://storage.googleapis.com/revisely-dev.firebasestorage.app/packs/recite/${id}/${part}.rcpk?sig=1`;
@@ -375,6 +378,117 @@ describe('Recite’s pack on the phone', () => {
     expect(mockDownload).not.toHaveBeenCalled();
     expect(packForEngine()).toBeNull();
     expect(getPackStatus().phase).toBe('waiting-for-wifi');
+  });
+
+  it.each([
+    ['RESOURCE_EXHAUSTED', 'That’s enough downloads for today.', 'limit', 'Too many tries today. It tries again tomorrow', false],
+    ['PERMISSION_DENIED', 'This account can’t download the pack yet.', 'account', 'Not available for this account yet', false],
+    ['PERMISSION_DENIED', 'This app can’t download the pack.', 'app', 'This build can’t download it', false],
+    ['FAILED_PRECONDITION', 'There is no pack to download here.', 'none', 'Nothing to download yet', false],
+    ['UNAUTHENTICATED', 'Unauthenticated', 'verify', 'Couldn’t verify this app. Try again', true],
+  ])('a %s refusal (%s) names its reason, and offers Download now only if it can help', async (code, message, why, line, offered) => {
+    mockCall.mockRejectedValue(Object.assign(new Error(message), { code }));
+    await run();
+    const s = getPackStatus();
+    expect(s).toMatchObject({ phase: 'unavailable', why });
+    expect(describePack(s).subtitle).toBe(line);
+    expect(packMenuActions(s).some((a) => a.key === 'download')).toBe(offered);
+  });
+
+  it('a pack the engine refused still offers Download now', async () => {
+    await run();
+    await dropBadPack('v7m-1');
+    const s = getPackStatus();
+    expect(s.why).toBe('bad');
+    expect(describePack(s).subtitle).toBe('This version didn’t open. Download it again');
+    expect(packMenuActions(s).some((a) => a.key === 'download')).toBe(true);
+  });
+
+  it('after the day’s limit it doesn’t ask again until the next UTC day', async () => {
+    const day = Date.UTC(2026, 10, 23, 23, 50);
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(day);
+    mockCall.mockRejectedValue(Object.assign(new Error('enough'), { code: 'RESOURCE_EXHAUSTED' }));
+    await run();
+    expect(mockCall).toHaveBeenCalledTimes(1);
+    await run();
+    expect(mockCall).toHaveBeenCalledTimes(1);
+    expect(getPackStatus().why).toBe('limit');
+
+    clock.mockReturnValue(Date.UTC(2026, 10, 24, 0, 1));
+    mockCall.mockResolvedValue({ result: { ...answer().result, expiresAt: Date.UTC(2026, 10, 24, 0, 16) } });
+    await run();
+    expect(mockCall).toHaveBeenCalledTimes(2);
+    expect(packForEngine()?.packId).toBe('v7m-1');
+    expect(getPackStatus().why).toBeUndefined();
+    clock.mockRestore();
+  });
+
+  it.each([
+    ['the download', () => mockDownload.mockResolvedValueOnce({ status: 403 }), 'core: download answered 403'],
+    ['the checksum', () => engine.sha256.mockResolvedValueOnce('c'.repeat(64)), 'core: checksum doesn\'t match'],
+    ['the reader', () => engine.packVerify.mockResolvedValueOnce({ ok: false, error: 'chunk 3 failed its check' }), 'core: chunk 3 failed its check'],
+    ['the server', () => mockCall.mockRejectedValueOnce(Object.assign(new Error('couldn’t be prepared'), { code: 'INTERNAL' })), 'the server, INTERNAL: couldn’t be prepared'],
+  ])('a failure at %s is named on the row', async (_step, fail, line) => {
+    fail();
+    await run();
+    const s = getPackStatus();
+    expect(s).toMatchObject({ phase: 'error', failure: line });
+    expect(describePack(s).subtitle).toBe(`It didn’t download: ${line}`);
+    expect(packMenuActions(s).some((a) => a.key === 'download')).toBe(true);
+  });
+
+  it('never shows a link or a file path', async () => {
+    mockDownload.mockRejectedValueOnce(new Error('failed for https://storage.googleapis.com/b/core.rcpk?X-Goog-Signature=abc at file:///var/mobile/x'));
+    await run();
+    expect(getPackStatus().failure).toBe('failed for (link) at (link)');
+  });
+
+  it('coming back mid-download uses the links it has, and doesn’t spend another call', async () => {
+    mockDownload.mockResolvedValue({ status: 500 });
+    await run();
+    expect(getPackStatus().phase).toBe('error');
+    await run();
+    await run();
+    expect(mockCall).toHaveBeenCalledTimes(1);
+    expect(mockDownload.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('links the server refuses are asked for again', async () => {
+    mockDownload.mockResolvedValueOnce({ status: 403 });
+    await run();
+    expect(getPackStatus().phase).toBe('error');
+    await run();
+    expect(mockCall).toHaveBeenCalledTimes(2);
+    expect(packForEngine()?.packId).toBe('v7m-1');
+  });
+
+  it('without a pack it takes three answers a day by itself, and Download now can still ask', async () => {
+    mockDownload.mockResolvedValue({ status: 500 });
+    mockCall.mockImplementation(async () => ({ result: { ...answer().result, expiresAt: Date.now() } })); // links that don't last
+    for (let i = 0; i < 6; i++) await run();
+    expect(mockCall).toHaveBeenCalledTimes(AUTO_CALLS_A_DAY);
+    const s = getPackStatus();
+    expect(s).toMatchObject({ phase: 'unavailable', why: 'paused' });
+    expect(describePack(s).subtitle).toBe('Paused after a few tries today');
+    expect(packMenuActions(s).some((a) => a.key === 'download')).toBe(true);
+
+    await downloadPackNow();
+    await settle();
+    expect(mockCall).toHaveBeenCalledTimes(AUTO_CALLS_A_DAY + 1);
+  });
+
+  it('a server failure counts against the phone’s own tries, since the callable counted it', async () => {
+    mockCall.mockRejectedValue(Object.assign(new Error('couldn’t be prepared'), { code: 'INTERNAL' }));
+    for (let i = 0; i < 6; i++) await run();
+    expect(mockCall).toHaveBeenCalledTimes(AUTO_CALLS_A_DAY);
+    expect(getPackStatus()).toMatchObject({ phase: 'unavailable', why: 'paused' });
+  });
+
+  it('a refusal the callable doesn’t count doesn’t use up the phone’s own tries', async () => {
+    mockCall.mockRejectedValue(Object.assign(new Error('This account can’t download the pack yet.'), { code: 'PERMISSION_DENIED' }));
+    for (let i = 0; i < 5; i++) await run();
+    expect(mockCall).toHaveBeenCalledTimes(5);
+    expect(getPackStatus().why).toBe('account');
   });
 
   it('Download now tries a refused pack again', async () => {

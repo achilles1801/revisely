@@ -1706,7 +1706,12 @@ shows up once and they must go through it and complete it … just the main stuf
   refuses as bad data is deleted and that version isn't fetched again until a new version, an app update with another
   engine, or Download now, and takes stay on the server. A pack whose files fail their check on the phone as it opens
   (a damaged file, a lost key) isn't the engine's refusal: it is deleted and fetched again on the usual network rules,
-  at most twice for a version, and takes stay on the server meanwhile.
+  at most twice for a version, and takes stay on the server meanwhile. When there is no pack for this phone the row says
+  why (this account, this build, too many tries today, the app couldn't be verified, nothing to download, a version that
+  didn't open), and offers Download now only where trying again can help. After the day's limit it doesn't ask again
+  until the next UTC day. A download that fails names the step that failed. Coming back to the app or the reader mid-download reuses the links it has, and without a whole
+  pack the phone makes at most three counted calls a UTC day by itself (a server failure counts), leaving the rest for
+  Download now.
 
 ## Premium early access
 

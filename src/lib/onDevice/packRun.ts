@@ -42,8 +42,35 @@ export const CHECK_EVERY_MS = 24 * 60 * 60 * 1000;
 export const RETRY_MS = [60_000, 5 * 60_000, 15 * 60_000];
 /** A pack damaged on this phone is fetched again at most this many times per version: a failing disk mustn't loop. */
 export const MAX_DAMAGED_REFETCHES = 2;
-/** The callable's answers that mean "not for this account or not yet": no retries today. */
-const NOT_NOW = new Set(['PERMISSION_DENIED', 'FAILED_PRECONDITION', 'UNAUTHENTICATED', 'RESOURCE_EXHAUSTED']);
+/** Why this phone has no pack to fetch: the callable's refusal, or (`bad`) the engine's. No retries today. */
+export type PackRefusal = 'account' | 'app' | 'limit' | 'verify' | 'none' | 'bad' | 'paused';
+
+function refusalOf(err: unknown): PackRefusal | null {
+  const { code, message } = err as { code?: string; message?: string };
+  switch (code) {
+    case 'RESOURCE_EXHAUSTED':
+      return 'limit';
+    case 'UNAUTHENTICATED':
+      return 'verify'; // the sign-in or App Check
+    case 'FAILED_PRECONDITION':
+      return 'none';
+    case 'PERMISSION_DENIED':
+      return message?.includes('This app') ? 'app' : 'account'; // functions/src/recitePack/handler.ts
+    default:
+      return null;
+  }
+}
+
+/** What failed, for the row and a screenshot: the app's own messages, with any link or file path taken out. */
+function failureLine(err: unknown): string {
+  const text = err instanceof Error ? err.message : String(err);
+  return text.replace(/\b(?:https?|file):\/\/\S+/g, '(link)').slice(0, 90);
+}
+
+/** The callable counts a phone's calls by the UTC day (handler.ts `packDay`). */
+const utcDay = (): string => new Date(Date.now()).toISOString().slice(0, 10);
+/** Counted calls a phone makes by itself in a UTC day: the rest of the callable's 6 stay for Download now. */
+export const AUTO_CALLS_A_DAY = 3;
 
 export type PackPhase =
   | 'idle'
@@ -65,6 +92,10 @@ export interface PackStatus {
   bytes: number;
   /** The whole pack, once the callable has said. */
   totalBytes: number;
+  /** With `unavailable`: why, when that is known. */
+  why?: PackRefusal | null;
+  /** With `error`: the step that failed. */
+  failure?: string | null;
 }
 
 interface Saved {
@@ -77,6 +108,10 @@ interface Saved {
   badPackEngine?: string | null;
   /** How many times this version has been fetched again after its files were damaged on this phone. */
   damaged?: { packId: string; count: number } | null;
+  /** The UTC day the callable said this account had had enough calls: it isn't asked again that day. */
+  limitDay?: string | null;
+  /** Calls today that the callable may have counted: a good answer, or a failure after its limit step. */
+  asks?: { day: string; n: number } | null;
 }
 
 let saved: Saved = { auto: true, have: null, checkedAt: 0 };
@@ -93,10 +128,18 @@ let generation = 0;
 let retry: ReturnType<typeof setTimeout> | null = null;
 let task: ReturnType<typeof createDownloadResumable> | null = null;
 let stopping = false;
+/** The callable's last answer: coming back to the app mid-download uses it while its links last, at no cost. */
+let lastAnswer: PackAnswer | null = null;
+/** Download now was tapped: this ask doesn't count against what the phone may do by itself. */
+let tapped = false;
 
 function publish(next: Partial<PackStatus>): void {
   const merged = { ...status, ...next };
+  if (merged.phase !== 'unavailable') delete merged.why;
+  if (merged.phase !== 'error') delete merged.failure;
   if (
+    (merged.why ?? null) === (status.why ?? null) &&
+    (merged.failure ?? null) === (status.failure ?? null) &&
     merged.phase === status.phase &&
     merged.packId === status.packId &&
     merged.bytes === status.bytes &&
@@ -235,7 +278,7 @@ export function requestPackDownload(): void {
   void runOnce()
     .catch((err) => {
       logger.warn('Recite’s pack didn’t download', err);
-      publish({ phase: 'error' });
+      publish({ phase: 'error', failure: failureLine(err) });
       scheduleRetry();
     })
     .finally(() => {
@@ -248,17 +291,19 @@ export function requestPackDownload(): void {
     });
 }
 
-async function askForPack(): Promise<PackAnswer | 'not-now'> {
+async function askForPack(): Promise<PackAnswer | { refused: PackRefusal | null }> {
   const engine = benchEngine();
   const user = auth.currentUser;
-  if (!engine || !user) return 'not-now';
+  if (!engine || !user) return { refused: null };
   const key = await engine.packPublicKey();
   let raw: unknown;
   try {
     raw = await callFunction(user, 'recitePack', { publicKey: key.publicKey, keyFormat: key.keyFormat }, { timeoutMs: 30_000 });
   } catch (err) {
-    if (NOT_NOW.has((err as { code?: string }).code ?? '')) return 'not-now';
-    throw err;
+    const refused = refusalOf(err);
+    if (refused) return { refused };
+    const { code, message } = err as { code?: string; message?: string };
+    throw new Error(`the server, ${code ?? 'no answer'}: ${message ?? ''}`); // i18n-ignore (an error for logs)
   }
   const answer = parsePackAnswer((raw as { result?: unknown } | null)?.result);
   if (!answer) throw new Error('recitePack answered something this app can’t read'); // i18n-ignore (an error for logs)
@@ -287,6 +332,7 @@ async function fetchPart(dir: Directory, packId: string, p: PackPartAnswer, befo
   }
   const got = new File(partial.uri);
   if (result.status !== 200) {
+    if (result.status >= 400 && result.status < 500) lastAnswer = null; // its links no longer work
     if (got.exists) got.delete();
     throw new Error(`${p.part}: download answered ${result.status}`); // i18n-ignore (an error for logs)
   }
@@ -323,11 +369,16 @@ function roomFor(bytes: number): boolean {
   }
 }
 
+function noteAsk(): void {
+  const day = utcDay();
+  saved.asks = { day, n: saved.asks?.day === day ? saved.asks.n + 1 : 1 };
+}
+
 const engineVersion = (): string | null => coreLine(benchEngine())?.version ?? null;
 
 async function runOnce(): Promise<void> {
   if (!benchEngine()) {
-    publish({ phase: 'unavailable' });
+    publish({ phase: 'unavailable', why: null });
     return;
   }
   await preparePack();
@@ -341,8 +392,12 @@ async function runOnce(): Promise<void> {
     publish(restingStatus());
     return;
   }
+  if (!holdsCore(saved.have) && saved.limitDay === utcDay()) {
+    publish({ phase: 'unavailable', why: 'limit' });
+    return;
+  }
   if (!holdsCore(saved.have) && saved.badPack && !once && Date.now() - saved.checkedAt < CHECK_EVERY_MS) {
-    publish({ phase: 'unavailable' });
+    publish({ phase: 'unavailable', why: 'bad' });
     return;
   }
   if (!mayUseNetwork()) {
@@ -351,18 +406,39 @@ async function runOnce(): Promise<void> {
     return;
   }
 
-  const answer = await askForPack();
+  const reusing = lastAnswer && urlsStillGood(lastAnswer, Date.now()) ? lastAnswer : null;
+  const tap = tapped;
+  tapped = false;
+  if (!reusing && !tap && !holdsCore(saved.have) && saved.asks?.day === utcDay() && saved.asks.n >= AUTO_CALLS_A_DAY) {
+    publish({ phase: 'unavailable', why: 'paused' });
+    return;
+  }
+  let answer: Awaited<ReturnType<typeof askForPack>>;
+  try {
+    answer = reusing ?? (await askForPack());
+  } catch (err) {
+    // The callable counts a call before it can fail preparing the answer.
+    noteAsk();
+    await persist();
+    throw err;
+  }
   if (gen !== generation) return;
   saved.checkedAt = Date.now();
-  if (answer === 'not-now') {
+  if ('refused' in answer) {
+    if (answer.refused === 'limit') saved.limitDay = utcDay();
     await persist();
-    publish(holdsCore(saved.have) ? restingStatus() : { phase: 'unavailable' });
+    publish(holdsCore(saved.have) ? restingStatus() : { phase: 'unavailable', why: answer.refused });
     return;
   }
 
+  if (!reusing) {
+    lastAnswer = answer;
+    noteAsk();
+    await persist();
+  }
   if (answer.packId === saved.badPack && !once) {
     await persist();
-    publish({ phase: 'unavailable' });
+    publish({ phase: 'unavailable', why: 'bad' });
     return;
   }
   const total = answer.parts.reduce((n, p) => n + p.bytes, 0);
@@ -413,6 +489,7 @@ async function runOnce(): Promise<void> {
     }
   }
   if (gen !== generation) return;
+  lastAnswer = null;
   if (fresh.parts.core) removeOtherPacks(fresh.packId);
   once = false;
   attempt = 0;
@@ -427,6 +504,7 @@ export async function downloadPackNow({ overMobileData = false } = {}): Promise<
   once = once || overMobileData;
   attempt = 0;
   clearRetry();
+  tapped = true;
   saved = { ...saved, auto: true, checkedAt: 0, badPack: null, badPackEngine: null, damaged: null };
   await persist();
   requestPackDownload();
@@ -442,10 +520,11 @@ export async function dropBadPack(packId: string): Promise<void> {
   generation += 1;
   clearRetry();
   stopDownload();
+  lastAnswer = null;
   saved = { ...saved, have: null, checkedAt: Date.now(), badPack: packId, badPackEngine: engineVersion() };
   await persist();
   deletePackFolder(packId);
-  publish({ phase: 'unavailable', packId: null, bytes: 0, totalBytes: 0 });
+  publish({ phase: 'unavailable', why: 'bad', packId: null, bytes: 0, totalBytes: 0 });
 }
 
 function deletePackFolder(packId: string): void {
@@ -473,6 +552,7 @@ export async function refetchDamagedPack(packId: string): Promise<void> {
   generation += 1;
   clearRetry();
   stopDownload();
+  lastAnswer = null;
   saved = { ...saved, have: null, checkedAt: 0, damaged: { packId, count: count + 1 } };
   await persist();
   deletePackFolder(packId);
@@ -488,7 +568,8 @@ export async function removePack(): Promise<void> {
   attempt = 0;
   clearRetry();
   stopDownload();
-  saved = { auto: false, have: null, checkedAt: 0 };
+  lastAnswer = null;
+  saved = { auto: false, have: null, checkedAt: 0, limitDay: saved.limitDay, asks: saved.asks };
   await persist();
   try {
     const r = root();
@@ -526,4 +607,6 @@ export function __resetPackForTests(): void {
   generation = 0;
   task = null;
   stopping = false;
+  lastAnswer = null;
+  tapped = false;
 }

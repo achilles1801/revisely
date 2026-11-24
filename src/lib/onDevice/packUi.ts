@@ -8,7 +8,7 @@ import { getMushafStatus } from '../mushafOffline';
 import { formatMegabytes } from '../mushafOfflineUi';
 import { networkState, onUnmeteredNetwork } from '../networkState';
 import { benchEngine } from './benchRun';
-import { downloadPackNow, getPackStatus, onPackStatus, preparePack, removePack, type PackStatus } from './packRun';
+import { downloadPackNow, getPackStatus, onPackStatus, preparePack, removePack, type PackRefusal, type PackStatus } from './packRun';
 
 /** This build carries the native module (older Revisely Dev builds and the store app don't). */
 export function packRowShown(): boolean {
@@ -21,6 +21,29 @@ export function usePackStatus(): PackStatus {
   }, []);
   return useSyncExternalStore(onPackStatus, getPackStatus);
 }
+
+function unavailableLine(why: PackRefusal | null | undefined): string {
+  switch (why) {
+    case 'limit':
+      return t('settings.recitePack.unavailableLimit');
+    case 'app':
+      return t('settings.recitePack.unavailableApp');
+    case 'verify':
+      return t('settings.recitePack.unavailableVerify');
+    case 'none':
+      return t('settings.recitePack.unavailableNone');
+    case 'bad':
+      return t('settings.recitePack.unavailableBad');
+    case 'paused':
+      return t('settings.recitePack.unavailablePaused');
+    default:
+      return t('settings.recitePack.unavailable');
+  }
+}
+
+/** Trying again can help: the app couldn't be verified just now, a copy the engine refused can be fetched afresh, or the phone stopped trying by itself. */
+const worthRetrying = (s: PackStatus): boolean =>
+  s.phase !== 'unavailable' || s.why === 'verify' || s.why === 'bad' || s.why === 'paused';
 
 /** The row's value (right) and the line under its label. */
 export function describePack(s: PackStatus): { value: string; subtitle: string } {
@@ -37,20 +60,23 @@ export function describePack(s: PackStatus): { value: string; subtitle: string }
     case 'no-space':
       return { value: '', subtitle: t('settings.recitePack.noSpace', { size: formatMegabytes(s.totalBytes) }) };
     case 'error':
-      return { value: '', subtitle: t('settings.recitePack.error') };
+      return {
+        value: '',
+        subtitle: s.failure ? t('settings.recitePack.errorWhy', { why: s.failure }) : t('settings.recitePack.error'),
+      };
     case 'removed':
       return { value: t('settings.recitePack.download'), subtitle: t('settings.recitePack.removed') };
     case 'unavailable':
-      return { value: '', subtitle: t('settings.recitePack.unavailable') };
+      return { value: '', subtitle: unavailableLine(s.why) };
     default:
       return { value: '', subtitle: t('settings.recitePack.idle') };
   }
 }
 
-/** The menu under the row: Download now unless it's here, and Remove once it is. */
+/** The menu under the row: Download now unless it's here or trying again can't help, and Remove once it is. */
 export function packMenuActions(s: PackStatus): SheetAction[] {
   const actions: SheetAction[] = [];
-  if (s.phase !== 'ready' && s.phase !== 'downloading') {
+  if (s.phase !== 'ready' && s.phase !== 'downloading' && worthRetrying(s)) {
     actions.push({
       key: 'download',
       label: t('settings.recitePack.downloadNow'),
