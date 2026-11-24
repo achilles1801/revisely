@@ -399,13 +399,14 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     // Mistake detection reached the store app with 1.0.5 (its lines are in GUIDE_SECTIONS). Strict stays Revisely Dev's
     // until it has a release of its own (Majd, Nov 17 2026).
     title: 'Only in Revisely Dev',
-    covers: ['SESS-8', 'LANG-2', 'RECITE-26', 'RECITE-27', 'SET-5', 'ONBOARD-5'],
+    covers: ['SESS-8', 'LANG-2', 'RECITE-26', 'RECITE-27', 'RECITE-28', 'SET-5', 'ONBOARD-5'],
     routes: ['Settings'],
     text: lines(
       '- Settings → Testing → “Preview onboarding”: the first setup’s screens on a blank account. It saves nothing.',
       '- Settings → Mushaf and Recite → “Mistakes to mark”: “Mistakes”, or “Strict (Beta)”, which also marks tajweed in violet: ghunnah, ikhfa, qalqalah, idgham (with and without ghunnah), iqlab, a natural madd dropped, “Madd munfasil” at 4 or 5 counts, a lazim madd held short, and “Madd ʿarid” once it’s set to a length. It doesn’t check “Madd muttasil”, munfasil at 2 counts or ikhfa of meem yet, so never say it checks every tajweed rule. It’s Beta: it can miss a slip or note a correct word, and notes never count in the score. The store app marks mistakes only.',
       '- Two tiers of marks (Majd, Nov 22 2026). Mistakes: a wrong, skipped or extra word, a wrong haraka and a wrong letter, each named for what it is on its card (“Wrong word”, “Wrong haraka”, “Wrong letter”, “Wrong shadda”), in the summary’s line (for example "1 wrong haraka, 1 wrong letter") and counted in the score; a wrong haraka or letter is a mistake like a wrong word, never a “slip”. Tajweed notes (Strict) are Beta: “(Beta)” after a note’s name, in the summary’s line and in Insights, and never counted. “Not clear” is neither: never a mistake, never counted. The colours are as before: red for words, amber for harakat and letters and Not clear, violet for tajweed.',
       '- A take needs at least one ayah recited (or about a mushaf line of a very long one). Less isn’t kept.',
+      '- The bar’s words show each word once it’s said, not as it begins.',
       '- Settings → Mushaf and Recite → “Keep my recitations as test data” (on unless turned off) keeps each take and its result for Revisely’s tests; software checks them, nobody listens. Any account that recites has it, tester or not. Settings → Testing → “Premium” turns Premium off to see Mark mistakes locked.',
       '- Settings → About → “Licences” shows, in full, the licence of the model Revisely’s recitation checking is built on (the Quran Muaalem License); it opens without a connection.',
       '- Settings → Testing → “Mistake detection model” says which model the checker runs for Recite, Mistakes and Strict (for example v7), read from the checker when Settings opens; a tap asks again.',

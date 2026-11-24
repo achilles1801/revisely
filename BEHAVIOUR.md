@@ -768,7 +768,7 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   in partway through an ayah needs the next one whole, or those 9 words. (Majd, Nov 23 2026: "atleast one verse has to
   be recited".)
 ## Recite insights
-- **RECITE-28.** The live words in the take's bar name a word only once it has been said: when the cursor has moved on
+- **RECITE-28.** (Revisely Dev) The live words in the take's bar name a word only once it has been said: when the cursor has moved on
   from it, when `said` reaches it at a pause, or, so the line never looks stuck, once it has been under the cursor as long
   as RECITE-6's wait (0.7–2.5 s, or 1.5–4 s with a checker whose `said` follows the voice). On the server and on the phone
   alike (Majd, Nov 23 2026: "i would basically start reciting a word (didn't finish saying it yet) and it shows me the
