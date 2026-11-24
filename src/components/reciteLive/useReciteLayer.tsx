@@ -1128,7 +1128,7 @@ export function useReciteLayer({
           clock={live.clock}
           recording={live.recording && live.mic === 'on'}
           // A test's place, once done, says how it went in the words' place.
-          words={placeResult ? [] : barWords(live.state, qw, { check: checkTake, startWord: live.startWord, upTo: hidden ? liveInfo.saidUpTo : undefined })}
+          words={placeResult ? [] : barWords(live.state, qw, { check: checkTake, startWord: live.startWord, upTo: hidden ? liveInfo.saidUpTo : undefined, held: heldCursor })}
           status={barStatus}
           phase={barPhase}
           paused={live.paused}

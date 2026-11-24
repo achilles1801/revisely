@@ -768,13 +768,15 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   in partway through an ayah needs the next one whole, or those 9 words. (Majd, Nov 23 2026: "atleast one verse has to
   be recited".)
 ## Recite insights
-- **RECITE-28.** The take's bar names a word only once it has been said: when the cursor has moved on from it, or `said`
-  reaches it at a pause, on the server and on the phone alike (Majd, Nov 23 2026: "i would basically start reciting a word
-  (didn't finish saying it yet) and it shows me the whole word already on the bottom tracker thing as if i already said
-  it"; the cursor lands on a word as it begins, a median 0.45 s in and before its end 94% of the time). The word being
-  said is never in the bar, the page shown or hidden. A word said earlier and gone back to isn't named again until it is
-  said again. Once the take has stopped, the bar ends on the word it stopped on. The newest word named is in the following
-  ink.
+- **RECITE-28.** The live words in the take's bar name a word only once it has been said: when the cursor has moved on
+  from it, when `said` reaches it at a pause, or, so the line never looks stuck, once it has been under the cursor as long
+  as RECITE-6's wait (0.7–2.5 s, or 1.5–4 s with a checker whose `said` follows the voice). On the server and on the phone
+  alike (Majd, Nov 23 2026: "i would basically start reciting a word (didn't finish saying it yet) and it shows me the
+  whole word already on the bottom tracker thing as if i already said it", "i meant the real time preview thing on the
+  bottom"; the cursor lands on a word as it begins, a median 0.45 s in and before its end 94% of the time). A word said
+  earlier and gone back to waits the same way. Once the take has stopped, the line ends on the word it stopped on. The
+  newest word named is in the following ink. The page's own following (RECITE-19, RECITE-20, the hidden page) doesn't
+  change.
 
 What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).
 

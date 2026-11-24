@@ -27,6 +27,17 @@ describe('the words heard in the bar', () => {
     ]);
   });
 
+  it('[RECITE-28] at a pause with no `said`, it joins once it has been under the cursor long enough: the line never sticks', () => {
+    const s = applyEvent(at(liveConnecting(), A23 + 3), { type: 'said', upTo: A23 + 1 });
+    expect(barWords(s, words, { check: false, startWord: A23 }).map((b) => b.w - A23)).toEqual([1, 2]);
+    expect(barWords(s, words, { check: false, startWord: A23, held: A23 + 3 }).map((b) => [b.w - A23, b.tone])).toEqual([
+      [2, 'said'],
+      [3, 'current'],
+    ]);
+    // The timer's word is another's: it says nothing of this one.
+    expect(barWords(s, words, { check: false, startWord: A23, held: A23 + 2 }).map((b) => b.w - A23)).toEqual([1, 2]);
+  });
+
   it('[RECITE-28] gone back: a word said earlier waits to be said again', () => {
     let s = applyEvent(at(liveConnecting(), A23 + 8), { type: 'said', upTo: A23 + 8 });
     s = at(s, A23 + 4);

@@ -580,19 +580,23 @@ describe('[RECITE-28] the bar names a word only once it has been said', () => {
     fc.integer({ min: 0, max: 40 }).map((d) => ({ type: 'said' as const, d })),
   );
 
-  it('while the take runs, the word under the cursor is there only when `said` is exactly on it, whatever the order of frames', () => {
+  it('while the take runs, the word under the cursor is there only when `said` is on it or its wait is over, whatever the order of frames', () => {
     const start = words.verseFirstWord(2, 255);
     fc.assert(
-      fc.property(fc.array(frame, { minLength: 1, maxLength: 40 }), fc.boolean(), (frames, check) => {
+      fc.property(fc.array(frame, { minLength: 1, maxLength: 40 }), fc.boolean(), fc.boolean(), (frames, check, waited) => {
         let s = applyEvent(liveConnecting(), { type: 'ready', take: 't', protocol: 6 });
         s = applyEvent(s, { type: 'locked', w: start, s: 2, a: 255 });
         for (const f of frames) {
           s = f.type === 'at' ? applyEvent(s, { type: 'at', w: start + f.d }) : applyEvent(s, { type: 'said', upTo: start + f.d });
-          const shown = barWords(s, words, { check, startWord: start }).map((b) => b.w);
           const cursor = s.cursor as number;
-          if (s.saidUpTo !== cursor) expect(shown).not.toContain(cursor);
+          const held = waited ? cursor : null;
+          const shown = barWords(s, words, { check, startWord: start, held }).map((b) => b.w);
+          const done = s.saidUpTo === cursor || waited;
+          if (!done) expect(shown).not.toContain(cursor);
           for (const w of shown) expect(w).toBeLessThanOrEqual(cursor);
-          if (shown.length) expect(shown[shown.length - 1]).toBe(s.saidUpTo === cursor ? cursor : cursor - 1);
+          if (shown.length) expect(shown[shown.length - 1]).toBe(done ? cursor : cursor - 1);
+          // Its wait over, the line always has the word: it never looks stuck.
+          if (waited) expect(shown).toContain(cursor);
         }
       }),
       { numRuns: runs(200) },

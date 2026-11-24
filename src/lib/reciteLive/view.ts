@@ -20,15 +20,16 @@ export interface BarWord {
 }
 
 /**
- * The words heard, for the bar: the last two said (newest last), never the word being said (RECITE-28). Check shows a
- * wrong word as heard. `upTo` (a hidden page): no further than the page shows (RECITE-6).
+ * The words heard, for the bar: the last two said (newest last), not the word being said until it's done or has been
+ * there long enough (`held`; RECITE-28). Check shows a wrong word as heard. `upTo` (a hidden page): no further than the
+ * page shows (RECITE-6).
  */
 export function barWords(
   state: LiveState,
   words: QuranWords,
-  opts: { check: boolean; startWord: number | null; upTo?: number | null },
+  opts: { check: boolean; startWord: number | null; upTo?: number | null; held?: number | null },
 ): BarWord[] {
-  const said = barUpTo(state);
+  const said = barUpTo(state, opts.held ?? null);
   if (said == null) return [];
   const top = opts.upTo !== undefined ? Math.min(said, opts.upTo ?? -1) : said;
   const wrong = new Map<number, Mark>();
