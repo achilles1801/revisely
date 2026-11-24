@@ -724,9 +724,14 @@ describe('mistakes are highlights (Majd, Nov 15 2026: “only things we should s
     expect(screen.getByTestId('live-mark-added').props.accessibilityLabel).toBe(`Extra word, after ${words.uthmani(A23 + 2)}`);
   });
 
-  it('[RECITE-29] off: the start frame doesn’t ask for word frames', async () => {
-    await startTake('recite');
-    expect(mockLive.start?.words).toBeUndefined();
+  it('[RECITE-29] off (outside Revisely Dev): the start frame doesn’t ask for word frames', async () => {
+    setWordLineForTests(false);
+    try {
+      await startTake('recite');
+      expect(mockLive.start?.words).toBeUndefined();
+    } finally {
+      setWordLineForTests();
+    }
   });
 
   it('[RECITE-29] on: it asks, and with `ready.words` the bar writes each word as it finishes, not as the cursor lands', async () => {

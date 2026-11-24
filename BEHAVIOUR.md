@@ -793,8 +793,7 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   `said` passes it, or 4 s have gone by since its last sound with no mark (then as the page's word, as a hidden page shows
   a word once passed, redrawn if a mark comes later); it takes its place. The take's end shows each word as its answer
   says. A word the checker takes back comes off the line. Without those
-  frames the bar is RECITE-28's. Off for every account until the checker's frames are on Revisely Dev and the lead has
-  seen their bars.
+  frames, or outside Revisely Dev, the bar is RECITE-28's.
 
 What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).
 

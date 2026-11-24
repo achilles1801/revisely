@@ -6,16 +6,18 @@
 // visit late: a, a + 2, then a + 1).
 
 import type { LiveEvent, Mark } from './contract';
+import { isDevVariant } from '../variant';
 
 /**
- * Whether takes ask for `word` frames. Off for everyone until the checker's frames are on Dev and the lead has seen the
- * bars (recite-word-frame-spec.md); with it off the start frame is as it was and the bar is RECITE-28's.
+ * Whether takes ask for `word` frames: Revisely Dev's (the lead, Nov 24 2026, once Dev's checker served them and the bars
+ * held on v7 and v9e). Elsewhere the start frame is as it was and the bar is RECITE-28's; so is a take whose checker or
+ * phone engine doesn't confirm `ready.words`.
  */
-let lineOn = false;
-export const wordLineOn = (): boolean => lineOn;
-/** Tests turn it on (and off again with no argument). */
-export function setWordLineForTests(on = false): void {
-  lineOn = on;
+let override: boolean | null = null;
+export const wordLineOn = (): boolean => override ?? isDevVariant();
+/** Tests choose (and go back to the variant's with no argument). */
+export function setWordLineForTests(on: boolean | null = null): void {
+  override = on;
 }
 
 /**
