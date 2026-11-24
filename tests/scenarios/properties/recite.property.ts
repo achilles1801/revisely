@@ -1186,7 +1186,13 @@ describe('[RECITE-16] a paused take stays open however long the pause', () => {
           let longest = 0;
           const sentBefore = () => s.sent.length;
           for (const st of stretches) {
+            const beforeHold = sentBefore();
             conn.hold!(st.paused);
+            // Holding sends a keepalive at once, so short pauses in a row are never silent.
+            if (s.sent.length > beforeHold) {
+              longest = Math.max(longest, t - lastFrame);
+              lastFrame = t;
+            }
             if (!st.paused) {
               conn.sendAudio(new Int16Array(160));
               lastFrame = t;
@@ -1213,7 +1219,11 @@ describe('[RECITE-16] a paused take stays open however long the pause', () => {
           expect(events).not.toContain('error');
         },
       ),
-      { numRuns: 60 },
+      {
+        numRuns: 60,
+        // Four short pauses adding up to exactly 30 s: the test used to miss the keepalive each hold sends.
+        examples: [[[{ paused: true, ms: 3583 }, { paused: true, ms: 6658 }, { paused: true, ms: 9759 }, { paused: true, ms: 10000 }], false]],
+      },
     );
   });
 });
