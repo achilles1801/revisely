@@ -61,6 +61,12 @@ function refusalOf(err: unknown): PackRefusal | null {
   }
 }
 
+/** What failed, for the row and a screenshot: the app's own messages, with any link or file path taken out. */
+function failureLine(err: unknown): string {
+  const text = err instanceof Error ? err.message : String(err);
+  return text.replace(/\b(?:https?|file):\/\/\S+/g, '(link)').slice(0, 90);
+}
+
 /** The callable counts a phone's calls by the UTC day (handler.ts `packDay`). */
 const utcDay = (): string => new Date(Date.now()).toISOString().slice(0, 10);
 /** Good answers a phone asks for by itself in a UTC day: the rest of the callable's 6 stay for Download now. */
@@ -88,6 +94,8 @@ export interface PackStatus {
   totalBytes: number;
   /** With `unavailable`: why, when that is known. */
   why?: PackRefusal | null;
+  /** With `error`: the step that failed. */
+  failure?: string | null;
 }
 
 interface Saved {
@@ -128,8 +136,10 @@ let tapped = false;
 function publish(next: Partial<PackStatus>): void {
   const merged = { ...status, ...next };
   if (merged.phase !== 'unavailable') delete merged.why;
+  if (merged.phase !== 'error') delete merged.failure;
   if (
     (merged.why ?? null) === (status.why ?? null) &&
+    (merged.failure ?? null) === (status.failure ?? null) &&
     merged.phase === status.phase &&
     merged.packId === status.packId &&
     merged.bytes === status.bytes &&
@@ -268,7 +278,7 @@ export function requestPackDownload(): void {
   void runOnce()
     .catch((err) => {
       logger.warn('Recite’s pack didn’t download', err);
-      publish({ phase: 'error' });
+      publish({ phase: 'error', failure: failureLine(err) });
       scheduleRetry();
     })
     .finally(() => {
@@ -292,7 +302,8 @@ async function askForPack(): Promise<PackAnswer | { refused: PackRefusal | null 
   } catch (err) {
     const refused = refusalOf(err);
     if (refused) return { refused };
-    throw err;
+    const { code, message } = err as { code?: string; message?: string };
+    throw new Error(`the server, ${code ?? 'no answer'}: ${message ?? ''}`); // i18n-ignore (an error for logs)
   }
   const answer = parsePackAnswer((raw as { result?: unknown } | null)?.result);
   if (!answer) throw new Error('recitePack answered something this app can’t read'); // i18n-ignore (an error for logs)

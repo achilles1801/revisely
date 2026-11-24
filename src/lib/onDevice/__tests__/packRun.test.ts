@@ -423,6 +423,26 @@ describe('Recite’s pack on the phone', () => {
     clock.mockRestore();
   });
 
+  it.each([
+    ['the download', () => mockDownload.mockResolvedValueOnce({ status: 403 }), 'core: download answered 403'],
+    ['the checksum', () => engine.sha256.mockResolvedValueOnce('c'.repeat(64)), 'core: checksum doesn\'t match'],
+    ['the reader', () => engine.packVerify.mockResolvedValueOnce({ ok: false, error: 'chunk 3 failed its check' }), 'core: chunk 3 failed its check'],
+    ['the server', () => mockCall.mockRejectedValueOnce(Object.assign(new Error('couldn’t be prepared'), { code: 'INTERNAL' })), 'the server, INTERNAL: couldn’t be prepared'],
+  ])('a failure at %s is named on the row', async (_step, fail, line) => {
+    fail();
+    await run();
+    const s = getPackStatus();
+    expect(s).toMatchObject({ phase: 'error', failure: line });
+    expect(describePack(s).subtitle).toBe(`It didn’t download: ${line}`);
+    expect(packMenuActions(s).some((a) => a.key === 'download')).toBe(true);
+  });
+
+  it('never shows a link or a file path', async () => {
+    mockDownload.mockRejectedValueOnce(new Error('failed for https://storage.googleapis.com/b/core.rcpk?X-Goog-Signature=abc at file:///var/mobile/x'));
+    await run();
+    expect(getPackStatus().failure).toBe('failed for (link) at (link)');
+  });
+
   it('coming back mid-download uses the links it has, and doesn’t spend another call', async () => {
     mockDownload.mockResolvedValue({ status: 500 });
     await run();

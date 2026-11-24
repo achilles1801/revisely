@@ -60,7 +60,10 @@ export function describePack(s: PackStatus): { value: string; subtitle: string }
     case 'no-space':
       return { value: '', subtitle: t('settings.recitePack.noSpace', { size: formatMegabytes(s.totalBytes) }) };
     case 'error':
-      return { value: '', subtitle: t('settings.recitePack.error') };
+      return {
+        value: '',
+        subtitle: s.failure ? t('settings.recitePack.errorWhy', { why: s.failure }) : t('settings.recitePack.error'),
+      };
     case 'removed':
       return { value: t('settings.recitePack.download'), subtitle: t('settings.recitePack.removed') };
     case 'unavailable':

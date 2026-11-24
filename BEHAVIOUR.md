@@ -1709,7 +1709,7 @@ shows up once and they must go through it and complete it … just the main stuf
   at most twice for a version, and takes stay on the server meanwhile. When there is no pack for this phone the row says
   why (this account, this build, too many tries today, the app couldn't be verified, nothing to download, a version that
   didn't open), and offers Download now only where trying again can help. After the day's limit it doesn't ask again
-  until the next UTC day. Coming back to the app or the reader mid-download reuses the links it has, and without a whole
+  until the next UTC day. A download that fails names the step that failed. Coming back to the app or the reader mid-download reuses the links it has, and without a whole
   pack the phone takes at most three answers a UTC day by itself, leaving the rest for Download now.
 
 ## Premium early access
