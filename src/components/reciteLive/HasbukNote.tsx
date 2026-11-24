@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Reanimated, { useAnimatedStyle, useSharedValue, withDelay, withSequence, withTiming } from 'react-native-reanimated';
+import Reanimated, { ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useTheme } from '../../context/ThemeContext';
 import { useHaptics } from '../../design/haptics';
 import { useReduceMotion } from '../../design/motion';
@@ -32,13 +32,18 @@ export function HasbukNote({ trigger, bottom }: { trigger: number; bottom: numbe
     if (trigger <= 0) return;
     setShownFor(trigger);
     haptics.success();
+    // A fade is what Reduce Motion asks for, so it always runs: left to the system's setting, a sequence jumps straight
+    // to its last value, 0, and the note is never seen (Android with animations off, flow 18).
     shown.value = 0;
-    shown.value = withSequence(
-      withTiming(1, { duration: FADE_IN }),
-      withDelay(SHOWN_MS - FADE_IN - FADE_OUT, withTiming(0, { duration: FADE_OUT })),
-    );
+    shown.value = withTiming(1, { duration: FADE_IN, reduceMotion: ReduceMotion.Never });
+    const fade = setTimeout(() => {
+      shown.value = withTiming(0, { duration: FADE_OUT, reduceMotion: ReduceMotion.Never });
+    }, SHOWN_MS - FADE_OUT);
     const done = setTimeout(() => setShownFor(0), SHOWN_MS);
-    return () => clearTimeout(done);
+    return () => {
+      clearTimeout(fade);
+      clearTimeout(done);
+    };
     // Only when a test reaches its end.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trigger]);
