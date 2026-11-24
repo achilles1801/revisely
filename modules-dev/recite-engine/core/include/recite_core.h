@@ -73,6 +73,9 @@ const char* rc_version(void); /* "recite-core 0.1.0 (abc1234)" */
 /* Opens the engine: reads the tables, creates the models' sessions, runs the load-time check.
  * options_json: {"threads": 2, "levels": ["recite", "harakat", "strict"], "hop": 0.5} (all optional). `hop` is 0.5 or 1
  * (seconds between the model's runs; anything else is RC_ERR_ARG). A phone at 1 s is held to the 1 s goldens.
+ * `levels` is what this host will run, and must hold "recite". Without "strict" v5 is never opened, so it costs no memory,
+ * and its self_check entry is {"ran": false}; to add a level later, release the engine and open it again from fresh blobs
+ * (v7's weights were widened in place). A take that needs a level left out is refused with RC_ERR_STATE.
  * A model that fails its load-time check does not fail rc_open: the engine opens, rc_info reports the numbers with
  * `ok` false and leaves out what that model does, and rc_start refuses takes that need it with RC_ERR_MODEL.
  * Returns NULL on failure (a bad pack, or a model that will not load) with *code set and a message in err. */
