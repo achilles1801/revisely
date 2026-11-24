@@ -82,6 +82,8 @@ export interface EngineTestRun {
   frames: Record<string, number>;
   /** The final answer, to compare mark for mark with the Python on the same samples. */
   result: EngineTestAnswer | null;
+  /** The last word the cursor reached (`at`), to compare with the Python's. */
+  lastAt: number | null;
   /** Each live mark as it came, and how many samples had been fed then. */
   liveMarks: (KeptMark & { atSample: number })[];
   unmarks: { id: string; why: string | null; atSample: number }[];
@@ -162,6 +164,7 @@ export async function runEngineTest(d: EngineTestDeps): Promise<EngineTestRun> {
   let fed = 0;
   let takeMax: number | null = null;
   let result: EngineTestAnswer | null = null;
+  let lastAt: number | null = null;
   const liveMarks: EngineTestRun['liveMarks'] = [];
   const unmarks: EngineTestRun['unmarks'] = [];
   const noteMemory = () => {
@@ -181,6 +184,7 @@ export async function runEngineTest(d: EngineTestDeps): Promise<EngineTestRun> {
         answered = true;
         result = keptAnswer(x.result);
       }
+      if (type === 'at') lastAt = num(x.w) ?? lastAt;
       if (type === 'mark' && liveMarks.length < MAX_KEPT) {
         const mark = keptMark(x.mark);
         if (mark) liveMarks.push({ ...mark, atSample: fed });
@@ -270,6 +274,7 @@ export async function runEngineTest(d: EngineTestDeps): Promise<EngineTestRun> {
     },
     frames,
     result,
+    lastAt,
     liveMarks,
     unmarks,
   };

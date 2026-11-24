@@ -70,7 +70,7 @@ describe('[ONDEV-1] the Strict take on a recording', () => {
     );
     h.bridge.feed.mockImplementationOnce((_t: number, _p: Int16Array) => undefined);
     h.bridge.feed.mockImplementationOnce(() => {
-      h.emit({ type: 'mark', mark }, { type: 'unmark', id: mark.id, why: 'corrected' });
+      h.emit({ type: 'at', w: 75150 }, { type: 'at', w: 75158 }, { type: 'mark', mark }, { type: 'unmark', id: mark.id, why: 'corrected' });
       return undefined;
     });
     const run = await runEngineTest(h.deps);
@@ -80,6 +80,7 @@ describe('[ONDEV-1] the Strict take on a recording', () => {
     });
     expect(run.liveMarks).toEqual([{ id: '75163:letter:', w: 75163, ayah: [78, 14], kind: 'letter', detail: null, sure: 'likely', t: [1.5, 2], atSample: 1600 }]);
     expect(run.unmarks).toEqual([{ id: '75163:letter:', why: 'corrected', atSample: 1600 }]);
+    expect(run.lastAt).toBe(75158);
     expect(JSON.stringify(run)).not.toContain('undefined');
   });
 
