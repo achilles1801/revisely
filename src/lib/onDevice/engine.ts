@@ -148,7 +148,8 @@ export async function engineSelfCheck(): Promise<SelfCheck | null> {
 }
 
 /**
- * A Strict take of a recording on this phone's real engine, for the bench (engineTest.ts); null with no real engine, or
+ * A take of a recording on this phone's real engine, for the bench (engineTest.ts): Strict, or words and harakat when the
+ * engine has no Strict level (a model that failed its check drops its levels). Null with no real engine, or
  * with a take already running. It counts as a take, so the speed check stays out of it, and an engine this opened closes
  * again afterwards.
  */
@@ -172,6 +173,7 @@ export async function engineStrictTest(
   try {
     return await runEngineTest({
       bridge,
+      level: info.levels?.includes('strict') ? 'strict' : 'harakat',
       pcm,
       hop: info.hop ?? null,
       peakMb: () => m.memoryPeakMb?.() ?? 0,

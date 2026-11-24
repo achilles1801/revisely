@@ -274,7 +274,7 @@ describe('[ONDEV-1] Settings → Testing → On-device model', () => {
       sendError: null,
     };
     mockBench.engineTest = {
-      run: { mode: 'engineTest', level: 'strict', ok: true, error: null, interrupted: false, hops: 180, lateHops: 2, worstHopMs: 310, peakAfterMb: 412.4 },
+      run: { mode: 'engineTest', level: 'strict', ok: true, error: null, interrupted: false, hops: 180, lateHops: 2, worstHopMs: 310, peakAfterMb: 412.4, wouldStepDown: false },
       sendError: null,
     };
     await show();

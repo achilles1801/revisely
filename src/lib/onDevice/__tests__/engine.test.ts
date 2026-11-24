@@ -212,6 +212,16 @@ describe('[ONDEV-1] engineStrictTest', () => {
     expect(mockModule.engineRelease).toHaveBeenCalledTimes(1);
   });
 
+  it('asks for Strict where the engine has it, and words and harakat where it doesn’t', async () => {
+    for (const [levels, tajweed, level] of [[['recite', 'harakat', 'strict'], true, 'strict'], [['recite', 'harakat'], false, 'harakat']] as const) {
+      mockModule.engineStart.mockClear();
+      mockModule.engineInfo.mockReturnValue(JSON.stringify({ version: 'recite-core 0.2.0', hop: 0.5, levels }));
+      const run = await engineStrictTest(new Int16Array(1600), () => true);
+      expect(run?.level).toBe(level);
+      expect(JSON.parse((mockModule.engineStart.mock.calls[0] as unknown as [string])[0]).tajweed).toBe(tajweed);
+    }
+  });
+
   it('never runs on the replay stand-in', async () => {
     mockModule.engineInfo.mockReturnValue(JSON.stringify({ version: 'recite-core replay 0.1.0' }));
     expect(await engineStrictTest(new Int16Array(1600), () => true)).toBeNull();

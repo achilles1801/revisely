@@ -417,6 +417,7 @@ export const settings = {
     engineTestRunning: 'Testing a Strict take on a recording… {{done}} of {{total}} s. Stay on this screen.',
     engineTestPreparing: 'Getting the recording for a Strict take…',
     engineTestResult: 'Strict take: {{late}} of {{hops}} checks late, slowest {{worst}} ms, peak memory {{peak}} MB',
+    engineTestResultWords: 'Words and harakat take (no Strict here): {{late}} of {{hops}} checks late, slowest {{worst}} ms, peak memory {{peak}} MB',
     engineTestFailed: 'The Strict take didn’t finish: {{error}}',
     engineTestStepDown: 'A take like this would step down to the 1 s hop.',
     engineTestLeft: 'The Strict take stopped when the screen was left. It runs again next time.',

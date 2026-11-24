@@ -26,6 +26,7 @@ function harness(over: Partial<EngineTestDeps> = {}, onFinish?: (emit: (...frame
   };
   const deps: EngineTestDeps = {
     bridge,
+    level: 'strict',
     pcm: new Int16Array(16_000 * 3),
     hop: 0.5,
     peakMb: jest.fn().mockReturnValueOnce(300).mockReturnValue(412.44),
@@ -52,6 +53,13 @@ describe('[ONDEV-1] the Strict take on a recording', () => {
       ok: true, error: null, interrupted: false, audioSec: 3, hop: 0.5, hops: 6, lateHops: 1, worstHopMs: 210, maxLagS: 0.12,
       thermalStart: 0, thermalEnd: 1, peakBeforeMb: 300, peakAfterMb: 412.4, frames: { done: 1, meter: 1 },
     });
+  });
+
+  it('runs words and harakat, and says so, on an engine with no Strict level', async () => {
+    const { deps, bridge } = harness({ level: 'harakat' });
+    const run = await runEngineTest(deps);
+    expect(JSON.parse(bridge.start.mock.calls[0][0])).toMatchObject({ tajweed: false, letters: true });
+    expect(run).toMatchObject({ ok: true, level: 'harakat' });
   });
 
   it('says when a take like this would step down, and changes nothing', async () => {

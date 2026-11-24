@@ -1,5 +1,5 @@
-// The real engine's speed and memory on a phone (Revisely Dev; BEHAVIOUR.md ONDEV-1): a Strict take of the bench's
-// recorded clip (Husary, page 7), fed at the live pace. Nobody recites, so every phone runs the same take through the
+// The real engine's speed and memory on a phone (Revisely Dev; BEHAVIOUR.md ONDEV-1): a take of the bench's recorded clip
+// (Husary, page 7), fed at the live pace: Strict, or words and harakat on a phone whose engine has no Strict level. Nobody recites, so every phone runs the same take through the
 // whole pipeline. The record holds the host's meter, the app's peak memory and how many frames of each kind came:
 // no audio and no words.
 
@@ -32,8 +32,11 @@ export const ANSWER_MS = 60_000;
 export const METER_MS = 2_000;
 const POLL_MS = 50;
 
+export type EngineTestLevel = 'strict' | 'harakat';
+
 export interface EngineTestDeps {
   bridge: EngineBridge;
+  level: EngineTestLevel;
   pcm: Int16Array;
   /** The engine's hop, as it opened. */
   hop: number | null;
@@ -47,7 +50,7 @@ export interface EngineTestDeps {
 
 export interface EngineTestRun {
   mode: 'engineTest';
-  level: 'strict';
+  level: EngineTestLevel;
   ok: boolean;
   error: string | null;
   interrupted: boolean;
@@ -115,7 +118,7 @@ export async function runEngineTest(d: EngineTestDeps): Promise<EngineTestRun> {
 
   const totalSec = d.pcm.length / RATE;
   try {
-    const opened = await d.bridge.start(JSON.stringify(TEST_START));
+    const opened = await d.bridge.start(JSON.stringify({ ...TEST_START, tajweed: d.level === 'strict' }));
     if (opened.take == null) {
       failure = opened.error ?? `the engine refused the take (${opened.code ?? '?'})`;
     } else {
@@ -155,7 +158,7 @@ export async function runEngineTest(d: EngineTestDeps): Promise<EngineTestRun> {
   const m: Record<string, unknown> = meter ?? {};
   return {
     mode: 'engineTest',
-    level: 'strict',
+    level: d.level,
     ok: !interrupted && !failure && answered,
     error: failure,
     interrupted,
