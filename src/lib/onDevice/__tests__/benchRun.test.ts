@@ -17,7 +17,7 @@ jest.mock('../../../../modules/recitation-audio', () => ({ __esModule: true, def
 jest.mock('../../../../modules-dev/recite-engine', () => ({ __esModule: true, default: null }));
 const mockSelfCheck = jest.fn();
 const mockStrict = jest.fn();
-jest.mock('../engine', () => ({ engineSelfCheck: () => mockSelfCheck(), engineStrictTest: (...a: unknown[]) => mockStrict(...a) }));
+jest.mock('../engine', () => ({ engineSelfCheck: () => mockSelfCheck(), engineTests: (...a: unknown[]) => mockStrict(...a) }));
 const mockStored = new Map<string, string>();
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
@@ -164,7 +164,8 @@ describe('[ONDEV-1] the Strict take’s record', () => {
   const finished = { mode: 'engineTest', ok: true, interrupted: false, hops: 180, lateHops: 0, peakAfterMb: 400 };
   const send = addDoc as unknown as jest.Mock;
   const clip = jest.fn(async () => new Int16Array(4));
-  const test = (pack = 'v7m-2') => recordEngineTest(device, pack, clip, () => true, () => undefined);
+  const speed = { kept: true, p95: 210, hop: 0.5, calls: 36 };
+  const test = (pack = 'v7m-2') => recordEngineTest(device, pack, [{ key: 'clip', read: clip }], () => true, () => undefined);
 
   beforeEach(() => {
     mockStored.clear();
@@ -172,22 +173,22 @@ describe('[ONDEV-1] the Strict take’s record', () => {
     send.mockResolvedValue({ id: 'r' });
     clip.mockClear();
     mockStrict.mockReset();
-    mockStrict.mockResolvedValue(finished);
+    mockStrict.mockResolvedValue({ runs: [finished], speed });
   });
 
   it('runs and sends once per pack and app update, then shows the saved result', async () => {
-    expect((await test())?.run).toEqual(finished);
-    expect((await test())?.run).toEqual(finished);
+    expect(await test()).toEqual({ runs: [finished], speed, sendError: null });
+    expect((await test())?.runs).toEqual([finished]);
     expect(mockStrict).toHaveBeenCalledTimes(1);
     expect(send).toHaveBeenCalledTimes(1);
-    expect(send.mock.calls[0][1]).toMatchObject({ windows: 1, runs: [{ mode: 'engineTest', hops: 180 }] });
+    expect(send.mock.calls[0][1]).toMatchObject({ windows: 1, runs: [{ mode: 'engineTest', hops: 180 }, { mode: 'speedCheck', p95: 210, hop: 0.5 }] });
     await test('v7m-3');
     expect(mockStrict).toHaveBeenCalledTimes(2);
   });
 
   it('a take cut short is neither sent nor saved, so the next visit runs it again', async () => {
-    mockStrict.mockResolvedValueOnce({ ...finished, ok: false, interrupted: true });
-    expect((await test())?.run.interrupted).toBe(true);
+    mockStrict.mockResolvedValueOnce({ runs: [{ ...finished, ok: false, interrupted: true }], speed: null });
+    expect((await test())?.runs[0].interrupted).toBe(true);
     expect(send).not.toHaveBeenCalled();
     await test();
     expect(mockStrict).toHaveBeenCalledTimes(2);

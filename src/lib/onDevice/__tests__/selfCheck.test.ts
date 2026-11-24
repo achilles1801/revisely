@@ -82,4 +82,19 @@ describe('[ONDEV-1] the engine self-check a device reports', () => {
     expect(lab({ packId: 'v7m-1', blobs }, [], 60)).toBeUndefined(); // a long run needs a run to repeat
     expect(lab(undefined)).toBeUndefined(); // no runs and no self-check: nothing to do
   });
+
+  it('a manifest can list the engine test’s clips, each with its golden’s start frame', () => {
+    const takes = [
+      { file: 'clip', start: { s: 78, a: 1, s2: 78, a2: 30, namesAfter: true, letters: true } },
+      { file: 'take', start: { s: 1, a: 1, s2: 1, a2: 7, namesAfter: true } },
+    ];
+    const parsed = parseManifest({ ...manifestJson, takes })!;
+    expect(parsed.takes).toEqual([
+      { file: 'clip', start: expect.objectContaining({ type: 'start', s: 78, a: 1, s2: 78, a2: 30, mon: 4, mot: 4, aar: 0, letters: true, tajweed: false, namesAfter: true }) },
+      { file: 'take', start: expect.objectContaining({ s: 1, a: 1, a2: 7, letters: true }) },
+    ]);
+    expect(parseManifest({ ...manifestJson, takes: [{ file: 'nope', start: { s: 1, a: 1 } }] })).toBeNull();
+    expect(parseManifest({ ...manifestJson, takes: [{ file: 'clip', start: { s: 'x' } }] })).toBeNull();
+    expect(parseManifest(manifestJson)!.takes).toBeUndefined();
+  });
 });

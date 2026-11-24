@@ -464,6 +464,8 @@ owner's `on-device-release.md`).
   With the real engine the bench and Test Lab then run a take of the 90 s clip at the live pace (`engineTest.ts`), from that
   golden's own start frame (78:1–30): a `{mode: 'engineTest'}` run with late hops, the slowest hop, memory, the final marks and
   score, and each live mark with its sample position, so the same samples can be compared mark for mark with the Python.
+  `bench.json`'s `takes` lists more clips, each with its golden's start frame; after them the speed check runs on the open
+  engine and its p95 and hop go in the record (`{mode: 'speedCheck'}`; Test Lab: `engineTests` and `speedCheck`).
 - **The on-device bench** (Settings → Testing → On-device model, BEHAVIOUR.md ONDEV-1): its list of runs, the models,
   the clip (EveryAyah, Husary, An-Naba from 78:1, 90 s: the start of the lab's `golden/bench-v0-on/husary.p7.clean.clean`, where "p7" is the item's name, not a mushaf page) and M's vectors live on the dev bucket under `models/recite/`
   (`bench.json` is the manifest: files with sizes and SHA-256, runs per platform, M's pass marks). Changing the runs or

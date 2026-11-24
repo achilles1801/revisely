@@ -5,6 +5,8 @@
 // provider with a thread count: checked on M's vectors, then timed over N windows of a 4 s window every 0.5 s (the
 // live checker's hop). This file reads the manifest and sums a run up; benchRun.ts does the downloads and the calls.
 
+import type { StartFrame } from '../reciteLive/feed';
+
 export type Provider = 'cpu' | 'coreml' | 'xnnpack' | 'nnapi';
 const PROVIDERS: readonly Provider[] = ['cpu', 'coreml', 'xnnpack', 'nnapi'];
 
@@ -49,6 +51,28 @@ export interface BenchManifest {
   tolerance: { mel: number; out: number; own: number };
   /** Firebase Test Lab's game loop (testLoop.ts): its runs, windows each, and a long run of the first (0: none). */
   testLab?: { plans: PlanSpec[]; windows: number; longSec: number; selfCheck?: TestLabSelfCheck };
+  /** The real engine's test takes: each a clip (a key of `files`) and the start frame its golden used. */
+  takes?: { file: string; start: StartFrame }[];
+}
+
+/** A start frame from the manifest: the place and the settings; the run sets Strict's tajweed. */
+function startFrame(v: unknown): StartFrame | null {
+  if (!isRecord(v) || typeof v.s !== 'number' || typeof v.a !== 'number') return null;
+  const n = (x: unknown, d: number) => (typeof x === 'number' ? x : d);
+  return {
+    type: 'start',
+    s: v.s,
+    a: v.a,
+    s2: typeof v.s2 === 'number' ? v.s2 : null,
+    a2: typeof v.a2 === 'number' ? v.a2 : null,
+    mon: n(v.mon, 4),
+    mot: n(v.mot, 4),
+    aar: n(v.aar, 0),
+    letters: v.letters !== false,
+    tajweed: false,
+    keep: false,
+    ...(v.namesAfter === true ? { namesAfter: true } : {}),
+  };
 }
 
 /** The engine's self-check on Test Lab: no account there, so no pack key, so its blobs come plain in the OBB. */
@@ -144,6 +168,16 @@ export function parseManifest(raw: unknown): BenchManifest | null {
     if (!list || (list.length === 0 && (!selfCheck || tl.longSec > 0))) return null;
     testLab = { plans: list, windows: tl.windows, longSec: Math.floor(tl.longSec), ...(selfCheck ? { selfCheck } : {}) };
   }
+  let takes: BenchManifest['takes'];
+  if (raw.takes !== undefined) {
+    if (!Array.isArray(raw.takes) || raw.takes.length === 0) return null;
+    takes = [];
+    for (const t of raw.takes) {
+      const start = isRecord(t) ? startFrame(t.start) : null;
+      if (!isRecord(t) || !has(t.file) || !start) return null;
+      takes.push({ file: t.file, start });
+    }
+  }
   return {
     files,
     models,
@@ -156,6 +190,7 @@ export function parseManifest(raw: unknown): BenchManifest | null {
     hopSamples: raw.hopSamples,
     tolerance: { mel: tol.mel, out: tol.out, own: tol.own },
     ...(testLab ? { testLab } : {}),
+    ...(takes ? { takes } : {}),
   };
 }
 

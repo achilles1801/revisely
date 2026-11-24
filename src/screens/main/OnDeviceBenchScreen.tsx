@@ -14,7 +14,7 @@ import { useKeepScreenOn } from '../../hooks/useKeepScreenOn';
 import { GATE_P95_MS, checkVerdict, longVerdict, planKey, type BenchManifest, type PlanSpec, type Provider } from '../../lib/onDevice/bench';
 import {
   benchEngine,
-  benchClip,
+  benchClips,
   benchRecord,
   ensureFiles,
   platformPlans,
@@ -29,6 +29,7 @@ import {
 } from '../../lib/onDevice/benchRun';
 import { coreLine } from '../../lib/onDevice/coreInfo';
 import type { ModelCheck } from '../../lib/onDevice/selfCheck';
+import type { EngineTestRun } from '../../lib/onDevice/engineTest';
 import { logger } from '../../lib/logger';
 import { t } from '../../i18n';
 
@@ -99,7 +100,7 @@ function selfCheckText({ check, sendError }: SelfCheckResult): string {
   return lines.join('\n');
 }
 
-function engineTestText({ run, sendError }: EngineTestResult): string {
+function engineRunLine(run: EngineTestRun): string {
   const line = run.interrupted
     ? t('settings.bench.engineTestLeft')
     : run.ok
@@ -110,8 +111,20 @@ function engineTestText({ run, sendError }: EngineTestResult): string {
           peak: run.peakAfterMb > 0 ? fixed(run.peakAfterMb) : '–',
         })
       : t('settings.bench.engineTestFailed', { error: run.error ?? '' });
-  const lines: string[] = [line];
-  if (run.ok && run.wouldStepDown) lines.push(t('settings.bench.engineTestStepDown'));
+  return run.ok && run.wouldStepDown ? `${line}\n${t('settings.bench.engineTestStepDown')}` : line;
+}
+
+function engineTestText({ runs, speed, sendError }: EngineTestResult): string {
+  const lines = runs.map((r) => (runs.length > 1 && r.clip ? `${r.clip}: ${engineRunLine(r)}` : engineRunLine(r)));
+  if (speed) {
+    lines.push(
+      !speed.kept
+        ? t('settings.bench.engineTestSpeedNone', { why: speed.why })
+        : speed.hop === null
+          ? t('settings.bench.engineTestSpeedServer', { p95: fixed(speed.p95) })
+          : t('settings.bench.engineTestSpeed', { p95: fixed(speed.p95), hop: speed.hop }),
+    );
+  }
   if (sendError) lines.push(t('settings.bench.selfCheckNotSent', { error: sendError }));
   return lines.join('\n');
 }
@@ -187,7 +200,7 @@ export default function OnDeviceBenchScreen() {
     if (!engine || !device || !manifest || !packId || testStarted.current) return;
     testStarted.current = true;
     setTesting({ done: 0, total: 0 });
-    recordEngineTest(device, packId, () => benchClip(engine, manifest), () => live.current, (done, total) => {
+    recordEngineTest(device, packId, benchClips(engine, manifest), () => live.current, (done, total) => {
       if (live.current) setTesting({ done, total });
     })
       .then((r) => {

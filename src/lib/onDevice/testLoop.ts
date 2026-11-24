@@ -11,6 +11,7 @@ import { logger } from '../logger';
 import { parseManifest } from './bench';
 import { benchEngine, benchRecord, readPcm, runPlan, type BenchRun } from './benchRun';
 import type { EngineTestRun } from './engineTest';
+import type { SpeedRun } from './speedCheck';
 import { selfCheckFromOpen, type SelfCheck } from './selfCheck';
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
@@ -25,11 +26,12 @@ export async function runTestLoopIfAsked(): Promise<void> {
   const runs: BenchRun[] = [];
   let windows = 1;
   let selfCheck: SelfCheck | null = null;
-  let engineTest: EngineTestRun | null = null;
+  let engineTests: EngineTestRun[] | null = null;
+  let speedCheck: SpeedRun | null = null;
   const write = (status: string, error?: string) =>
     engine.writeTestLoopResult!(
       results,
-      JSON.stringify({ status, ...(error ? { error } : {}), ...(selfCheck ? { selfCheck } : {}), ...(engineTest ? { engineTest } : {}), ...benchRecord(engine.deviceInfo(), windows, runs) }),
+      JSON.stringify({ status, ...(error ? { error } : {}), ...(selfCheck ? { selfCheck } : {}), ...(engineTests ? { engineTests } : {}), ...(speedCheck ? { speedCheck } : {}), ...benchRecord(engine.deviceInfo(), windows, runs) }),
     );
   try {
     const dir = await engine.unpackObb();
@@ -51,8 +53,12 @@ export async function runTestLoopIfAsked(): Promise<void> {
       selfCheck = selfCheckFromOpen(opened, wanted.packId);
       await write('running');
       if (opened.ok) {
-        const { engineStrictTest } = require('./engine') as typeof import('./engine');
-        engineTest = await engineStrictTest(readPcm(files[manifest.audio]), () => true);
+        const { engineTests: runTests } = require('./engine') as typeof import('./engine');
+        const takes = manifest.takes ?? [{ file: manifest.audio, start: undefined }];
+        const clips = takes.map((t) => ({ key: t.file, ...(t.start ? { start: t.start } : {}), read: async () => readPcm(files[t.file]) }));
+        const done = await runTests(clips, () => true);
+        engineTests = done?.runs ?? null;
+        speedCheck = done?.speed ?? null;
       }
       await engine.engineRelease?.(); // before the runs, whose memory figures shouldn't carry it
       await write('running');

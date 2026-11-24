@@ -1,6 +1,6 @@
 // The engine opening from Recite's pack (ONDEV-3, ONDEV-4): only a real engine decrypts it, and a pack it refuses isn't
 // decrypted again. The native side (decrypting, aligned buffers, wiping after release) runs on a phone.
-import { __resetEngineForTests, deviceConnect, engineSelfCheck, engineStrictTest, warmEngine } from '../engine';
+import { __resetEngineForTests, deviceConnect, engineSelfCheck, engineStrictTest, engineTests, warmEngine } from '../engine';
 import { routedFeed } from '../../reciteLive/route';
 
 const mockModule = {
@@ -219,6 +219,32 @@ describe('[ONDEV-1] engineStrictTest', () => {
       const run = await engineStrictTest(new Int16Array(1600), () => true);
       expect(run?.level).toBe(level);
       expect(JSON.parse((mockModule.engineStart.mock.calls[0] as unknown as [string])[0]).tajweed).toBe(tajweed);
+    }
+  });
+
+  it('runs each clip from its own start frame, then the speed check, which keeps nothing from a disturbed run', async () => {
+    mockModule.engineInfo.mockReturnValue(JSON.stringify({ version: 'recite-core 0.2.0', hop: 0.5, levels: ['recite', 'harakat'] }));
+    const probe = jest.fn(async () => 200);
+    Object.assign(mockModule, { engineProbe: probe });
+    jest.useFakeTimers();
+    try {
+      const done = await engineTests(
+        [
+          { key: 'naba', read: async () => new Int16Array(1600) },
+          { key: 'fatiha', start: { type: 'start', s: 1, a: 1, s2: 1, a2: 7, mon: 4, mot: 4, aar: 0, letters: true, keep: false }, read: async () => new Int16Array(1600) },
+        ],
+        () => true,
+      );
+      expect(done?.runs.map((r) => r.clip)).toEqual(['naba', 'fatiha']);
+      const starts = mockModule.engineStart.mock.calls.map((c) => JSON.parse((c as unknown as [string])[0]).s);
+      expect(starts).toEqual([78, 1]);
+      // Under Jest the app isn't in front, so the check stops before its first call and keeps no result.
+      expect(done?.speed).toEqual({ kept: false, why: 'disturbed' });
+      expect(probe).not.toHaveBeenCalled();
+    } finally {
+      delete (mockModule as { engineProbe?: unknown }).engineProbe;
+      jest.clearAllTimers();
+      jest.useRealTimers();
     }
   });
 

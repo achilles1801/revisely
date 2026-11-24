@@ -19,7 +19,7 @@ import { routedFeed } from '../reciteLive/route';
 import { chooseWhere, EngineInfo, isReplayEngine, parseEngineInfo, WhereAnswer } from '../reciteLive/where';
 import { reciteWhere } from '../reciteLive/whereSettings';
 import { benchRunning } from './benchBusy';
-import { speedKeeper } from './speedCheck';
+import { runSpeedCheck, speedKeeper, type SpeedRun } from './speedCheck';
 import { postSecond, reportPhoneTake } from './takeReport';
 import { logger } from '../logger';
 import { knownOffline } from '../networkState';
@@ -147,17 +147,24 @@ export async function engineSelfCheck(): Promise<SelfCheck | null> {
   return last && last.opened.code !== PACK_DAMAGED ? selfCheckFromOpen(last.opened, last.packId) : null;
 }
 
+/** A clip for the engine's test: its name, its start frame (absent: the Husary clip's) and its samples. */
+export interface EngineTestClip {
+  key: string;
+  start?: StartFrame;
+  read: () => Promise<Int16Array>;
+}
+
 /**
- * A take of a recording on this phone's real engine, for the bench (engineTest.ts): Strict, or words and harakat when the
- * engine has no Strict level (a model that failed its check drops its levels). Null with no real engine, or
- * with a take already running. It counts as a take, so the speed check stays out of it, and an engine this opened closes
- * again afterwards.
+ * The engine's test on this phone (engineTest.ts): one take per clip, Strict, or words and harakat when the engine has no
+ * Strict level (a model that failed its check drops its levels), then the speed check that decides the hop. Null with no
+ * real engine, or with a take already running. It counts as a take, so the background speed check stays out of it, and
+ * an engine this opened closes again afterwards.
  */
-export async function engineStrictTest(
-  pcm: Int16Array,
+export async function engineTests(
+  clips: readonly EngineTestClip[],
   keepGoing: () => boolean,
   onProgress?: (doneSec: number, totalSec: number) => void,
-): Promise<EngineTestRun | null> {
+): Promise<{ runs: EngineTestRun[]; speed: SpeedRun | null } | null> {
   const m = native();
   const bridge = engineBridge();
   if (!m || !bridge || openTakes > 0) return null;
@@ -178,26 +185,49 @@ export async function engineStrictTest(
   }
   openTakes += 1;
   speed.takeOpened();
+  const going = () => AppState.currentState === 'active' && keepGoing();
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
   try {
-    return await runEngineTest({
-      bridge,
-      level: info.levels?.includes('strict') ? 'strict' : 'harakat',
-      pcm,
-      hop: info.hop ?? null,
-      peakMb: () => m.memoryPeakMb?.() ?? 0,
-      memoryNow,
-      beforeOpenMb,
-      afterOpenMb,
-      now: () => Date.now(),
-      sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
-      keepGoing: () => AppState.currentState === 'active' && keepGoing(),
-      onProgress,
-    });
+    const runs: EngineTestRun[] = [];
+    for (const [i, clip] of clips.entries()) {
+      const run = await runEngineTest({
+        bridge,
+        level: info.levels?.includes('strict') ? 'strict' : 'harakat',
+        start: clip.start,
+        clip: clip.key,
+        pcm: await clip.read(),
+        hop: info.hop ?? null,
+        peakMb: () => m.memoryPeakMb?.() ?? 0,
+        memoryNow,
+        // The engine opened once, before the first take.
+        beforeOpenMb: i === 0 ? beforeOpenMb : null,
+        afterOpenMb: i === 0 ? afterOpenMb : null,
+        now: () => Date.now(),
+        sleep,
+        keepGoing: going,
+        onProgress,
+      });
+      runs.push(run);
+      if (run.interrupted) return { runs, speed: null };
+    }
+    const probe = (m as Native & { engineProbe?: () => Promise<number | null> }).engineProbe;
+    const checked = probe ? await runSpeedCheck({ probe: () => probe.call(m), calm: going, now: () => Date.now(), sleep }) : null;
+    return { runs, speed: checked };
   } finally {
     openTakes = Math.max(0, openTakes - 1);
     speed.takeClosed();
     if (!wasOpen && openTakes === 0 && openEngineInfo()) await m.engineRelease?.();
   }
+}
+
+/** One take of the Husary clip (engineTests with that clip alone). */
+export async function engineStrictTest(
+  pcm: Int16Array,
+  keepGoing: () => boolean,
+  onProgress?: (doneSec: number, totalSec: number) => void,
+): Promise<EngineTestRun | null> {
+  const r = await engineTests([{ key: 'clip', read: async () => pcm }], keepGoing, onProgress);
+  return r?.runs[0] ?? null;
 }
 
 export function __resetEngineForTests(): void {

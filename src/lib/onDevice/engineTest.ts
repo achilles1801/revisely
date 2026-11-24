@@ -41,6 +41,9 @@ export type EngineTestLevel = 'strict' | 'harakat';
 export interface EngineTestDeps {
   bridge: EngineBridge;
   level: EngineTestLevel;
+  /** The clip's start frame (TEST_START: the Husary clip's) and its name in the record. */
+  start?: StartFrame;
+  clip?: string;
   pcm: Int16Array;
   /** The engine's hop, as it opened. */
   hop: number | null;
@@ -60,6 +63,7 @@ export interface EngineTestDeps {
 export interface EngineTestRun {
   mode: 'engineTest';
   level: EngineTestLevel;
+  clip: string | null;
   ok: boolean;
   error: string | null;
   interrupted: boolean;
@@ -207,7 +211,7 @@ export async function runEngineTest(d: EngineTestDeps): Promise<EngineTestRun> {
 
   const totalSec = d.pcm.length / RATE;
   try {
-    const opened = await d.bridge.start(JSON.stringify({ ...TEST_START, tajweed: d.level === 'strict' }));
+    const opened = await d.bridge.start(JSON.stringify({ ...(d.start ?? TEST_START), tajweed: d.level === 'strict' }));
     if (opened.take == null) {
       failure = opened.error ?? `the engine refused the take (${opened.code ?? '?'})`;
     } else {
@@ -252,6 +256,7 @@ export async function runEngineTest(d: EngineTestDeps): Promise<EngineTestRun> {
   return {
     mode: 'engineTest',
     level: d.level,
+    clip: d.clip ?? null,
     ok: !interrupted && !failure && answered,
     error: failure,
     interrupted,
