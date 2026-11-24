@@ -42,7 +42,9 @@ const set = () => [
 ];
 ok('small-chunks.rcpk', set(), 'v7m-1', 'core', 1024);
 ok('one-mib.rcpk', set(), 'v7m-1', 'core', 1 << 20);
-ok('strict.rcpk', [{ name: 'strict.bin', data: Buffer.alloc(70_000, 3) }, { name: 'v5.onnx', data: crypto.randomBytes(9000) }], 'v7m-1', 'strict');
+const v5Weights = crypto.randomBytes(120_000);
+ok('strict.rcpk', [{ name: 'strict.bin', data: Buffer.alloc(70_000, 3) }, { name: 'v5.graph.onnx', data: crypto.randomBytes(9000) },
+  { name: 'v5.weights.f16', data: v5Weights, room: v5Weights.length * 2 + 20 }], 'v7m-1', 'strict');
 ok('table-only.rcpk', [{ name: 'a', data: Buffer.from('x') }], 'p', 'core', 1024);
 
 const good = F.seal(F.packContainer(set()), key, { packId: 'v7m-1', part: 'core', chunk: 4096 });

@@ -9,7 +9,7 @@
  *
  * The usual way, one command from the functions/ directory, after `npm run build`:
  *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-dev-admin.json node scripts/recite-pack-make.js --lab [--dry]
- * It takes the lab's standard files (runs/mobile/models, golden/pack-v3, golden/pack-strict), refuses a table that isn't
+ * It takes the lab's standard files (runs/mobile/models, golden/pack-v4, golden/pack-strict), refuses a table that isn't
  * its manifest's or a model that isn't in the private checker/marks.json, and works the id out from the files' hashes:
  * a changed file is a new version, and the same files are "already current". Phones move to it at their next daily check.
  *
@@ -22,17 +22,21 @@
  *            norms.bin=/pack/norms.bin,stops.bin=/pack/stops.bin,lexicon.bin=/pack/lexicon.bin,\
  *            letters.bin=/pack/letters.bin,mel.bin=/pack/mel.bin,config.json=/pack/config.json,\
  *            manifest.json=/pack/manifest.json \
- *     --strict v5.onnx=/models/v5m-server-int8.onnx,v5.check=/pack/v5.check,strict.bin=/pack-strict/strict.bin \
+ *     --strict v5.graph.onnx=/models/v5m.graph.onnx,v5.weights.f16=/models/v5m.weights.f16,\
+ *              v5.weights.json=/models/v5m.weights.json,v5.check=/pack/v5.check,strict.bin=/pack-strict/strict.bin \
  *     --apps 1:433792838929:ios:…,1:433792838929:android:… \
  *     --claim onDeviceBench
  *
  * Either way every table must be the one manifest.json names, and manifest.json travels in the core part: the engine
  * reports its version and content in rc_info.
  *
- * Only marked models leave the Mac: v7m-* and v5m-server-int8.onnx (their hashes are in the private checker/marks.json).
+ * Only marked models leave the Mac: v7m-* and v5m.* (their hashes are in the private checker/marks.json). From pack-v4 the
+ * phone's v5 is full precision, held as v7 is: the signed 8-bit file computed something else on a real iPhone.
  *
  *   --lab       the standard files, as above (--marks FILE: another marks.json, instead of the private repo's)
  *   --dry       seal and check only: no credentials, nothing uploaded or written
+ *   --hold      upload the pack and keep its key, and leave recitePacks/current where it is: no phone is offered it
+ *   --make-current ID   point recitePacks/current at a pack uploaded with --hold, once its files are checked
  *   --no-claim  any signed-in account of the listed apps (the default claim is onDeviceBench)
  */
 const crypto = require('crypto');
@@ -45,10 +49,10 @@ const { PACK_ID, RCPK_FORMAT, KEY_BYTES, contentPackId, open, packContainer, sea
 /** The names recite-core's rc_open takes (recite_core.h). */
 const CORE_NEEDS = ['v7.graph.onnx', 'v7.weights.f16', 'v7.weights.json', 'v7.check', 'words.rcwt', 'ayahs.bin', 'norms.bin',
   'stops.bin', 'lexicon.bin', 'letters.bin', 'mel.bin', 'config.json', 'manifest.json'];
-const STRICT_NEEDS = ['v5.onnx', 'v5.check', 'strict.bin'];
+const STRICT_NEEDS = ['v5.graph.onnx', 'v5.weights.f16', 'v5.weights.json', 'v5.check', 'strict.bin'];
 const BLOB_NAMES = new Set([...CORE_NEEDS, ...STRICT_NEEDS]);
 /** The lab's tables. A pack folder is never remade in place: a new one sits beside the others under its own name. */
-const TABLES_FOLDER = 'golden/pack-v3';
+const TABLES_FOLDER = 'golden/pack-v4';
 
 /** Revisely Dev's iOS and Android apps (handbook/dev-stack.md): the App Check ids a --lab pack is for. */
 const DEV_APPS = ['1:433792838929:ios:854e01f457f27d29bbf0b0', '1:433792838929:android:5c8c71d0893a4fe3bbf0b0'];
@@ -58,7 +62,9 @@ const MODEL_FILES = {
   'v7.graph.onnx': 'v7m-any.graph.onnx',
   'v7.weights.f16': 'v7m-any.weights.f16',
   'v7.weights.json': 'v7m-any.weights.json',
-  'v5.onnx': 'v5m-server-int8.onnx',
+  'v5.graph.onnx': 'v5m.graph.onnx',
+  'v5.weights.f16': 'v5m.weights.f16',
+  'v5.weights.json': 'v5m.weights.json',
 };
 
 function fail(message) {
@@ -73,7 +79,11 @@ function args(argv) {
     if (a === '--dry') out.dry = true;
     else if (a === '--lab') out.lab = true;
     else if (a === '--no-claim') out.claim = null;
-    else if (['--id', '--core', '--strict', '--apps', '--claim', '--marks'].includes(a)) {
+    else if (a === '--hold') out.hold = true;
+    else if (a === '--make-current') {
+      if (argv[i + 1] === undefined) fail(`${a} needs a pack id`);
+      out.makeCurrent = argv[++i];
+    } else if (['--id', '--core', '--strict', '--apps', '--claim', '--marks'].includes(a)) {
       if (argv[i + 1] === undefined) fail(`${a} needs a value`);
       out[a.slice(2)] = argv[++i];
     } else fail(`unknown argument ${a}`);
@@ -176,11 +186,14 @@ function labParts(marksFile) {
 /** One part sealed, and opened again with the key before anything leaves this machine. */
 function makePart(packId, part, list, key) {
   const blobs = list.map(({ name, path }) => ({ name, data: fs.readFileSync(path) }));
-  const weights = blobs.find((b) => b.name === 'v7.weights.f16');
-  if (weights) {
+  for (const model of ['v7', 'v5']) {
+    const weights = blobs.find((b) => b.name === `${model}.weights.f16`);
+    if (!weights) continue;
     // the engine widens them in place: the phone's buffer for them is the fp32 size (recite_core.h)
-    const layout = JSON.parse(blobs.find((b) => b.name === 'v7.weights.json').data.toString('utf8'));
-    if (!Number.isSafeInteger(layout.fp32_bytes) || layout.fp32_bytes < weights.data.length) fail('v7.weights.json: fp32_bytes');
+    const table = blobs.find((b) => b.name === `${model}.weights.json`);
+    if (!table) fail(`${model}.weights.f16 without ${model}.weights.json`);
+    const layout = JSON.parse(table.data.toString('utf8'));
+    if (!Number.isSafeInteger(layout.fp32_bytes) || layout.fp32_bytes < weights.data.length) fail(`${model}.weights.json: fp32_bytes`);
     weights.room = layout.fp32_bytes;
   }
   const sealed = seal(packContainer(blobs), key, { packId, part });
@@ -193,8 +206,45 @@ function makePart(packId, part, list, key) {
   return { sealed, info };
 }
 
+/** The dev backend, from the admin key. Refuses any other project. */
+function devBackend() {
+  const keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (!keyFile) fail('Set GOOGLE_APPLICATION_CREDENTIALS to the dev project service account JSON path.');
+  const project = JSON.parse(fs.readFileSync(keyFile, 'utf8')).project_id;
+  if (project !== 'revisely-dev') fail(`The pack lives on the dev backend only; this key is for ${project}.`);
+  const admin = require('firebase-admin');
+  admin.initializeApp({ storageBucket: 'revisely-dev.firebasestorage.app' });
+  return { admin, db: admin.firestore() };
+}
+
+/** recitePacks/held-<id>: what recitePacks/current will say for a pack uploaded with --hold. Closed to clients, as they all are. */
+const heldDoc = (id) => `recitePacks/held-${id}`;
+
+/** Points recitePacks/current at a held pack, after checking its key and its uploaded files are all there. */
+async function makeCurrent(id) {
+  if (!PACK_ID.test(id)) fail('--make-current: not a pack id');
+  const { admin, db } = devBackend();
+  const held = (await db.doc(heldDoc(id)).get()).data();
+  if (!held || held.packId !== id) fail(`${id} isn't a held pack`);
+  if (!(await db.doc(`recitePackKeys/${id}`).get()).exists) fail(`${id} has no key`);
+  for (const info of Object.values(held.parts)) {
+    const file = admin.storage().bucket().file(info.path);
+    const [there] = await file.exists();
+    if (!there) fail(`${info.path} isn't there`);
+    const [meta] = await file.getMetadata();
+    if (Number(meta.size) !== info.bytes) fail(`${info.path} is the wrong size`);
+  }
+  await db.doc('recitePacks/current').set({ ...held, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+  console.log(`recitePacks/current → ${id}`);
+}
+
 async function main() {
   const o = args(process.argv.slice(2));
+  if (o.makeCurrent) {
+    if (o.lab || o.hold || o.dry || o.core) fail('--make-current takes only the pack id');
+    await makeCurrent(o.makeCurrent);
+    return;
+  }
   const lab = o.lab ? labParts(o.marks) : null;
   if (lab) {
     o.id = contentPackId(lab.hashes);
@@ -219,13 +269,7 @@ async function main() {
   let admin;
   let db;
   if (!o.dry) {
-    const keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-    if (!keyFile) fail('Set GOOGLE_APPLICATION_CREDENTIALS to the dev project service account JSON path.');
-    const project = JSON.parse(fs.readFileSync(keyFile, 'utf8')).project_id;
-    if (project !== 'revisely-dev') fail(`The pack lives on the dev backend only; this key is for ${project}.`);
-    admin = require('firebase-admin');
-    admin.initializeApp({ storageBucket: 'revisely-dev.firebasestorage.app' });
-    db = admin.firestore();
+    ({ admin, db } = devBackend());
     if ((await db.doc(`recitePackKeys/${o.id}`).get()).exists) {
       if (lab && (await db.doc('recitePacks/current').get()).data()?.packId === o.id) {
         console.log(`${o.id} is already the current pack: nothing to do.`);
@@ -256,7 +300,7 @@ async function main() {
     console.log(`uploaded ${info.path}`);
   }
   await db.doc(`recitePackKeys/${o.id}`).create({ key: key.toString('base64'), createdAt: admin.firestore.FieldValue.serverTimestamp() });
-  await db.doc('recitePacks/current').set({
+  const record = {
     packId: o.id,
     format: RCPK_FORMAT,
     parts: Object.fromEntries(Object.entries(parts).map(([name, p]) => [name, p.info])),
@@ -265,7 +309,14 @@ async function main() {
     dailyCalls: 6,
     dailyKeys: 3,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+  };
+  if (o.hold) {
+    await db.doc(heldDoc(o.id)).create(record);
+    const current = (await db.doc('recitePacks/current').get()).data()?.packId;
+    console.log(`held: ${o.id}. recitePacks/current stays on ${current ?? 'nothing'}; --make-current ${o.id} moves it.`);
+    return;
+  }
+  await db.doc('recitePacks/current').set(record);
   console.log(`recitePacks/current → ${o.id} (${apps.length} apps, claim: ${o.claim ?? 'none'})`);
 }
 
