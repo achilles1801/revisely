@@ -103,7 +103,7 @@ function engineTestText({ run, sendError }: EngineTestResult): string {
   const line = run.interrupted
     ? t('settings.bench.engineTestLeft')
     : run.ok
-      ? t('settings.bench.engineTestResult', {
+      ? t(run.level === 'strict' ? 'settings.bench.engineTestResult' : 'settings.bench.engineTestResultWords', {
           late: run.lateHops ?? '–',
           hops: run.hops ?? '–',
           worst: run.worstHopMs ?? '–',
