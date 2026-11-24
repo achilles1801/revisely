@@ -10,6 +10,8 @@ import { t } from '../../i18n';
 
 /** How long the note stays, its fades included. */
 export const HASBUK_MS = 2200;
+/** An E2E build holds it long enough for the flow's screenshot (flow 18, rl08c). */
+const SHOWN_MS = process.env.EXPO_PUBLIC_E2E === '1' ? 8000 : HASBUK_MS;
 const FADE_IN = 220;
 const FADE_OUT = 320;
 
@@ -33,9 +35,9 @@ export function HasbukNote({ trigger, bottom }: { trigger: number; bottom: numbe
     shown.value = 0;
     shown.value = withSequence(
       withTiming(1, { duration: FADE_IN }),
-      withDelay(HASBUK_MS - FADE_IN - FADE_OUT, withTiming(0, { duration: FADE_OUT })),
+      withDelay(SHOWN_MS - FADE_IN - FADE_OUT, withTiming(0, { duration: FADE_OUT })),
     );
-    const done = setTimeout(() => setShownFor(0), HASBUK_MS);
+    const done = setTimeout(() => setShownFor(0), SHOWN_MS);
     return () => clearTimeout(done);
     // Only when a test reaches its end.
     // eslint-disable-next-line react-hooks/exhaustive-deps
