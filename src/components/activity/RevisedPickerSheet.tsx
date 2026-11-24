@@ -30,7 +30,7 @@ import {
   setJuzPages,
   togglePages,
 } from '../../lib/revisedPicker';
-import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
+import { radiusV2, typeV2 } from '../../theme/v2';
 import type { RevisionLog } from '../../types';
 import { dayWords } from './AddSheetParts';
 import { revisedOnDay, useDayItems } from './useDayItems';
@@ -294,6 +294,6 @@ const styles = StyleSheet.create({
   back: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', minHeight: 32 },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8, marginBottom: 8 },
   pill: { minHeight: 36, borderRadius: radiusV2.full, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
-  foot: { borderTopWidth: StyleSheet.hairlineWidth, marginHorizontal: layoutV2.gutter, paddingTop: 12 },
+  foot: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12 },
   footButton: { marginTop: 12 },
 });

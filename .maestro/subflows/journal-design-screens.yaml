@@ -91,7 +91,9 @@ appId: com.revisionbuddy.app
       NAME: 23-search-${THEME}
 - tapOn:
     id: elsewhere-search-clear
-- hideKeyboard
+# The field's search key puts the keyboard away.
+- pressKey: Enter
+- waitForAnimationToEnd
 - runFlow: close-sheet.yaml
 - extendedWaitUntil:
     notVisible:
