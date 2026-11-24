@@ -477,6 +477,13 @@ describe('Recite’s pack on the phone', () => {
     expect(mockCall).toHaveBeenCalledTimes(AUTO_CALLS_A_DAY + 1);
   });
 
+  it('a server failure counts against the phone’s own tries, since the callable counted it', async () => {
+    mockCall.mockRejectedValue(Object.assign(new Error('couldn’t be prepared'), { code: 'INTERNAL' }));
+    for (let i = 0; i < 6; i++) await run();
+    expect(mockCall).toHaveBeenCalledTimes(AUTO_CALLS_A_DAY);
+    expect(getPackStatus()).toMatchObject({ phase: 'unavailable', why: 'paused' });
+  });
+
   it('a refusal the callable doesn’t count doesn’t use up the phone’s own tries', async () => {
     mockCall.mockRejectedValue(Object.assign(new Error('This account can’t download the pack yet.'), { code: 'PERMISSION_DENIED' }));
     for (let i = 0; i < 5; i++) await run();

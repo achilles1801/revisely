@@ -69,7 +69,7 @@ function failureLine(err: unknown): string {
 
 /** The callable counts a phone's calls by the UTC day (handler.ts `packDay`). */
 const utcDay = (): string => new Date(Date.now()).toISOString().slice(0, 10);
-/** Good answers a phone asks for by itself in a UTC day: the rest of the callable's 6 stay for Download now. */
+/** Counted calls a phone makes by itself in a UTC day: the rest of the callable's 6 stay for Download now. */
 export const AUTO_CALLS_A_DAY = 3;
 
 export type PackPhase =
@@ -110,7 +110,7 @@ interface Saved {
   damaged?: { packId: string; count: number } | null;
   /** The UTC day the callable said this account had had enough calls: it isn't asked again that day. */
   limitDay?: string | null;
-  /** Good answers taken today, which the callable counted. */
+  /** Calls today that the callable may have counted: a good answer, or a failure after its limit step. */
   asks?: { day: string; n: number } | null;
 }
 
@@ -369,6 +369,11 @@ function roomFor(bytes: number): boolean {
   }
 }
 
+function noteAsk(): void {
+  const day = utcDay();
+  saved.asks = { day, n: saved.asks?.day === day ? saved.asks.n + 1 : 1 };
+}
+
 const engineVersion = (): string | null => coreLine(benchEngine())?.version ?? null;
 
 async function runOnce(): Promise<void> {
@@ -408,7 +413,15 @@ async function runOnce(): Promise<void> {
     publish({ phase: 'unavailable', why: 'paused' });
     return;
   }
-  const answer = reusing ?? (await askForPack());
+  let answer: Awaited<ReturnType<typeof askForPack>>;
+  try {
+    answer = reusing ?? (await askForPack());
+  } catch (err) {
+    // The callable counts a call before it can fail preparing the answer.
+    noteAsk();
+    await persist();
+    throw err;
+  }
   if (gen !== generation) return;
   saved.checkedAt = Date.now();
   if ('refused' in answer) {
@@ -420,8 +433,7 @@ async function runOnce(): Promise<void> {
 
   if (!reusing) {
     lastAnswer = answer;
-    const day = utcDay();
-    saved.asks = { day, n: saved.asks?.day === day ? saved.asks.n + 1 : 1 };
+    noteAsk();
     await persist();
   }
   if (answer.packId === saved.badPack && !once) {
