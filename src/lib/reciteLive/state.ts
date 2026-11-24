@@ -426,6 +426,19 @@ export function revealedUpTo(state: LiveState): number | null {
 }
 
 /**
+ * The furthest word the take's bar names (RECITE-28; Majd, Nov 23 2026: "it shows me the whole word already ... as if i
+ * already said it"). The cursor lands on a word as it begins, so while the take runs that word waits until the cursor
+ * has moved on, `said` reaches it, or it has been there as long as a hidden page waits (`held`, the screen's timer): at a
+ * pause `said` often doesn't reach it for seconds, and the line mustn't look stuck. A `said` further on is from before
+ * the reciter went back: it says nothing of this word. Once the take has stopped, the word it stopped on.
+ */
+export function barUpTo(state: LiveState, held: number | null = null): number | null {
+  if (state.cursor == null) return null;
+  if (state.status !== 'listening' && state.status !== 'connecting') return state.cursor;
+  return state.saidUpTo === state.cursor || held === state.cursor ? state.cursor : state.cursor - 1;
+}
+
+/**
  * How long the word under the cursor waits before a hidden page shows it, while the take listens (ms): Majd, Nov 22
  * 2026, "i recite a word and honestly it should be under one second max that it shows up". The cursor reaches a word
  * while it is being said (p95 0.13 s before its end), so this shows it about as it ends, not as it begins.
