@@ -111,6 +111,14 @@ describe('[RECITE-29] a word not heard as the page’s word is never printed as 
     expect(line(play(held, { type: 'said', upTo: A + 1 }))).toEqual([1]);
   });
 
+  it('4 s after its last sound with no mark it is written as the page’s word; a mark that comes later redraws it', () => {
+    const s = begin(word(1, 0, 1.5, 2, true));
+    const at = (now: number, st = s) => barWords(st, words, { check: true, startWord: A, now }).map((b) => [b.w - A, b.tone]);
+    expect(at(5.9)).toEqual([]);
+    expect(at(6)).toEqual([[1, 'current']]);
+    expect(at(6, play(s, { type: 'mark', mark: wrongAt(1) }))).toEqual([[1, 'wrong']]);
+  });
+
   it('a `said` from before it came doesn’t settle it', () => {
     const s = begin({ type: 'said', upTo: A + 5 }, word(1, 0, 8, 8.4, true));
     expect(line(s)).toEqual([]);

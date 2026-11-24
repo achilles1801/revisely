@@ -789,8 +789,10 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   take's bar are what the reciter said, each written once it has finished, in the order said, on the server and on the
   phone alike (Majd, Nov 24 2026: "It should just be exactly what is that user saying", "the word is only getting written
   down in the text when the word finishes"). A word said again, or gone back to, is written again. A word not heard as
-  the page's word is never printed as it: nothing shows for it, on any page, until a mark names it (then as heard) or
-  `said` passes it unmarked, and it takes its place. A word the checker takes back comes off the line. Without those
+  the page's word isn't printed as it at once: nothing shows for it, on any page, until a mark names it (then as heard),
+  `said` passes it, or 4 s have gone by since its last sound with no mark (then as the page's word, as a hidden page shows
+  a word once passed, redrawn if a mark comes later); it takes its place. The take's end shows each word as its answer
+  says. A word the checker takes back comes off the line. Without those
   frames the bar is RECITE-28's. Off for every account until the checker's frames are on Revisely Dev and the lead has
   seen their bars.
 

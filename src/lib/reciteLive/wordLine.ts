@@ -18,6 +18,13 @@ export function setWordLineForTests(on = false): void {
   lineOn = on;
 }
 
+/**
+ * A held word (`sub`) with no mark this long after its last sound is written as the page's word: a hole in the line for
+ * longer is worse than the risk it guards against (the lead, Nov 24 2026; on bench a quarter of held words were never
+ * named or passed before the take ended). A mark that comes later redraws it. The lead's to change.
+ */
+export const SUB_RELEASE_S = 4;
+
 /** One visit to a word, as the checker sent it. */
 export interface WordVisit {
   w: number;

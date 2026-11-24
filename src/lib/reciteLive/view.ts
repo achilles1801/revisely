@@ -4,7 +4,7 @@ import type { QuranWords } from '../recite/quranWords';
 import type { WordFollow } from '../recite/hiddenPage';
 import { isUnclear, strongestByWord, type Mark } from './contract';
 import { barUpTo, furthestWord, LiveState, LiveStatus, mistakeCount } from './state';
-import { marksByVisit } from './wordLine';
+import { marksByVisit, SUB_RELEASE_S } from './wordLine';
 import { SAMPLE_RATE } from '../recite/segmenter';
 import { formatAccuracy, pageAccuracy, ScoreLevel, scoreLevel } from './score';
 
@@ -29,9 +29,9 @@ export interface BarWord {
 export function barWords(
   state: LiveState,
   words: QuranWords,
-  opts: { check: boolean; startWord: number | null; upTo?: number | null; held?: number | null },
+  opts: { check: boolean; startWord: number | null; upTo?: number | null; held?: number | null; now?: number | null },
 ): BarWord[] {
-  if (state.wordFrames) return lineWords(state, words, opts.check);
+  if (state.wordFrames) return lineWords(state, words, opts.check, opts.now ?? null);
   const said = barUpTo(state, opts.held ?? null);
   if (said == null) return [];
   const top = opts.upTo !== undefined ? Math.min(said, opts.upTo ?? -1) : said;
@@ -67,10 +67,10 @@ export function barWords(
 
 /**
  * The bar's line from the checker's `word` frames (RECITE-29): the last two visits in the order said, a repeat again as
- * itself. A visit not heard as the page's word (`sub`) is left out until a mark names it or `said` passes it, so the line
- * never prints the right word for a wrong one; once the take has stopped nothing is held.
+ * itself. A visit not heard as the page's word (`sub`) is left out until a mark names it, `said` passes it, or `now` (the
+ * take's audio, s) is SUB_RELEASE_S past its last sound; once the take has stopped nothing is held.
  */
-function lineWords(state: LiveState, words: QuranWords, check: boolean): BarWord[] {
+function lineWords(state: LiveState, words: QuranWords, check: boolean, now: number | null): BarWord[] {
   const visits = state.visits ?? [];
   const running = state.status === 'listening' || state.status === 'connecting';
   const marked = marksByVisit(visits, check ? Object.values(state.marks) : [], SAMPLE_RATE);
@@ -79,7 +79,8 @@ function lineWords(state: LiveState, words: QuranWords, check: boolean): BarWord
     const x = visits[i];
     const marks = marked.get(x) ?? [];
     if (marks.some((m) => m.kind === 'skipped')) continue;
-    if (x.sub && !x.settled && marks.length === 0 && running) continue;
+    const released = now != null && now >= x.e / SAMPLE_RATE + SUB_RELEASE_S;
+    if (x.sub && !x.settled && !released && marks.length === 0 && running) continue;
     const wrong = marks.find((m) => m.kind === 'word' && m.heard);
     const slips = marks.filter((m) => (m.kind === 'harakat' || m.kind === 'letter') && !isUnclear(m));
     const part = slips.length ? (slips.some((m) => m.kind === 'letter') ? ('letter' as const) : ('harakat' as const)) : undefined;
