@@ -19,9 +19,12 @@ export function setWordLineForTests(on = false): void {
 }
 
 /**
- * A held word (`sub`) with no mark this long after its last sound is written as the page's word: a hole in the line for
- * longer is worse than the risk it guards against (the lead, Nov 24 2026; on bench a quarter of held words were never
- * named or passed before the take ended). A mark that comes later redraws it. The lead's to change.
+ * A held word (`sub`) with no mark this long after its last sound is written as the page's word, on the take's own clock so
+ * a silent pause releases it too; a mark that comes later redraws it. The lead's, Nov 24 2026: a hole in the line for
+ * longer is worse than the risk it guards against. On the finished `golden/words` (checker 0ffbffa3), bench: it releases
+ * 189 of 762 held words, 171 of them never marked (the page's word was right); of held words later marked, 18 of 481
+ * (3.7%) are released first, shown a median 0.5 s (p90 6.3 s) before the mark redraws them. Lengthening it would hide
+ * correct words longer to protect a few wrong ones.
  */
 export const SUB_RELEASE_S = 4;
 
