@@ -191,7 +191,6 @@ The English is the app's label (as in `src/i18n/en`), or the concept where there
 | Peek | إلقاء نظرة | | [TT] |
 | hide the verses / hidden view | إخفاء الآيات | | [TT] |
 | Test me | اختبرني | | |
-| Recite the mistakes again | إعادة تسميع الأخطاء | | Verbal noun on a button |
 | Hear it | الاستماع | | |
 | score | النتيجة | الدرجة | |
 | Clean | بلا أخطاء | نظيف | |

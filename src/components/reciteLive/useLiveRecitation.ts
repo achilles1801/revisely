@@ -88,7 +88,7 @@ const REPLAYED = new Set(['at', 'said', 'off', 'ayah', 'score', 'locked']);
 /** Failures a take ends on without what it found being kept: the checker's gate (the Premium page opens instead). */
 const GATE_FAILURES = new Set(['check_locked', 'premium_required']);
 
-/** What ended a take: Stop tapped, the app left, iOS took the microphone, or a drill reached its end. */
+/** What ended a take: Stop tapped, the app left, iOS took the microphone, or a spot test reached its end. */
 type StopWhy = 'tap' | 'background' | 'mic-lost' | 'reached';
 
 /**
@@ -121,7 +121,7 @@ export const START_ANYWHERE = true;
 /**
  * A take from the reader's mic may start anywhere in the Qur'an (Majd, Nov 15 2026: step 2 of search and follow-along;
  * protocol 7): when the page doesn't match, the checker looks in the whole Qur'an and the reader turns to where it
- * locks. Never for a span (a drill, a Test me place, a voice search's ayahs): those know where they are.
+ * locks. Never for a span (a spot test, a voice search's ayahs): those know where they are.
  */
 export const START_IN_QURAN = true;
 
@@ -150,7 +150,7 @@ const defaultConnect: LiveConnect = (start, handlers) => {
 /**
  * The start frame for a take on `page`, with the account's settings (contract draft 5): anywhere on the page
  * (`startBy`, the page's last ayah), or from its first ayah; or over a given span (lib/reciteLive/span): a stretch of
- * ayahs ("Recite the mistakes again", from its first ayah to its last), or the ayahs a voice search found (the start
+ * ayahs (a spot test, from its first ayah to its last), or the ayahs a voice search found (the start
  * looked for only there).
  */
 export function startFrameFor(
@@ -252,7 +252,7 @@ export function useLiveRecitation({
   const takeNo = useRef(0);
   /** The chain's samples before the current link's first. */
   const linkStart = useRef(0);
-  /** The take may roll over: one from the mic, not a span (a drill, a Test me place, a voice search's ayahs). */
+  /** The take may roll over: one from the mic, not a span (a spot test, a voice search's ayahs). */
   const chainable = useRef(false);
   /** The link whose next take's instance has been woken (WARM_NEXT_S). */
   const warmedFor = useRef(0);
@@ -354,7 +354,7 @@ export function useLiveRecitation({
   // and when the cursor first reached each word, in seconds of the take (for a mark that carries no time of its own).
   const lastConn = useRef<LiveConnection | null>(null);
   const wordTimes = useRef(new Map<number, number>());
-  /** A drill take's last word (a span with an end): it stops by itself once the checker has decided it. */
+  /** A spot test's last word (a span with an end): it stops by itself once the checker has decided it. */
   const endWord = useRef<number | null>(null);
   // For the Stop trace (lib/reciteLive/stopTrace), read when Stop is tapped.
   const traceRef = useRef({ state, mode });
@@ -1130,7 +1130,7 @@ export function useLiveRecitation({
     }
   }, [live, state.cursor, words]);
 
-  // A drill take stops by itself once the checker has decided its last word (reciting on would add "Added after the
+  // A spot test stops by itself once the checker has decided its last word (reciting on would add "Added after the
   // end" marks).
   const saidUpTo = state.saidUpTo;
   useEffect(() => {

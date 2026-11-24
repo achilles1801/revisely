@@ -15,7 +15,6 @@ import { isUnclear, markGroup } from '../../lib/reciteLive/contract';
 import { markFill } from './markColours';
 import { expectedPhrase, findingNote, intoLine, intoMarks, markTitle, recitedLabel, recitedPhrase, spokenIntoLine } from '../../lib/reciteLive/describe';
 import { Phrase, Row } from './MarkParts';
-import { drillMarks } from '../../lib/reciteLive/drill';
 import type { ScoreLevel } from '../../lib/reciteLive/score';
 import { mistakesLabel, pagesReached, perPageLabel } from '../../lib/reciteLive/score';
 import { CheckMark } from './ReciteMic';
@@ -113,8 +112,6 @@ export function TakeSummarySheet({
   onAgain,
   againLabel,
   spotTest = null,
-  onDrill,
-  before = null,
   memory = null,
   onProgress,
   history = [],
@@ -162,10 +159,6 @@ export function TakeSummarySheet({
   againLabel?: string;
   /** The take was a spot test (RECITE-8): its length, and whether it finished or was stopped early. */
   spotTest?: SpotTestRecord | null;
-  /** Recite the mistakes again (Check, with something to drill): one take from the first mistake to the last. */
-  onDrill?: () => void;
-  /** This take recited the mistakes of the one before: what that one found there ("1 wrong word, 1 not clear"). */
-  before?: string | null;
   /**
    * Recite's memory (lib/reciteMemory; agreed with Recite UI): the words this take cleared from the page (said right on
    * a second day), and its passage's trend (accuracy over its takes, oldest first, with the line saying it).
@@ -220,7 +213,6 @@ export function TakeSummarySheet({
   const findings = [...marks.filter((m) => !isUnclear(m)), ...marks.filter(isUnclear)];
   const peekedCount = peeked.reduce((n, p) => n + p.words.length, 0);
   // Something to recite again: a mistake (not a tajweed note), or a word peeked.
-  const drillable = check && onDrill != null && (drillMarks(marks).length > 0 || peekedCount > 0);
   const scoreColor = score?.level === 'good' ? palette.good : score?.level === 'warn' ? palette.warn : palette.onRedSubtle;
   // Once, when the summary is on screen: what was recited, how long, and (Check) the score. Nothing is spoken while
   // the microphone is on, where it would be recorded with the recitation.
@@ -249,18 +241,16 @@ export function TakeSummarySheet({
     </View>
   ) : (
     <View style={styles.buttons}>
-      {drillable ? <PillButton title={t('reciteLive.summary.drill')} size="lg" onPress={onDrill} testID="take-summary-drill" /> : null}
       {onAgain ? (
         <PillButton
           title={againLabel ?? t('reciteLive.summary.again')}
           size="lg"
-          variant={drillable ? 'outline' : undefined}
           onPress={onAgain}
           testID="take-summary-again"
         />
       ) : null}
-      {/* Done is the main button when nothing else is (a past take with nothing to recite again). */}
-      <PillButton title={t('common.done')} size="lg" variant={drillable || onAgain ? 'outline' : undefined} onPress={onDone} testID="take-summary-done" />
+      {/* Done is the main button when nothing else is (a past take). */}
+      <PillButton title={t('common.done')} size="lg" variant={onAgain ? 'outline' : undefined} onPress={onDone} testID="take-summary-done" />
       {onRecited ? (
         <Tap
           onPress={onRecited}
@@ -334,11 +324,6 @@ export function TakeSummarySheet({
         {peekedCount ? (
           <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX} testID="take-summary-peeked">
             {peekedLine(peekedCount)}
-          </Text>
-        ) : null}
-        {check && before ? (
-          <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={CHROME_MAX} testID="take-summary-before">
-            {t('reciteLive.summary.before', { before })}
           </Text>
         ) : null}
         {unfinished ? (

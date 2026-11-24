@@ -173,10 +173,9 @@ export const RELEASES: readonly WhatsNewRelease[] = [
         id: 'again',
         title: 'Until it sticks',
         text:
-          '{{Recite the mistakes again}} goes over just those ayat. A mistake stays marked on the page until you say ' +
-          'it right on two different days.',
+          'A mistake stays marked on the page until you say it right on two different days.',
         picture: 'again',
-        covers: ['RECITE-7', 'RMEM-2', 'RMEM-3'],
+        covers: ['RMEM-2', 'RMEM-3'],
         needs: 'recite',
       },
       {

@@ -177,7 +177,6 @@ Majd, Nov 17 2026: "the most important being a super heavy user with a lot of ac
   - **Recitation:** the score's weeks, Keeps slipping (Al-Baqarah 58, Al-Kahf 75), Similar ayahs.
 - **The reader:**
   - Al-Baqarah p. 9 and Al-Kahf p. 302 show the words still marked;
-  - the mic's menu offers "Recite your N mistakes here";
   - Your progress shows each passage's takes.
 - **Revo** (once on): History lists the three; Memory the four.
 - **Relaunch:** strengths, counts and last revised days stay as they were. Before Nov 17 2026 an account with more

@@ -113,7 +113,12 @@ describe('Revo’s guide names what the app has', () => {
     const source = appSource().replace(/’/g, "'");
     const labels = [...new Set([...`${REVO_GUIDE}\n${DEV_GUIDE}`.matchAll(/“([^”]+)”/g)].map((m) => m[1]))];
     expect(labels.length).toBeGreaterThan(50);
-    const absent = labels.filter((l) =>
+    // RECITE-7: gone from the app. The main guide still names it until the release's re-record of its replies (that
+    // needs Majd's yes), and the Dev guide tells Revo it's gone. Take this out with that re-record.
+    const untilReRecord = 'Recite the mistakes again';
+    expect(REVO_GUIDE).toContain(`“${untilReRecord}”`);
+    expect(DEV_GUIDE).toContain(`“${untilReRecord}” and "Recite your N mistakes here" are gone`);
+    const absent = labels.filter((l) => l !== untilReRecord).filter((l) =>
       l
         .split('…')
         .map((part) => part.trim().replace(/’/g, "'"))

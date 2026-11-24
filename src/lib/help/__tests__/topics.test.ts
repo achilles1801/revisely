@@ -162,10 +162,10 @@ describe('the help stays short and plain', () => {
     const text = recite.flatMap((s) => HELP[s].topics.map((t) => t.text)).join(' ');
     for (const said of [
       'anywhere', 'elsewhere in the Qur’an', 'Red', 'Amber', 'Violet', '{{Not clear}}', '{{Hear it}}', '{{Your recitation}}',
-      '{{Not a mistake}}', '{{Put back}}', '{{Recite the mistakes again}}', '[[eye]]', '{{Delete this take}}', 'similar ayah',
+      '{{Not a mistake}}', '{{Put back}}', '[[eye]]', '{{Delete this take}}', 'similar ayah',
       // Nov 16: the page put away, peeked words, past mistakes, a passage's progress, Activity's takes, Test me, voice search.
       'header and the bar away', 'grey', '{{Clear now}}', '{{Your progress}}', '{{Recited}}', '{{Show on the page}}',
-      'Recite your 3 mistakes here', '{{Test me}}', '{{Test me again}}', 'Search by voice',
+      '{{Test me}}', '{{Test me again}}', 'Search by voice',
     ]) {
       expect(text).toContain(said);
     }

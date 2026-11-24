@@ -21,7 +21,6 @@ import { SmallPill } from '../reciteLive/MarkParts';
 import { markFill } from '../reciteLive/markColours';
 import { PAST_OPACITY } from '../reciteMemory/RememberedLayers';
 import { useQuranWordsWhen } from '../reciteMemory/TakeRows';
-import { PillButton } from '../v2/PillButton';
 import { arabicFullV2 } from '../../theme/v2';
 import { strictOffered } from '../../lib/reciteCheck/settings';
 import type { QuranWords } from '../../lib/recite/quranWords';
@@ -37,7 +36,6 @@ import { t } from '../../i18n';
 export function pictureWords() {
   const today = t('activity.add.today');
   return {
-    drill: t('reciteLive.summary.drill'),
     addTitle: t('activity.addMenu.title', { day: today }),
     rows: [
       [t('activity.elsewhere.title'), t('activity.addMenu.revisedSubtitle', { Day: `${today.charAt(0).toUpperCase()}${today.slice(1)}` })],
@@ -352,14 +350,11 @@ function MarksPicture() {
   );
 }
 
-/** The page after the take: the mistakes kept on it, lighter, and the way over them again. */
+/** The page after the take: the mistakes kept on it, lighter. */
 function AgainPicture() {
   return (
     <View style={styles.reciteScreen}>
       <TakeLines live={false} past />
-      <View style={styles.againButton}>
-        <PillButton title={pictureWords().drill} size="lg" onPress={noop} />
-      </View>
     </View>
   );
 }
@@ -453,5 +448,4 @@ const styles = StyleSheet.create({
   reciteBar: { marginTop: 14 },
   markCard: { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingVertical: 14 },
   markActions: { flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' },
-  againButton: { marginTop: 18, alignItems: 'center' },
 });

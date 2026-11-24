@@ -7,7 +7,6 @@ jest.mock('react-native-safe-area-context', () => require('react-native-safe-are
 import { readRepo } from '../../../../jest/behaviourRules';
 import { clippedArabic } from '../../../../jest/arabicLines';
 import { demoTakeOf, pictureFor, pictureWords } from '../pictures';
-import { en } from '../../../i18n/en';
 import { t } from '../../../i18n';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DesignProvider } from '../../../design/DesignContext';
@@ -57,12 +56,6 @@ describe('the pictures', () => {
     expect(fresh.lines[fresh.lines.length - 1].some((x) => x.w === fresh.cursor)).toBe(true);
   });
 
-  it("the drill's button is the take summary's", () => {
-    // The summary's button is t('reciteLive.summary.drill') (src/i18n): the picture draws the same English.
-    expect(source('src/components/reciteLive/TakeSummarySheet.tsx')).toContain("title={t('reciteLive.summary.drill')}");
-    expect(en.reciteLive.summary.drill).toBe(pictureWords().drill);
-  });
-
   it('each draws, hidden from VoiceOver and never touched', async () => {
     for (const p of ['activity', 'elsewhere', 'ayah', 'marks', 'again', 'gaps'] as const) {
       render(
@@ -94,7 +87,6 @@ describe('the pictures in Arabic', () => {
     try {
       const words = pictureWords();
       expect(words.addTitle).toBe('إضافة إلى اليوم');
-      expect(words.drill).toBe('إعادة تسميع الأخطاء');
       expect(words.rows.map(([title]) => title)).toEqual(['راجعت في مكان آخر', 'المحفوظ', 'ملاحظة']);
     } finally {
       await i18n.changeLanguage('en');

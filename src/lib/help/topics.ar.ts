@@ -113,8 +113,8 @@ export const HELP_TOPICS_AR: Readonly<Record<string, ArabicHelpText>> = {
   },
   'recite.after': {
     title: 'بعد التسميع',
-    text: '{{إعادة تسميع الأخطاء}} تمرّ عليها مرة أخرى، والانتقال إلى آية متشابهة له سطر خاص. و[[more]] ← {{حذف هذا التسميع}} يحذفه.',
-    from: 'f2a94d7fcf9acef9',
+    text: 'الانتقال إلى آية متشابهة له سطر خاص. و[[more]] ← {{حذف هذا التسميع}} يحذفه.',
+    from: '50a2622b113bd999',
   },
   'reciteTake.page': {
     title: 'الصفحة وحدها',
@@ -128,8 +128,8 @@ export const HELP_TOPICS_AR: Readonly<Record<string, ArabicHelpText>> = {
   },
   'reciteTake.peeked': {
     title: 'الكلمات التي كشفتها',
-    text: 'الكلمات التي تكشفها تبقى رمادية طوال التسميع ولا تُحتسب في نتيجتك أبدًا. يعرضها الملخص، و{{إعادة تسميع الأخطاء}} تشملها.',
-    from: '36522dc4fb7b2aab',
+    text: 'الكلمات التي تكشفها تبقى رمادية طوال التسميع ولا تُحتسب في نتيجتك أبدًا. ويعرضها الملخص.',
+    from: 'c470044a656e7966',
   },
   'reciteTake.pause': {
     title: 'الإيقاف المؤقت',
@@ -140,11 +140,6 @@ export const HELP_TOPICS_AR: Readonly<Record<string, ArabicHelpText>> = {
     title: 'في الصفحة',
     text: 'الكلمة التي أخطأت فيها تبقى مظللة تظليلًا خفيفًا حتى تقولها صحيحة في تسميعين متتاليين، في يومين مختلفين. اضغط عليها لترى سجلها، أو {{إزالتها الآن}}.',
     from: 'b4334b4768121d92',
-  },
-  'reciteMemory.drill': {
-    title: 'تسميعها مرة أخرى',
-    text: 'في صفحة فيها كلمات لم تُصحَّح بعد، اضغط مطوّلًا على [[mic]] لتختار «سمّع أخطاءك الثلاثة هنا»: تسميع واحد لذلك المقطع وحده.',
-    from: '40c58b731471daac',
   },
   'reciteMemory.progress': {
     title: 'تقدّمك',

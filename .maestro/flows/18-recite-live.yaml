@@ -4,7 +4,7 @@
 # 379 with a wrong word and a haraka slip, the moment of Majd's Tarteel screenshots of Nov 14 2026).
 # Screenshots of each state for the mocks (~/Documents/revisely-recite-mocks/option-A-final-2.png and
 # mistakes-toggle-after.png): the reader with the mic, the mic's menu (Mark mistakes off, then on),
-# following, a mark and the score, the hidden view, done, reciting the mistakes again, and the locked switch's
+# following, a mark and the score, the hidden view, done, and the locked switch's
 # Premium page. Last, a Recite take begun in the middle of the page (An-Naml 25), as a take can start anywhere on it.
 appId: com.revisionbuddy.app
 ---
@@ -400,27 +400,11 @@ appId: com.revisionbuddy.app
 - tapOn: "Done"
 - extendedWaitUntil:
     visible:
-      id: take-summary-drill
+      id: take-summary-done
     timeout: 8000
-
-# Recite the mistakes again (Majd, Nov 15 2026): one take over the stretch from the first mistake to the last, from the
-# ayah before (An-Naml 22–23). It stops by itself once the checker has decided the stretch's last word, and its summary
-# says what the take before found there.
-- tapOn:
+# RECITE-7: a summary with mistakes offers no take over just them.
+- assertNotVisible:
     id: take-summary-drill
-# No wait for the bar between: the drill is short and stops by itself, so on Android its summary can be up before
-# Maestro has seen the bar (#632's run 43770950205). Only the drill's summary has "Before:".
-- extendedWaitUntil:
-    visible:
-      id: take-summary-before
-    timeout: 30000
-- assertVisible:
-    id: take-summary-before
-    text: "Before: 1 wrong word, 1 wrong haraka"
-- runFlow:
-    file: ../subflows/shot.yaml
-    env:
-      NAME: rl10b-drill-summary-dark
 - tapOn:
     id: take-summary-done
 - tapOn:

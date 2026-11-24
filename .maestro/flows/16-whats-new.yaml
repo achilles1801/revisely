@@ -6,7 +6,7 @@
 # launch runs it from the next launch as App Store users will see it. It resumes on the card it was
 # left on after a relaunch, Android's back goes to the card before, and after Done it doesn't come back.
 # The current release is 1.0.5 (mistake detection), five cards: the Recite moment (ReciteMoment: a take plays by
-# itself; Skip takes it to its end, its screenshot is that end), the marks, Recite the mistakes again, Gaps in Insights,
+# itself; Skip takes it to its end, its screenshot is that end), the marks, a mistake staying until it's said right, Gaps in Insights,
 # and Also new. The Recite cards need a phone that can run Recite (the microphone stream: both E2E builds have it).
 # A card's title reads "Step 1 of 5. <title>" to VoiceOver, and iOS matches that label: titles are
 # matched by id, with .* before them.

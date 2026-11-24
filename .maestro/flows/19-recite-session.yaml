@@ -4,7 +4,7 @@
 # (src/lib/e2e/reciteLive.ts: An-Naml 23–24 on page 379 with a wrong word and a haraka slip).
 # Screenshots for the mocks (~/Documents/revisely-today-mocks/recite-in-sessions/): the session with the eye and mic
 # (no eye at the top), the mic's menu (no Test me), the take's marks, its summary, the page after it (still not
-# marked revised) and "Recite your N mistakes here" on it.
+# marked revised) and the mic's menu on it, with no row for the page's mistakes (RECITE-7).
 appId: com.revisionbuddy.app
 ---
 - runFlow:
@@ -167,9 +167,11 @@ appId: com.revisionbuddy.app
     id: recite-mic
 - extendedWaitUntil:
     visible:
-      id: recite-mode-drill
+      id: recite-mode-menu
     timeout: 15000
+- assertNotVisible:
+    id: recite-mode-drill
 - runFlow:
     file: ../subflows/shot.yaml
     env:
-      NAME: rs06-drill
+      NAME: rs06-menu

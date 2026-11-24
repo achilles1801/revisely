@@ -279,7 +279,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Recite and Mark mistakes',
-    covers: ['RECITE-1', 'RECITE-2', 'RECITE-3', 'RECITE-4', 'RECITE-5', 'RECITE-6', 'RECITE-7', 'RECITE-8', 'RECITE-9', 'RECITE-14', 'SEARCH-4', 'PREM-1', 'READ-2'],
+    covers: ['RECITE-1', 'RECITE-2', 'RECITE-3', 'RECITE-4', 'RECITE-5', 'RECITE-6', 'RECITE-8', 'RECITE-9', 'RECITE-14', 'SEARCH-4', 'PREM-1', 'READ-2'],
     routes: ['QuranReader', 'ActiveRevision', 'Settings'],
     text: lines(
       '- Who has it: an iPhone, or Android from version 1.0.5, with the Madani 1405 mushaf (Settings → Mushaf and Recite → “Mushaf”): the reader’s bar and a session’s have a mic and an eye in place of the record button. It needs the internet: Revisely’s server checks the recitation; nobody listens.',
@@ -399,12 +399,14 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     // Mistake detection reached the store app with 1.0.5 (its lines are in GUIDE_SECTIONS). Strict stays Revisely Dev's
     // until it has a release of its own (Majd, Nov 17 2026).
     title: 'Only in Revisely Dev',
-    covers: ['SESS-8', 'LANG-2', 'RECITE-26', 'RECITE-27', 'RECITE-28', 'SET-5', 'ONBOARD-5'],
+    covers: ['SESS-8', 'LANG-2', 'RECITE-7', 'RECITE-26', 'RECITE-27', 'RECITE-28', 'SET-5', 'ONBOARD-5'],
     routes: ['Settings'],
     text: lines(
       '- Settings → Testing → “Preview onboarding”: the first setup’s screens on a blank account. It saves nothing.',
       '- Settings → Mushaf and Recite → “Mistakes to mark”: “Mistakes”, or “Strict (Beta)”, which also marks tajweed in violet: ghunnah, ikhfa, qalqalah, idgham (with and without ghunnah), iqlab, a natural madd dropped, “Madd munfasil” at 4 or 5 counts, a lazim madd held short, and “Madd ʿarid” once it’s set to a length. It doesn’t check “Madd muttasil”, munfasil at 2 counts or ikhfa of meem yet, so never say it checks every tajweed rule. It’s Beta: it can miss a slip or note a correct word, and notes never count in the score. The store app marks mistakes only.',
       '- Two tiers of marks (Majd, Nov 22 2026). Mistakes: a wrong, skipped or extra word, a wrong haraka and a wrong letter, each named for what it is on its card (“Wrong word”, “Wrong haraka”, “Wrong letter”, “Wrong shadda”), in the summary’s line (for example "1 wrong haraka, 1 wrong letter") and counted in the score; a wrong haraka or letter is a mistake like a wrong word, never a “slip”. Tajweed notes (Strict) are Beta: “(Beta)” after a note’s name, in the summary’s line and in Insights, and never counted. “Not clear” is neither: never a mistake, never counted. The colours are as before: red for words, amber for harakat and letters and Not clear, violet for tajweed.',
+      // The main guide's two lines on this go with the release's re-record of its replies.
+      '- “Recite the mistakes again” and "Recite your N mistakes here" are gone: never offer them. To work on a mistake, recite the passage again.',
       '- A take needs at least one ayah recited (or about a mushaf line of a very long one). Less isn’t kept.',
       '- The bar’s words show each word once it’s said, not as it begins.',
       '- “Test me” here is one spot test, not five places: a random verse, the page hidden but for it. They choose how far (½, 1, 2 or 3 pages) and carry on; it ends with “Hasbuk”, or is kept as “Stopped early”.',
@@ -446,7 +448,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['RMEM-8'],
     routes: ['QuranReader', 'ActivityDay', 'ActivityAll'],
     text: lines(
-      '- A take shown on its page (from a day’s “Recited”, “Recitations”, “This passage” or “Your takes here”) has its card at the bottom, “Your take · …”, with ▶ and Done. A tap on the card opens that take’s summary again as it ended: when, score, each mistake (a tap shows its card), similar ayahs, words peeked, marks called Not a mistake with Put back, words cleared, “This passage” and “Your progress here”; “Recite the mistakes again”, “Its day in Activity” and ⋯ “Delete this take”. No Recite again.',
+      '- A take shown on its page (from a day’s “Recited”, “Recitations”, “This passage” or “Your takes here”) has its card at the bottom, “Your take · …”, with ▶ and Done. A tap on the card opens that take’s summary again as it ended: when, score, each mistake (a tap shows its card), similar ayahs, words peeked, marks called Not a mistake with Put back, words cleared, “This passage” and “Your progress here”; “Its day in Activity” and ⋯ “Delete this take”. No Recite again.',
       '- Takes before Nov 22 2026 don’t show their peeked words or marks called Not a mistake (not kept then).',
     ),
   },

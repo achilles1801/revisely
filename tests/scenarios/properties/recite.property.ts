@@ -59,11 +59,11 @@ import { markFill } from '../../../src/components/reciteLive/markColours';
 import { markTitle } from '../../../src/lib/reciteLive/describe';
 import { coverHighlights, NOTHING_SHOWN, revealAyah, revealNextWord, wordShown } from '../../../src/lib/reciteLive/view';
 import { createMistakeCue, cuesMark, CUE_GAP_MS } from '../../../src/lib/reciteLive/mistakeCue';
-import { drillRange, lastWordOf, openDrill } from '../../../src/lib/reciteLive/drill';
 import { pickTest, testFinished, testStarts, wordPagesOn } from '../../../src/lib/reciteLive/testMe';
 import { TEST_LENGTHS } from '../../../src/lib/reciteLive/testLength';
 import { recordFromTake } from '../../../src/lib/reciteMemory/fromTake';
-import type { TakeRecord } from '../../../src/lib/reciteMemory/record';
+import { fromStored, toStored, type TakeRecord } from '../../../src/lib/reciteMemory/record';
+import { openInRange, wordMemories } from '../../../src/lib/reciteMemory/memory';
 import { ayahKey, ayahsBetween, ayahCount, nextAyah, suraOf, ayahOf, type AyahKey } from '../../../src/lib/ayahKeys';
 import { getJuzForPage } from '../../../src/lib/quranData';
 import { runs } from './fixtures';
@@ -449,37 +449,12 @@ describe('[RECITE-6] the hidden page: words show as recited, peeks are words sho
   });
 });
 
-/** Ayah order across surahs. */
-const order = (x: readonly [number, number]) => x[0] * 1000 + x[1];
-
-describe('[RECITE-7] Recite the mistakes again: from the ayah before the first mistake to the last mistake’s ayah', () => {
-  it('the stretch: tajweed notes left out, peeked ayahs in, the ayah before the first (in its surah); none without either', () => {
+describe('[RECITE-7] a take saved from the removed option still reads like any other', () => {
+  it('its record comes back from its document whole, with its marks, and they stay remembered on the page', () => {
     fc.assert(
-      fc.property(
-        pageArb.chain((p) => fc.tuple(fc.array(markArb(p), { maxLength: 8 }), fc.array(wordOn(p), { maxLength: 3 }))),
-        ([marks, peekedWords]) => {
-          const peeked = peekedWords.map((w) => [words.ref(w).sura, words.ref(w).ayah] as const);
-          const range = drillRange(marks, peeked);
-          const ayahs = [...marks.filter((m) => m.kind !== 'tajweed').map((m) => m.ayah), ...peeked];
-          if (ayahs.length === 0) {
-            expect(range).toBeNull();
-            return;
-          }
-          const first = ayahs.reduce((a, b) => (order(b) < order(a) ? b : a));
-          const last = ayahs.reduce((a, b) => (order(b) > order(a) ? b : a));
-          expect(range).toEqual({ from: [first[0], Math.max(1, first[1] - 1)], to: [last[0], last[1]] });
-          // It stops by itself at that ayah's last word.
-          expect(lastWordOf(words, range!)).toBe(words.verseRange(last[0], last[1])[1] - 1);
-        },
-      ),
-      { numRuns: runs(300) },
-    );
-  });
-
-  it('a page with remembered mistakes: one word each, over the same stretch', () => {
-    fc.assert(
-      fc.property(pageArb.chain((p) => fc.tuple(fc.constant(p), fc.array(markArb(p).map((m) => ({ ...m, sure: 'clear' as const })), { minLength: 1, maxLength: 8 }))), ([page, marks]) => {
+      fc.property(pageArb.chain((p) => fc.tuple(fc.constant(p), fc.array(markArb(p).map((m) => ({ ...m, sure: 'clear' as const })), { maxLength: 8 }))), ([page, marks]) => {
         const [from, to] = words.pageRange(page);
+        const unique = [...new Map(marks.map((m) => [m.id, m])).values()];
         const take: TakeRecord = {
           id: 'TakeOnThePage0000000',
           kind: 'take',
@@ -492,22 +467,20 @@ describe('[RECITE-7] Recite the mistakes again: from the ayah before the first m
           from,
           to: to - 1,
           secs: 60,
-          mistakes: marks.length,
+          mistakes: unique.length,
           tajweed: 0,
           unclear: 0,
           accuracy: 0.9,
-          marks,
+          marks: unique,
           passed: [],
           recordingId: null,
         };
-        const drill = openDrill([take], words, page);
-        const open = new Set(marks.filter((m) => m.kind !== 'tajweed').map((m) => m.w));
-        if (open.size === 0) {
-          expect(drill).toBeNull();
-          return;
-        }
-        expect(drill?.count).toBe(open.size);
-        expect(drill?.range).toEqual(drillRange(drill!.marks));
+        const back = fromStored(take.id, toStored(take)) as TakeRecord;
+        expect(back.marks.map((m) => [m.id, m.w, m.kind])).toEqual(unique.map((m) => [m.id, m.w, m.kind]));
+        expect([back.from, back.to, back.mistakes, back.accuracy]).toEqual([from, to - 1, unique.length, 0.9]);
+        const open = openInRange(wordMemories([back]), from, to).map((m) => m.w).sort((a, b) => a - b);
+        const expected = [...new Set(unique.filter((m) => m.kind !== 'tajweed').map((m) => m.w))].sort((a, b) => a - b);
+        for (const w of expected) expect(open).toContain(w);
       }),
       { numRuns: runs(150) },
     );

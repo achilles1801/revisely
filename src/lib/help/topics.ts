@@ -246,7 +246,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
   // `when: 'liveRecite'`: Recite is everyone's from 1.0.5, but only on a phone and print that have it.
   recite: {
     // Majd, Nov 15 2026: in line with what Revisely Dev's Recite does (highlights in three colours, Not clear, Undo
-    // and Put back, Hear it, Recite the mistakes again, the hidden view). Nov 16: anywhere in the Qur'an, a slip into a
+    // and Put back, Hear it, the hidden view). Nov 16: anywhere in the Qur'an, a slip into a
     // similar ayah, links to Recite's other sheets, and takes kept apart from recordings (RMEM-6).
     title: 'How Recite works',
     linked: true,
@@ -287,9 +287,9 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'repeat-outline',
         title: 'After the take',
         text:
-          '{{Recite the mistakes again}} goes over them once more; a slip into a similar ayah gets its own line. ' +
+          'A slip into a similar ayah gets its own line. ' +
           '[[more]] → {{Delete this take}} deletes it.',
-        covers: ['RECITE-7', 'RMEM-6'],
+        covers: ['RMEM-6'],
         when: 'liveRecite',
       },
     ],
@@ -324,7 +324,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         title: 'Peeked words',
         text:
           'Words you uncover stay grey for the take and never count in your score. ' +
-          'The summary lists them, and {{Recite the mistakes again}} takes them in.',
+          'The summary lists them.',
         covers: ['RECITE-6'],
         when: 'liveRecite',
       },
@@ -352,14 +352,6 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
           'A word you missed stays lightly highlighted until you say it right in two takes in a row, on two different ' +
           'days. Tap it for its history, or {{Clear now}}.',
         covers: ['RMEM-2', 'RMEM-3'],
-        when: 'liveRecite',
-      },
-      {
-        id: 'reciteMemory.drill',
-        icon: 'refresh',
-        title: 'Recite them again',
-        text: 'On a page with words still to fix, hold [[mic]] for "Recite your 3 mistakes here": one take over just that stretch.',
-        covers: ['RECITE-7'],
         when: 'liveRecite',
       },
       {

@@ -2,7 +2,7 @@
 //
 // A take from the reader's mic looks anywhere on the page on screen (protocol 6's `startBy`: the page's last ayah).
 // The others are given a span:
-// - Recite the mistakes again: a stretch from one ayah to another, from its first word, that stops by itself at its end.
+// - A spot test (RECITE-8): from a verse on to an ayah further on, that stops by itself at its end.
 // - A voice search's one result (Majd, Nov 15 2026: "take them to that page as if they're about to recite it"): the
 //   checker looks for the start only in the ayahs found, and the take goes on until Stop.
 

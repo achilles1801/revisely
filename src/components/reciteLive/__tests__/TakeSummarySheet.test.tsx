@@ -303,16 +303,16 @@ describe('[RMEM-8] a finished take’s summary opened again from its card', () =
     expect(within(screen.getByTestId('take-summary-recited')).getByText(/Its day in Activity/)).toBeTruthy();
   });
 
-  it('offers Recite the mistakes again when it has one, and the words peeked and Removed it kept', () => {
+  it('[RECITE-7] offers no take over its mistakes; it has the words peeked and Removed it kept', () => {
     const m = wrong(A23 + 3, [27, 23]);
     showPast({
       marks: [m],
-      onDrill: () => undefined,
       peeked: [{ ayah: [27, 24], words: [A23 + 25] }],
       removed: [{ ...m, id: 'gone', w: A23 + 5 }],
       onPutBack: () => undefined,
     });
-    expect(screen.getByTestId('take-summary-drill')).toBeTruthy();
+    expect(screen.queryByTestId('take-summary-drill')).toBeNull();
+    expect(screen.queryByText('Recite the mistakes again')).toBeNull();
     expect(screen.getByTestId('take-summary-peeked-row')).toBeTruthy();
     expect(screen.getByTestId('take-summary-removed-toggle')).toBeTruthy();
   });

@@ -623,14 +623,14 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   be showing the full word until the user maybe either starts the next word or we get a full match"; Nov 22: "it should
   be under one second max that it shows up"). Nothing is drawn on the word being said, still hidden (Majd's Dev take,
   Nov 22 2026: marking it showed where the next word was and how long, before it was said); the newest word shown is in
-  the following ink (RECITE-20), so the reciter always sees where they are. ‹ shows the next hidden word and ‹‹ the rest of its ayah: a word shown by hand is peeked, never counts in the score, and its
-  ayah joins Recite the mistakes again. While something else is said where the next word goes, that word's cover
+  the following ink (RECITE-20), so the reciter always sees where they are. ‹ shows the next hidden word and ‹‹ the rest of its ayah: a word shown by hand is peeked, never counts in the score. While something else is said where the next word goes, that word's cover
   turns red. It goes once the word is reached or said, the reciter goes back, or a mark lands on it (or an extra word
   just before it); it is never a mark and never counts.
-- **RECITE-7.** Recite the mistakes again is one take over the stretch from the ayah before the first mistake (in its
-  surah) to the last mistake's ayah. Tajweed notes are left out, and peeked ayahs are in. It stops by itself once
-  that ayah's last word is decided. Holding the mic on a page that still has remembered mistakes offers the same
-  stretch over them ("Recite your N mistakes here"), one each per word.
+- **RECITE-7.** (Revisely Dev) Nothing offers a take over just a take's mistakes (Majd, Nov 23 2026: "we should completely
+  get rid of the retry ur mistakes option everywhere -- it just doesn't make sense to be honest"). A take's summary, right
+  after it or opened again later, has no such button, and the held mic's menu has no row for the page's remembered
+  mistakes. A take saved from that option before it went is kept, and opens and reads like any other. Remembered
+  mistakes still show on the page and clear as in RMEM-2.
 - **RECITE-8.** Test me is one spot test at a time, with no next place (Majd, Nov 23 2026: "when people spot test they
   always recite one verse or give them one verse and then the person starts from that one verse and continues"; "there
   should only be one spot test at a time"). It gives one verse at random in what the account has memorized, or in one juz
@@ -737,7 +737,7 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   twice and none missed. A take cut mid-word (at the cap, or near it) counts and marks nothing past the last word it had
   decided: the word in flight is judged by neither take, never wrongly marked. Nothing on screen changes: the bar listens on, the clock runs on, every mark stays, and the
   cursor and a hidden page's words stay where the reciter was until the next take has found the place. Stop, ✕,
-  leaving the app or a drill's or a test's end never start a next take. The summary covers the whole recitation once
+  leaving the app or a test's end never start a next take. The summary covers the whole recitation once
   every take has its answer (a take whose answer doesn't come stands unfinished, RECITE-11), with one score, one
   recording and one record in Recite's memory, whose Not a mistake labels go to the take that judged the word. "Your
   recitation" on an earlier take's mark plays from the recitation's recording, while it lasts and after Stop (read from
@@ -901,11 +901,10 @@ Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's bigg
   - the words it cleared (RMEM-4), "This passage" (RMEM-7), and "Your progress here", whose line is the passage's trend up
     to and including this take (a later take isn't this take's progress); the progress page's Done comes back to it.
 
-  Its buttons: Recite the mistakes again with Premium (one take over its mistakes and peeked ayat, as right after it),
-  and Done, back to the take on its page; no Recite again. Under them "Its day in Activity" (or "In today's Recited")
+  Its button: Done, back to the take on its page; no Recite again. Under them "Its day in Activity" (or "In today's Recited")
   opens its day at its takes, and ⋯ has Delete this take. A take kept before Nov 22 2026 has no peeked words or marks
-  called Not a mistake to show: the record didn't keep them then. A take of Recite the mistakes again shows no
-  "Before:" line later, and no take of Recite alone is kept (RMEM-1), so none has a summary to open.
+  called Not a mistake to show: the record didn't keep them then. No take of Recite
+  alone is kept (RMEM-1), so none has a summary to open.
 
 ## Searching the Qur'an
 

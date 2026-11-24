@@ -274,14 +274,6 @@ until its part is set up.
     It works until the take is closed, and has no button when the moment isn't known (E2E's recorded take has no audio).
     The clip is a WAV in the caches folder (`lib/reciteLive/clipFile`), on this phone only. A past take's ▶ (Recite's
     memory, `clipOfTake`) still plays a moment around one time: its record keeps no time for every word.
-  - **Recite the mistakes again** (Majd, Nov 15 2026; `lib/reciteLive/drill`): a Check summary with a mark other than
-    tajweed offers one take over the stretch from the ayah before the first mistake (same surah) to the last mistake's
-    ayah (`s2`/`a2`, no `startBy`). It stops by itself once `said` reaches the stretch's last word (reciting on would
-    add "Extra word after the end" marks), and its summary says "Before: …" (what the take before found there).
-    - **From the page** (Nov 16 2026; `openDrill`): with Premium, holding the mic on a page that still has words to fix
-      in Recite's memory (open until two right takes on two days; tajweed notes left out) adds "Recite your N mistakes
-      here" under the stretch's name. The same kind of take, over the stretch that holds those words; "Before: …" is
-      each word's latest wrong try. On a phone that hasn't seen the notice, the notice comes first, then that stretch.
   - **Where a slip went** (`into`, contract draft 6; Majd said yes, Nov 15 2026; live on the checker since #617/#618):
     the final answer can name, on the first skipped or wrong word of a run, the similar ayah the reciter went on with,
     or (`ending`) the ayah whose ending they used. The summary gives each a row under its head ("You continued with
@@ -329,7 +321,7 @@ until its part is set up.
       the mic also sends `startIn: "quran"`. When the page doesn't match, the checker looks in the whole Qur'an and locks
       only on a place it is sure is the one (`locked.where: "quran"`); the reader turns there (the cursor's page turn),
       VoiceOver hears "Started at …", and a Sentry breadcrumb notes it (numbers only; the checker keeps where every kept
-      take locked). Drills, Test me places and a voice search's ayahs never send it. Older checkers ignore it. It fits up
+      take locked). Spot tests and a voice search's ayahs never send it. Older checkers ignore it. It fits up
       to 35 s of speech while it searches (50 s at most), and a long run (8 words, one heard wrong) locks too: 2:255 and
       3:2 share their first seven words.
     - Nothing before the start is skipped, and the summary counts from the start.
@@ -409,10 +401,8 @@ until its part is set up.
     only the words of the ayah not yet shown) stay in quiet grey ink on the page while the take lasts, shown or
     hidden, recited or not: a veil of the page's colour over their ink (`peekVeil` in `theme/readPalette`), never over
     a word with a mistake (its highlight shows as it is). Grey, not amber: amber is a slip. The summary says "3 words
-    peeked" and lists each ayah's peeked words in a row (a tap shows it on the page). Recite the mistakes again takes
-    in their ayahs (offered for peeks alone too; its summary's "Before:" counts them). Peeks never count in the score
-    (the checker counts them as `helped`). In Test me a place said to its end with a peek is "1 word peeked", not
-    clean. The words Test me shows to start a place aren't peeks.
+    peeked" and lists each ayah's peeked words in a row (a tap shows it on the page). Peeks never count in the score
+    (the checker counts them as `helped`). The verse Test me shows to start from isn't a peek.
 
 ## Native code for Revisely Dev only: `modules-dev/` (Recite on the phone, Nov 23 2026)
 
