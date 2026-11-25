@@ -54,7 +54,6 @@ export const revo: NonNullable<ArStrings['revo']> = {
   composer: {
     placeholder: 'اسأل ⁨Revo⁩ عن أي شيء',
     send: 'إرسال',
-    dictate: 'الإملاء بلوحة المفاتيح',
   },
   month: {
     revised: 'المراجعة',
