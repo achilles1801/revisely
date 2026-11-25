@@ -1,8 +1,8 @@
 {
   "repo": "achilles1801/revisely-engine-releases",
-  "version": "0.2.1",
-  "tag": "recite-core-v0.2.1",
-  "asset": "recite-core-0.2.1.zip",
-  "sha256": "e4ad2b905fbe8b3f95bea87d1168c20f80f575a6981a8bc550556498bfc8db3b",
+  "version": "0.2.2",
+  "tag": "recite-core-v0.2.2",
+  "asset": "recite-core-0.2.2.zip",
+  "sha256": "c639c33163479f41af82072df76a994d5638451983065a0b5e0e29b3bc402e30",
   "abi": 1
 }
