@@ -9,7 +9,7 @@
  *
  * The usual way, one command from the functions/ directory, after `npm run build`:
  *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-dev-admin.json node scripts/recite-pack-make.js --lab [--dry]
- * It takes the lab's standard files (runs/mobile/models, golden/pack-v4, golden/pack-strict), refuses a table that isn't
+ * It takes the lab's standard files (runs/mobile/models, golden/pack-v5, golden/pack-strict), refuses a table that isn't
  * its manifest's or a model that isn't in the private checker/marks.json, and works the id out from the files' hashes:
  * a changed file is a new version, and the same files are "already current". Phones move to it at their next daily check.
  *
@@ -52,7 +52,7 @@ const CORE_NEEDS = ['v7.graph.onnx', 'v7.weights.f16', 'v7.weights.json', 'v7.ch
 const STRICT_NEEDS = ['v5.graph.onnx', 'v5.weights.f16', 'v5.weights.json', 'v5.check', 'strict.bin'];
 const BLOB_NAMES = new Set([...CORE_NEEDS, ...STRICT_NEEDS]);
 /** The lab's tables. A pack folder is never remade in place: a new one sits beside the others under its own name. */
-const TABLES_FOLDER = 'golden/pack-v4';
+const TABLES_FOLDER = 'golden/pack-v5';  // pack-v4 with the off-script switches on (engine 0.2.2)
 
 /** Revisely Dev's iOS and Android apps (handbook/dev-stack.md): the App Check ids a --lab pack is for. */
 const DEV_APPS = ['1:433792838929:ios:854e01f457f27d29bbf0b0', '1:433792838929:android:5c8c71d0893a4fe3bbf0b0'];
