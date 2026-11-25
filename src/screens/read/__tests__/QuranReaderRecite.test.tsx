@@ -953,6 +953,21 @@ describe('a take starts anywhere on the page (Majd, Nov 14 2026)', () => {
     expect(mockPager.scrolled).toEqual([378]);
   });
 
+  it('[RECITE-30] the page’s last ayah said: the next page shows at once and waits', async () => {
+    await startTake('recite', null);
+    await event({ type: 'locked', w: A25, s: 27, a: 25 });
+    const page = words.pageOf(A25);
+    const last = words.pageRange(page)[1] - 1;
+    await event({ type: 'at', w: last });
+    expect(mockPager.scrolled).toEqual([]);
+    await event({ type: 'said', upTo: last });
+    expect(mockPager.scrolled).toEqual([page + 1]);
+    // The reciter then begins the next page: nothing more turns.
+    await event({ type: 'at', w: last + 1 });
+    await event({ type: 'said', upTo: last + 1 });
+    expect(mockPager.scrolled).toEqual([page + 1]);
+  });
+
   it('nothing before the start is skipped, and the summary names the passage from where the reciter started', async () => {
     await startTake('check', null);
     await event({ type: 'locked', w: A25, s: 27, a: 25 });

@@ -1,4 +1,4 @@
-// Recite in a revision session (BEHAVIOUR.md, RECITE-9): the real session screen, opened from Home, in Revisely Dev (the
+// Recite in a revision session (BEHAVIOUR.md, RECITE-9, RECITE-30): the real session screen, opened from Home, in Revisely Dev (the
 // live check's gate: the Dev app, a tester, the microphone stream), against the emulators. The checker is a stand-in at
 // its socket (lib/reciteLive/socket), the outermost edge of an outside service: the scenario sends what it says.
 
@@ -29,7 +29,7 @@ jest.mock('../../../src/lib/reciteLive/socket', () => ({
 
 const say = (app: OpenApp, e: LiveEvent) => app.act(async () => mockChecker.onEvent?.(e));
 
-it('[RECITE-9] [SESS-1] a take in a session turns its pages with the reciter and marks none; a swipe still marks the page it leaves', async () => {
+it('[RECITE-9] [RECITE-30] [SESS-1] a take in a session turns its pages with the reciter and marks each page they finish; a swipe still marks the page it leaves', async () => {
   setZone(ZONES.kolkata);
   setNow('2026-11-17 20:00');
   const phone = new Phone();
@@ -61,18 +61,22 @@ it('[RECITE-9] [SESS-1] a take in a session turns its pages with the reciter and
   });
   await app.until(() => mockChecker.start != null, 'the take to start');
 
-  // The checker finds the reciter at Al-Fatihah 1 and follows them into Al-Baqarah on the next page: the page turns.
+  // The checker finds the reciter at Al-Fatihah 1. Once Al-Fatihah's last word is said, page 2 shows before a word of it
+  // (RECITE-30), and page 1, finished, is marked revised (RECITE-9).
   const words = fixture.quranWords();
   await say(app, { type: 'ready', take: 't1', protocol: 6 });
   await say(app, { type: 'locked', w: words.verseFirstWord(1, 1), s: 1, a: 1 });
-  await say(app, { type: 'at', w: words.verseFirstWord(2, 2) });
+  const last1 = words.pageRange(1)[1] - 1;
+  await say(app, { type: 'at', w: last1 });
+  expect(session.current()).toBe(1);
+  await say(app, { type: 'said', upTo: last1 });
   await app.until(() => session.current() === 2, 'the take to turn to page 2');
 
-  // A swipe on, during the take: the page it leaves is marked, as always. Page 1, turned by the take, isn't.
+  // A swipe on, during the take: the page it leaves is marked, as always.
   await session.swipe();
   expect(session.current()).toBe(3);
   await session.back();
   await app.untilSynced();
-  expect(app.app.logs.map((l) => [l.date, l.pagesRevised])).toEqual([['2026-11-17', [2]]]);
+  expect(app.app.logs.map((l) => [l.date, l.pagesRevised])).toEqual([['2026-11-17', [1, 2]]]);
   await app.close();
 });

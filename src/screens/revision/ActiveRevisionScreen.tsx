@@ -271,9 +271,11 @@ export default function ActiveRevisionScreen() {
   }, [dismissHint, toggleChrome]);
 
   // ===== Recite: the reader's mic, on the day's pages (Revisely Dev; components/reciteLive/useReciteLayer) =====
-  // The same mic, menu, take bar, marks, hidden view, cards and summary as the reader (Majd, Nov 17 2026). A take never
-  // marks a page revised (RECITE-9): it turns pages with the pager's scrollToPage, which never reports an advance, so
-  // only a swipe or the Pages sheet marks one (SESS-1). Its page turns stay on the day's pages; a place the session doesn't hold (a
+  // The same mic, menu, take bar, marks, hidden view, cards and summary as the reader (Majd, Nov 17 2026). A take turns
+  // pages with the pager's scrollToPage, which never reports an advance; when the reciter goes on past a page to the
+  // session's next one, the take marks the page left revised, as a swipe off it does (RECITE-9; Majd, Nov 25 2026: "when
+  // i get to the next page (as it takes me there automatically) it should auto mark the page as revised"). A jump (a
+  // mark's page, the summary) marks nothing. Its page turns stay on the day's pages; a place the session doesn't hold (a
   // similar ayah, a past take) opens in the reader over it, and Back comes back here.
   const pageOnScreen =
     currentPageNumber ??
@@ -297,9 +299,12 @@ export default function ActiveRevisionScreen() {
     ({ page, highlight, showTake }: ElsewherePlace) => navigation.push('QuranReader', { pageNumber: page, highlight, showTake }),
     [navigation],
   );
+  // Set once markRevised exists (below): the take moved on from `from` to the session's next page.
+  const recitedPastRef = useRef<(from: number, to: number) => void>(() => undefined);
   const recite = useReciteLayer({
     currentPage: recitePage,
     showPage: (page: number) => pagerRef.current?.scrollToPage(page) ?? false,
+    onRecitedPast: (from: number, to: number) => recitedPastRef.current(from, to),
     openElsewhere,
     day: sessionDay,
     focused: isScreenFocused,
@@ -522,6 +527,14 @@ export default function ActiveRevisionScreen() {
       return next;
     });
   }, []);
+
+  // ===== A take that goes on to the next page credits the page left (RECITE-9) =====
+  // Quietly: the strip's bar fills and "Revised" shows, with no note over the take (✓ or the Pages sheet takes it back).
+  recitedPastRef.current = (from: number, to: number) => {
+    const at = shownPages.indexOf(from);
+    if (at < 0 || shownPages[at + 1] !== to || !assignedPages.includes(from)) return;
+    markRevised(from);
+  };
 
   // ===== Swipe-to-credit =====
 

@@ -409,7 +409,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     // Mistake detection reached the store app with 1.0.5 (its lines are in GUIDE_SECTIONS). Strict stays Revisely Dev's
     // until it has a release of its own (Majd, Nov 17 2026).
     title: 'Only in Revisely Dev',
-    covers: ['SESS-8', 'LANG-2', 'RECITE-7', 'RECITE-26', 'RECITE-27', 'RECITE-28', 'RECITE-29', 'SET-5', 'ONBOARD-5'],
+    covers: ['SESS-8', 'LANG-2', 'RECITE-7', 'RECITE-26', 'RECITE-27', 'RECITE-28', 'RECITE-29', 'RECITE-30', 'SET-5', 'ONBOARD-5'],
     routes: ['Settings'],
     text: lines(
       '- Settings → Testing → “Preview onboarding”: the first setup’s screens on a blank account. It saves nothing.',
@@ -418,6 +418,8 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       // The main guide's two lines on this go with the release's re-record of its replies.
       '- “Recite the mistakes again” and "Recite your N mistakes here" are gone: never offer them. To work on a mistake, recite the passage again.',
       '- A take needs at least one ayah recited (or about a mushaf line of a very long one). Less isn’t kept.',
+      // The main guide's line on a take in a session goes with the release's re-record of its replies.
+      '- In a session, going on to the next page while reciting marks the page they finished revised, as a swipe does (✓ or “Pages” takes it back); a jump to a mark’s page marks nothing. Once a page’s last ayah is said, the next page shows and waits for them.',
       '- The bar writes each word once they’ve said it, in the order said: a repeat or going back shows again, and nothing ahead of their voice.',
       '- “Test me” here is one spot test, not five places: a random verse, the page hidden but for it. They choose how far (½, 1, 2 or 3 pages) and carry on; it ends with “Hasbuk”, or is kept as “Stopped early”.',
       '- Settings → Mushaf and Recite → “Keep my recitations as test data” (on unless turned off) keeps each take and its result for Revisely’s tests; software checks them, nobody listens. Any account that recites has it, tester or not. Settings → Testing → “Premium” turns Premium off to see Mark mistakes locked.',

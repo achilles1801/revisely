@@ -935,7 +935,7 @@ describe('ActiveRevisionScreen — Recite (Revisely Dev)', () => {
     expect(screen.queryByText('Test me')).toBeNull();
   });
 
-  it('[RECITE-9] a take turns the session’s pages but marks none; a page the session doesn’t hold isn’t turned to', async () => {
+  it('[RECITE-9] a take turns the session’s pages and marks the page the reciter went on from; a page the session doesn’t hold isn’t turned to', async () => {
     await live();
     fireEvent.press(screen.getByTestId('recite-mic'));
     await flush();
@@ -948,16 +948,62 @@ describe('ActiveRevisionScreen — Recite (Revisely Dev)', () => {
     const on380 = words.pageRange(380)[0] + 3;
     await event({ type: 'at', w: on380 });
     expect(mockPager.scrolled).toEqual([380]);
+    // The reciter went on from page 379: it is marked revised, as a swipe off it would; 380, on screen, isn't yet.
+    expect(pagesSheet().props.done.has(379)).toBe(true);
+    expect(hereIsMarked()).toBe(false);
     // Past the session's last page: the page stays.
     await event({ type: 'at', w: words.pageRange(381)[0] + 3 });
     expect(mockPager.scrolled).toEqual([380]);
-    // Nothing marked revised: page 380 isn't checked, and Back saves nothing (SESS-3).
-    expect(hereIsMarked()).toBe(false);
     await act(async () => {
       fireEvent.press(screen.getByLabelText('Back'));
     });
-    expect(mockApp.addLog).not.toHaveBeenCalled();
-    expect(mockApp.updatePages).not.toHaveBeenCalled();
+    expect(mockApp.addLog).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [379] }));
+  });
+
+  it('[RECITE-9] a take that first finds the reciter on the next page turns there but marks nothing', async () => {
+    await live();
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    await flush();
+    await flush();
+    await event({ type: 'ready', take: 't1', protocol: 6 });
+    // Found on page 380 straight away: nothing was recited on 379.
+    const on380 = words.pageRange(380)[0] + 3;
+    await event({ type: 'locked', w: on380, s: 27, a: 0 });
+    expect(mockPager.scrolled).toEqual([380]);
+    expect(pagesSheet().props.done.has(379)).toBe(false);
+  });
+
+  it('[RECITE-30] the page’s last ayah said: the page turns to the next one at once, before a word of it, and marks the page left', async () => {
+    await live();
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    await flush();
+    await flush();
+    await event({ type: 'ready', take: 't1', protocol: 6 });
+    await event({ type: 'locked', w: A23, s: 27, a: 23 });
+    const last379 = words.pageRange(379)[1] - 1;
+    await event({ type: 'at', w: last379 });
+    expect(mockPager.scrolled).toEqual([]);
+    // The checker says the last word is said: the next page shows and waits for the reciter.
+    await event({ type: 'said', upTo: last379 });
+    expect(mockPager.scrolled).toEqual([380]);
+    expect(pagesSheet().props.done.has(379)).toBe(true);
+    // Their place reaching page 380 then turns nothing more, and once only.
+    await event({ type: 'at', w: words.pageRange(380)[0] });
+    await event({ type: 'said', upTo: words.pageRange(380)[0] });
+    expect(mockPager.scrolled).toEqual([380]);
+  });
+
+  it('[RECITE-30] the last ayah said on the session’s last page: nothing turns', async () => {
+    await live([379]);
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    await flush();
+    await flush();
+    await event({ type: 'ready', take: 't1', protocol: 6 });
+    await event({ type: 'locked', w: A23, s: 27, a: 23 });
+    const last379 = words.pageRange(379)[1] - 1;
+    await event({ type: 'at', w: last379 });
+    await event({ type: 'said', upTo: last379 });
+    expect(mockPager.scrolled).toEqual([]);
   });
 });
 

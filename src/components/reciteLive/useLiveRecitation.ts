@@ -219,6 +219,7 @@ export function useLiveRecitation({
   settings,
   currentPage,
   onShowPage,
+  onRecitedPast,
   recordingDay = null,
   onRecordingSaved,
   connect = defaultConnect,
@@ -227,6 +228,12 @@ export function useLiveRecitation({
   currentPage: number;
   /** Turns the screen to a page; false when it doesn't hold that page (a session's pager holds its day's alone). */
   onShowPage: (page: number) => boolean | void;
+  /**
+   * The take turned the page because the reciter went on past it: their place moved on from a word of `from`, or `from`'s
+   * last ayah was said (RECITE-30). A session marks `from` revised, as a swipe off it does (RECITE-9). A turn to where the
+   * checker first found the reciter, or to a page shown by hand, isn't one.
+   */
+  onRecitedPast?: (from: number, to: number) => void;
   /** The revision day a take's audio belongs to (null: nothing is kept). */
   recordingDay?: string | null;
   /** A take's audio was saved (its record notes it). */
@@ -333,6 +340,8 @@ export function useLiveRecitation({
   pageRef.current = currentPage;
   const onShowPageRef = useRef(onShowPage);
   onShowPageRef.current = onShowPage;
+  const onRecitedPastRef = useRef(onRecitedPast);
+  onRecitedPastRef.current = onRecitedPast;
   const [owner] = useState(() => `recite-live-${Math.random().toString(36).slice(2)}`);
   const recordingRef = useRef<TakeRecording | null>(null);
   const [recording, setRecording] = useState(false);
@@ -1123,19 +1132,47 @@ export function useLiveRecitation({
 
   // The reciter's place turns the page.
   const live = state.status === 'listening';
-  useEffect(() => {
-    if (!live || state.cursor == null || !words) return;
-    const page = words.pageOf(state.cursor);
-    if (page !== pageRef.current) {
-      turningTo.current = page;
-      // A page the screen doesn't hold (past a session's last page) isn't turned to: nothing to wait for.
-      if (onShowPageRef.current(page) === false) turningTo.current = null;
+  /** The page of the reciter's place as last shown (null before the checker has found them, or after a page turned by hand). */
+  const cursorPage = useRef<number | null>(null);
+  const turnTo = useCallback((page: number, recitedPast: boolean) => {
+    const from = pageRef.current;
+    turningTo.current = page;
+    // A page the screen doesn't hold (past a session's last page) isn't turned to: nothing to wait for.
+    if (onShowPageRef.current(page) === false) {
+      turningTo.current = null;
+      return;
     }
-  }, [live, state.cursor, words]);
+    if (recitedPast && page > from) onRecitedPastRef.current?.(from, page);
+  }, []);
+  useEffect(() => {
+    if (!live || state.cursor == null || !words) {
+      if (!live) cursorPage.current = null;
+      return;
+    }
+    const page = words.pageOf(state.cursor);
+    const was = cursorPage.current;
+    cursorPage.current = page;
+    if (page !== pageRef.current) turnTo(page, was === pageRef.current);
+  }, [live, state.cursor, words, turnTo]);
+
+  // The page's last ayah said: the page turns to the next one and waits for the reciter (RECITE-30; Majd, Nov 25 2026:
+  // "when i finish reciting the last verse it should automatically take me to the next page and wait for me to begin if
+  // i didn't already"). Once, as `said` reaches that last word with the reciter's place on the page. A stretch with an
+  // end of its own (a spot test) stops there instead.
+  const saidUpTo = state.saidUpTo;
+  const saidBefore = useRef<number | null>(null);
+  useEffect(() => {
+    const before = saidBefore.current;
+    saidBefore.current = live ? saidUpTo : null;
+    if (!live || saidUpTo == null || !words || endWord.current != null) return;
+    const page = pageRef.current;
+    if (cursorPage.current !== page || page >= 604) return;
+    const last = words.pageRange(page)[1] - 1;
+    if (saidUpTo >= last && (before == null || before < last)) turnTo(page + 1, true);
+  }, [live, saidUpTo, words, turnTo]);
 
   // A spot test stops by itself once the checker has decided its last word (reciting on would add "Added after the
   // end" marks).
-  const saidUpTo = state.saidUpTo;
   useEffect(() => {
     const end = endWord.current;
     if (end == null || !live || saidUpTo == null || saidUpTo < end) return;
@@ -1154,6 +1191,7 @@ export function useLiveRecitation({
       turningTo.current = null;
       return;
     }
+    cursorPage.current = null;
     if (!conn.current || !words || state.status !== 'listening') return;
     const w = words.pageRange(currentPage)[0];
     // The current take's checker (a long recitation's next take may still be starting: it looks on this page instead).

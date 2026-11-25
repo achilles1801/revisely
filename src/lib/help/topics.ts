@@ -185,7 +185,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         title: 'Reciting',
         text:
           '[[mic]] records you; hold it and choose {{Recite}}, and the page follows you. ' +
-          'A take never marks a page revised: swipe on or mark it in [[pages]].',
+          'Going on to the next page marks the one you finished revised; [[pages]] takes it back.',
         covers: ['RECITE-9'],
         when: 'liveRecite',
       },
