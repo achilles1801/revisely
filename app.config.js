@@ -7,6 +7,9 @@ import 'dotenv/config';
 // fingerprint hashes the resolved config, not this file, so production's runtime doesn't move. Keep
 // it that way: a dev-only plugin or value goes behind DEV, never into the store app's config.
 const DEV = process.env.APP_VARIANT === 'dev';
+// The microphone's purpose string (iPhone), the app's own, for expo-audio and Revisely Dev's speech module alike.
+const MIC_TEXT =
+  "Revisely uses the microphone to record your recitation, follow along and mark your mistakes as you recite, and search the Quran by voice. Following along and marking mistakes send your recitation's audio to Revisely's server; voice search stays on this iPhone.";
 const BUNDLE_ID = DEV ? "com.revisionbuddy.app.dev" : "com.revisionbuddy.app";
 const APP_GROUP = DEV ? "group.com.revisionbuddy.app.dev" : "group.com.revisionbuddy.app";
 const SCHEME = DEV ? "revisely-dev" : "revisely";
@@ -186,8 +189,7 @@ export default {
       [
         "expo-audio",
         {
-          microphonePermission:
-            "Revisely uses the microphone to record your recitation, follow along and mark your mistakes as you recite, and search the Quran by voice. Following along and marking mistakes send your recitation's audio to Revisely's server; voice search stays on this iPhone.",
+          microphonePermission: MIC_TEXT,
           recordAudioAndroid: false,
         },
       ],
@@ -211,8 +213,22 @@ export default {
         }
       ],
       // Revisely Dev only: its widget reads its own App Group and opens revisely-dev:// links, and the native modules
-      // in modules-dev/ (Recite on the phone) are linked into its builds alone.
-      ...(DEV ? ["./plugins/withDevVariant", "./plugins/withDevModules"] : [])
+      // in modules-dev/ (Recite on the phone, Revo's mic) are linked into its builds alone.
+      ...(DEV
+        ? [
+            "./plugins/withDevVariant",
+            "./plugins/withDevModules",
+            [
+              // Revo's mic (REVO-42): the speech module's own plugin, iPhone's speech recognition text and Android's
+              // RECORD_AUDIO and recognizer queries. The microphone's text stays the app's own.
+              "./modules-dev/expo-speech-recognition/app.plugin.js",
+              {
+                microphonePermission: MIC_TEXT,
+                speechRecognitionPermission: "Revisely turns what you say into text when you speak a question to Revo. Nothing is saved unless you send it."
+              }
+            ]
+          ]
+        : [])
     ],
     extra: {
       firebase: {

@@ -5,13 +5,15 @@ import { useTheme } from '../../context/ThemeContext';
 import type { RevoAttachment } from '../../lib/revo/types';
 import { Tap } from '../v2/Tap';
 import { ContextChip } from './RevoParts';
+import { useDictation } from './useDictation';
 import { t } from '../../i18n';
 
 export const QUESTION_MAX = 600;
 
 /**
- * Where the user asks: + (Add to chat: RevoAddSheet), the field ("Ask Revo anything", ending in send;
- * dictation is the keyboard's own mic key), and what's attached as chips above it, each with ×. Off (`disabled`) when the
+ * Where the user asks: + (Add to chat: RevoAddSheet), the field ("Ask Revo anything"), and what's attached as chips
+ * above it, each with ×. The field ends in its mic while it's empty, where the build has the speech module (REVO-42:
+ * Revisely Dev until the native release), and in send otherwise. Off (`disabled`) when the
  * day's questions are used: 45% and the placeholder says when Revo is back.
  */
 export function RevoComposer({
@@ -37,11 +39,20 @@ export function RevoComposer({
   const [text, setText] = useState('');
   const input = useRef<TextInput>(null);
   const canSend = !disabled && !busy && text.trim().length > 0;
+  const speech = useDictation((heard) => setText(heard.slice(0, QUESTION_MAX)));
   const send = () => {
     if (!canSend) return;
+    speech.stop();
     onSend(text.trim());
     setText('');
   };
+  const placeholder = disabled
+    ? disabledText
+    : speech.listening
+      ? t('revo.composer.listening')
+      : speech.denied
+        ? t('revo.composer.speechDenied')
+        : t('revo.composer.placeholder');
   return (
     <View style={[styles.wrap, disabled && styles.off]}>
       {attachments.length > 0 ? (
@@ -71,7 +82,7 @@ export function RevoComposer({
             value={text}
             onChangeText={(value) => setText(value.slice(0, QUESTION_MAX))}
             editable={!disabled}
-            placeholder={disabled ? disabledText : t('revo.composer.placeholder')}
+            placeholder={placeholder}
             placeholderTextColor={palette.secondary}
             style={[styles.input, { color: palette.text }]}
             multiline
@@ -83,17 +94,41 @@ export function RevoComposer({
             accessibilityLabel={t('revo.composer.placeholder')}
             testID="revo-input"
           />
-          {/* Send, grey until there is a question (REVO-42: no mic; the keyboard's own mic key dictates). */}
-          <Tap
-            onPress={send}
-            disabled={!canSend}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={t('revo.composer.send')}
-            testID="revo-send"
-          >
-            <Ionicons name="arrow-up-circle" size={30} color={canSend ? palette.primary : palette.secondary} />
-          </Tap>
+          {speech.listening ? (
+            <Tap
+              onPress={speech.stop}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('revo.composer.stopDictating')}
+              testID="revo-dictate-stop"
+            >
+              <Ionicons name="stop-circle" size={30} color={palette.primary} />
+            </Tap>
+          ) : speech.available && text.trim().length === 0 ? (
+            // REVO-42: speak the question; the words appear in the field as they're heard
+            <Tap
+              onPress={() => speech.start(text)}
+              disabled={disabled}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('revo.composer.dictate')}
+              testID="revo-mic"
+            >
+              <Ionicons name="mic-outline" size={22} color={palette.secondary} />
+            </Tap>
+          ) : (
+            // send, grey until there is a question
+            <Tap
+              onPress={send}
+              disabled={!canSend}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('revo.composer.send')}
+              testID="revo-send"
+            >
+              <Ionicons name="arrow-up-circle" size={30} color={canSend ? palette.primary : palette.secondary} />
+            </Tap>
+          )}
         </View>
       </View>
     </View>

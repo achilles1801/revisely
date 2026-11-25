@@ -30,6 +30,8 @@ export default defineConfig([
     'modules/**',
     // Node scripts that run at build time and their tests, not app code (the on-device engine's fetch).
     'modules-dev/recite-engine/core/**',
+    // Vendored as published (expo-speech-recognition, Revo's mic), not our code.
+    'modules-dev/expo-speech-recognition/**',
     'plugins/**',
     'scripts/**',
     'store/**',
