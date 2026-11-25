@@ -601,6 +601,25 @@ describe('[SET-1] Settings: a short first level, a page per group', () => {
     expect(screen.getByTestId('settings-delete-account')).toBeTruthy();
   });
 
+  it('Revision says the schedule’s amount, and its first row, Schedule, says what Edit schedule says and opens it', async () => {
+    // 110 pages memorized, 10 a day: every page comes round every 11 days.
+    mockPages = Array.from({ length: 110 }, (_, i) => ({ pageNumber: 495 + i, status: 'memorized' }));
+    Object.assign(mockUser, { dailyPageCapacity: 10, scheduleMode: 'pages', customPlan: null, scheduleAnchorDate: '2026-11-01T12:00:00' });
+    try {
+      await renderV2();
+      expect(screen.getByTestId('settings-page-revision').props.accessibilityLabel).toBe('Revision, 10 pages a day');
+      await renderV2('revision');
+      const row = screen.getByTestId('settings-schedule');
+      expect(row.props.accessibilityLabel).toContain('Schedule');
+      expect(screen.getByText('10 pages a day')).toBeTruthy();
+      expect(screen.getByText('Every page comes round every 11 days')).toBeTruthy();
+      fireEvent.press(row);
+      expect(mockNavigation.navigate).toHaveBeenCalledWith('PlanEdit');
+    } finally {
+      mockPages = [];
+    }
+  });
+
   it("a Settings section (Revo's openScreen, Insights' Turn on Smart Tracking) opens the page that holds it", async () => {
     await renderV2(undefined, { section: 'notifications' });
     expect(screen.getByText('Reminders')).toBeTruthy();

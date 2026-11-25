@@ -174,6 +174,7 @@ export const settings = {
     qibla: 'Qibla',
   },
   revision: {
+    schedule: 'Schedule',
     smartTracking: 'Smart Tracking',
     smartTrackingOff: 'Turn on to rate pages from the session menu and see personalized insights.',
     speechModel: 'Speech model',

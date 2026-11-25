@@ -102,7 +102,9 @@ import { earlyAccessLine, useEarlyAccess } from '../../lib/earlyAccess';
 import { checkLevel, maddChecked, setReciteCheckSettings, strictOffered, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { TEST_LENGTHS, type TestLength } from '../../lib/reciteLive/testLength';
 import { getJuzForPage } from '../../lib/quranData';
+import { getRevisionDateForUser } from '../../lib/fajrBoundary';
 import { revisablePages } from '../../lib/memorizedAyahs';
+import { scheduleSummary } from '../../lib/scheduleSummary';
 import { ReciteCheckNotice } from '../../components/reciteCheck/ReciteCheckNotice';
 import { currentLanguage, t, formatNumber } from '../../i18n';
 import {
@@ -283,6 +285,8 @@ export default function SettingsScreen() {
   useEffect(() => {
     if (user) setLocalUser(user);
   }, [user]);
+  // Revision's first row, Schedule (SET-1; Majd, Nov 25 2026): the schedule in Edit schedule's own words.
+  const schedule = useMemo(() => (user ? scheduleSummary(user, revisablePages(pages ?? []), getRevisionDateForUser(user)) : null), [user, pages]);
   const [showNameModal, setShowNameModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [resetSheet, setResetSheet] = useState(false);
@@ -682,7 +686,7 @@ export default function SettingsScreen() {
               </Tap>
             ) : null}
             <Section>
-              <Row icon="analytics-outline" label={t('settings.sections.revision')} value={localUser.smartTrackingEnabled ? t('settings.root.smartOn') : t('settings.root.smartOff')} onPress={() => openPage('revision')} testID="settings-page-revision" />
+              <Row icon="analytics-outline" label={t('settings.sections.revision')} value={schedule?.perDay ?? (localUser.smartTrackingEnabled ? t('settings.root.smartOn') : t('settings.root.smartOff'))} onPress={() => openPage('revision')} testID="settings-page-revision" />
               <Row icon="alarm-outline" label={t('settings.sections.reminders')} value={remindersSummary(remindersOn, prayerEnabled ? prayerOn : 0)} onPress={() => openPage('reminders')} testID="settings-page-reminders" />
               {prayerEnabled ? (
                 <Row icon="time-outline" label={t('settings.sections.prayer')} value={prayerValue} onPress={() => openPage('prayer')} testID="settings-page-prayer" />
@@ -761,6 +765,15 @@ export default function SettingsScreen() {
         ) : null}
         {page === 'revision' ? (
           <Section>
+            {/* Edit schedule, where people look for settings (Majd, Nov 25 2026: "the most intuitive is to just put it in settings"). */}
+            <Row
+              icon="calendar-outline"
+              label={t('settings.revision.schedule')}
+              subtitle={schedule?.repeats}
+              value={schedule?.perDay}
+              onPress={() => navigation.navigate('PlanEdit')}
+              testID="settings-schedule"
+            />
             <View style={v2.iconRow} testID="smart-tracking-row">
               <SettingIcon name="analytics-outline" />
               <View style={v2.iconRowText}>

@@ -11,7 +11,7 @@ import { prepare, type FactSources } from '../facts';
 import { nextPlaceOpens, readPlaceOpens } from '../greeting';
 import { placeFacts, revoOpener, type PlaceFacts } from '../openers';
 import { placeKey, resetRevoPlaceForTests, revoPlaceOf, setRevoActivityView, setRevoDayExtras, type RevoPlace } from '../place';
-import { REVO_BUTTON_ROUTES } from '../availability';
+import { REVO_BUTTON_NO_TAB_BAR, REVO_BUTTON_ROUTES } from '../availability';
 import type { RevoContext, RevoDayFacts } from '../types';
 
 const user = {
@@ -264,9 +264,13 @@ describe('where Revo is opened from (REVO-38) and where its button shows (REVO-2
     expect(revoPlaceOf(null)).toEqual({ kind: 'home' });
   });
 
-  it('[REVO-25] the button shows on Home and Activity’s screens, never on the Read tab, in a session, an editor or Settings', () => {
-    expect([...REVO_BUTTON_ROUTES].sort()).toEqual(['Activity', 'ActivityAll', 'ActivityDay', 'Dashboard', 'PagesByStrength']);
-    for (const name of ['ReadIndex', 'QuranReader', 'ActiveRevision', 'PlanEdit', 'PlanDayEdit', 'Memorization', 'Settings', 'JournalEntry']) {
+  it('[REVO-25] the button shows on Home and Activity’s screens and Edit schedule, never on the Read tab, in a session, another editor or Settings', () => {
+    expect([...REVO_BUTTON_ROUTES].sort()).toEqual(['Activity', 'ActivityAll', 'ActivityDay', 'Dashboard', 'PagesByStrength', 'PlanEdit']);
+    // Edit schedule has no tab bar: the button sits just above the bottom edge there, and only there.
+    expect([...REVO_BUTTON_NO_TAB_BAR]).toEqual(['PlanEdit']);
+    // Opened there, Revo starts as from Home.
+    expect(revoPlaceOf({ name: 'PlanEdit' })).toEqual(revoPlaceOf({ name: 'Dashboard' }));
+    for (const name of ['ReadIndex', 'QuranReader', 'ActiveRevision', 'PlanDayEdit', 'Memorization', 'Settings', 'JournalEntry']) {
       expect(REVO_BUTTON_ROUTES.has(name)).toBe(false);
     }
   });
