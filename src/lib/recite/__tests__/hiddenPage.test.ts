@@ -300,10 +300,29 @@ describe('[RECITE-20] over and under a verse marker, as the words beside it (pag
     expect(overline((w) => w <= lastOf24)).toBe(true);
     // 25's first word shown: the overline over it shows with it, in ۲٤'s left half.
     expect(overline((w) => w <= firstOf25)).toBe(false);
-    // The marker itself is never covered.
+    // The marker itself is never covered: its middle top to bottom, and its sides (the ears) halfway down. Only the
+    // opening's corners, outside its round outline, are (lib/recite/markerOutline).
     for (const shown of [() => false, (w: number) => w <= lastOf24, (w: number) => w <= firstOf25]) {
-      for (const x of [620, 658.5, 697]) for (const y of [top + 1, (top + bottom) / 2, bottom - 1]) expect(coveredAt(shown, x, y)).toBe(false);
+      for (const y of [top + 1, (top + bottom) / 2, bottom - 1]) expect(coveredAt(shown, 658.5, y)).toBe(false);
+      for (const x of [620, 697]) expect(coveredAt(shown, x, (top + bottom) / 2)).toBe(false);
     }
+  });
+
+  it('[RECITE-20] the opening’s corners beside the round marker are covered while the word on that side is hidden (Majd, Nov 25 2026: “pieces of letters”)', () => {
+    const words = getQuranWords();
+    const l = pageLines(PAGE).find((p) => p.line === LINE)!;
+    const [top, bottom] = l.markerRows[0];
+    const [a, b] = l.markers[0];
+    const firstOf25 = words.verseFirstWord(27, 25);
+    const corners = (side: 'left' | 'right'): [number, number][] => {
+      const x = side === 'left' ? a + 0.5 : b - 0.5;
+      return [[x, top + 1], [x, bottom - 1]];
+    };
+    // All hidden: every corner covered.
+    for (const [x, y] of [...corners('left'), ...corners('right')]) expect(coveredAt(() => false, x, y)).toBe(true);
+    // 25's first word shown (the word after ۲٤, on its left): the left corners open with it, the right ones stay covered.
+    for (const [x, y] of corners('left')) expect(coveredAt((w) => w <= firstOf25, x, y)).toBe(false);
+    for (const [x, y] of corners('right')) expect(coveredAt((w) => w === firstOf25, x, y)).toBe(true);
   });
 
   it('the right half goes with the word before the marker: covered while it is hidden, open once it is shown', () => {

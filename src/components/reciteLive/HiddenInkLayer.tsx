@@ -5,6 +5,7 @@ import { pageImageProps } from '../../lib/quranImages';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import { pageLines, subtractSpans, type Span } from '../../lib/recite/pageLines';
 import { verseKey, type WordFollow } from '../../lib/recite/hiddenPage';
+import { markerCorners } from '../../lib/recite/markerOutline';
 import { Wash } from './Wash';
 
 /** Where the faint rule runs in a line's band (from the top): about the baseline. */
@@ -83,7 +84,9 @@ export function hiddenInkPlan(words: QuranWords, page: number, shown: (w: number
     l.markers.forEach(([a, b], k) => open.push({ line: l.line, box: { ...band(a, b), y0: l.markerRows[k][0], y1: l.markerRows[k][1] }, kind: 'marker' }));
     for (const [a, b] of shownSpans) open.push({ line: l.line, box: band(a, b), kind: 'shown' });
     const shownHoles: Span[] = shownSpans.map(([a, b]) => [a - INK_EDGE, b + INK_EDGE]);
-    const holes: Span[] = [...l.markers.map(([a, b]): Span => [a - INK_EDGE, b + INK_EDGE]), ...shownHoles];
+    // A marker's opening is its hole as measured (its ink and half the gap to the next ink): a unit more each side showed
+    // the next word's edge where the gap is narrow (Majd, Nov 25 2026: the sliver beside page 592's ٦).
+    const holes: Span[] = [...l.markers, ...shownHoles];
     const covers = subtractSpans(l.x0 - COVER_EDGE, l.x1 + COVER_EDGE, holes)
       .filter(([a, b]) => b - a > 0.5)
       .map(([a, b]): Rect => ({ x0: a, x1: b, y0: l.coverTop, y1: l.coverBottom }));
@@ -94,7 +97,6 @@ export function hiddenInkPlan(words: QuranWords, page: number, shown: (w: number
     const lineWords = onLine.get(l.line) ?? [];
     l.markers.forEach(([a, b], k) => {
       const [top, bottom] = l.markerRows[k];
-      if (top <= l.coverTop && bottom >= l.coverBottom) return;
       const mid = (a + b) / 2;
       let before: { x0: number; shown: boolean } | null = null;
       let after: { x1: number; shown: boolean } | null = null;
@@ -105,6 +107,15 @@ export function hiddenInkPlan(words: QuranWords, page: number, shown: (w: number
       const leftOpen = after?.shown ?? false;
       const rightOpen = before?.shown ?? false;
       if (leftOpen && rightOpen) return;
+      // In its rows, the corners of the opening beside the marker's round outline, by the same halves: a word's stroke
+      // there (a damma, a kaf's top) shows with its word, never while it is hidden (lib/recite/markerOutline).
+      for (const { rect, side } of markerCorners({ x0: a - INK_EDGE, x1: b + INK_EDGE, y0: top, y1: bottom })) {
+        if (side === 'left' ? leftOpen : rightOpen) continue;
+        for (const [p, q] of subtractSpans(rect.x0, rect.x1, shownHoles)) {
+          if (q - p > 0.5) covers.push({ ...rect, x0: p, x1: q });
+        }
+      }
+      if (top <= l.coverTop && bottom >= l.coverBottom) return;
       const x0 = leftOpen ? mid : a - INK_EDGE - SEAM;
       const x1 = rightOpen ? mid : b + INK_EDGE + SEAM;
       for (const [p, q] of subtractSpans(x0, x1, shownHoles)) {
