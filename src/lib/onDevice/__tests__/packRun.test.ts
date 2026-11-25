@@ -3,6 +3,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setNetworkState, __resetNetworkStateForTests } from '../../networkState';
 import {
+  checkForNewPack,
   AUTO_CALLS_A_DAY,
   __resetPackForTests,
   downloadPackNow,
@@ -489,6 +490,17 @@ describe('Recite’s pack on the phone', () => {
     for (let i = 0; i < 5; i++) await run();
     expect(mockCall).toHaveBeenCalledTimes(5);
     expect(getPackStatus().why).toBe('account');
+  });
+
+  it('Check for a new version asks at once, and moves to a new pack without waiting a day', async () => {
+    await run();
+    expect(packMenuActions(getPackStatus()).some((a) => a.key === 'check')).toBe(true);
+    mockCall.mockResolvedValue(answer('v7m-2'));
+    await run(); // within the day: not asked
+    expect(packForEngine()?.packId).toBe('v7m-1');
+    await checkForNewPack();
+    await settle();
+    expect(packForEngine()?.packId).toBe('v7m-2');
   });
 
   it('Download now tries a refused pack again', async () => {

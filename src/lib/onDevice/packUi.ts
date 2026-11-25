@@ -8,7 +8,7 @@ import { getMushafStatus } from '../mushafOffline';
 import { formatMegabytes } from '../mushafOfflineUi';
 import { networkState, onUnmeteredNetwork } from '../networkState';
 import { benchEngine } from './benchRun';
-import { downloadPackNow, getPackStatus, onPackStatus, preparePack, removePack, type PackRefusal, type PackStatus } from './packRun';
+import { checkForNewPack, downloadPackNow, getPackStatus, onPackStatus, preparePack, removePack, type PackRefusal, type PackStatus } from './packRun';
 
 /** This build carries the native module (older Revisely Dev builds and the store app don't). */
 export function packRowShown(): boolean {
@@ -83,6 +83,9 @@ export function packMenuActions(s: PackStatus): SheetAction[] {
       icon: 'cloud-download-outline',
       onPress: () => downloadNow(s),
     });
+  }
+  if (s.phase === 'ready') {
+    actions.push({ key: 'check', label: t('settings.recitePack.checkNew'), icon: 'refresh-outline', onPress: () => void checkForNewPack() });
   }
   if (s.phase === 'ready' || s.bytes > 0) {
     actions.push({

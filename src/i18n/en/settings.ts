@@ -230,6 +230,7 @@ export const settings = {
     unavailablePaused: 'Paused after a few tries today',
     idle: 'For checking your recitation on this phone',
     downloadNow: 'Download now',
+    checkNew: 'Check for a new version',
     remove: 'Remove from this phone',
     removeTitle: 'Remove Recite from this phone?',
     removeBody: 'This frees {{size}}. Recite keeps working through the server.',
