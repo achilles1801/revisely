@@ -646,8 +646,11 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   isn't a take (RECITE-27). The take's record says it was a test, its length and whether it finished (`spotTest`). Tajweed
   notes and Not clear count as in any take. Its result in the bar opens the take's summary, with Test me again.
 - **RECITE-9.** A revision session has the reader's mic, with the same takes, marks, hidden view, cards and summary;
-  Test me stays in the reader. A take there stays in Recite: it never marks a page revised, since its own page turns
-  credit nothing, so only a swipe off a page or the Pages sheet marks one (SESS-1). Its page turns stay on the session's pages, and
+  Test me stays in the reader. When the reciter goes on past a page to the session's next one (their place moves on to
+  it, or the page's last ayah is said, RECITE-30), the take marks the page left revised, as a swipe off it does (SESS-1),
+  quietly: no note over the take; ✓ or the Pages sheet takes it back (Majd, Nov 25 2026: "when i get to the next page (as
+  it takes me there automatically ...) it should auto mark the page as revised"). A turn to where the reciter was first
+  found, or to a mark's or the summary's page, marks nothing. Its page turns stay on the session's pages, and
   a place outside them (a similar ayah, a past take) opens in the reader over the session; Back comes back to it.
   (Majd, Nov 17 2026: "add the mistake detection and mic functionality same as mushaf to the revision sessions".)
 - **RECITE-10.** A long take keeps up: what the checker sends is shown as it comes, and a burst of it never holds the
@@ -794,6 +797,11 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   a word once passed, redrawn if a mark comes later); it takes its place. The take's end shows each word as its answer
   says. A word the checker takes back comes off the line. Without those
   frames, or outside Revisely Dev, the bar is RECITE-28's.
+- **RECITE-30.** (Revisely Dev) Once the page's last ayah is said (the checker's `said` reaches its last word, the
+  reciter's place on that page), the next page shows at once and the take waits there for the reciter, whether or not
+  they have begun it; it doesn't wait for a word of the next page (Majd, Nov 25 2026: "when i finish reciting the last
+  verse it should automatically take me to the next page and wait for me to begin if i didn't already"). Once per page.
+  Never past a session's last page, and never in a stretch with an end of its own (Test me), which stops there instead.
 
 What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).
 

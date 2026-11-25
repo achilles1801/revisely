@@ -147,6 +147,8 @@ export interface ReciteLayerOptions {
   currentPage: number;
   /** Turns the pager to a page; false when the pager doesn't hold it (MushafPager's scrollToPage). */
   showPage: (page: number) => boolean;
+  /** The take turned the page because the reciter went on past it (useLiveRecitation's onRecitedPast; a session credits it). */
+  onRecitedPast?: (from: number, to: number) => void;
   /** A place the pager doesn't hold (a similar ayah, a past take, a test's place): the reader opens there. */
   openElsewhere?: (place: ElsewherePlace) => void;
   /** The revision day: a take's recording and its record in Recite's memory are the day's. */
@@ -184,6 +186,7 @@ function takeResultText(state: LiveState, qw: QuranWords | null, startWord: numb
 export function useReciteLayer({
   currentPage,
   showPage,
+  onRecitedPast,
   openElsewhere,
   day,
   focused,
@@ -262,6 +265,7 @@ export function useReciteLayer({
     settings: reciteSettings,
     currentPage,
     onShowPage: showPage,
+    onRecitedPast,
     recordingDay: day,
     onRecordingSaved: (saved) => noteTakeRecording.current(saved),
   });
