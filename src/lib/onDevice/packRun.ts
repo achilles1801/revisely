@@ -560,6 +560,15 @@ export async function refetchDamagedPack(packId: string): Promise<void> {
   requestPackDownload();
 }
 
+/** "Check for a new version": asks now instead of at the day's check; a tap, so it isn't one of the phone's own tries. */
+export async function checkForNewPack(): Promise<void> {
+  await preparePack();
+  tapped = true;
+  saved = { ...saved, checkedAt: 0 };
+  await persist();
+  requestPackDownload();
+}
+
 /** "Remove from this phone": everything of it, and the download stays off until "Download now". */
 export async function removePack(): Promise<void> {
   await preparePack();
