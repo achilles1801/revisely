@@ -143,6 +143,13 @@ describe('[ONDEV-1] the self-check’s record', () => {
     expect(send).toHaveBeenCalledTimes(2);
   });
 
+  it('a re-sent record the server already has counts as sent, not as a failure', async () => {
+    send.mockRejectedValueOnce(Object.assign(new Error('Document already exists'), { code: 'already-exists' }));
+    expect(await recordSelfCheck(device)).toEqual({ check: passed, sendError: null });
+    await recordSelfCheck(device);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
   it('sends a failed check too, and tries again after a send that failed', async () => {
     mockSelfCheck.mockResolvedValue(selfCheckFromFailedOpen(-3, 'v7 check', 'v7m-1'));
     send.mockRejectedValueOnce(new Error('offline'));

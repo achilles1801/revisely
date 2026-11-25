@@ -325,8 +325,14 @@ export function engineTestRecord(device: DeviceInfo, runs: readonly EngineTestRu
 export async function sendBenchRecord(
   record: BenchRecord | ReturnType<typeof selfCheckRecord> | ReturnType<typeof engineTestRecord>,
 ): Promise<string> {
-  const ref = await addDoc(collection(db, 'onDeviceBench'), { ...record, createdAt: serverTimestamp() });
-  return ref.id;
+  try {
+    const ref = await addDoc(collection(db, 'onDeviceBench'), { ...record, createdAt: serverTimestamp() });
+    return ref.id;
+  } catch (err) {
+    // The SDK retried a write the server had already taken: the record is there, once.
+    if ((err as { code?: string }).code === 'already-exists') return 'sent';
+    throw err;
+  }
 }
 
 const SELF_CHECK_SENT = '@revisely_bench_self_check_sent';
