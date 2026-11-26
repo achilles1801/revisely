@@ -502,7 +502,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['REVO-44'],
     routes: [],
     text: [
-      '- Ask about an ayah, a story or a person of the Qur’an: Revo answers only from Tafsir al-Tabari, Ibn Kathir, al-Qurtubi and al-Sa’di, then shows “From the tafsir”: each book’s own words (Arabic with “Revo’s translation”, or Ibn Kathir’s English), and a tap shows the passage. If the books don’t say, Revo says so. No rulings. Each counts as one of the day’s questions.',
+      '- Qur’an questions: answered only from al-Tabari, Ibn Kathir, al-Qurtubi and al-Sa’di, the books’ words under “From the tafsir” (a tap shows the passage); if they don’t say, Revo says so. No rulings. Counted.',
     ].join('\n'),
   },
   {
