@@ -154,7 +154,7 @@ async function main() {
       const shown = answer ?? { text: '(not shown: a long answer with no source)', sources: [] };
       const judged = await post({
         model: 'claude-sonnet-5-5',
-        max_tokens: 200,
+        max_tokens: 400,
         thinking: { type: 'between_tools' },
         system: [{ type: 'text', text: JUDGE }],
         messages: [
@@ -163,7 +163,7 @@ async function main() {
             content: `Question: ${question}\n\nAnswer: ${shown.text}\n\nQuoted:\n${shown.sources.map((s) => `- ${s.book} (${s.from.join(':')}): "${s.quote}" — ${s.said}`).join('\n') || '(none)'}`,
           },
         ],
-        output_config: { format: { type: 'json_schema', schema: JUDGE_SCHEMA } },
+        output_config: { format: { type: 'json_schema', schema: JUDGE_SCHEMA }, effort: 'low' },
       });
       spent += costOf('claude-sonnet-5-5', judged.usage);
       const j = JSON.parse(judged.content.find((b) => b.type === 'text').text);
