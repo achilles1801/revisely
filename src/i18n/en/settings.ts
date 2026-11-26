@@ -240,6 +240,11 @@ export const settings = {
     dataBodyLarge: 'This is a large download.',
   },
   recite: {
+    spotTests: 'Spot tests',
+    testHowFar: 'How far (pages)',
+    testWhere: 'Where from',
+    testProgress: 'Show progress',
+    testProgressSub: 'A line under the header fills as you go',
     premium: 'Premium',
     premiumSub: 'Marking mistakes and Test me are part of it',
     footer: 'Marking mistakes is AI and can make mistakes. Recordings are checked by software; nobody listens.',

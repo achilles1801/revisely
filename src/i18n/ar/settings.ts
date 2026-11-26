@@ -211,6 +211,11 @@ export const settings: NonNullable<ArStrings['settings']> = {
     cellularLabel: 'تنزيل المصحف عبر بيانات الجوّال',
   },
   recite: {
+    spotTests: 'الاختبارات',
+    testHowFar: 'إلى أين (بالصفحات)',
+    testWhere: 'من أين',
+    testProgress: 'إظهار التقدّم',
+    testProgressSub: 'يمتلئ خط تحت العنوان كلما تقدّمت',
     premium: 'بريميوم',
     premiumSub: 'يشمل تحديد الأخطاء و«اختبرني»',
     footer: 'تحديد الأخطاء يعمل بالذكاء الاصطناعي وقد يخطئ. تُفحَص التسجيلات آليًا، ولا يستمع إليها أحد.',

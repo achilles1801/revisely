@@ -39,18 +39,51 @@ function canStart(words: QuranWords, key: AyahKey, held: ReadonlySet<AyahKey>, j
   return juz == null || (juzOf(words, key) === juz && juzOf(words, n) === juz);
 }
 
-/** The word about `pages` pages on from `w`: just before the same place on the page that far ahead. */
-export function wordPagesOn(words: QuranWords, w: number, pages: number): number {
-  const page = words.pageOf(w);
-  const [p0, p1] = words.pageRange(page);
-  const at = page + (w - p0) / (p1 - p0) + pages;
-  const target = Math.floor(at);
-  if (target > words.pageOf(words.count - 1)) return words.count - 1;
-  const [q0, q1] = words.pageRange(target);
-  return Math.max(w, q0 + Math.round((at - target) * (q1 - q0)) - 1);
+/** Lines of the 1405 print in a page: a test's length in lines is its pages times this. */
+export const LINES_PER_PAGE = 15;
+
+/** Per page: how many words each line holds (QuranWords is fixed, so kept). */
+const lineCache = new WeakMap<QuranWords, Map<number, { count: Map<number, number> }>>();
+function pageLines(words: QuranWords, page: number) {
+  let byPage = lineCache.get(words);
+  if (!byPage) lineCache.set(words, (byPage = new Map()));
+  let lines = byPage.get(page);
+  if (!lines) {
+    const count = new Map<number, number>();
+    const [p0, p1] = words.pageRange(page);
+    for (let i = p0; i < p1; i++) count.set(words.lineOf(i), (count.get(words.lineOf(i)) ?? 0) + 1);
+    lines = { count };
+    byPage.set(page, lines);
+  }
+  return lines;
 }
 
-/** The test from `key`, and whether what's memorized holds its whole length. */
+/**
+ * Lines of ayat from the start of word `from` to the end of word `to` (RECITE-8): a whole line is 1, part of one its
+ * share of the line's words. Surah names and the basmala above a surah are no line of ayat, so they never count.
+ */
+export function linesRecited(words: QuranWords, from: number, to: number): number {
+  let total = 0;
+  let i = from;
+  while (i <= to) {
+    const page = words.pageOf(i);
+    const line = words.lineOf(i);
+    const n = pageLines(words, page).count.get(line) ?? 1;
+    let j = i;
+    while (j + 1 <= to && words.pageOf(j + 1) === page && words.lineOf(j + 1) === line) j++;
+    total += (j - i + 1) / n;
+    i = j + 1;
+  }
+  return total;
+}
+
+/**
+ * The test from `key`, and whether it holds its whole length (RECITE-8; Majd, Nov 25 2026: "should always finish the
+ * surah if i'm at the end of it already, we need to do proper math"). What's counted is what's recited from memory: the
+ * lines of ayat after the verse shown, `pages` × 15 of them. It ends at the end of the ayah that count is reached in,
+ * then a surah's end wins within a third of that length either side (to the line above: 3 lines for half a page):
+ * near the end it finishes the surah, just past it it doesn't start the next. Memorized ayahs only, in the juz picked, and at least the ayah after the one shown.
+ */
 function testAt(
   words: QuranWords,
   key: AyahKey,
@@ -59,25 +92,56 @@ function testAt(
   juz: number | null,
 ): { test: SpotTest; fits: boolean } {
   const [first, afterVerse] = words.verseRange(suraOf(key), ayahOf(key));
-  const target = wordPagesOn(words, first, pages);
   const endOf = (k: AyahKey) => words.verseRange(suraOf(k), ayahOf(k))[1] - 1;
+  const goal = pages * LINES_PER_PAGE;
+  const lines = (k: AyahKey) => linesRecited(words, afterVerse, endOf(k));
+  const ok = (n: AyahKey | null): n is AyahKey => n != null && held.has(n) && (juz == null || juzOf(words, n) === juz);
   const next = nextAyah(key) as AyahKey; // canStart: there is one
-  let to = next;
-  while (endOf(to) < target) {
-    const n = nextAyah(to);
-    if (n == null || !held.has(n) || (juz != null && juzOf(words, n) !== juz)) break;
-    to = n;
+  // The ayahs it may run through, up to a third of the length past the goal, each with its lines so far.
+  const path: { k: AyahKey; at: number }[] = [{ k: next, at: lines(next) }];
+  while (path[path.length - 1].at < goal + Math.ceil(goal / 3)) {
+    const n = nextAyah(path[path.length - 1].k);
+    if (!ok(n)) break;
+    path.push({ k: n, at: lines(n) });
   }
-  const last = endOf(to);
+  // The ayah the goal is reached in (or the last there is).
+  const reachedAt = path.findIndex((p) => p.at >= goal);
+  const natural = reachedAt === -1 ? path.length - 1 : reachedAt;
+  // A third of the length, to the line above: 3 lines for half a page, 5 for a page.
+  const near = Math.ceil(goal / 3);
+  // A surah's end within a third of the length of that end, either side: the nearest wins.
+  let end = natural;
+  let snapped = false;
+  let best = Infinity;
+  path.forEach((p, i) => {
+    const n = nextAyah(p.k);
+    const lastOfSurah = n == null || suraOf(n) !== suraOf(p.k);
+    const off = Math.abs(p.at - path[natural].at);
+    if (lastOfSurah && off <= near && off < best) {
+      best = off;
+      end = i;
+      snapped = true;
+    }
+  });
+  const to = path[end].k;
   return {
     test: {
       span: { from: [suraOf(key), ayahOf(key)], startBy: [suraOf(next), ayahOf(next)], to: [suraOf(to), ayahOf(to)] },
       cue: Array.from({ length: afterVerse - first }, (_, i) => first + i),
-      last,
+      last: endOf(to),
       pages,
     },
-    fits: last >= target,
+    // Its length, or near enough that a surah's end took its place.
+    fits: path[end].at >= goal - (snapped ? near : 0),
   };
+}
+
+/** How far into a test the reciter is, 0 to 1, in lines of ayat recited from memory (its progress line). */
+export function testProgress(words: QuranWords, test: Pick<SpotTest, 'cue' | 'last'>, reached: number | null): number {
+  const from = test.cue[test.cue.length - 1] + 1;
+  if (reached == null || reached < from) return 0;
+  const all = linesRecited(words, from, test.last);
+  return all <= 0 ? 1 : Math.min(1, linesRecited(words, from, Math.min(reached, test.last)) / all);
 }
 
 /** The ayahs a test can start in: memorized ones (in `juz`, when given) with the next ayah of the surah to carry on to. */

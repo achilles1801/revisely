@@ -1,6 +1,6 @@
 // The reader's one mic (Revisely Dev): Record, Recite, Check; the recite bar; marks and the hidden view.
 import React from 'react';
-import { AccessibilityInfo, Alert, Modal, StatusBar } from 'react-native';
+import { AccessibilityInfo, Alert, Modal, StatusBar, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import QuranReaderScreen from '../QuranReaderScreen';
@@ -12,6 +12,8 @@ import type { LiveEvent } from '../../../lib/reciteLive/contract';
 import { STOP_TRACE_KEY } from '../../../lib/reciteLive/stopTrace';
 import { revealDelay, wordLetters } from '../../../lib/reciteLive/state';
 import { versesOnPage } from '../../../lib/ayahBounds';
+import { pickTest } from '../../../lib/reciteLive/testMe';
+import { ayahKey, ayahsBetween } from '../../../lib/ayahKeys';
 import { paletteV2 } from '../../../theme/v2';
 import { setMistakeDetectionReleasedForTests } from '../../../lib/release/mistakeDetection';
 
@@ -79,12 +81,14 @@ jest.mock('../../../components/MushafPager', () => {
   };
 });
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn(), push: jest.fn() };
+// Whether the reader is the screen in front (Settings pushed over it is not).
+const mockFocus = { focused: true };
 // The reader's params: page 379 unless a test opens it otherwise (a search's result).
 const mockRoute: { params: Record<string, unknown> } = { params: { pageNumber: 379 } };
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => mockNavigation,
   useRoute: () => ({ key: 'QuranReader-1', name: 'QuranReader', params: mockRoute.params }),
-  useIsFocused: () => true,
+  useIsFocused: () => mockFocus.focused,
 }));
 jest.mock('../../../navigation/navigationRef', () => ({ navigateToActivityDay: jest.fn() }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
@@ -1977,10 +1981,12 @@ describe('Test me is one spot test (RECITE-8; Majd, Nov 23 2026: "there should o
   afterEach(() => (Math.random as jest.Mock).mockRestore());
 
   /** The test from Al-Mulk 1 at one page: to the end of the ayah that ends page 562. */
+  /** Where a test from Al-Mulk 1 ends, by the length rule (lib/reciteLive/testMe, its own tests). */
+  const endFrom = (pages: 1 | 2) => pickTest(ayahsBetween(ayahKey(67, 1), ayahKey(67, 30)), words, { pages, random: () => 0 })!.last;
   const spot = () => {
     const first = words.verseFirstWord(67, 1);
     const next = words.verseFirstWord(67, 2);
-    const last = words.pageRange(562)[1] - 1;
+    const last = endFrom(1);
     return { first, next, last, end: words.ref(last) };
   };
   async function openSheet() {
@@ -1992,8 +1998,10 @@ describe('Test me is one spot test (RECITE-8; Majd, Nov 23 2026: "there should o
     expect(screen.getByTestId('test-me-sheet')).toBeTruthy();
   }
   async function openTest(pick: 'all' | 'juz-30' = 'all') {
+    // Where from is a setting now (Settings → Mushaf and Recite → Spot tests).
+    setReciteCheckSettings('u1', { testJuz: pick === 'juz-30' ? 30 : null });
     await openSheet();
-    fireEvent.press(screen.getByTestId(`test-me-${pick}`));
+    fireEvent.press(screen.getByTestId('test-me-start'));
     await flush();
     await flush();
   }
@@ -2027,25 +2035,50 @@ describe('Test me is one spot test (RECITE-8; Majd, Nov 23 2026: "there should o
     expect(screen.queryByTestId('test-me-sheet')).toBeNull();
   });
 
-  it('the sheet: how far (1 page at first) and where from, everything memorized or a juz of it', async () => {
+  it('[RECITE-8] the sheet: what the test will be, Start, and a quiet Test settings that opens Settings over the reader and comes back', async () => {
     await openSheet();
-    expect(screen.getByLabelText('1 page, selected')).toBeTruthy();
-    for (const label of ['½ page', '2 pages', '3 pages']) expect(screen.getByLabelText(label)).toBeTruthy();
-    expect(screen.getByText('Everything you’ve memorized')).toBeTruthy();
-    expect(screen.getByTestId('test-me-juz-29')).toBeTruthy();
-    expect(screen.getByTestId('test-me-juz-30')).toBeTruthy();
-    expect(screen.queryByTestId('test-me-juz-1')).toBeNull();
+    expect(screen.getByTestId('test-me-summary').props.children).toBe('1 page · Everything you’ve memorized');
+    expect(screen.getByTestId('test-me-start')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('test-me-settings'));
+    await flush();
+    expect(mockNavigation.push).toHaveBeenCalledWith('Settings', { page: 'mushaf' });
+    // A juz chosen there, and the reader in front again: the sheet is back, saying so.
+    await act(async () => setReciteCheckSettings('u1', { testJuz: 30 }));
+    mockFocus.focused = false;
+    screen.rerender(<QuranReaderScreen />);
+    mockFocus.focused = true;
+    screen.rerender(<QuranReaderScreen />);
+    await flush();
+    expect(screen.getByTestId('test-me-summary').props.children).toBe('1 page · Juz 30');
+    await act(async () => setReciteCheckSettings('u1', { testJuz: null }));
   });
 
-  it('the length chosen sets how far the take goes, and is kept for next time', async () => {
+  it('[RECITE-8] a line under the header fills from the right as the test goes; off in Settings, none', async () => {
+    await openTest();
+    const { next, last } = spot();
+    await event({ type: 'ready', take: 'p1', protocol: 6 });
+    await event({ type: 'locked', w: next, s: 67, a: 2 });
+    await event({ type: 'said', upTo: next + Math.floor((last - next) / 2) } as LiveEvent);
+    await flush();
+    const line = screen.getByTestId('test-progress');
+    expect(line.props.accessibilityValue.now).toBeGreaterThan(20);
+    expect(line.props.accessibilityValue.now).toBeLessThan(80);
+    // It fills from the right, in both languages.
+    expect(StyleSheet.flatten(screen.getByTestId('test-progress-fill').props.style)).toMatchObject({ right: 0 });
+    expect(StyleSheet.flatten(line.props.style)).toMatchObject({ direction: 'ltr' });
+    await act(async () => setReciteCheckSettings('u1', { testProgress: false }));
+    expect(screen.queryByTestId('test-progress')).toBeNull();
+    await act(async () => setReciteCheckSettings('u1', { testProgress: true }));
+  });
+
+  it('[RECITE-8] the length set sets how far the take goes', async () => {
+    await act(async () => setReciteCheckSettings('u1', { testPages: 2 }));
     await openSheet();
-    fireEvent.press(screen.getByTestId('pill-2'));
-    await flush();
-    expect(screen.getByLabelText('2 pages, selected')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('test-me-all'));
+    expect(screen.getByTestId('test-me-summary').props.children).toBe('2 pages · Everything you’ve memorized');
+    fireEvent.press(screen.getByTestId('test-me-start'));
     await flush();
     await flush();
-    const end = words.ref(words.pageRange(563)[1] - 1);
+    const end = words.ref(endFrom(2));
     expect(mockLive.start).toMatchObject({ s: 67, a: 1, s2: end.sura, a2: end.ayah });
     expect(screen.getByTestId('recite-status').props.children).toBe('2 pages');
     await act(async () => setReciteCheckSettings('u1', { testPages: 1 }));
@@ -2141,7 +2174,7 @@ describe('Test me is one spot test (RECITE-8; Majd, Nov 23 2026: "there should o
     fireEvent(screen.getByTestId('recite-mic'), 'longPress');
     fireEvent.press(screen.getByTestId('recite-mode-test'));
     await flush();
-    fireEvent.press(screen.getByTestId('test-me-all'));
+    fireEvent.press(screen.getByTestId('test-me-start'));
     // The notice takes its turn once the where-from sheet has gone (SHEET-1; in Jest, the fallback about a second on).
     await settle(() => expect(screen.getByTestId('recite-notice-sheet')).toBeTruthy());
     expect(mockLive.start).toBeUndefined();
@@ -2333,7 +2366,7 @@ describe('peeked words (Majd, Nov 15 2026: on the page in quiet grey, and in the
       fireEvent(screen.getByTestId('recite-mic'), 'longPress');
       fireEvent.press(screen.getByTestId('recite-mode-test'));
       await flush();
-      fireEvent.press(screen.getByTestId('test-me-all'));
+      fireEvent.press(screen.getByTestId('test-me-start'));
       await flush();
       await flush();
       const first = words.verseFirstWord(67, 1);

@@ -386,8 +386,8 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'shuffle',
         title: 'Test me',
         text:
-          'Hold [[mic]] → {{Test me}}: one verse at random from what you’ve memorized, or from one juz. ' +
-          'Choose how far, then carry on from that verse.',
+          'Hold [[mic]] → {{Test me}} → {{Start}}: carry on from one verse at random. ' +
+          'How far and where from are under {{Test settings}}.',
         covers: ['RECITE-8'],
         when: 'liveRecite',
       },

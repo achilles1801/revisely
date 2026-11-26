@@ -144,6 +144,11 @@ export const reciteLive = {
   },
   test: {
     title: 'Test me',
+    /** Test me's sheet: what the test will be ("1 page · Everything you’ve memorized"). */
+    summary: '{{length}} · {{where}}',
+    start: 'Start',
+    /** The sheet's quiet link to Settings → Mushaf and Recite → Spot tests. */
+    settings: 'Test settings',
     howFar: 'How far',
     halfPage: '½ page',
     everything: 'Everything you’ve memorized',

@@ -153,8 +153,8 @@ export const HELP_TOPICS_AR: Readonly<Record<string, ArabicHelpText>> = {
   },
   'reciteTest.start': {
     title: 'اختبرني',
-    text: 'اضغط مطوّلًا على [[mic]] ← {{اختبرني}}: آية عشوائية مما حفظته، أو من جزء واحد. اختر المقدار، ثم أكمل من تلك الآية.',
-    from: 'e0b9a00f37355c00',
+    text: 'اضغط مطوّلًا على [[mic]] ← {{اختبرني}} ← {{ابدأ}}: أكمل من آية عشوائية. المقدار ومن أين في {{إعدادات الاختبار}}.',
+    from: 'fd18b2aedea055aa',
   },
   'reciteTest.result': {
     title: 'كيف سار',

@@ -2,7 +2,7 @@ import { quranWords } from '../../recite/__fixtures__/quranWords';
 import { ayahKey, ayahCount, ayahsBetween } from '../../ayahKeys';
 import type { Mark } from '../contract';
 import { applyEvent, liveConnecting, LiveState } from '../state';
-import { pickTest, spotTestLine, testFinished, testJuz, testLengthLabel, testStarts, wordPagesOn } from '../testMe';
+import { linesRecited, pickTest, spotTestLine, testFinished, testJuz, testLengthLabel, testProgress, testStarts } from '../testMe';
 
 const words = quranWords();
 const surah = (n: number) => ayahsBetween(ayahKey(n, 1), ayahKey(n, ayahCount(n)));
@@ -44,18 +44,53 @@ describe('Test me: where a spot test starts (RECITE-8)', () => {
 });
 
 describe('Test me: how far it goes', () => {
-  it('a page on is the same place on the next page, less a word', () => {
+  it('counts lines of ayat: a whole line is 1, part of one its share; a surah’s name and basmala are no line', () => {
+    // Al-Mulk's first page: its lines of ayat, not its 15 (the surah's name and the basmala take two).
     const [p0, p1] = words.pageRange(562);
-    expect(wordPagesOn(words, p0, 1)).toBe(p1 - 1);
-    const [q0] = words.pageRange(564);
-    expect(wordPagesOn(words, p0, 2)).toBe(q0 - 1);
-    expect(wordPagesOn(words, words.count - 5, 3)).toBe(words.count - 1);
+    const lines = new Set(Array.from({ length: p1 - p0 }, (_, i) => words.lineOf(p0 + i))).size;
+    expect(lines).toBeLessThan(15);
+    expect(linesRecited(words, p0, p1 - 1)).toBeCloseTo(lines, 6);
+    // Half the words of the first line.
+    const firstLine = Array.from({ length: p1 - p0 }, (_, i) => p0 + i).filter((w) => words.lineOf(w) === words.lineOf(p0));
+    const half = Math.floor(firstLine.length / 2);
+    expect(linesRecited(words, p0, p0 + half - 1)).toBeCloseTo(half / firstLine.length, 6);
+  });
+
+  // Majd, Nov 25 2026: "should always finish the surah if i'm at the end of it already" (~/Documents/revisely-recite-mocks/spot-test-v2/length.md).
+  const from = (start: [number, number], to: [number, number], pages: 0.5 | 1, also: number[] = []) =>
+    pickTest([...ayahsBetween(ayahKey(...start), ayahKey(...to)), ...also], words, { pages, random: first })!.span.to;
+  it('[RECITE-8] finishes the surah when its end is within a third of the length', () => {
+    // ½ page from An-Naba' 30 reached 78:39, one ayah short; An-Nazi'at memorized too.
+    expect(from([78, 30], [78, 40], 0.5, surah(79))).toEqual([78, 40]);
+    expect(from([36, 70], [36, 83], 1, ayahsBetween(ayahKey(37, 1), ayahKey(37, 40)))).toEqual([36, 83]);
+  });
+
+  it('[RECITE-8] stops at a surah’s end rather than start the next for a line or two', () => {
+    expect(from([67, 26], [67, 30], 0.5, ayahsBetween(ayahKey(68, 1), ayahKey(68, 20)))).toEqual([67, 30]);
+  });
+
+  it('[RECITE-8] counts from after the verse shown: a long verse doesn’t eat the test', () => {
+    // Al-Baqarah 282 is a whole page; ½ page after it runs to 285 (it was 283).
+    expect(from([2, 282], [2, 286], 0.5)).toEqual([2, 285]);
+  });
+
+  it('[RECITE-8] its progress is the lines recited from memory out of the test’s', () => {
+    const t = pickTest(surah(67), words, { pages: 1, random: first })!;
+    const after = t.cue[t.cue.length - 1] + 1;
+    expect(testProgress(words, t, null)).toBe(0);
+    expect(testProgress(words, t, t.cue[0])).toBe(0);
+    expect(testProgress(words, t, t.last)).toBe(1);
+    const mid = testProgress(words, t, after + Math.floor((t.last - after) / 2));
+    expect(mid).toBeGreaterThan(0.3);
+    expect(mid).toBeLessThan(0.7);
   });
 
   it('ends at the end of the ayah about that far on, and a longer length goes further', () => {
     const lengths = ([0.5, 1, 2, 3] as const).map((pages) => pickTest(surah(67).concat(surah(68)), words, { pages, random: first })!);
     for (const t of lengths) expect(t.last).toBe(words.verseRange(...t.span.to!)[1] - 1);
-    for (let i = 1; i < lengths.length; i++) expect(lengths[i].last).toBeGreaterThan(lengths[i - 1].last);
+    // Longer goes no shorter; 2 and 3 pages from Al-Mulk's start can both end at its end (within a third).
+    for (let i = 1; i < lengths.length; i++) expect(lengths[i].last).toBeGreaterThanOrEqual(lengths[i - 1].last);
+    expect(new Set(lengths.slice(0, 3).map((t) => t.last)).size).toBe(3);
   });
 
   it('runs across a surah’s end when the next one is memorized', () => {
@@ -75,7 +110,8 @@ describe('Test me: how far it goes', () => {
   it('takes a start with room for the whole length when there is one', () => {
     // Drawn last to first: the late starts can't hold a page, so it keeps drawing until one can.
     const t = pickTest(surah(67), words, { pages: 1, random: () => 0.99 })!;
-    expect(t.last).toBeGreaterThanOrEqual(wordPagesOn(words, t.cue[0], 1));
+    // A page from memory, or a surah's end within a third of it.
+    expect(linesRecited(words, t.cue[t.cue.length - 1] + 1, t.last)).toBeGreaterThanOrEqual(10);
   });
 
   it('says its length in words', () => {

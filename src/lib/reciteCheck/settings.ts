@@ -39,8 +39,12 @@ export interface ReciteCheckSettings {
   showPast: boolean;
   /** A short sound and a tap as a take marks a mistake (lib/reciteLive/mistakeCue; Majd, Nov 20 2026); off in Settings. */
   mistakeSound: boolean;
-  /** How far a spot test goes, in pages (RECITE-8): the last one chosen. */
+  /** How far a spot test goes, in pages (RECITE-8; Settings → Mushaf and Recite → Spot tests). */
   testPages: TestLength;
+  /** Where a spot test comes from: one juz of what's memorized, or everything (null). */
+  testJuz: number | null;
+  /** The line under the header that fills as a test goes (on unless turned off). */
+  testProgress: boolean;
 }
 
 /**
@@ -63,6 +67,8 @@ export const RECITE_CHECK_DEFAULTS: ReciteCheckSettings = {
   showPast: true,
   mistakeSound: true,
   testPages: DEFAULT_TEST_LENGTH,
+  testJuz: null,
+  testProgress: true,
 };
 
 /** Whether Strict is offered: Revisely Dev's, until its own switch is on (lib/release/mistakeDetection). */
@@ -106,6 +112,8 @@ export function parseReciteCheckSettings(raw: string | null): ReciteCheckSetting
     showPast: typeof s.showPast === 'boolean' ? s.showPast : d.showPast,
     mistakeSound: typeof s.mistakeSound === 'boolean' ? s.mistakeSound : d.mistakeSound,
     testPages: pick(s.testPages, TEST_LENGTHS, d.testPages),
+    testJuz: typeof s.testJuz === 'number' && Number.isInteger(s.testJuz) && s.testJuz >= 1 && s.testJuz <= 30 ? s.testJuz : null,
+    testProgress: typeof s.testProgress === 'boolean' ? s.testProgress : d.testProgress,
   };
 }
 

@@ -166,6 +166,9 @@ export const reciteLive: NonNullable<ArStrings['reciteLive']> = {
   },
   test: {
     title: 'اختبرني',
+    summary: '{{length}} · {{where}}',
+    start: 'ابدأ',
+    settings: 'إعدادات الاختبار',
     howFar: 'المقدار',
     halfPage: 'نصف صفحة',
     everything: 'كل ما حفظته',
