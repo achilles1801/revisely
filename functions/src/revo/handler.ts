@@ -418,7 +418,8 @@ export async function handleRevoAsk(auth: { uid: string } | undefined, data: unk
   }
 
   const allowed = new Set([...contextPages(context), ...attached.flatMap(attachmentPages), ...history.flatMap((m) => attachmentsOf(m).flatMap(attachmentPages))]);
-  const parts = parseReply(result.reply.text, allowed, { firstTurn: !chat, smartTracking });
+  // A drafted schedule only for Revisely Dev, which can show it (REVO-43).
+  const parts = parseReply(result.reply.text, allowed, { firstTurn: !chat, smartTracking, drafts: context.app === 'dev' });
   if (!parts) {
     await deps.store.releaseQuestion(uid, day);
     deps.log({ event: 'failed', code: 'no-text' });

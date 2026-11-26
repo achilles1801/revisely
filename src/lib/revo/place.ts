@@ -5,6 +5,7 @@
 // Insights) and what a day's screen has loaded beyond the logs (its notes and timed reading).
 
 import type { DayExtras } from './facts';
+import { isDevVariant } from '../variant';
 
 export type RevoPlace =
   | { kind: 'home' }
@@ -16,7 +17,9 @@ export type RevoPlace =
   | { kind: 'weakSpots' }
   /** Pages by strength. */
   | { kind: 'strength' }
-  | { kind: 'juz'; juz: number };
+  | { kind: 'juz'; juz: number }
+  /** Edit schedule (REVO-43, Revisely Dev). */
+  | { kind: 'schedule' };
 
 export const HOME: RevoPlace = { kind: 'home' };
 
@@ -46,6 +49,9 @@ export function revoPlaceOf(route: { name: string; params?: object } | null | un
     }
     case 'PagesByStrength':
       return { kind: 'strength' };
+    case 'PlanEdit':
+      // REVO-43: on the schedule, in Revisely Dev; elsewhere it opens as from Home.
+      return isDevVariant() ? { kind: 'schedule' } : HOME;
     default:
       // Home, See all, and anywhere else Revo is opened from (Settings).
       return HOME;

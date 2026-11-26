@@ -9,6 +9,9 @@ import { dayFacts, passageFacts, passagePreview, prepare, type FactSources } fro
 import { screenButton } from '../../lib/revo/screens';
 import { smartTrackingOn } from '../../lib/smartTracking';
 import type { RevoAction, RevoVisual } from '../../lib/revo/types';
+import { draftRows, type ScheduleDraft } from '../../lib/revo/scheduleDraft';
+import { revisablePages } from '../../lib/memorizedAyahs';
+import { getRevisionDateForUser } from '../../lib/fajrBoundary';
 import { PillButton } from '../v2/PillButton';
 import { DailyPagesChart } from './charts/DailyPagesChart';
 import { JuzMapChart } from './charts/JuzMapChart';
@@ -123,6 +126,7 @@ const actionButton = (a: RevoAction) => (a.kind === 'openScreen' ? screenButton(
 
 const ACTION_ICON: Record<RevoAction['kind'], keyof typeof Ionicons.glyphMap> = {
   reviseFirst: 'calendar-outline',
+  draftSchedule: 'calendar-outline',
   openPage: 'book-outline',
   startRevision: 'play-circle-outline',
   openScreen: 'arrow-forward-circle-outline',
@@ -154,6 +158,7 @@ export function PlanCard({
           {action.detail}
         </Text>
       ) : null}
+      {action.kind === 'draftSchedule' ? <DraftRows draft={action} /> : null}
       {state === 'added' ? (
         <View style={styles.planDone} testID="revo-plan-added">
           <Ionicons name="checkmark-circle" size={18} color={palette.doneText} />
@@ -171,7 +176,43 @@ export function PlanCard({
   );
 }
 
+/**
+ * What a drafted schedule changes (REVO-43): how much a day, how often each page comes round and rest days, now (struck
+ * through) and with the draft, worked out on the phone from the account's own pages, whatever Revo's words said.
+ */
+function DraftRows({ draft }: { draft: ScheduleDraft }) {
+  const { palette } = useTheme();
+  const { user, pages } = useApp();
+  const rows = useMemo(
+    () => (user ? draftRows(user, revisablePages(pages ?? []), getRevisionDateForUser(user), draft) : []),
+    [user, pages, draft],
+  );
+  if (rows.length === 0) return null;
+  return (
+    <View style={styles.rows} testID="revo-draft-rows">
+      {rows.map((r) => (
+        <View key={r.label} style={[styles.row, { borderTopColor: palette.separator }]} accessible accessibilityLabel={t('revo.card.rowLabel', { label: r.label, now: r.now, draft: r.draft })}>
+          <Text style={[styles.rowCell, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+            {r.label}
+          </Text>
+          <Text style={[styles.rowCell, styles.struck, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+            {r.now}
+          </Text>
+          <Text style={[styles.rowCell, styles.rowNew, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
+            {r.draft}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  rows: { marginTop: 6 },
+  row: { flexDirection: 'row', gap: 8, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },
+  rowCell: { flex: 1, fontSize: 14, lineHeight: 19 },
+  struck: { textDecorationLine: 'line-through' },
+  rowNew: { fontWeight: '600' },
   plan: { borderRadius: 16, borderWidth: 1, padding: 14, gap: 6 },
   planHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   planTitle: { fontSize: 17, fontWeight: '600', flexShrink: 1 },

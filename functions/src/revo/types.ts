@@ -381,7 +381,12 @@ export type RevoAction =
       /** reader only: where it opens, a surah (1–114) or a juz (1–30); neither opens the Read tab's list. */
       surah?: number;
       juz?: number;
-    };
+    }
+  /**
+   * (Revisely Dev, REVO-43) A schedule to check: the app builds its days and opens Edit schedule filled in, not saved.
+   * Pages a day 1–40 or juz a day 1–3; a rest day after every `restEvery - 1` days (2–14).
+   */
+  | { kind: 'draftSchedule'; title: string; detail: string; mode: 'pages' | 'juz'; perDay: number; restEvery?: number; reverse?: boolean };
 
 export interface RevoMessage {
   id: string;

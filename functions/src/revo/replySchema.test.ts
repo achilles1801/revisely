@@ -69,7 +69,7 @@ const actions = [
 describe('Revo’s reply schema', () => {
   it('lists every chart and action kind reply.ts takes, with its own lists of values', () => {
     expect(Object.keys(CHART_SCHEMAS).sort()).toEqual(['dailyPages', 'pageRatings', ...REVO_NEW_CHART_KINDS].sort());
-    expect(Object.keys(ACTION_SCHEMAS).sort()).toEqual(['openPage', 'openScreen', 'reviseFirst', 'startRevision']);
+    expect(Object.keys(ACTION_SCHEMAS).sort()).toEqual(['draftSchedule', 'openPage', 'openScreen', 'reviseFirst', 'startRevision']);
     const enums = walk(REVO_REPLY_SCHEMA).filter((s) => Array.isArray(s.enum)).map((s) => s.enum);
     expect(enums).toEqual(expect.arrayContaining([[...REVO_SCREENS], [...REVO_SETTINGS_SECTIONS], [...REVO_TABLE_COLUMNS], [...REVO_TIMELINE_DAYS], [...REVO_MEMORIZED_MONTHS], [7, 30]]));
   });
@@ -86,6 +86,26 @@ describe('Revo’s reply schema', () => {
       expect(valid(REVO_REPLY_SCHEMA, reply)).toBe(true);
       expect(parseReply(JSON.stringify(reply), allowed, { firstTurn: true })!.action).toEqual(action);
     }
+  });
+
+  it('[REVO-43] a drafted schedule: kept for Revisely Dev only, in range, and never for the store app', () => {
+    const drafts = [
+      { kind: 'draftSchedule', title: 'A new schedule', detail: '6 pages a day, a weekly rest day', mode: 'pages', perDay: 6, restEvery: 7 },
+      { kind: 'draftSchedule', title: 'A new schedule', detail: 'A juz a day, from An-Nas back', mode: 'juz', perDay: 1, reverse: true },
+    ];
+    for (const action of drafts) {
+      const reply = JSON.stringify({ ...base, action });
+      expect(valid(REVO_REPLY_SCHEMA, { ...base, action })).toBe(true);
+      expect(parseReply(reply, allowed, { firstTurn: true, drafts: true })!.action).toEqual(action);
+      expect(parseReply(reply, allowed, { firstTurn: true })!.action).toBeUndefined();
+    }
+    const out = (a: object) => parseReply(JSON.stringify({ ...base, action: { kind: 'draftSchedule', title: 'x', detail: '', ...a } }), allowed, { firstTurn: true, drafts: true })!.action;
+    expect(out({ mode: 'pages', perDay: 41 })).toBeUndefined();
+    expect(out({ mode: 'juz', perDay: 4 })).toBeUndefined();
+    expect(out({ mode: 'pages', perDay: 6, restEvery: 1 })).toBeUndefined();
+    expect(out({ mode: 'hours', perDay: 6 })).toBeUndefined();
+    // A reverse that isn't true is left out.
+    expect(out({ mode: 'pages', perDay: 6, reverse: false })).toEqual({ kind: 'draftSchedule', title: 'x', detail: '', mode: 'pages', perDay: 6 });
   });
 
   it('allows nothing more: no unknown kind, field or screen, and every field present', () => {

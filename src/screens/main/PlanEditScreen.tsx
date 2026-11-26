@@ -38,6 +38,7 @@ import {
 } from '../../lib/planBuilder';
 import { liveScheduleDays, scheduleAmount } from '../../lib/scheduleSummary';
 import { useRevoFootprint } from '../../lib/revo/presence';
+import { draftScheduleDays, validDraft } from '../../lib/revo/scheduleDraft';
 import { pageCountLabel, summarizeDay } from '../../lib/planDisplay';
 import { CustomPlan, SavedPlan, User } from '../../types';
 import { GroupedRow, GroupedSection } from '../../components/plan/Grouped';
@@ -315,6 +316,25 @@ export default function PlanEditScreen() {
   }, []);
   const applyBuiltPlan = useCallback((next: number[][], dir: PlanDirection) => startPlan(next, dir), [startPlan]);
 
+  // A schedule Revo drafted (REVO-43): its days, not saved. Only Save keeps them; Back leaves the schedule as it was.
+  const [revoDraft, setRevoDraft] = useState(false);
+  useEffect(() => {
+    const draft = route.params?.draft;
+    if (!draft || !user) return;
+    navigation.setParams({ draft: undefined });
+    if (!validDraft(draft)) return;
+    const built = draftScheduleDays(user, memorizedPages, revisionDate, draft);
+    if (built.days.length === 0) return;
+    startPlan(built.days, built.direction);
+    setRevoDraft(true);
+  }, [route.params?.draft, user, memorizedPages, revisionDate, navigation, startPlan]);
+  // Saved (or put back as it was): no longer a draft. Only on the change, so the open that fills it in keeps it.
+  const wasDirty = useRef(isDirty);
+  useEffect(() => {
+    if (wasDirty.current && !isDirty) setRevoDraft(false);
+    wasDirty.current = isDirty;
+  }, [isDirty]);
+
   // ---- Saved plans ----------------------------------------------------------------
   const openSaveName = () => {
     if (days.length === 0) return;
@@ -521,6 +541,12 @@ export default function PlanEditScreen() {
           <Text style={[typeV2.title, { color: palette.text }]}>{heroTitle}</Text>
           {hasMemorized && days.length > 0 ? (
             <Text style={[typeV2.body, styles.heroLineV2, { color: palette.secondary }]}>{repeats}</Text>
+          ) : null}
+          {revoDraft && isDirty ? (
+            <View style={[styles.revoDraftV2, { backgroundColor: palette.accentSubtle }]} testID="plan-revo-draft" accessibilityLiveRegion="polite">
+              <Ionicons name="sparkles-outline" size={18} color={palette.accentText} />
+              <Text style={[typeV2.meta, styles.revoDraftTextV2, { color: palette.accentText }]}>{t('plan.edit.revoDraft')}</Text>
+            </View>
           ) : null}
           {/* MEM-6: saving an edit turns the automatic schedule into a custom plan; say so before Save. */}
           {!user.customPlan && isDirty && hasMemorized ? (
@@ -813,6 +839,8 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   // Rows carry their own 16pt gutter, so the content is full width.
   scrollContentV2: { paddingBottom: spacing.huge },
+  revoDraftV2: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 14, padding: 12, marginTop: 12 },
+  revoDraftTextV2: { flex: 1, fontSize: 14, lineHeight: 19 },
   heroV2: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad, paddingBottom: 8 },
   heroLineV2: { marginTop: 2 },
   heroNoteV2: { marginTop: 6 },
