@@ -26,7 +26,8 @@ import { knownAction } from '../../lib/revo/screens';
 import { refreshRevoRelease } from '../../lib/revo/release';
 import { RevoComposer } from './RevoComposer';
 import { TafsirSources } from './TafsirSources';
-import { Chips, FeedbackRow, LimitCard, ReviewRow, RevoHeader, RevoText, Typing, UserBubble } from './RevoParts';
+import { Chips, ContextChip, FeedbackRow, LimitCard, ReviewRow, RevoHeader, RevoText, Typing, UserBubble } from './RevoParts';
+import type { RevoQuranOpen } from '../../lib/revo/open';
 import { t } from '../../i18n';
 
 /**
@@ -43,6 +44,8 @@ export function RevoChat({
   usage,
   attachments,
   onAttachments,
+  quran = null,
+  onQuran,
   onAdd,
   onHistory,
   onMemory,
@@ -62,6 +65,9 @@ export function RevoChat({
   /** What + attached to the next question (several at most REVO_MAX_ATTACHMENTS). */
   attachments: RevoAttachment[];
   onAttachments: (list: RevoAttachment[]) => void;
+  /** Opened from the mushaf (REVO-45): the page or ayah the questions are about, answered from the tafsir (REVO-44). */
+  quran?: RevoQuranOpen | null;
+  onQuran?: (q: RevoQuranOpen | null) => void;
   /** Opens Add to chat. */
   onAdd: () => void;
   onHistory: () => void;
@@ -140,16 +146,28 @@ export function RevoChat({
     () => (context ? ramadanOpener(revoOpener(name, context, facts, open, extras), name, phase, facts != null) : null),
     [context, name, facts, open, extras, phaseKey], // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const greeting = opener?.text ?? null;
+  // From the mushaf, a new conversation is about the page or ayah (REVO-45): its own line and starters.
+  const fromMushaf = quran != null && !chatId;
+  const greeting = fromMushaf ? t(quran.kind === 'page' ? 'revo.tafsir.greetingPage' : 'revo.tafsir.greetingAyah') : (opener?.text ?? null);
   const lastRevo = [...messages].reverse().find((m) => m.role === 'revo');
-  const chips = chatId ? (lastRevo?.chips ?? []) : (opener?.chips ?? []);
+  const chips = chatId
+    ? (lastRevo?.chips ?? [])
+    : fromMushaf
+      ? quran.kind === 'page'
+        ? [t('revo.tafsir.startPage1'), t('revo.tafsir.startPage2'), t('revo.tafsir.startPage3')]
+        : [t('revo.tafsir.startAyah1'), t('revo.tafsir.startAyah2'), t('revo.tafsir.startAyah3')]
+      : (opener?.chips ?? []);
 
   const ask = async (question: string) => {
     const ctx = build();
     if (!ctx) return;
     const sent = attachments;
     setRefusal(null);
-    setPending({ text: question, attached: sent.map((a) => ({ kind: a.kind, label: a.label })) });
+    const about = quran;
+    setPending({
+      text: question,
+      attached: [...(about && !chatId ? [{ kind: 'quran', label: about.label }] : []), ...sent.map((a) => ({ kind: a.kind, label: a.label }))],
+    });
     onAttachments([]);
     onExpand();
     try {
@@ -162,6 +180,7 @@ export function RevoChat({
         context: place?.kind === 'schedule' && ctx.app === 'dev' ? { ...ctx, place: 'schedule' } : ctx,
         attach: sent.length === 1 ? sent[0] : null,
         ...(sent.length > 1 ? { attachments: sent } : {}),
+        ...(about ? { quran: about.scope } : {}),
       });
       // Checked by the backend, and read here, never inside a state update: React throws an
       // updater's error again while rendering, outside this try (REACT-NATIVE-10).
@@ -316,6 +335,11 @@ export function RevoChat({
         ) : (
           <Chips chips={chips} onPick={(c) => void ask(c)} disabled={pending != null} />
         )}
+        {fromMushaf ? (
+          <View style={styles.quranChip}>
+            <ContextChip label={quran.label} kind="quran" onRemove={onQuran ? () => onQuran(null) : undefined} />
+          </View>
+        ) : null}
         <RevoComposer
           onSend={(question) => void ask(question)}
           onAdd={onAdd}
@@ -343,5 +367,6 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, gap: 20 },
   revo: { gap: 14 },
   foot: { gap: 12, paddingTop: 8 },
+  quranChip: { flexDirection: 'row' },
   error: { fontSize: 15, lineHeight: 21 },
 });

@@ -1,6 +1,8 @@
 // screens/read and components/search: the reader's header, the Read tab's surah list, search.
 export const read = {
   reader: {
+    /** Revo at the page's foot (Revisely Dev, REVO-45), for VoiceOver. */
+    askRevo: 'Ask Revo about this page',
     /** Under the surah's name: "Page 12 · Juz 1 · Hizb 2". */
     subtitle: 'Page {{page}} · Juz {{juz}} · Hizb {{hizb}}',
     tapHint: 'Tap the page for the controls',

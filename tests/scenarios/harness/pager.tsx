@@ -18,6 +18,8 @@ export interface PagerProps {
   pageAccessories?: (page: number, scale: number) => React.ReactNode;
   /** A tap at a point of the page (bounds units); the scenario taps a word with `tapPoint`. */
   onTapPoint?: (page: number, x: number, y: number, toWindow: (r: { x0: number; y0: number; x1: number; y1: number }) => Box) => boolean;
+  /** A held ayah (the reader's verse menu); the scenario holds one with `holdAyah`. */
+  onLongPressAyah?: (ayah: { page: number; sura: number; ayah: number }, point?: { x: number; y: number }) => void;
 }
 
 interface Box {
@@ -64,6 +66,12 @@ export const MushafPager = forwardRef<PagerHandle, PagerProps>(function MushafPa
     </View>
   );
 });
+
+/** A finger held on an ayah of the page shown: what the reader does (its verse menu opens). */
+export function holdAyah(sura: number, ayah: number): void {
+  const state = pagerState();
+  if (state.props?.onLongPressAyah && state.current != null) state.props.onLongPressAyah({ page: state.current, sura, ayah }, { x: 200, y: 300 });
+}
 
 /** A finger on the page at (x, y) in its bounds units: what the reader does with a tap there (true: it took it). */
 export function tapPoint(x: number, y: number): boolean {

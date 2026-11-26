@@ -185,6 +185,11 @@ export const settings = {
     deleteSpeechModel: 'Delete speech model',
   },
   revo: {
+    /** Revisely Dev (REVO-44): the one quiet line on the four tafsirs (Majd, Nov 26 2026: "more subtle"). */
+    footerTafsir: 'Revo AI can make mistakes. It answers from your own revision data, and about the Qur’an only from Tafsir al-Tabari, Ibn Kathir, al-Qurtubi and al-Sa’di.',
+    mushaf: 'In the mushaf',
+    mushafSub: 'Revo at the foot of each page, to ask about it',
+    mushafFailed: 'Couldn’t change it',
     footer: 'Revo AI can make mistakes. It answers from your own revision data.',
     revo: 'Revo',
     paused: 'Paused for now',

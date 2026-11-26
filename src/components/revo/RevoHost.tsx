@@ -18,7 +18,7 @@ import { useRevoButtonSide } from '../../lib/revo/buttonSide';
 import { revoBackend } from '../../lib/revo/backend';
 import { dayHadActivity } from '../../lib/revo/context';
 import { greetingState, nextPlaceOpens, readPlaceOpens, type GreetingOpens, type PlaceOpens } from '../../lib/revo/greeting';
-import { onRevoOpen, type RevoOpenRequest } from '../../lib/revo/open';
+import { onRevoOpen, type RevoOpenRequest, type RevoQuranOpen } from '../../lib/revo/open';
 import { HOME, placeKey, revoPlaceOf, type RevoPlace } from '../../lib/revo/place';
 import { dayAttachment, dayLabel } from '../../lib/revo/attachments';
 import { prepare } from '../../lib/revo/facts';
@@ -26,7 +26,8 @@ import { shiftDay } from '../../lib/journal';
 import { smartTrackingOn } from '../../lib/smartTracking';
 import { listRecordings } from '../../lib/recordings';
 import { openScreen } from '../../lib/revo/screens';
-import { setRevoButtonRoute, setRevoPresent } from '../../lib/revo/presence';
+import { setRevoButtonRoute, setRevoInMushaf, setRevoPresent } from '../../lib/revo/presence';
+import { isDevVariant } from '../../lib/variant';
 import type { RevoAction, RevoAttachment, RevoSettings } from '../../lib/revo/types';
 import { useRevoContext } from '../../lib/revo/useRevoContext';
 import { RevoBoundary } from './RevoBoundary';
@@ -120,12 +121,19 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
   const { day, build, sources } = useRevoContext();
 
   const [settings, setSettings] = useState<RevoSettings | null>(null);
+  // Revo in the mushaf (REVO-45): Revisely Dev only, Revo on, the switch on (on unless turned off).
+  useEffect(() => {
+    setRevoInMushaf(isDevVariant() && settings?.optIn === true && settings.mushafOn !== false);
+    return () => setRevoInMushaf(false);
+  }, [settings]);
   const [usage, setUsage] = useState({ day: '', count: 0 });
   const [open, setOpen] = useState(false);
   const [full, setFull] = useState(false);
   const [view, setView] = useState<View_>({ name: 'chat' });
   const [chatId, setChatId] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<RevoAttachment[]>([]);
+  // Opened from the mushaf: the page or ayah the next questions are about (REVO-45).
+  const [quran, setQuran] = useState<RevoQuranOpen | null>(null);
   // The sheet's height before Add to chat took it to full height: back to it after (mock a7).
   const fullBeforeAdd = useRef(false);
   const [optInBusy, setOptInBusy] = useState(false);
@@ -237,6 +245,7 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
       setPlace(at);
       setView({ name: 'chat' });
       setChatId(null);
+      setQuran(null);
       setReviewOffer(reviewNow.current);
       countOpen(at);
     },
@@ -329,6 +338,7 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
         // A new conversation, its greeting written now (REVO-34), whatever was open before.
         startFresh(at);
         setFull(false);
+        setQuran(request.quran ?? null);
         if (request.attach) setAttachments([request.attach]);
         else if (at.kind === 'day') attachDay(at);
       }
@@ -482,6 +492,8 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
               usage={usage}
               attachments={attachments}
               onAttachments={setAttachments}
+              quran={quran}
+              onQuran={setQuran}
               onAdd={() => {
                 fullBeforeAdd.current = full;
                 setView({ name: 'add' });

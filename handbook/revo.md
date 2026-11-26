@@ -160,3 +160,11 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
     (`components/revo/TafsirSources`: "From the tafsir", a tap shows the passage). The emulator answers the two new
     requests from `revo-locate.json` and `revo-tafsir.json` (hand-written in the documented shape, citations computed
     against page 379, until Majd OKs recording them); `replies.<kind>` on an account sets one kind's reply.
+  - **In the mushaf** (REVO-45; Majd, Nov 26 2026, reversing REVO-25's "no revo in the mushaf tab at all" for Dev):
+    `RevoHost` sets `useRevoInMushaf()` (Dev, Revo on, `mushafOn` not false). The reader then puts a 30pt R
+    (44pt to tap) in `ReaderFrame`'s `quietEnd`, the quiet footer's empty end slot beside the page number, in the room
+    kept under the page; hidden while a take runs. It opens Revo with `openRevo({ quran })` (`lib/revo/open`:
+    `pageScope`, `ayahScope`); the chat starts on the page's or ayah's chip and starters and sends `quran`. The held
+    ayah's menu gets "Ask Revo" through `useVerseActions({ onAskRevo })`, which only the reader passes (never a
+    session). Settings → Revo AI → "In the mushaf" saves `mushafOn` through `revoSetOptions`; the section's footer is
+    the one quiet line naming the four tafsirs (Majd: "more subtle").

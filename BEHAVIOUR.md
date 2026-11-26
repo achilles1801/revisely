@@ -1482,10 +1482,11 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   the bottom edge (Majd, Nov 25 2026, of Revo's button there: "yes the revo there is nice"); opened there, it starts as
   from Home. There is no Revo on the Read tab (its list or the reader) or in a
   revision session, and their help sheets offer no "Ask Revo" (Majd, Nov 8 2026: "no revo in the revision
-  sessions. there should also be no revo in the mushaf tab at all"); none in another editor or Settings either. The one
-  way to Revo from the reader or a session is a finished take's summary (Majd, Nov 25 2026: "the reader stays free of
-  Revo"): its row "Ask Revo about this take" closes the summary and opens Revo with the take attached, only for an
-  account with Revo on, and never while the take still runs. The
+  sessions. there should also be no revo in the mushaf tab at all"); none in another editor or Settings either. In
+  Revisely Dev the reader has Revo in its own place instead, at the page's foot (REVO-45: Majd's Nov 26 2026 word is
+  newer). The one way to Revo from a session is a finished take's summary (Majd, Nov 25 2026: "the reader stays free of
+  Revo"), as from the reader: its row "Ask Revo about this take" closes the summary and opens Revo with the take
+  attached, only for an account with Revo on, and never while the take still runs. The
   screens it shows on end their lists with room for it (`useRevoFootprint`), so their last row scrolls clear of it;
   other screens leave none.
 
@@ -1656,6 +1657,15 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   grey highlight. Every quote is the books' own text: a long answer that cites none is never shown. When the books
   don't answer it, Revo says so in a sentence or two, and it gives no rulings. A follow-up in that conversation is
   answered from the same ayat. Each counts as one of the day's questions (REVO-22).
+
+- **REVO-45.** (Revisely Dev) Revo in the mushaf (Majd, Nov 26 2026: "revo can be confirable such that in shows up in
+  the mushaf itself (without blocking any text)"). With Revo on and Settings → Revo AI → "In the mushaf" on (on unless
+  turned off), the reader shows a small R at the foot of the page while reading, on the other side of the page number,
+  in the room kept under the page, so it never covers it; not with the controls up, nor while a take runs. A tap opens
+  Revo about that page: its chip ("An-Naml, 3rd page"), a line that it answers only from the tafsir, and three
+  starters. A held ayah's menu starts with "Ask Revo" ("About this ayah, from the tafsir"), which opens Revo about
+  that ayah. Their questions are answered from the tafsir (REVO-44). Never in a revision session. Turned off, neither
+  shows. Settings → Revo AI's footer says in one line that answers about the Qur'an come only from the four tafsirs.
 
 ## Memorizing
 

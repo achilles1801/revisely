@@ -156,3 +156,102 @@ it("[REVO-44] a question that isn't about the Qur'an is answered as before, with
     await app.close();
   }
 });
+
+/** Home, the reader and Revo, as MainNavigator mounts Revo over the screens. */
+function readerRevoStack(mods: Booted): ReactElement {
+  const { React, require: req } = mods;
+  const { NavigationContainer } = req<any>('@react-navigation/native');
+  const { createNativeStackNavigator } = req<any>('@react-navigation/native-stack');
+  const Dashboard = req<any>('src/screens/main/DashboardScreen').default;
+  const Reader = req<any>('src/screens/read/QuranReaderScreen').default;
+  const { ReadingTimerProvider } = req<any>('src/context/ReadingTimerContext');
+  const { RevoHost } = req<any>('src/components/revo/RevoHost');
+  const { navigationRef } = req<any>('src/navigation/navigationRef');
+  const nav = req<{ navigation: { current: unknown } }>('./navRef');
+  const Stack = createNativeStackNavigator();
+  const h = React.createElement;
+  const Elsewhere = () => null;
+  const ref = (r: unknown) => {
+    nav.navigation.current = r;
+    navigationRef.current = r;
+  };
+  return h(
+    ReadingTimerProvider,
+    null,
+    h(
+      NavigationContainer,
+      { ref },
+      h(
+        Stack.Navigator,
+        { screenOptions: { headerShown: false, animation: 'none' } },
+        h(Stack.Screen, { name: 'Dashboard', component: Dashboard }),
+        h(Stack.Screen, { name: 'QuranReader', component: Reader }),
+        ...['ActiveRevision', 'Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'ActivityDay', 'Memorization', 'Insights'].map((name) =>
+          h(Stack.Screen, { key: name, name, component: Elsewhere }),
+        ),
+      ),
+    ),
+    h(RevoHost),
+  );
+}
+
+type Nav = { navigation: { current: { navigate: (name: string, params?: object) => void } } };
+
+/** Closes Revo's sheet as VoiceOver's activate on its handle does. */
+async function closeRevo(app: OpenApp) {
+  await app.act(async () => {
+    app.mods.rtl.fireEvent(app.screen.getByTestId('revo-sheet-handle'), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
+  });
+  await app.until(() => app.screen.queryByTestId('revo-input') == null, 'Revo closed');
+}
+
+it('[REVO-45] [REVO-25] [REVO-44] Revo in the mushaf (Revisely Dev): an R at the page’s foot asks about the page, a held ayah’s menu asks about the ayah, both answered from the tafsir; Settings’ switch takes both away', async () => {
+  setZone(ZONES.amman);
+  setNow('2026-11-26 10:00');
+  const phone = new Phone('phone');
+  let app = await newAccount(phone, { memorized: pagesRange(1, 20), user: { dailyPageCapacity: 5 } });
+  const uid = app.uid;
+  await app.untilSynced();
+  await app.close();
+  await markPreviewTester(uid);
+  await setServerDoc(`coachSettings/${uid}`, { revoOn: true });
+  revoMomentSeen(phone, uid);
+  const asks = watchFunction('revoAsk');
+  try {
+    app = await phone.open(readerRevoStack);
+    await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
+    await app.act(() => app.mods.require<Nav>('./navRef').navigation.current.navigate('QuranReader', { pageNumber: 379 }));
+    await app.until(() => app.screen.queryByTestId('reader-revo') != null, 'Revo at the page’s foot');
+    // In the room under the page (the quiet footer), never on the page.
+    const { within } = app.mods.rtl;
+    expect(within(app.screen.getByTestId('reader-quiet-footer')).getByTestId('reader-revo')).toBeTruthy();
+
+    // About the page: its chip, the line, the starters; the question carries the page's ayat (no step to find them).
+    await tap(app, 'reader-revo');
+    await app.until(() => app.screen.queryByText(/Ask me anything about this page/) != null, 'Revo about the page');
+    expect(app.screen.getByText('An-Naml, 3rd page')).toBeTruthy();
+    await tap(app, 'revo-chip-What’s happening here?');
+    await app.until(() => app.screen.queryByTestId('revo-tafsir-sources') != null, 'the answer from the tafsir');
+    expect(asks.sent[asks.sent.length - 1]).toMatchObject({ question: 'What’s happening here?', quran: { from: [27, 23], to: [27, 35] } });
+    expect((await modelRequests(uid)).map((r) => r.kind)).toEqual(['revo-tafsir']);
+    await closeRevo(app);
+
+    // A held ayah: "Ask Revo" first in its menu, about that ayah.
+    const { holdAyah } = require('../harness/pager') as { holdAyah: (s: number, a: number) => void };
+    await app.act(async () => holdAyah(27, 35));
+    await tap(app, 'verse-menu-askRevo');
+    await app.until(() => app.screen.queryByText(/Ask me anything about this ayah/) != null, 'Revo about the ayah');
+    expect(app.screen.getByText('An-Naml 35')).toBeTruthy();
+    await closeRevo(app);
+
+    // Settings → Revo AI → In the mushaf, off: neither shows.
+    await setServerDoc(`coachSettings/${uid}`, { revoOn: true, mushafOn: false });
+    await app.until(() => app.screen.queryByTestId('reader-revo') == null, 'Revo gone from the page’s foot');
+    await app.act(async () => holdAyah(27, 35));
+    await app.until(() => app.screen.queryByTestId('verse-menu-play') != null, 'the verse menu');
+    expect(app.screen.queryByTestId('verse-menu-askRevo')).toBeNull();
+  } finally {
+    asks.restore();
+    await app.close();
+  }
+});

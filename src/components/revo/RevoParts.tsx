@@ -146,6 +146,7 @@ export function UserBubble({ text, attached = [], testID }: { text: string; atta
 
 export const ATTACH_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   revisionDay: 'calendar-outline',
+  quran: 'book-outline',
   surah: 'book-outline',
   juz: 'albums-outline',
   pages: 'document-outline',

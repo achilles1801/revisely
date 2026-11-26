@@ -4,6 +4,8 @@ import type { ArStrings } from './types';
 
 export const verse: NonNullable<ArStrings['verse']> = {
   menu: {
+    askRevo: 'اسأل ⁨Revo⁩',
+    askRevoSubtitle: 'عن هذه الآية، من التفسير',
     play: 'تشغيل',
     translation: 'الترجمة',
     copy: 'نسخ',

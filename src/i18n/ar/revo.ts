@@ -455,6 +455,14 @@ export const revo: NonNullable<ArStrings['revo']> = {
   /** إجابات من التفسير (Revisely Dev، REVO-44). */
   tafsir: {
     fromTheTafsir: 'من التفسير',
+    greetingPage: 'اسألني أي شيء عن هذه الصفحة. أجيب من التفسير فقط، وأريك أين.',
+    greetingAyah: 'اسألني أي شيء عن هذه الآية. أجيب من التفسير فقط، وأريك أين.',
+    startPage1: 'ماذا يحدث هنا؟',
+    startPage2: 'ماذا تعلمنا هذه الآيات؟',
+    startPage3: 'عمن تتحدث؟',
+    startAyah1: 'ما معنى هذه الآية؟',
+    startAyah2: 'ماذا تعلمنا؟',
+    startAyah3: 'ماذا حدث هنا؟',
     book: {
       tabari: 'الطبري',
       ibnKathir: 'ابن كثير',

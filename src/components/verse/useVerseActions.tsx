@@ -50,6 +50,8 @@ interface Options {
   /** The screen is the one in front (useIsFocused). A focused screen whose
    *  pages hold the verse playing takes the recitation over. */
   focused?: boolean;
+  /** The reader, with Revo in the mushaf (REVO-45): the menu offers "Ask Revo" about the held ayah. Never a session. */
+  onAskRevo?: (verse: AyahRef) => void;
 }
 
 /**
@@ -59,7 +61,7 @@ interface Options {
  * by the Quran tab and revision sessions. Returns the props for MushafPager and
  * the overlay to render on top of it.
  */
-export function useVerseActions({ pages, onShowPage, currentPage, focused = true }: Options) {
+export function useVerseActions({ pages, onShowPage, currentPage, focused = true, onAskRevo }: Options) {
   const { user, saveUser } = useApp();
   // A held verse is an outcome (it's selected): Medium; the Haptics setting
   // can turn it off.
@@ -350,6 +352,15 @@ export function useVerseActions({ pages, onShowPage, currentPage, focused = true
         onTranslation={openTranslation}
         onCopy={copyVerse}
         onShare={shareVerse}
+        onAskRevo={
+          onAskRevo && selected
+            ? () => {
+                const verse = selected;
+                closeMenu();
+                onAskRevo(verse);
+              }
+            : undefined
+        }
         onClose={closeMenu}
       />
       <VerseSheet

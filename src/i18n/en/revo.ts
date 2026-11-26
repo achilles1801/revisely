@@ -417,6 +417,14 @@ export const revo = {
   /** Answers from the tafsir (Revisely Dev, REVO-44): the books' words under an answer. */
   tafsir: {
     fromTheTafsir: 'From the tafsir',
+    greetingPage: 'Ask me anything about this page. I answer only from the tafsir, and show you where.',
+    greetingAyah: 'Ask me anything about this ayah. I answer only from the tafsir, and show you where.',
+    startPage1: 'What’s happening here?',
+    startPage2: 'What do these ayat teach?',
+    startPage3: 'Who is this about?',
+    startAyah1: 'What does this ayah mean?',
+    startAyah2: 'What does it teach?',
+    startAyah3: 'What happened here?',
     book: {
       tabari: 'Al-Tabari',
       ibnKathir: 'Ibn Kathir',

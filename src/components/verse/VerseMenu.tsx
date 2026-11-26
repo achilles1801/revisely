@@ -41,6 +41,8 @@ interface VerseMenuProps {
   onCopy: () => void;
   /** The same text, to the share sheet. */
   onShare: () => void;
+  /** Revo in the mushaf (REVO-45): a first row, "Ask Revo" about this ayah, answered from the tafsir. */
+  onAskRevo?: () => void;
   onClose: () => void;
   /** The held verse ("Al-Baqarah 2:255"), for VoiceOver. */
   verseLabel?: string;
@@ -77,6 +79,7 @@ export function VerseMenu({
   onShare,
   onClose,
   verseLabel,
+  onAskRevo,
 }: VerseMenuProps) {
   const { palette, isDark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -85,8 +88,8 @@ export function VerseMenu({
   const visible = point != null;
 
   // What it was opened with stays while it closes.
-  const last = useRef({ point, anchor, playSubtitle, verseLabel });
-  if (visible) last.current = { point, anchor, playSubtitle, verseLabel };
+  const last = useRef({ point, anchor, playSubtitle, verseLabel, onAskRevo });
+  if (visible) last.current = { point, anchor, playSubtitle, verseLabel, onAskRevo };
   const shown = last.current;
 
   const [mounted, setMounted] = useState(visible);
@@ -159,6 +162,9 @@ export function VerseMenu({
 
   const verse = shown.verseLabel;
   const groups: Row[][] = [
+    ...(shown.onAskRevo
+      ? [[{ key: 'askRevo', label: t('verse.menu.askRevo'), icon: 'sparkles-outline' as IconName, subtitle: t('verse.menu.askRevoSubtitle'), onPress: shown.onAskRevo }]]
+      : []),
     [
       { key: 'play', label: t('verse.menu.play'), icon: 'play', subtitle: shown.playSubtitle ?? t('verse.playTo.juz'), onPress: onPlay },
       { key: 'translation', label: t('verse.menu.translation'), icon: 'language-outline', onPress: onTranslation },
@@ -174,6 +180,7 @@ export function VerseMenu({
     translation: verse ? t('verse.menu.translationOf', { verse }) : t('verse.menu.translation'),
     copy: verse ? t('verse.menu.copyOf', { verse }) : t('verse.menu.copy'),
     share: verse ? t('verse.menu.shareOf', { verse }) : t('verse.menu.share'),
+    askRevo: t('verse.menu.askRevo'),
   };
 
   return (

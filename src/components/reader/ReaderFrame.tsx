@@ -36,6 +36,9 @@ interface ReaderFrameProps {
   pageLabel: ReactNode;
   /** While reading: what is running (a recording, a recitation), beside the page number. */
   activity?: ReactNode;
+  /** While reading: the other side of the page number (Revo in the mushaf, REVO-45). In the room kept under the page,
+   *  so it never covers it. */
+  quietEnd?: ReactNode;
   /** While reading: a line under the page number (a first-time hint). */
   hint?: ReactNode;
   /** The pages. */
@@ -79,6 +82,7 @@ export function ReaderFrame({
   footerHeight,
   pageLabel,
   activity,
+  quietEnd,
   hint,
   children,
 }: ReaderFrameProps) {
@@ -151,7 +155,9 @@ export function ReaderFrame({
             {activity}
           </View>
           <View pointerEvents="none">{pageLabel}</View>
-          <View style={styles.side} />
+          <View style={[styles.side, styles.sideEnd]} pointerEvents="box-none">
+            {quietEnd}
+          </View>
         </View>
         {hint ? (
           <View style={styles.hint} pointerEvents="none">
@@ -205,4 +211,5 @@ const styles = StyleSheet.create({
   side: { flex: 1, flexDirection: 'row' },
   hint: { alignItems: 'center', paddingTop: 2 },
   sideStart: { justifyContent: 'flex-start' },
+  sideEnd: { justifyContent: 'flex-end' },
 });
