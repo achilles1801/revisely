@@ -405,7 +405,8 @@ current basic sounds". October 2026's version was removed for the voices it offe
   first note, one still waiting to be sent included, or "Add a note" when there is none.
 - **HOME-3.** Where today starts on Home's Today post ends with "Change", which opens Jump to directly (Majd, Nov 25
   2026: "yes jump to should be option 3 the 'change' one"). There is no menu: Edit schedule is in Settings → Revision
-  (SET-1). Once today is done the word goes, as the › did, and a tap on the line still opens Jump to. (Before: a › that
+  (SET-1). Once today is done the word goes, as the › did, and a tap on the line still opens Jump to. Today's page numbers,
+  which only that menu showed ("pp. 542–551"), are gone from Home (Majd, Nov 26 2026: "yeah drop them"). (Before: a › that
   opened a menu of Jump to… and Edit schedule, under today's exact pages.)
 
 ## Sheets and updates
