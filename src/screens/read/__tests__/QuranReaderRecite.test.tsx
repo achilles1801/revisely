@@ -87,6 +87,10 @@ jest.mock('@react-navigation/native', () => ({
   useIsFocused: () => true,
 }));
 jest.mock('../../../navigation/navigationRef', () => ({ navigateToActivityDay: jest.fn() }));
+// Revo on for the account or not (RevoHost isn't mounted here), and where its sheet would open: the summary's row (REVO-25).
+const mockRevo = { present: false };
+jest.mock('../../../lib/revo/presence', () => ({ ...jest.requireActual('../../../lib/revo/presence'), useRevoPresent: () => mockRevo.present }));
+jest.mock('../../../lib/revo/open', () => ({ openRevo: jest.fn() }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 
 const mockState: {
@@ -316,6 +320,7 @@ beforeEach(async () => {
   mockRoute.params = { pageNumber: 379 };
   mockMic = null;
   mockPremium.has = true;
+  mockRevo.present = false;
   mockTake.started = null;
   mockTake.added = 0;
   mockTake.finished = 0;
@@ -359,15 +364,15 @@ describe('the one mic (Revisely Dev)', () => {
     expect(screen.queryByTestId('reader-eye')).toBeNull();
   });
 
-  it('a tester in the Dev app: one mic (no record button) and the eye; never two mics', async () => {
+  it('[RECITE-32] a tester in the Dev app: one mic (no record button) and the eye; never two mics; Mark mistakes on from the start', async () => {
     await open();
     expect(screen.getByTestId('recite-mic')).toBeTruthy();
-    expect(screen.getByLabelText('Recite')).toBeTruthy();
+    expect(screen.getByLabelText('Recite and mark mistakes')).toBeTruthy();
     expect(screen.getByTestId('reader-eye')).toBeTruthy();
     expect(screen.queryByLabelText('Record your recitation')).toBeNull();
   });
 
-  it('holding the mic: Record and Recite, with Mark mistakes under Recite (off, no lock for a tester); Record starts the recorder and stays', async () => {
+  it('holding the mic: Record and Recite, with Mark mistakes under Recite (on from the start, no lock for a tester); Record starts the recorder and stays', async () => {
     await open();
     fireEvent(screen.getByTestId('recite-mic'), 'longPress');
     expect(screen.getByTestId('recite-mode-menu')).toBeTruthy();
@@ -375,7 +380,7 @@ describe('the one mic (Revisely Dev)', () => {
     expect(screen.getByText('The page follows you')).toBeTruthy();
     expect(screen.queryByTestId('recite-mode-check')).toBeNull();
     expect(screen.getByText('Mark mistakes')).toBeTruthy();
-    expect(screen.getByTestId('recite-mistakes-off')).toBeTruthy();
+    expect(screen.getByTestId('recite-mistakes-on')).toBeTruthy();
     expect(screen.queryByTestId('recite-mistakes-locked')).toBeNull();
     fireEvent.press(screen.getByTestId('recite-mode-record'));
     expect(mockState.recordStart).toHaveBeenCalled();
@@ -400,7 +405,8 @@ describe('the one mic (Revisely Dev)', () => {
     fireEvent.press(screen.getByTestId('recite-notice-agree'));
     await flush();
     await flush();
-    expect(mockLive.start).toMatchObject({ type: 'start', s: 27, a: 23, follow: true, letters: true, tajweed: false });
+    // Mark mistakes is on from the start (RECITE-32): the first take checks, it doesn't only follow.
+    expect(mockLive.start).toMatchObject({ type: 'start', s: 27, a: 23, follow: false, letters: true, tajweed: false });
   });
 });
 
@@ -1723,12 +1729,11 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     },
   );
 
-  it('Mark mistakes: the switch stays on, the mic says so, and the next take marks mistakes', async () => {
+  it('[RECITE-32] Mark mistakes: on from the start, the mic says so, the take marks mistakes; turned off, it stays off', async () => {
     setReciteCheckSettings('u1', { noticeSeen: true });
     await open();
     fireEvent(screen.getByTestId('recite-mic'), 'longPress');
-    fireEvent.press(screen.getByTestId('recite-mistakes'));
-    // The menu stays open, the switch on; the mic now starts Recite marking mistakes.
+    // Nothing set yet: the switch is on, and the mic starts Recite marking mistakes.
     expect(screen.getByTestId('recite-mistakes-on')).toBeTruthy();
     expect(screen.getByTestId('recite-mic', { includeHiddenElements: true }).props.accessibilityLabel).toBe('Recite and mark mistakes');
     expect(screen.getByTestId('recite-mic-badge-check', { includeHiddenElements: true })).toBeTruthy();
@@ -1788,7 +1793,8 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     expect(setDevPremium).toHaveBeenCalledWith(true);
     expect(screen.queryByTestId('check-intro')).toBeNull();
     fireEvent(screen.getByTestId('recite-mic'), 'longPress');
-    expect(screen.getByTestId('recite-mistakes-off')).toBeTruthy();
+    // On from the start (RECITE-32), now that the account has it.
+    expect(screen.getByTestId('recite-mistakes-on')).toBeTruthy();
     expect(screen.queryByTestId('recite-mistakes-locked')).toBeNull();
     alert.mockRestore();
   });
@@ -2154,7 +2160,8 @@ describe('Test me is one spot test (RECITE-8; Majd, Nov 23 2026: "there should o
     fireEvent.press(screen.getByTestId('recite-mic'));
     await flush();
     await flush();
-    expect(mockLive.start).toMatchObject({ s: 27, a: 23, startBy: expect.any(Array), follow: true });
+    // An ordinary take on the page, with Mark mistakes as it is (on from the start, RECITE-32): not the test's.
+    expect(mockLive.start).toMatchObject({ s: 27, a: 23, startBy: expect.any(Array), follow: false });
     expect(screen.getByTestId('recite-status').props.children).toBe('Starting…');
   });
 
@@ -2845,5 +2852,61 @@ describe('after Stop, nothing opens by itself (Majd, Nov 22 2026: "nothing pops 
     } finally {
       mockState.dev = true;
     }
+  });
+});
+
+describe('what friends asked, Nov 25 2026', () => {
+  const amber = (id: string, w: number) =>
+    event({ type: 'mark', mark: { id, w, ayah: [27, 23], kind: 'harakat', sure: 'clear', slip: { expected: 'ٍ', heard: 'ٌّ' } } });
+
+  it('[RECITE-31] the first amber mark explains itself once, in the bar’s line, then the words come back; a red mark doesn’t, and it never comes again', async () => {
+    await startTake('check');
+    await event({ type: 'at', w: A23 + 3 });
+    await event({ type: 'mark', mark: { id: 'r', w: UTIYAT, ayah: [27, 23], kind: 'word', sure: 'clear', heard: 'وَأُوهِيَتْ', heardExact: false } });
+    await flush();
+    expect(screen.queryByTestId('recite-note')).toBeNull();
+    await amber('h1', A23 + 7);
+    await flush();
+    expect(screen.getByTestId('recite-note')).toBeTruthy();
+    expect(screen.getByText('Amber: a wrong haraka or letter, or not clear. Tap a mark to see.')).toBeTruthy();
+    expect(screen.queryByTestId('recite-words')).toBeNull();
+    // Kept on the account at once, so it's never shown again, even if the app closes now.
+    const { parseReciteCheckSettings } = jest.requireActual('../../../lib/reciteCheck/settings');
+    await settle(async () => expect(parseReciteCheckSettings(await AsyncStorage.getItem('@revisely_recite_check:v1:u1')).amberExplained).toBe(true));
+    // About 6 seconds, then the words again.
+    await settle(() => expect(screen.queryByTestId('recite-note')).toBeNull(), 9000);
+    await event({ type: 'at', w: A23 + 9 });
+    expect(screen.getByTestId('recite-words')).toBeTruthy();
+    await amber('h2', A23 + 8);
+    await flush();
+    expect(screen.queryByTestId('recite-note')).toBeNull();
+  }, 20000);
+
+  const finishedTake = async () => {
+    await startTake('check');
+    fireEvent.press(screen.getByTestId('recite-stop'));
+    await event({ type: 'done', result: { v: 2, take: 't1', from: A23, to: A23 + 10, secs: 12, marks: [], score: null, start: A23 } });
+    await openResult();
+    expect(screen.getByTestId('take-summary')).toBeTruthy();
+  };
+
+  it('[REVO-25] a finished take’s summary ends with “Ask Revo about this take”: it closes the summary and opens Revo with the take attached', async () => {
+    mockRevo.present = true;
+    await finishedTake();
+    await settle(() => expect(screen.getByTestId('take-summary-ask-revo')).toBeTruthy());
+    expect(screen.getByText('Ask Revo about this take')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('take-summary-ask-revo'));
+    await flush();
+    const { openRevo } = jest.requireMock('../../../lib/revo/open');
+    expect(openRevo).toHaveBeenCalledWith({ attach: expect.objectContaining({ kind: 'reciteTake' }) });
+    // The summary goes first (one modal at a time on iOS, SHEET-1); Revo's sheet takes its turn after it.
+    await settle(() => expect(screen.queryByTestId('take-summary')).toBeNull());
+    // The reader itself stays free of Revo: no button of its own.
+    expect(screen.queryByTestId('revo-button')).toBeNull();
+  });
+
+  it('[REVO-25] with Revo off for the account, the summary has no Ask Revo', async () => {
+    await finishedTake();
+    expect(screen.queryByTestId('take-summary-ask-revo')).toBeNull();
   });
 });

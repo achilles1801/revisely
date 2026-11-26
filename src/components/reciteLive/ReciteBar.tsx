@@ -151,6 +151,7 @@ export function ReciteBar({
   onScore,
   result = null,
   undo = null,
+  note = null,
 }: {
   hidden: boolean;
   onToggleHidden: () => void;
@@ -189,6 +190,11 @@ export function ReciteBar({
    * buttons staying (RECITE-25). It used to be a note above the bar, over the page's last lines.
    */
   undo?: { text: string; onUndo: () => void } | null;
+  /**
+   * A line that explains, once, in the words' place for a few seconds (RECITE-31: what the first amber mark means), with
+   * a dot in the colour it explains. Quiet, as the slow line is: never a pop-up, a sound or speech over the recitation.
+   */
+  note?: { text: string; colour: string } | null;
 }) {
   const { palette } = useTheme();
   const ticking = useTakeSeconds(takeClock);
@@ -199,6 +205,7 @@ export function ReciteBar({
   const slowNow = slow && !paused && phase === 'live';
   const shownWords = paused || slowNow ? [] : words;
   const shownStatus = paused ? t('reciteLive.bar.paused') : slowNow ? t('reciteLive.bar.slow') : status;
+  const noteNow = note && !undo && phase !== 'done' ? note : null;
   return (
     <View
       style={[styles.capsule, { backgroundColor: surface.background, borderColor: surface.border }]}
@@ -220,7 +227,7 @@ export function ReciteBar({
       ) : null}
       {/* Not a live region: its clock changes every second, and TalkBack would speak each one over the recitation, where
           the microphone hears it. VoiceOver reads it when focused; the summary is spoken once when it shows. */}
-      <View style={styles.middle} accessible={!(phase === 'done' && result) && !undo} accessibilityLabel={`${clock(secs)}${recording && phase === 'live' && !paused ? ', recording' : ''}. ${paused ? shownStatus : spoken || status}`} testID="recite-middle">
+      <View style={styles.middle} accessible={!(phase === 'done' && result) && !undo} accessibilityLabel={`${clock(secs)}${recording && phase === 'live' && !paused ? ', recording' : ''}. ${paused ? shownStatus : noteNow ? noteNow.text : spoken || status}`} testID="recite-middle">
         {undo ? (
           <View style={styles.undo} accessibilityLiveRegion="polite" testID="recite-undo-note">
             <Text style={[typeV2.meta, styles.undoText, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>
@@ -248,7 +255,14 @@ export function ReciteBar({
             {clock(secs)}
           </Text>
         </View>
-        {undo ? null : phase === 'done' && result ? (
+        {undo ? null : noteNow ? (
+          <View style={styles.note} testID="recite-note">
+            <View style={[styles.noteDot, { backgroundColor: noteNow.colour }]} />
+            <Text style={[typeV2.meta, styles.noteText, { color: palette.text }]} numberOfLines={2} maxFontSizeMultiplier={1.2}>
+              {noteNow.text}
+            </Text>
+          </View>
+        ) : phase === 'done' && result ? (
           <Tap
             onPress={result.onPress}
             hitSlop={8}
@@ -335,6 +349,9 @@ const styles = StyleSheet.create({
   middle: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   undo: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   undoText: { flexShrink: 1 },
+  note: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  noteDot: { width: 9, height: 9, borderRadius: 4.5, flexShrink: 0 },
+  noteText: { flexShrink: 1, lineHeight: 16 },
   // The time steps aside while Undo has the words' place (it keeps its clock running).
   away: { display: 'none' },
   time: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 0 },

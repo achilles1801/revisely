@@ -33,6 +33,8 @@ export const reciteLive: NonNullable<ArStrings['reciteLive']> = {
     paused: 'متوقف مؤقتًا',
     undoLabel: '{{text}}. تراجع',
     slow: 'الاتصال بطيء: الفحص متأخر عن تلاوتك',
+    amberNote: 'الأصفر: خطأ في الحركة أو الحرف، أو غير واضح. اضغط على أي تظليل لترى التفاصيل.',
+    amberNoteUnclear: 'الأصفر: لم يُسمع بوضوح، ولا يُحتسب. اضغط على أي تظليل لترى التفاصيل.',
     scoreLabel: 'النتيجة {{score}}. عرض أخطائك',
     resume: 'استئناف',
     pause: 'إيقاف مؤقت',
@@ -163,6 +165,7 @@ export const reciteLive: NonNullable<ArStrings['reciteLive']> = {
     seeLabel: 'عرض أخطائك، جزء من بريميوم',
     see: 'عرض أخطائك',
     seeSub: 'يعرض «تحديد الأخطاء» كل خطأ أثناء تلاوتك',
+    askRevo: 'اسأل ⁨Revo⁩ عن هذا التسميع',
   },
   test: {
     title: 'اختبرني',

@@ -31,7 +31,7 @@ import { reciteLiveEnabled } from '../../lib/reciteLive/availability';
 import { isDevVariant } from '../../lib/variant';
 import { premiumErrorText, setDevPremium, supportLinkUrl, usePremium } from '../../lib/premium';
 import { claimEarlyAccess, useEarlyAccess } from '../../lib/earlyAccess';
-import { checkLevel, setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
+import { checkLevel, reciteCheckSettingsLoaded, setReciteCheckSettings, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { loadQuranWords, getQuranWords, QuranWords } from '../../lib/recite/quranWords';
 import {
   furthestWord,
@@ -71,6 +71,8 @@ import { followCues } from '../../lib/reciteLive/wash';
 import { hiddenTakeInfo, keepRecited, revealedOnHide } from '../../lib/reciteLive/hideSwitch';
 
 const NO_VERSES: ReadonlySet<string> = new Set();
+/** How long the amber marks' one-time note holds the bar's line (RECITE-31). */
+export const AMBER_NOTE_MS = 6000;
 import { ReciteNoticeSheet } from './ReciteNoticeSheet';
 import { MarkCard } from './MarkCard';
 import { SimilarPhrasesSheet } from './SimilarPhrasesSheet';
@@ -102,7 +104,10 @@ import { PassageProgressSheet } from '../reciteMemory/PassageProgressSheet';
 import { memoryId, takeOfWord, type ClearRecord } from '../../lib/reciteMemory/record';
 import { clipOfTake, useTakeRecordings } from '../../lib/reciteMemory/takeAudio';
 import { markOf, PAST_OPACITY, RememberedTargets, RememberedUnderlay } from '../reciteMemory/RememberedLayers';
-import { markFill, markFirm } from './markColours';
+import { anyAmber, COLOURS_FOLLOW_TIERS, markFill, markFirm } from './markColours';
+import { openRevo } from '../../lib/revo/open';
+import { useRevoPresent } from '../../lib/revo/presence';
+import { takeAttachment } from '../../lib/revo/recitation';
 import { WordHistoryCard } from '../reciteMemory/WordHistoryCard';
 import { ShownTakeBar } from '../reciteMemory/ShownTakeBar';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
@@ -512,6 +517,38 @@ export function useReciteLayer({
   }, [qw, currentPage, revealed, hiddenInfo, live, notePeeks]);
 
   const checkTake = live.mode === 'check';
+  // Revo on for the account: the summary's "Ask Revo about this take" (REVO-25), the one way to Revo from here.
+  const revoOn = useRevoPresent();
+  const askRevoAbout = useCallback(
+    (take: TakeRecord, close: () => void) => {
+      if (!qw) return;
+      close();
+      const records = [...memoryRecords.filter((r) => r.id !== take.id), take];
+      const attach = takeAttachment(records, take, qw, day ?? take.day);
+      openRevo(attach ? { attach } : {});
+    },
+    [qw, memoryRecords, day],
+  );
+  // The first amber mark a take shows explains itself once, in the bar's line (RECITE-31; Majd, Nov 25 2026, from a
+  // friend's "Whats does yellow mean?"): never again on this account and phone. Read only once the kept settings are.
+  // The take it was shown in: it goes with that take (a new take never inherits it), or after AMBER_NOTE_MS.
+  const [amberNote, setAmberNote] = useState<string | null>(null);
+  const amberDue =
+    checkTake &&
+    !reciteSettings.amberExplained &&
+    reciteCheckSettingsLoaded(user?.id) &&
+    live.state.status !== 'done' &&
+    anyAmber(Object.values(live.state.marks));
+  useEffect(() => {
+    if (!amberDue || !user?.id) return;
+    setReciteCheckSettings(user.id, { amberExplained: true });
+    setAmberNote(live.state.take ?? '');
+  }, [amberDue, user?.id, live.state.take]);
+  useEffect(() => {
+    if (amberNote == null) return;
+    const id = setTimeout(() => setAmberNote(null), AMBER_NOTE_MS);
+    return () => clearTimeout(id);
+  }, [amberNote]);
   const cardMarks = useMemo<Mark[]>(
     () => (cardAt ? Object.values(live.state.marks).filter((m) => m.w === cardAt.w) : []),
     [cardAt, live.state.marks],
@@ -1070,6 +1107,11 @@ export function useReciteLayer({
                 }
               : null
           }
+          note={
+            amberNote != null && amberNote === (live.state.take ?? '') && barPhase === 'live'
+              ? { text: t(COLOURS_FOLLOW_TIERS ? 'reciteLive.bar.amberNoteUnclear' : 'reciteLive.bar.amberNote'), colour: v2.markSlipFirm }
+              : null
+          }
           // Not a mistake's Undo, in the words' place: never a note over the page (RECITE-25).
           undo={
             undoFor
@@ -1390,6 +1432,15 @@ export function useReciteLayer({
                 }
               : undefined
           }
+          onAskRevo={
+            revoOn && takeRecord && checkTake
+              ? () =>
+                  askRevoAbout(takeRecord, () => {
+                    setSummaryShown(null);
+                    setSoFar(false);
+                  })
+              : undefined
+          }
         />
         {/* A finished take's summary again, from its card on the page (RMEM-8): built from its record. */}
         <TakeSummarySheet
@@ -1453,6 +1504,7 @@ export function useReciteLayer({
                 }
               : undefined
           }
+          onAskRevo={revoOn && past ? () => askRevoAbout(past.take, () => setPastOpen(false)) : undefined}
           recitedToday={past?.take.day === day}
         />
         <CheckIntroPage

@@ -24,7 +24,7 @@ import type { HistoryRow } from '../../lib/reciteMemory/history';
 import type { SpotTestRecord } from '../../lib/reciteMemory/record';
 import { spotTestLine } from '../../lib/reciteLive/testMe';
 import { t } from '../../i18n';
-import { chevron } from '../../i18n/direction';
+import { chevron, forwardIcon } from '../../i18n/direction';
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 /** "1 minute 42 seconds", for VoiceOver. */
@@ -122,6 +122,7 @@ export function TakeSummarySheet({
   onShown,
   onDelete,
   onRecited,
+  onAskRevo,
   when = null,
   recitedToday = true,
   unfinished = false,
@@ -184,6 +185,11 @@ export function TakeSummarySheet({
   onDelete?: () => void;
   /** "In today's Recited ›": the take's day in Activity, its Recited open (where a kept take lives, RMEM-6). */
   onRecited?: () => void;
+  /**
+   * "Ask Revo about this take", the summary's last row (REVO-25; Majd, Nov 25 2026: the reader stays free of Revo, and
+   * this is the one way to it from there): absent where Revo isn't on for the account, and while the take still runs.
+   */
+  onAskRevo?: () => void;
   /**
    * A finished take's summary opened again from its card (RMEM-8, Revisely Dev): when it was ("Yesterday, 9:41 PM · page
    * hidden"), first in the head. Absent right after a take.
@@ -554,6 +560,25 @@ export function TakeSummarySheet({
           <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
         </Tap>
       ) : null}
+      {onAskRevo && !during ? (
+        <Tap
+          onPress={onAskRevo}
+          style={[styles.row, { borderTopColor: palette.separator }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('reciteLive.summary.askRevo')}
+          testID="take-summary-ask-revo"
+        >
+          <View style={[styles.revoMark, { backgroundColor: palette.fill }]}>
+            <Ionicons name="sparkles-outline" size={18} color={palette.accentText} />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX}>
+              {t('reciteLive.summary.askRevo')}
+            </Text>
+          </View>
+          <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
+        </Tap>
+      ) : null}
       {!check && !checkOwned && !during ? (
         <Tap
           onPress={onCheck}
@@ -583,6 +608,7 @@ const styles = StyleSheet.create({
   scoreRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, marginBottom: 4 },
   score: { fontSize: 44, lineHeight: 50, fontWeight: '300', letterSpacing: -1 },
   scoreNote: { paddingBottom: 8 },
+  revoMark: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

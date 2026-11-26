@@ -175,13 +175,34 @@ describe('the check’s settings on the phone', () => {
     expect(parseReciteCheckSettings(await AsyncStorage.getItem('@revisely_recite_check:v1:u9'))).toMatchObject({ munfasil: 2, markMistakes: true, noticeSeen: true });
   });
 
-  it('Mark mistakes is off until turned on; a kept "check" (the three-way menu) is Recite with mistakes marked', () => {
+  it('[RECITE-32] Mark mistakes is on from the start, kept as set once set; a kept "check" (the three-way menu) is Recite', () => {
     const { parseReciteCheckSettings } = require('../settings') as typeof import('../settings');
-    expect(parseReciteCheckSettings(null)).toMatchObject({ mode: 'recite', markMistakes: false, level: 'words' });
+    expect(parseReciteCheckSettings(null)).toMatchObject({ mode: 'recite', markMistakes: true, markMistakesSet: false, level: 'words' });
     expect(parseReciteCheckSettings(JSON.stringify({ mode: 'check' }))).toMatchObject({ mode: 'recite', markMistakes: true });
-    expect(parseReciteCheckSettings(JSON.stringify({ mode: 'check', markMistakes: false }))).toMatchObject({ mode: 'recite', markMistakes: false });
-    expect(parseReciteCheckSettings(JSON.stringify({ mode: 'record' }))).toMatchObject({ mode: 'record', markMistakes: false });
+    // Only the old default, never set on this phone since it came on from the start: on.
+    expect(parseReciteCheckSettings(JSON.stringify({ mode: 'check', markMistakes: false }))).toMatchObject({ mode: 'recite', markMistakes: true });
+    expect(parseReciteCheckSettings(JSON.stringify({ mode: 'record', markMistakes: false }))).toMatchObject({ mode: 'record', markMistakes: true });
+    // Turned off since: stays off.
+    expect(parseReciteCheckSettings(JSON.stringify({ markMistakes: false, markMistakesSet: true }))).toMatchObject({ markMistakes: false, markMistakesSet: true });
+    expect(parseReciteCheckSettings(JSON.stringify({ markMistakesSet: true }))).toMatchObject({ markMistakes: true, markMistakesSet: false });
     expect(parseReciteCheckSettings(JSON.stringify({ mode: 'shout' }))).toMatchObject({ mode: 'recite' });
+  });
+
+  it('[RECITE-32] turning Mark mistakes off keeps it off, on this phone, for that account', async () => {
+    const storage = require('@react-native-async-storage/async-storage');
+    const AsyncStorage = storage.default ?? storage;
+    const { setReciteCheckSettings, parseReciteCheckSettings, resetReciteCheckSettingsForTests } = require('../settings') as typeof import('../settings');
+    resetReciteCheckSettingsForTests();
+    setReciteCheckSettings('u32', { markMistakes: false });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(parseReciteCheckSettings(await AsyncStorage.getItem('@revisely_recite_check:v1:u32'))).toMatchObject({ markMistakes: false, markMistakesSet: true });
+  });
+
+  it('[RECITE-31] the amber note is unseen until shown, then kept', () => {
+    const { parseReciteCheckSettings } = require('../settings') as typeof import('../settings');
+    expect(parseReciteCheckSettings(null).amberExplained).toBe(false);
+    expect(parseReciteCheckSettings(JSON.stringify({ amberExplained: true })).amberExplained).toBe(true);
+    expect(parseReciteCheckSettings(JSON.stringify({ amberExplained: 'yes' })).amberExplained).toBe(false);
   });
 });
 

@@ -84,17 +84,13 @@ appId: com.revisionbuddy.app
       id: check-intro
     timeout: 30000
 
-# Premium on: Mark mistakes unlocks. Switch it on (the menu stays), then Recite.
+# Premium on: Mark mistakes unlocks, on from the start (RECITE-32). Then Recite.
 - longPressOn:
     id: recite-mic
 - extendedWaitUntil:
     visible:
-      id: recite-mistakes-off
+      id: recite-mistakes-on
     timeout: 10000
-- tapOn:
-    id: recite-mistakes
-- assertVisible:
-    id: recite-mistakes-on
 - tapOn:
     id: recite-mode-recite
 
