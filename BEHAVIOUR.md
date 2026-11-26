@@ -867,7 +867,8 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   says. A word the checker takes back comes off the line. Without those
   frames, or outside Revisely Dev, the bar is RECITE-28's.
 - **RECITE-30.** (Revisely Dev) Once the page's last ayah is said (the checker's `said` reaches its last word, the
-  reciter's place on that page), the next page shows at once and the take waits there for the reciter, whether or not
+  reciter's place on that page, or the place has stayed on that last word for 1.5 s: in a noisy room `said` often doesn't
+  reach it until the next word is begun; Majd, Nov 26 2026, "homie it didn't work"), the next page shows at once and the take waits there for the reciter, whether or not
   they have begun it; it doesn't wait for a word of the next page (Majd, Nov 25 2026: "when i finish reciting the last
   verse it should automatically take me to the next page and wait for me to begin if i didn't already"). Once per page.
   Never past a session's last page, and never in a stretch with an end of its own (Test me), which stops there instead.

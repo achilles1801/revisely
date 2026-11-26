@@ -61,15 +61,16 @@ it('[RECITE-9] [RECITE-30] [SESS-1] a take in a session turns its pages with the
   });
   await app.until(() => mockChecker.start != null, 'the take to start');
 
-  // The checker finds the reciter at Al-Fatihah 1. Once Al-Fatihah's last word is said, page 2 shows before a word of it
-  // (RECITE-30), and page 1, finished, is marked revised (RECITE-9).
+  // The checker finds the reciter at Al-Fatihah 1. They finish the page and wait: in a noisy room the checker's `said`
+  // stays one word short of the last (Majd, Nov 26 2026: "homie it didn't work"), so page 2 shows once their place has
+  // stayed on the last word a moment, before a word of it (RECITE-30), and page 1, finished, is marked revised (RECITE-9).
   const words = fixture.quranWords();
   await say(app, { type: 'ready', take: 't1', protocol: 6 });
   await say(app, { type: 'locked', w: words.verseFirstWord(1, 1), s: 1, a: 1 });
   const last1 = words.pageRange(1)[1] - 1;
+  await say(app, { type: 'said', upTo: last1 - 1 });
   await say(app, { type: 'at', w: last1 });
   expect(session.current()).toBe(1);
-  await say(app, { type: 'said', upTo: last1 });
   await app.until(() => session.current() === 2, 'the take to turn to page 2');
 
   // A swipe on, during the take: the page it leaves is marked, as always.
