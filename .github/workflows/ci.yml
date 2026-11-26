@@ -579,11 +579,14 @@ jobs:
   # still open, the same head, and no run of its own failed). From #676 until Nov 16 2026 a lower PR merged
   # only with the PR above it: two separate PRs into develop, one of which happened to hold the other's
   # commits, kept the lower one waiting for the upper to merge.
+  # `!cancelled()` is needed: without a status function GitHub adds success(), which is false when any job
+  # before it was skipped, and `scenarios-wait` is skipped on almost every PR. So until Nov 26 2026 this job
+  # never ran (100 PR runs; #987 waited on #1010's green run and merged only with it).
   # -----------------------------------------------------------------------
   pass-lower:
     name: Pass the PRs this run tested
     needs: [plan, required]
-    if: ${{ github.event_name == 'pull_request' && needs.plan.outputs.draft != 'true' && needs.plan.outputs.upper == '' && needs.plan.outputs.lower != '' && needs.plan.outputs.lower != '[]' && needs.required.result == 'success' }}
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.plan.outputs.draft != 'true' && needs.plan.outputs.upper == '' && needs.plan.outputs.lower != '' && needs.plan.outputs.lower != '[]' && needs.required.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
