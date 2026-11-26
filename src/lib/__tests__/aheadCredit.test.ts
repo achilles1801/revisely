@@ -7,7 +7,7 @@ import {
   removeAheadPages,
 } from '../aheadCredit';
 import { recomputePagesFromLogs } from '../algorithm';
-import { doneOnDay, reviewedOn, reviewPagesInOrder } from '../aheadCredit';
+import { doneOnDay, heldElsewhere, reviewedOn, reviewPagesInOrder, takeBackCredit } from '../aheadCredit';
 import { removeRevisedPages } from '../revisionSession';
 import { applySessionEdit, mergeSessionAdd, sessionUpdateData } from '../offline/ops';
 import type { RevisionLog, UserPage } from '../../types';
@@ -302,5 +302,52 @@ describe('the review’s order (Majd, Nov 5 2026)', () => {
     const a = log('2026-11-03', [6, 7]);
     const b = { ...log('2026-11-03', [8, 9, 10, 11, 12], { '2026-11-04': [11, 12] }), id: 'b' };
     expect(reviewPagesInOrder([a, b], '2026-11-03', [6, 7, 8, 9, 10])).toEqual([6, 7, 8, 9, 10, 11, 12]);
+  });
+});
+
+describe('a review’s pages held by other sessions (SESS-4; Majd, Nov 26 2026)', () => {
+  // His data: Wednesday's session revised ahead for Thursday; Thursday's own session revised its own pages.
+  const wed = log('2026-11-25', [1, 2, 6, 7], { '2026-11-26': [6, 7] });
+  const thu = log('2026-11-26', [8, 9, 10]);
+
+  it('Thursday’s review: the pages Wednesday revised ahead are held elsewhere, Thursday’s own are not', () => {
+    expect(heldElsewhere([wed, thu], '2026-11-26', thu)).toEqual([6, 7]);
+  });
+
+  it('a draft review (no session of its own yet) holds none of them itself', () => {
+    const draft = { ...log('2026-11-26', []), id: '' };
+    expect(heldElsewhere([wed], '2026-11-26', draft)).toEqual([6, 7]);
+  });
+
+  it('a page the day’s own session also holds is its own, never held elsewhere', () => {
+    expect(heldElsewhere([wed, log('2026-11-26', [6, 8])], '2026-11-26', log('2026-11-26', [6, 8]))).toEqual([7]);
+  });
+
+  it('another day’s credit for other days is not this day’s', () => {
+    const tue = log('2026-11-24', [3, 11], { '2026-11-27': [11] });
+    expect(heldElsewhere([tue, wed, thu], '2026-11-26', thu)).toEqual([6, 7]);
+  });
+
+  it('another session of the same day (an old log) holds its revised and credited pages', () => {
+    const other = { ...log('2026-11-26', [4], { '2026-11-27': [5] }), id: 'old' };
+    expect(heldElsewhere([other, thu], '2026-11-26', thu)).toEqual([4, 5]);
+  });
+
+  it('unchecking one takes back only its credit to the day: Wednesday still revised it (AHEAD-6)', () => {
+    expect(takeBackCredit([wed, thu], '2026-11-26', [6], thu.id)).toEqual([{ ...wed, ahead: { '2026-11-26': [7] } }]);
+  });
+
+  it('unchecking all of a day’s credit drops the day from the map', () => {
+    expect(takeBackCredit([wed, thu], '2026-11-26', [6, 7], thu.id)).toEqual([{ ...wed, ahead: {} }]);
+  });
+
+  it('nothing unchecked, or a page nobody else holds: no session changes', () => {
+    expect(takeBackCredit([wed, thu], '2026-11-26', [], thu.id)).toEqual([]);
+    expect(takeBackCredit([wed, thu], '2026-11-26', [9], thu.id)).toEqual([]);
+  });
+
+  it('another session of the same day no longer holds the page at all', () => {
+    const other = { ...log('2026-11-26', [4, 5], { '2026-11-27': [5] }), id: 'old' };
+    expect(takeBackCredit([other, thu], '2026-11-26', [5], thu.id)).toEqual([{ ...other, pagesRevised: [4], ahead: {} }]);
   });
 });

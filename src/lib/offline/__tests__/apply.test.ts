@@ -73,6 +73,31 @@ describe('applyEntry: Activity items beside a session (dual write)', () => {
     expect(mocked.replaceRevisionItems).toHaveBeenCalledWith(DAY, [expect.objectContaining({ id: DAY })], UID);
   });
 
+  it('[SESS-4] an edit that changes the credit for other days writes it; one that does not leaves it alone', async () => {
+    const write = async (ahead?: Record<string, number[]>) => {
+      mocked.mergeSessionOnServer.mockClear();
+      await applyEntry(UID, {
+        id: 'e2',
+        at: 1,
+        op: {
+          kind: 'session.edit',
+          id: DAY,
+          addRevised: [],
+          removeRevised: [],
+          pagesSkipped: [],
+          durationMinutes: null,
+          weaknessUpdates: [],
+          ...(ahead ? { ahead, checked: [549] } : {}),
+        },
+      });
+      const [, merge, updateData] = mocked.mergeSessionOnServer.mock.calls[0];
+      return updateData(merge({ ...serverSession, ahead: { '2026-11-05': [549, 550] } })!);
+    };
+    // Page 550's credit to the next day taken back: the server gets the map without it.
+    expect(await write({ '2026-11-05': [549] })).toMatchObject({ ahead: { '2026-11-05': [549] } });
+    expect(await write()).not.toHaveProperty('ahead');
+  });
+
   it('a session that is gone leaves no items for its day', async () => {
     mocked.mergeSessionOnServer.mockResolvedValue(null);
     await applyEntry(UID, {

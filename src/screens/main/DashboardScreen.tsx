@@ -68,7 +68,7 @@ import { avatarInitial } from '../../lib/displayName';
 import { prefetchPages } from '../../lib/pageCache';
 import { catchUpLine } from '../../lib/todayLines';
 import { applyCarryOver, leftoversFor, type Leftovers } from '../../lib/carryOver';
-import { reviewPagesInOrder } from '../../lib/aheadCredit';
+import { heldElsewhere, reviewPagesInOrder, takeBackCredit } from '../../lib/aheadCredit';
 import { ownRevised } from '../../lib/activityItems';
 import { aheadLead, nextRevisionDayPlan } from '../../lib/aheadPlan';
 import type { HistoryItem } from '../../lib/streakFromItems';
@@ -180,6 +180,8 @@ export default function DashboardScreen() {
   useEffect(() => onJumpSheetRequest(() => setJumpOpen(true)), []);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSessionPages, setSelectedSessionPages] = useState<number[]>([]);
+  // The review's pages done for its day that other sessions hold (SESS-4): checked there, kept where they are.
+  const [selectedHeld, setSelectedHeld] = useState<number[]>([]);
   const { refreshing, onRefresh } = usePullToRefresh(loadData);
 
   const quranData = getQuranData();
@@ -382,7 +384,7 @@ export default function DashboardScreen() {
     );
   }
 
-  const handleEditSession = (log: RevisionLog, reviewPages?: number[]) => {
+  const handleEditSession = (log: RevisionLog, reviewPages?: number[], held: number[] = []) => {
     // Prefer the day's actual assignedPages so the edit modal shows the
     // whole session, not just what the user marked. Fall back to
     // revised+skipped for legacy logs without the assignedPages field.
@@ -393,14 +395,26 @@ export default function DashboardScreen() {
         : [...log.pagesRevised, ...log.pagesSkipped].sort((a, b) => a - b));
     setSelectedLog(log);
     setSelectedSessionPages(sessionPages);
+    setSelectedHeld(held);
     setShowEditModal(true);
   };
 
-  const handleSaveSession = async (updatedLog: RevisionLog) => {
+  const closeReview = () => {
+    setShowEditModal(false);
+    setSelectedLog(null);
+    setSelectedSessionPages([]);
+    setSelectedHeld([]);
+  };
+
+  const handleSaveSession = async (updatedLog: RevisionLog, released: number[]) => {
+    // Pages another session holds that were unchecked: their credit to the day is taken back there (SESS-4);
+    // that session keeps its revision of them (AHEAD-6).
+    for (const changed of takeBackCredit(logs, updatedLog.date, released, updatedLog.id)) await updateLog(changed);
     if (updatedLog.id) {
       await updateLog(updatedLog);
-    } else {
-      // A review of a day with no session yet (see handleCtaPress) is saved as its first session.
+    } else if (updatedLog.pagesRevised.length > 0 || updatedLog.weaknessUpdates.length > 0) {
+      // A review of a day with no session yet (see handleCtaPress) becomes its first session only when it holds
+      // something of its own: the pages other sessions revised stay theirs.
       await addLog({
         date: updatedLog.date,
         assignedPages: updatedLog.assignedPages,
@@ -410,18 +424,14 @@ export default function DashboardScreen() {
         durationMinutes: updatedLog.durationMinutes,
       });
     }
-    setShowEditModal(false);
-    setSelectedLog(null);
-    setSelectedSessionPages([]);
+    closeReview();
   };
 
   const handleDeleteSession = async () => {
     if (selectedLog) {
       // A review with no session yet has nothing to delete.
       if (selectedLog.id) await deleteLog(selectedLog.id);
-      setShowEditModal(false);
-      setSelectedLog(null);
-      setSelectedSessionPages([]);
+      closeReview();
     }
   };
 
@@ -435,17 +445,19 @@ export default function DashboardScreen() {
       const done = reviewPagesInOrder(logs, revisionDay, assignment.pages);
       const todayLog = logs.find((log) => log.date === revisionDay);
       // Done only by pages revised ahead from an earlier session: no session of
-      // today yet, so the review opens as a new one, with those pages checked.
+      // today yet, so the review opens as a new one, holding none of them itself.
       const draft: RevisionLog = {
         id: '',
         date: revisionDay,
         assignedPages: assignment.pages,
-        pagesRevised: done,
+        pagesRevised: [],
         pagesSkipped: [],
         weaknessUpdates: [],
         durationMinutes: 0,
       };
-      handleEditSession(todayLog ?? draft, done);
+      const log = todayLog ?? draft;
+      // Every done page starts checked, the ones other sessions hold too (SESS-4).
+      handleEditSession(log, done, heldElsewhere(logs, revisionDay, log));
     } else if (assignment.totalPages === 0) {
       navigation.navigate('Memorization', { edit: true });
     } else {
@@ -539,14 +551,11 @@ export default function DashboardScreen() {
   const editModal = selectedLog && (
     <EditSessionModal
       visible={showEditModal}
-      onClose={() => {
-        setShowEditModal(false);
-        setSelectedLog(null);
-        setSelectedSessionPages([]);
-      }}
+      onClose={closeReview}
       log={selectedLog}
       quranData={quranData}
       sessionPages={selectedSessionPages}
+      held={selectedHeld}
       onSave={handleSaveSession}
       onDelete={handleDeleteSession}
     />

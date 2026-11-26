@@ -26,6 +26,7 @@ import {
 } from '../lib/quranData';
 import { arabicLabelLines } from '../lib/platformUi';
 import { ModalNest, useModalHold } from './v2/modalTurn';
+import { removeAheadPages } from '../lib/aheadCredit';
 import { t } from '../i18n';
 
 interface EditSessionModalProps {
@@ -34,8 +35,21 @@ interface EditSessionModalProps {
   log: RevisionLog;
   quranData: QuranPage[];
   sessionPages: number[];
-  onSave: (updatedLog: RevisionLog) => void;
+  /**
+   * Pages done for the log's day that another session holds (lib/aheadCredit heldElsewhere): Home's review shows
+   * them checked like its own, and never copies them into this log (SESS-4, AHEAD-6).
+   */
+  held?: readonly number[];
+  /** `released`: the held pages unchecked here, whose credit to the day the caller takes back (takeBackCredit). */
+  onSave: (updatedLog: RevisionLog, released: number[]) => void;
   onDelete: () => void;
+}
+
+const NONE: readonly number[] = [];
+
+/** Every page `log` holds as revised: its pagesRevised and the pages it credits to other days (SESS-7's catch-up pages are only credited). */
+function heldByLog(log: RevisionLog): number[] {
+  return [...log.pagesRevised, ...Object.values(log.ahead ?? {}).flat()];
 }
 
 export function EditSessionModal({
@@ -44,6 +58,7 @@ export function EditSessionModal({
   log,
   quranData,
   sessionPages,
+  held = NONE,
   onSave,
   onDelete,
 }: EditSessionModalProps) {
@@ -54,8 +69,9 @@ export function EditSessionModal({
   // Sheets wait for it (v2/modalTurn); its own menu and rating sheets show over it.
   useModalHold(visible);
 
+  // Every page done starts checked (SESS-4): the log's own, its catch-up pages, and the ones other sessions hold.
   const [revisedPages, setRevisedPages] = useState<Set<number>>(
-    new Set(log.pagesRevised),
+    () => new Set([...heldByLog(log), ...held]),
   );
   const [selectedPageForRating, setSelectedPageForRating] = useState<number | null>(null);
   const [localRatings, setLocalRatings] = useState<Map<number, number>>(new Map());
@@ -69,10 +85,10 @@ export function EditSessionModal({
       const ratingsMap = new Map<number, number>();
       log.weaknessUpdates?.forEach((wu) => ratingsMap.set(wu.page, wu.rating));
       setLocalRatings(ratingsMap);
-      setRevisedPages(new Set(log.pagesRevised));
+      setRevisedPages(new Set([...heldByLog(log), ...held]));
       setCurrentPageNumber(sessionPages[0] ?? 1);
     }
-  }, [visible, log.id, sessionPages]);
+  }, [visible, log.id, sessionPages, held]);
 
   // Save current edits then close — no separate Save button. Tapping X is the
   // commit action; if the user really wants to discard, they can use the
@@ -81,12 +97,21 @@ export function EditSessionModal({
     const weaknessUpdatesArray = Array.from(localRatings.entries()).map(
       ([page, rating]) => ({ page, rating }),
     );
-    onSave({
-      ...log,
-      pagesRevised: Array.from(revisedPages),
-      pagesSkipped: sessionPages.filter((p) => !revisedPages.has(p)),
-      weaknessUpdates: weaknessUpdatesArray,
-    });
+    // A page another session holds stays there (AHEAD-6): unchecked, its credit to the day is taken back; checked,
+    // nothing changes. A catch-up page stays out of pagesRevised (SESS-7): unchecked, it leaves the log's credit.
+    const heldSet = new Set(held);
+    const catchUp = new Set(Object.values(log.ahead ?? {}).flat().filter((p) => !log.pagesRevised.includes(p)));
+    const unchecked = heldByLog(log).filter((p) => !revisedPages.has(p));
+    onSave(
+      {
+        ...log,
+        pagesRevised: Array.from(revisedPages).filter((p) => !heldSet.has(p) && !catchUp.has(p)),
+        pagesSkipped: sessionPages.filter((p) => !revisedPages.has(p)),
+        weaknessUpdates: weaknessUpdatesArray,
+        ...(log.ahead ? { ahead: removeAheadPages(log.ahead, unchecked) } : {}),
+      },
+      held.filter((p) => !revisedPages.has(p)),
+    );
     onClose();
   };
 

@@ -90,7 +90,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       '- The bottom bar: the recitation player, the mic (record) and the timer.',
       '- Back saves what was marked; nothing marked, nothing is saved.',
       '- The end card: “Revision complete” (or how many of the pages were revised), “Keep going” (revise ahead) and “Listen back” after a recording.',
-      '- When every page of today is revised, Home says Done and the button is “Review session”, which opens the day’s done pages to check or change.',
+      '- Once today is all revised, Home says Done and the button is “Review session”: the day’s done pages, each checked; its ✓ (top right) unmarks the page shown (it then no longer counts for today) or marks it again.',
       '- A past session: Home → Recent sessions → tap it, or its menu: “Edit session”, “Delete session”. Every session: “See all” (searchable).',
       '- On a juz plan a session of whole juz is named by the juz ("Juz 29"); other sessions by their surahs.',
     ),

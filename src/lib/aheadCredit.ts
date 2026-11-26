@@ -219,6 +219,67 @@ export function reviewPagesInOrder(
   return out;
 }
 
+/** The pages a session holds as revised: its pagesRevised and its credit for other days (a catch-up page is only credited, SESS-7). */
+function heldBy(log: Pick<RevisionLog, 'pagesRevised' | 'ahead'>): number[] {
+  return [...log.pagesRevised, ...Object.values(log.ahead ?? {}).flat()];
+}
+
+/**
+ * The pages done for `day` that another session holds, not `edited` (the day's own session, or a review's draft
+ * of one): revised ahead for the day in an earlier session (AHEAD-2), or in another session of the same day. A
+ * day's review shows them checked, and never copies them into its own session (SESS-4, AHEAD-6).
+ */
+export function heldElsewhere(
+  logs: readonly RevisionLog[],
+  day: string,
+  edited: Pick<RevisionLog, 'id' | 'pagesRevised' | 'ahead'>,
+): number[] {
+  const own = new Set(heldBy(edited));
+  const out = new Set<number>();
+  for (const log of logs) {
+    if (edited.id && log.id === edited.id) continue;
+    const pages = log.date === day ? heldBy(log) : (log.ahead?.[day] ?? []);
+    for (const p of pages) if (!own.has(p)) out.add(p);
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
+/**
+ * The sessions that change when `pages`, held elsewhere (heldElsewhere), are unchecked in `day`'s review: each
+ * page's credit to the day is taken back. A session of another day keeps its revision of the page (AHEAD-6); it
+ * only stops counting for `day`. Another session of the same day no longer holds it. Unchanged sessions are left out.
+ */
+export function takeBackCredit(
+  logs: readonly RevisionLog[],
+  day: string,
+  pages: readonly number[],
+  editedId: string,
+): RevisionLog[] {
+  if (pages.length === 0) return [];
+  const remove = new Set(pages);
+  const out: RevisionLog[] = [];
+  for (const log of logs) {
+    if (editedId && log.id === editedId) continue;
+    if (log.date === day) {
+      if (!heldBy(log).some((p) => remove.has(p))) continue;
+      out.push({
+        ...log,
+        pagesRevised: log.pagesRevised.filter((p) => !remove.has(p)),
+        ...(log.ahead ? { ahead: removeAheadPages(log.ahead, pages) } : {}),
+      });
+      continue;
+    }
+    const credited = log.ahead?.[day];
+    if (!credited?.some((p) => remove.has(p))) continue;
+    const ahead = { ...log.ahead };
+    const kept = credited.filter((p) => !remove.has(p));
+    if (kept.length > 0) ahead[day] = kept;
+    else delete ahead[day];
+    out.push({ ...log, ahead });
+  }
+  return out;
+}
+
 /**
  * How a session's pages are credited when saved (SESS-7). A page whose day is before the session's
  * (a catch-up page, credited to the day it was missed) is kept out of this session's pagesRevised,

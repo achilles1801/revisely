@@ -5,7 +5,7 @@
 
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { CITIES, newAccount, pagesRange } from '../harness/account';
-import { flatText, Home, homeStack } from '../harness/screens';
+import { flatText, Home, homeStack, Review } from '../harness/screens';
 import { place, plain, startsAt } from '../harness/words';
 import { Phone, OpenApp } from '../harness/phone';
 import type { User } from '../../../src/types';
@@ -205,7 +205,7 @@ describe('Keep going', () => {
 describe('a day done only ahead', () => {
   // Monday's keep going revised Tuesday's pages ahead, so Tuesday is done with no
   // session of its own. Its review must open on those pages (Majd, Nov 4).
-  it('[AHEAD-2] [SESS-2] [SESS-4] Review session on a day done ahead opens with its done pages, and saving them makes its session', async () => {
+  it('[AHEAD-2] [SESS-2] [SESS-4] [AHEAD-6] Review session on a day done ahead opens with its done pages checked; closing it changes nothing', async () => {
     const { phone } = await account();
     let { app, home } = await openHome(phone, '2026-11-02 21:00');
     const session = await home.startSession();
@@ -220,19 +220,102 @@ describe('a day done only ahead', () => {
     ({ app, home } = await openHome(phone, '2026-11-03 09:00'));
     expect(home.title()).toMatch(/^Done · 5 pages/);
     expect(home.carryOver()).toBeNull();
-    const { fireEvent } = app.mods.rtl;
-    await app.act(async () => {
-      fireEvent.press(app.screen.getByTestId('today-cta'));
-    });
-    // The review opens, on Tuesday's first page.
-    expect(app.screen.queryByTestId('edit-session')).not.toBeNull();
+    // The review opens, on Tuesday's first page, every page checked.
+    expect(await home.openReview()).toEqual(TUE);
     expect(flatText(app.screen.getByTestId('edit-session-page'))).toBe(String(TUE[0]));
-    // Close and save: Tuesday gets its own session with the five pages done.
-    await app.act(async () => {
-      fireEvent.press(app.screen.getByLabelText('Close and save'));
-    });
+    const review = new Review(app);
+    expect(await review.checks()).toEqual({ 6: true, 7: true, 8: true, 9: true, 10: true });
+    // Closing it saves nothing: the pages stay Monday's revision, credited to Tuesday (AHEAD-6), never revised twice.
+    await review.close();
     await app.untilSynced();
-    expect(credit(app).find((c) => c.day === '2026-11-03')?.revised).toEqual(TUE);
+    expect(credit(app)).toEqual([{ day: '2026-11-02', revised: [...MON, ...TUE], ahead: { '2026-11-03': TUE } }]);
+    expect(home.title()).toMatch(/^Done · 5 pages/);
+    await app.close();
+  });
+
+  it('[SESS-4] [AHEAD-2] [AHEAD-6] unchecking a page revised ahead in its review takes back its credit to the day, not Monday’s revision', async () => {
+    const { phone } = await account();
+    let { app, home } = await openHome(phone, '2026-11-02 21:00');
+    const session = await home.startSession();
+    await session.swipeThrough(5);
+    await session.keepGoing();
+    await session.swipeThrough(5);
+    await session.back();
+    await app.untilSynced();
+    await app.close();
+
+    ({ app, home } = await openHome(phone, '2026-11-03 09:00'));
+    await home.openReview();
+    const review = new Review(app);
+    await review.goTo(10);
+    await review.toggle();
+    expect(review.isChecked()).toBe(false);
+    await review.close();
+    await app.untilSynced();
+    // Monday still revised page 10; Tuesday no longer counts it, so Tuesday isn't done.
+    expect(credit(app)).toEqual([{ day: '2026-11-02', revised: [...MON, ...TUE], ahead: { '2026-11-03': [6, 7, 8, 9] } }]);
+    expect(home.title()).not.toMatch(/^Done/);
+    await app.close();
+  });
+});
+
+describe('the review of a day with a session of its own and pages revised ahead the day before', () => {
+  // Majd, Nov 26 2026: Monday's session went ahead into Tuesday; Tuesday's session did the rest. Tuesday's review
+  // showed the pages revised ahead unchecked, and toggling them changed nothing ("checking/unchecking isn't rly doing
+  // anything").
+  async function tuesdayDone(): Promise<Phone> {
+    const { phone } = await account();
+    let { app, home } = await openHome(phone, '2026-11-02 21:00');
+    const session = await home.startSession();
+    await session.swipeThrough(5);
+    await session.keepGoing();
+    await session.check();
+    await session.swipe();
+    await session.check();
+    await session.back();
+    await app.untilSynced();
+    await app.close();
+
+    ({ app, home } = await openHome(phone, '2026-11-03 18:00'));
+    const tue = await home.startSession();
+    expect(tue.pages()).toEqual(TUE);
+    await tue.swipeThrough(5);
+    await tue.back();
+    await app.untilSynced();
+    expect(home.title()).toMatch(/^Done · 5 pages/);
+    await app.close();
+    return phone;
+  }
+
+  it('[SESS-4] [AHEAD-2] every page starts checked, the two revised ahead too', async () => {
+    const phone = await tuesdayDone();
+    const { app, home } = await openHome(phone, '2026-11-03 19:00');
+    expect(await home.openReview()).toEqual(TUE);
+    expect(await new Review(app).checks()).toEqual({ 6: true, 7: true, 8: true, 9: true, 10: true });
+    await app.close();
+  });
+
+  it('[SESS-4] [AHEAD-6] unchecking one revised ahead takes it off the day; checking one again keeps it; nothing is copied into the day’s session', async () => {
+    const phone = await tuesdayDone();
+    const { app, home } = await openHome(phone, '2026-11-03 19:00');
+    await home.openReview();
+    const review = new Review(app);
+    // Page 6 unchecked; page 7 unchecked and checked again.
+    await review.goTo(6);
+    await review.toggle();
+    await review.goTo(7);
+    await review.toggle();
+    await review.toggle();
+    expect(review.isChecked()).toBe(true);
+    await review.close();
+    await app.untilSynced();
+    // Monday keeps its revision of both; only page 6's credit to Tuesday is gone. Tuesday's own session holds its three.
+    expect(credit(app)).toEqual([
+      { day: '2026-11-02', revised: [...MON, 6, 7], ahead: { '2026-11-03': [7] } },
+      { day: '2026-11-03', revised: [8, 9, 10], ahead: {} },
+    ]);
+    expect(app.app.logs.find((l) => l.date === '2026-11-03')?.pagesSkipped).toEqual([6]);
+    expect(home.title()).not.toMatch(/^Done/);
     await app.close();
   });
 });
