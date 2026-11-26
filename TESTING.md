@@ -169,9 +169,12 @@ passed 06 once in the smoke set, and broke 06 on develop for everyone.
   not from the event: a push and `gh pr ready` seconds apart once made a single run with the draft
   payload, no E2E and "Required (draft)", and the PR sat with every check green (#674, Nov 16 2026).
 - **The scenario harness, its Jest config or `scripts/emulators.sh`:** the scenario suite twice. The
-  second run starts from empty Firestore and Auth emulators (`harness/clearEmulators.js`), as the
-  first does: it had found the first run's data, and the day's Revo spend put Revo to rest halfway
-  through REVO-26 (#328's run 42586241564). Within one run, files still share the emulators, so a
+  second run starts from empty Firestore, Auth and Storage emulators (`harness/clearEmulators.js`), as
+  the first does: it had found the first run's data, and the day's Revo spend put Revo to rest halfway
+  through REVO-26 (#328's run 42586241564). Storage kept the first run's files until Nov 26 2026: the
+  emulator lists a prefix by going through every file it holds, so loading a test scenario took up to
+  128 s in the second run (3–13 s in the first), past the app's 70 s for a callable, and REVO-26 hung
+  for its 15 minutes (runs 45782607100, 45770868685). Within one run, files still share the emulators, so a
   test sets up every document it reads that other accounts share (the month's coach ledger: COACH-4
   and REVO-37 each take a month no other test uses and clear its ledger first).
 
