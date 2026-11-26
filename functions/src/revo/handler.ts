@@ -9,6 +9,7 @@
  */
 import { createHash } from 'crypto';
 import { BlocksRequest, CoachCallError, CoachReply, MessagesRequest } from '../coach/call';
+import type { StreamEvents } from '../coach/stream';
 import { CallLedger, MONTHLY_CAP_USD, ledgerOf } from '../coach/handler';
 import { costUsd, worstCaseCostUsd } from '../coach/pricing';
 import { LOCATE_MAX_TOKENS, LOCATE_MODEL, buildLocateRequest, parseLocate } from './tafsir/locate';
@@ -16,6 +17,7 @@ import { PageLoader } from './tafsir/pages';
 import { TafsirAnswer, parseTafsirReply } from './tafsir/reply';
 import { AHEAD_QUESTION, aheadPageOf } from './tafsir/ahead';
 import { TAFSIR_MAX_TOKENS, TafsirTurn, buildTafsirRequest } from './tafsir/request';
+import { tafsirStream } from './tafsir/stream';
 import { loadScopePages, placeOf, scopeOfLocated, spanOf, validateQuranScope } from './tafsir/scope';
 import { selectPieces } from './tafsir/select';
 import { REVO_HISTORY, REVO_MAX_TOKENS, buildAskRequest, buildReviewRequest, withStoreSchema } from './prompt';
@@ -170,14 +172,24 @@ export interface RevoLog {
 
 export interface RevoDeps {
   store: RevoStore;
-  /** The model call (callCoach); a BlocksRequest (answers from the tafsir) goes through it the same way. */
-  call: (request: MessagesRequest) => Promise<CoachReply>;
+  /** The model call (callCoach); a BlocksRequest (answers from the tafsir) goes through it the same way, streamed when asked. */
+  call: (request: MessagesRequest, stream?: StreamEvents) => Promise<CoachReply>;
+  /**
+   * The phone takes the answer as it is written (the callable's stream; Revisely Dev asks for it): an answer from the
+   * tafsir sends its text here, a piece at a time (tafsir/stream.ts). The result is the same either way.
+   */
+  stream?: (chunk: RevoStreamChunk) => void;
   /** Revo's copy of the tafsirs, a page at a time (tafsir/pages.ts). Without it, no answers from the tafsir. */
   tafsirPages?: PageLoader;
   /** "What's happening here?" answered ahead for a page (scripts/tafsir/answers-batch.js), or null. */
   tafsirAhead?: (page: number) => Promise<TafsirAnswer | null>;
   now: () => Date;
   log: RevoLog;
+}
+
+/** A piece of an answer from the tafsir as it is written, streamed to the phone (src/lib/revo/backend.ts reads it). */
+export interface RevoStreamChunk {
+  text: string;
 }
 
 export interface RevoAskResult {
@@ -289,6 +301,7 @@ async function metered(
   request: MessagesRequest | BlocksRequest,
   event: string,
   fallback: MessagesRequest | null = null,
+  stream?: StreamEvents,
 ): Promise<{ reply: CoachReply; ledger: CallLedger; cost: number; fellBack?: true } | 'capped' | 'resting'> {
   const today = utcDay(deps.now());
   const month = today.slice(0, 7);
@@ -308,7 +321,7 @@ async function metered(
   }
   let reply: CoachReply;
   try {
-    reply = await deps.call(request as MessagesRequest);
+    reply = await deps.call(request as MessagesRequest, stream);
   } catch (err) {
     await deps.store.settleSpend(month, reserved, 0, NO_USAGE, today);
     const code = err instanceof CoachCallError ? err.status : null;
@@ -446,7 +459,7 @@ async function answerFromTafsir(deps: RevoDeps, a: TafsirAsk): Promise<RevoAskRe
     const books = selectPieces(pages, spanOf(a.scope), a.question, a.english);
     const built = buildTafsirRequest({ question: a.question, place: placeOf(a.scope), books, history: turnsOf(a.history), memory: a.memory.map((m) => m.text) });
     documents = built.documents;
-    result = await metered(deps, built.request, 'tafsir');
+    result = await metered(deps, built.request, 'tafsir', null, deps.stream ? tafsirStream((text) => deps.stream!({ text })) : undefined);
   } catch (err) {
     await deps.store.releaseQuestion(a.uid, a.day);
     if (err instanceof RevoError) throw err;

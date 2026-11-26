@@ -156,6 +156,17 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
     is Haiku 5.5's too (`TAFSIR_MODEL`; Majd, Nov 26 2026: "haiku", from the 60-question test: the same passes as Sonnet
     5.5 at about a twentieth of the cost), thinking off (Haiku refuses `between_tools`). The answers written ahead stay
     Sonnet 5.5's (already paid for).
+  - **Streaming** (Nov 26 2026, Revisely Dev; measured from a laptop: the first words after 0.6 s, the whole answer
+    after 3.1 s): Revo’s chat in Dev asks `revoAsk` for its answer as it is written (`callFunctionStreaming` in
+    `services/firestoreService`: the callable protocol with `Accept: text/event-stream`, read with `expo/fetch`,
+    whose body arrives as it comes; React Native's own fetch reads it whole). The server streams only answers from
+    the tafsir: `callCoach` with `onStream` asks Anthropic for `stream: true` and reads the events
+    (`coach/stream.ts`) into the same reply, and `tafsir/stream.ts` passes the text to the callable's `sendChunk`
+    (`{ text }`), holding anything past `UNCITED_MAX_WORDS` until the first citation. Every other answer, and the
+    store app, comes whole. A stream is retried only before any text went on. The emulator plays a recorded reply
+    back as the API streams it (`sseOf`), and the scenario harness hands `expo/fetch`'s body over as it arrives
+    (`harness/functions.ts`, `streams`). `coach/stream.test.ts` reads a real stream (`revo-tafsir.stream.txt`, made by
+    `scripts/tafsir/record-stream.js`).
   - **The answer** (`handleRevoAsk` → `answerFromTafsir`, REVO-44): in Revisely Dev, a question with `quran` (the app's
     ayat: the mushaf's page or a held ayah), in a chat that has one, or that the Haiku step places, is answered from the
     tafsir and counts in the 20 a day; the reply keeps `sources` (each the book's words, the passage around them, Revo's

@@ -25,6 +25,8 @@ export function watchFunction(name: string): {
   readonly calls: number;
   readonly sent: unknown[];
   readonly results: Record<string, unknown>[];
+  /** For each call that took its answer as it was written: the pieces (harness/functions). */
+  readonly streams: unknown[][];
   restore: () => void;
 } {
   forget(name);
@@ -37,6 +39,9 @@ export function watchFunction(name: string): {
     },
     get results() {
       return served(name).answers;
+    },
+    get streams() {
+      return served(name).streams;
     },
     restore: () => forget(name),
   };

@@ -1567,12 +1567,11 @@ export async function callFunction(
   );
 }
 
-async function callFunctionNow(
+/** Where a callable is and the headers it needs: the account's ID token and App Check. */
+async function callableTarget(
   user: NonNullable<typeof auth.currentUser>,
   name: string,
-  data: Record<string, unknown>,
-  signal?: AbortSignal,
-): Promise<unknown> {
+): Promise<{ url: string; headers: Record<string, string> }> {
   const idToken = await user.getIdToken(/* forceRefresh */ true);
 
   let appCheckToken: string | null = null;
@@ -1604,6 +1603,32 @@ async function callFunctionNow(
     url = e2e.url;
     Object.assign(headers, e2e.headers);
   }
+  return { url, headers };
+}
+
+/** A callable's error as callers read it: its message, status (e.g. RESOURCE_EXHAUSTED) and details. */
+function callableError(httpStatus: number, text: string): Error {
+  let message = `HTTP ${httpStatus}: ${text.slice(0, 200)}`; // i18n-ignore (an error for logs)
+  let code: string | undefined;
+  let details: unknown;
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed?.error?.message) message = parsed.error.message;
+    if (typeof parsed?.error?.status === 'string') code = parsed.error.status;
+    details = parsed?.error?.details;
+  } catch {
+    // keep raw
+  }
+  return Object.assign(new Error(message), { code, details, httpStatus });
+}
+
+async function callFunctionNow(
+  user: NonNullable<typeof auth.currentUser>,
+  name: string,
+  data: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<unknown> {
+  const { url, headers } = await callableTarget(user, name);
   const resp = await fetch(url, {
     method: 'POST',
     headers,
@@ -1611,27 +1636,91 @@ async function callFunctionNow(
     ...(signal ? { signal } : {}),
   });
 
-  if (!resp.ok) {
-    const text = await resp.text();
-    let message = `HTTP ${resp.status}: ${text.slice(0, 200)}`; // i18n-ignore (an error for logs)
-    // The callable's error status (e.g. RESOURCE_EXHAUSTED) and details, for callers that tell cases apart.
-    let code: string | undefined;
-    let details: unknown;
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed?.error?.message) message = parsed.error.message;
-      if (typeof parsed?.error?.status === 'string') code = parsed.error.status;
-      details = parsed?.error?.details;
-    } catch {
-      // keep raw
-    }
-    throw Object.assign(new Error(message), { code, details, httpStatus: resp.status });
-  }
+  // The callable's error status (e.g. RESOURCE_EXHAUSTED) and details, for callers that tell cases apart.
+  if (!resp.ok) throw callableError(resp.status, await resp.text());
   try {
     return await resp.json();
   } catch {
     return null;
   }
+}
+
+/**
+ * A callable whose answer streams (the callable protocol's server-sent events: `{ message }` for each piece, then
+ * `{ result }` or `{ error }`). Read with expo/fetch, whose reply body arrives as it comes (React Native's own fetch
+ * reads the whole body first). Each piece goes to `onChunk`; the answer is `{ result }`, as callFunction returns it.
+ * A server that doesn't stream answers as before.
+ */
+export async function callFunctionStreaming(
+  user: NonNullable<typeof auth.currentUser>,
+  name: string,
+  data: Record<string, unknown>,
+  onChunk: (chunk: unknown) => void,
+): Promise<unknown> {
+  const { url, headers } = await callableTarget(user, name);
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { fetch: streamingFetch } = require('expo/fetch') as typeof import('expo/fetch');
+  const resp = await streamingFetch(url, {
+    method: 'POST',
+    headers: { ...headers, Accept: 'text/event-stream' },
+    body: JSON.stringify({ data }),
+  });
+  if (!resp.ok) throw callableError(resp.status, await resp.text());
+  // The events carry no content type of their own (firebase-functions writes them as they come), so the body says
+  // which it is: `data:` lines, or a server that didn't stream and sent its JSON.
+  const read = resp.body?.getReader();
+  if (!read) return answerOfText(await resp.text(), onChunk);
+  const decoder = new TextDecoder();
+  let whole = '';
+  let buffer = '';
+  let answer: unknown = null;
+  for (;;) {
+    const { done, value } = await read.read();
+    const text = done ? decoder.decode() : decoder.decode(value, { stream: true });
+    whole += text;
+    if (!whole.trimStart().startsWith('{')) {
+      buffer += text;
+      const parts = (done ? `${buffer}\n\n` : buffer).split('\n\n');
+      buffer = parts.pop() ?? '';
+      for (const part of parts) answer = eventOf(part, onChunk) ?? answer;
+    }
+    if (done) break;
+  }
+  if (whole.trimStart().startsWith('{')) return JSON.parse(whole);
+  return answerOf(answer);
+}
+
+/** A streamed callable's body read whole: its JSON, or its events. */
+function answerOfText(text: string, onChunk: (chunk: unknown) => void): unknown {
+  if (text.trimStart().startsWith('{')) return JSON.parse(text);
+  return answerOf(text.split('\n\n').reduce<unknown>((answer, part) => eventOf(part, onChunk) ?? answer, null));
+}
+
+/** A streamed callable's last event: `{ result }`, or its `{ error }` thrown as callFunction throws it. */
+function answerOf(answer: unknown): unknown {
+  if (answer && typeof answer === 'object' && 'error' in answer) throw callableError(500, JSON.stringify(answer));
+  return answer;
+}
+
+/** One server-sent event of a streamed callable: a piece goes to `onChunk`; the answer (`{ result }` or `{ error }`) is returned. */
+function eventOf(part: string, onChunk: (chunk: unknown) => void): unknown {
+  const data = part
+    .split('\n')
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice(5).trim())
+    .join('');
+  if (!data) return undefined; // a heartbeat (": ping")
+  let event: unknown;
+  try {
+    event = JSON.parse(data);
+  } catch {
+    return undefined;
+  }
+  if (event && typeof event === 'object' && 'message' in event) {
+    onChunk((event as { message: unknown }).message);
+    return undefined;
+  }
+  return event;
 }
 
 // ============================================================================

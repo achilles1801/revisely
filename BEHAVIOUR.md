@@ -1683,7 +1683,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   grey highlight. Every quote is the books' own text: a long answer that cites none is never shown. When the books
   don't answer it, Revo says so in a sentence or two, and it gives no rulings. A follow-up in that conversation is
   answered from the same ayat. Each counts as one of the day's questions (REVO-22). The answers come from
-  claude-haiku-5-5 (Majd's pick, Nov 26 2026), not Revo's own model (REVO-6).
+  claude-haiku-5-5 (Majd's pick, Nov 26 2026), not Revo's own model (REVO-6). The answer's words show as the model
+  writes them, in place of Revo's dots, and the finished answer, with the books' words under it, takes their place; no
+  more than 60 words of it show before its first quote, so a long answer that cites none never shows in part either.
 
 - **REVO-45.** (Revisely Dev) Revo in the mushaf (Majd, Nov 26 2026: "revo can be confirable such that in shows up in
   the mushaf itself (without blocking any text)"). With Revo on and Settings → Revo AI → "In the mushaf" on (on unless

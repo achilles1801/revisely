@@ -5,6 +5,7 @@
  * never logged, and error text returned to callers never includes it.
  */
 import { Usage } from './pricing';
+import { StreamEvents, StreamedMessage, readMessageStream } from './stream';
 
 export const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 export const ANTHROPIC_VERSION = '2023-06-01';
@@ -67,6 +68,11 @@ export interface CallDeps {
   apiKey: string;
   fetch?: FetchLike;
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * Stream the reply (coach/stream.ts): each piece of text and each citation as it arrives. The reply returned is the
+   * same. A failed attempt is tried again only while nothing has been passed on yet.
+   */
+  onStream?: StreamEvents;
 }
 
 /** How long to wait before attempt `n+1`: retry-after when the server gives a short one, else 1s, 2s. */
@@ -91,7 +97,7 @@ export async function callCoach(request: MessagesRequest | BlocksRequest, deps: 
           'x-api-key': deps.apiKey,
           'anthropic-version': ANTHROPIC_VERSION,
         },
-        body: JSON.stringify(request),
+        body: JSON.stringify(deps.onStream ? { ...request, stream: true } : request),
         signal: controller.signal,
       });
     } catch {
@@ -103,23 +109,43 @@ export async function callCoach(request: MessagesRequest | BlocksRequest, deps: 
       }
       throw new CoachCallError('The coach did not answer in time. Try again.', null, false);
     }
+
+    if (res.ok && deps.onStream && res.body) {
+      // The attempt's timeout covers the whole stream.
+      let passedOn = false;
+      const on = deps.onStream;
+      let streamed: StreamedMessage | null = null;
+      try {
+        streamed = await readMessageStream(res.body, {
+          onText: (text) => {
+            passedOn = true;
+            on.onText?.(text);
+          },
+          onCitation: () => on.onCitation?.(),
+        });
+      } catch {
+        // Cut off, or the attempt's time ran out.
+      }
+      clearTimeout(timer);
+      if (streamed && !streamed.error) return replyOf({ content: streamed.content, usage: streamed.usage, stop_reason: streamed.stopReason }, res.status, attempt);
+      // Cut off, out of time, or the API's error event (overloaded is busy, as a 529).
+      const busy = !streamed || /overloaded|api_error/.test(streamed.error?.type ?? '');
+      if (busy && !passedOn && attempt < MAX_ATTEMPTS) {
+        await sleep(backoffMs(attempt, null));
+        continue;
+      }
+      throw new CoachCallError(
+        !streamed ? 'The coach did not answer in time. Try again.' : busy ? 'The coach is busy. Try again later.' : 'The coach could not answer this question.',
+        streamed ? res.status : null,
+        busy,
+        streamed?.error?.message,
+      );
+    }
     clearTimeout(timer);
 
     if (res.ok) {
       const body = (await res.json()) as { content?: { type?: string; text?: string }[]; usage?: Usage; stop_reason?: string };
-      const text = (body.content ?? [])
-        .filter((b) => b.type === 'text' && typeof b.text === 'string')
-        .map((b) => b.text)
-        .join('')
-        .trim();
-      if (text === '') throw new CoachCallError('The coach gave no answer. Try again.', res.status, false);
-      return {
-        text,
-        content: body.content ?? [],
-        usage: body.usage ?? {},
-        attempts: attempt,
-        ...(typeof body.stop_reason === 'string' ? { stopReason: body.stop_reason } : {}),
-      };
+      return replyOf(body, res.status, attempt);
     }
 
     const retryable = res.status === 429 || res.status >= 500;
@@ -135,4 +161,21 @@ export async function callCoach(request: MessagesRequest | BlocksRequest, deps: 
     );
   }
   throw new CoachCallError('The coach is busy. Try again later.', null, true);
+}
+
+/** The reply from a Messages API body (the whole reply, or a stream added up). */
+function replyOf(body: { content?: { type?: string; text?: string }[]; usage?: Usage; stop_reason?: string }, status: number, attempt: number): CoachReply {
+  const text = (body.content ?? [])
+    .filter((b) => b.type === 'text' && typeof b.text === 'string')
+    .map((b) => b.text)
+    .join('')
+    .trim();
+  if (text === '') throw new CoachCallError('The coach gave no answer. Try again.', status, false);
+  return {
+    text,
+    content: body.content ?? [],
+    usage: body.usage ?? {},
+    attempts: attempt,
+    ...(typeof body.stop_reason === 'string' ? { stopReason: body.stop_reason } : {}),
+  };
 }
