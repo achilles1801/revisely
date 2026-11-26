@@ -562,6 +562,27 @@ service cloud.firestore {
         allow read, delete: if isOwner(userId);
         allow create, update: if isOwner(userId) && isValidReciteRecord();
       }
+
+      // RECITE TURN TRACES (lib/reciteLive/turnTrace; Revisely Dev, J6, Nov 26 2026): each live take's trail of the
+      // frames it applied and its page turns, numbers only (event types, word ids, pages, seconds), written once when
+      // the take ends. Goes, with the trail, once J6 is confirmed fixed.
+      match /reciteTraces/{traceId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidReciteTrace();
+      }
+    }
+
+    function isValidReciteTrace() {
+      let d = incomingData();
+      return d.keys().hasOnly(['v', 'take', 'app', 'at', 'steps', 'stall', 'cut']) &&
+             d.keys().hasAll(['v', 'take', 'app', 'at', 'steps', 'stall', 'cut']) &&
+             d.v == 1 &&
+             (d.take == null || (d.take is string && d.take.size() <= 100)) &&
+             d.app is string && d.app.size() <= 100 &&
+             d.at is int &&
+             d.steps is list && d.steps.size() <= 800 &&
+             d.stall is int && d.stall >= 0 &&
+             d.cut is int && d.cut >= 0;
     }
 
     function isValidReciteRecord() {

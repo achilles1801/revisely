@@ -24,6 +24,7 @@ import { stopHearing } from '../../lib/reciteLive/hearAudio';
 import { clipRange } from '../../lib/reciteLive/phrase';
 import { spanEndWord, TakeSpan } from '../../lib/reciteLive/span';
 import { stopTrace } from '../../lib/reciteLive/stopTrace';
+import { createTurnTrace, eventStep } from '../../lib/reciteLive/turnTrace';
 import { createTakeClock } from '../../lib/reciteLive/takeClock';
 import { createTakeStats } from '../../lib/reciteLive/takeStats';
 import { createMistakeCue, playCueSound, playCueTap } from '../../lib/reciteLive/mistakeCue';
@@ -135,12 +136,16 @@ function lastAyahOf(page: number): [number, number] {
 
 let realConnect: LiveConnect | null = null;
 /** The checker's live socket, made on first use. */
+/** The app's release as the checker's take record names it ("1.0.5 (27) dev f809a0bc"). */
+function appLabel(): string {
+  const r = currentRelease();
+  return `${r.version ?? '?'} (${r.build ?? '?'}) ${r.channel ?? 'dev'} ${r.updateShort ?? 'embedded'}`;
+}
 const defaultConnect: LiveConnect = (start, handlers) => {
   if (!realConnect) {
-    const r = currentRelease();
     const server = socketFeed({
       token: async () => (await getAuth().currentUser?.getIdToken()) ?? null,
-      app: `${r.version ?? '?'} (${r.build ?? '?'}) ${r.channel ?? 'dev'} ${r.updateShort ?? 'embedded'}`,
+      app: appLabel(),
     });
     // Revisely Dev: on the phone's engine when it can (lib/reciteLive/where). The store app has no engine.
     realConnect = isDevVariant() ? deviceConnect(server) : server;
@@ -371,6 +376,11 @@ export function useLiveRecitation({
   // For the Stop trace (lib/reciteLive/stopTrace), read when Stop is tapped.
   const traceRef = useRef({ state, mode });
   traceRef.current = { state, mode };
+  // Revisely Dev's trail of frames applied and page turns, kept on the account per take (lib/reciteLive/turnTrace; J6).
+  // Release builds only: never in tests, E2E or a development build.
+  const turnTrace = useRef(
+    createTurnTrace({ enabled: isDevVariant() && !__DEV__ && process.env.EXPO_PUBLIC_E2E !== '1', app: appLabel }),
+  ).current;
   // Events waiting to be applied together (LIVE_BATCH_MS), and when they last were.
   const queued = useRef<LiveEvent[]>([]);
   const batchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -389,7 +399,9 @@ export function useLiveRecitation({
     queuedSince.current = null;
     lastApplied.current = Date.now();
     update((s) => batch.reduce(applyEvent, s));
-  }, [update]);
+    const s = curRef.current;
+    turnTrace.step(`apply ${batch.length} place ${s.cursor ?? '-'} said ${s.saidUpTo ?? '-'} ${s.status}${s.seeking ? ' seeking' : ''}`);
+  }, [update, turnTrace]);
   /** A new take, or the take let go: nothing waiting carries over. */
   const dropQueued = useCallback(() => {
     if (batchTimer.current) clearTimeout(batchTimer.current);
@@ -449,7 +461,11 @@ export function useLiveRecitation({
     }
     // A re-check's times start again from 0: not the checker's lag (the E2E long take read 306 s).
     stats.event(e, linkSecs(), replayed);
-    if (replayed && REPLAYED.has(e.type) && (e.type !== 'locked' || curRef.current.start != null)) return;
+    if (replayed && REPLAYED.has(e.type) && (e.type !== 'locked' || curRef.current.start != null)) {
+      turnTrace.step(`dropped ${eventStep(e)}`);
+      return;
+    }
+    if (e.type !== 'beat' && e.type !== 'score') turnTrace.step(eventStep(e));
     if (e.type === 'at' && e.t != null) shownT.current = Math.max(shownT.current, e.t);
     // A new mistake while reciting: its sound and tap at once (never one called Not a mistake, or after Stop).
     if (e.type === 'mark' && traceRef.current.state.status === 'listening' && !traceRef.current.state.dismissed.includes(e.mark.id)) {
@@ -486,7 +502,7 @@ export function useLiveRecitation({
     const wait = e.type === 'done' || e.type === 'error' || LIVE_BATCH_MS <= 0 ? 0 : lastApplied.current + LIVE_BATCH_MS - Date.now();
     if (wait <= 0) applyQueued();
     else if (!batchTimer.current) batchTimer.current = setTimeout(applyQueued, wait);
-  }, [applyQueued, stats, cue, linkSecs, linkOffset]);
+  }, [applyQueued, stats, cue, linkSecs, linkOffset, turnTrace]);
 
   /** An event from a take rolled over: its final answer, where its slips went, what it decided before them. */
   const onLinkEvent = useCallback(
@@ -616,6 +632,7 @@ export function useLiveRecitation({
   const stopFor = useCallback(
     (why: StopWhy) => {
       const t = traceRef.current;
+      turnTrace.step(`stop ${why}`);
       stopTrace.stop({
         mode: `${t.mode ?? '?'}${why === 'tap' ? '' : ` (${why})`}`,
         status: t.state.status,
@@ -654,7 +671,7 @@ export function useLiveRecitation({
         });
       }, stopBudgetMs);
     },
-    [stopMic, clock, applyQueued, clearBudget, stats, endFrame, update, updatePrior, linkSecs],
+    [stopMic, clock, applyQueued, clearBudget, stats, endFrame, update, updatePrior, linkSecs, turnTrace],
   );
   const stop = useCallback(() => stopFor('tap'), [stopFor]);
 
@@ -803,6 +820,8 @@ export function useLiveRecitation({
       behindBefore.current = null;
       setSlow(false);
       endWord.current = null;
+      turnTrace.begin();
+      turnTrace.step(`start ${take} page ${pageRef.current}`);
       /** The page the take starts on: the span's first ayah's (turned to), or the one on screen. */
       const startPage = (qw: QuranWords) => {
         if (!span) return pageRef.current;
@@ -942,7 +961,7 @@ export function useLiveRecitation({
         update((s) => (s.status === 'connecting' ? { ...s, status: 'failed', failure: 'server' } : s));
       }
     },
-    [connect, owner, settings, stopFor, stopMic, recordingDay, finishRecording, clock, dropQueued, clearBudget, cue, resetChain, update, openLink, feedAudio, stats],
+    [connect, owner, settings, stopFor, stopMic, recordingDay, finishRecording, clock, dropQueued, clearBudget, cue, resetChain, update, openLink, feedAudio, stats, turnTrace],
   );
 
   /**
@@ -1117,6 +1136,7 @@ export function useLiveRecitation({
 
   /** Done with the take: back to idle (the summary closed). */
   const clear = useCallback(() => {
+    turnTrace.end(curRef.current.take);
     dropQueued();
     clearBudget();
     stopTrace.end();
@@ -1128,7 +1148,9 @@ export function useLiveRecitation({
     resetChain();
     update(() => LIVE_IDLE);
     setMode(null);
-  }, [stopMic, dropQueued, clearBudget, resetChain, update]);
+  }, [stopMic, dropQueued, clearBudget, resetChain, update, turnTrace]);
+  // The screen left: whatever the take traced is written.
+  useEffect(() => () => turnTrace.end(curRef.current.take), [turnTrace]);
 
   // The reciter's place turns the page.
   const live = state.status === 'listening';
@@ -1138,12 +1160,14 @@ export function useLiveRecitation({
     const from = pageRef.current;
     turningTo.current = page;
     // A page the screen doesn't hold (past a session's last page) isn't turned to: nothing to wait for.
-    if (onShowPageRef.current(page) === false) {
+    const shown = onShowPageRef.current(page);
+    turnTrace.step(`turnTo ${page} from ${from}${recitedPast ? ' recited past' : ''}: ${String(shown)}`);
+    if (shown === false) {
       turningTo.current = null;
       return;
     }
     if (recitedPast && page > from) onRecitedPastRef.current?.(from, page);
-  }, []);
+  }, [turnTrace]);
   useEffect(() => {
     if (!live || state.cursor == null || !words) {
       if (!live) cursorPage.current = null;
@@ -1152,8 +1176,9 @@ export function useLiveRecitation({
     const page = words.pageOf(state.cursor);
     const was = cursorPage.current;
     cursorPage.current = page;
+    turnTrace.step(`place ${state.cursor} on ${page} was ${was ?? '-'} shown ${pageRef.current}`);
     if (page !== pageRef.current) turnTo(page, was === pageRef.current);
-  }, [live, state.cursor, words, turnTo]);
+  }, [live, state.cursor, words, turnTo, turnTrace]);
 
   // The page's last ayah said: the page turns to the next one and waits for the reciter (RECITE-30; Majd, Nov 25 2026:
   // "when i finish reciting the last verse it should automatically take me to the next page and wait for me to begin if
@@ -1166,10 +1191,11 @@ export function useLiveRecitation({
     saidBefore.current = live ? saidUpTo : null;
     if (!live || saidUpTo == null || !words || endWord.current != null) return;
     const page = pageRef.current;
-    if (cursorPage.current !== page || page >= 604) return;
     const last = words.pageRange(page)[1] - 1;
-    if (saidUpTo >= last && (before == null || before < last)) turnTo(page + 1, true);
-  }, [live, saidUpTo, words, turnTo]);
+    const turn = cursorPage.current === page && page < 604 && saidUpTo >= last && (before == null || before < last);
+    turnTrace.step(`said ${saidUpTo} was ${before ?? '-'} shown ${page} last ${last} place on ${cursorPage.current ?? '-'}${turn ? ': turn' : ''}`);
+    if (turn) turnTo(page + 1, true);
+  }, [live, saidUpTo, words, turnTo, turnTrace]);
 
   // A spot test stops by itself once the checker has decided its last word (reciting on would add "Added after the
   // end" marks).
@@ -1187,6 +1213,7 @@ export function useLiveRecitation({
 
   // A page turned by hand: tell the checker where to look.
   useEffect(() => {
+    turnTrace.step(`screen ${currentPage} turning to ${turningTo.current ?? '-'} ${state.status}`);
     if (turningTo.current === currentPage) {
       turningTo.current = null;
       return;
@@ -1221,6 +1248,7 @@ export function useLiveRecitation({
   const failure = state.failure;
   useEffect(() => {
     if (status === 'done') {
+      turnTrace.end(traceRef.current.state.take);
       clearBudget();
       stopTrace.step(isUnfinished(traceRef.current.state) ? 'summary-unfinished' : 'done', conn.current?.status?.());
       stats.stop(clock.get());
@@ -1247,7 +1275,8 @@ export function useLiveRecitation({
       }
       stopTrace.end();
     }
-  }, [status, failure, clearBudget, stats, clock, update]);
+    if (status === 'failed') turnTrace.end(traceRef.current.state.take);
+  }, [status, failure, clearBudget, stats, clock, update, turnTrace]);
 
   // A long recitation's next take failed (it couldn't start, the connection was lost): the recitation ends there, with
   // what every take found, its end unchecked (RECITE-22). The microphone has stopped with the connection.
