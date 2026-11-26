@@ -165,7 +165,9 @@ export function RevoChat({
       ? quran.kind === 'page'
         ? [t('revo.tafsir.startPage1'), t('revo.tafsir.startPage2'), t('revo.tafsir.startPage3')]
         : [t('revo.tafsir.startAyah1'), t('revo.tafsir.startAyah2'), t('revo.tafsir.startAyah3')]
-      : [...(nextOffer ? [t('revo.tafsir.nextChip')] : []), ...(opener?.chips ?? [])].slice(0, 3);
+      : nextOffer
+        ? [t('revo.tafsir.nextChip'), ...(opener?.chips ?? [])].slice(0, 3)
+        : (opener?.chips ?? []);
 
   const ask = async (question: string) => {
     const ctx = build();
