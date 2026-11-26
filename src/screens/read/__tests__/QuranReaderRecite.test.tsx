@@ -2899,11 +2899,13 @@ describe('what friends asked, Nov 25 2026', () => {
     await flush();
     const { openRevo } = jest.requireMock('../../../lib/revo/open');
     expect(openRevo).toHaveBeenCalledWith({ attach: expect.objectContaining({ kind: 'reciteTake' }) });
-    // The summary goes first (one modal at a time on iOS, SHEET-1); Revo's sheet takes its turn after it.
-    await settle(() => expect(screen.queryByTestId('take-summary')).toBeNull());
+    // The summary goes first (one modal at a time on iOS, SHEET-1); Revo's sheet takes its turn after it. Its closing
+    // animation runs in real time: about 0.8 s here on a laptop, past 5 s on a loaded CI runner (#992's first run), so
+    // this wait and the test get the room the amber test above has.
+    await settle(() => expect(screen.queryByTestId('take-summary')).toBeNull(), 15000);
     // The reader itself stays free of Revo: no button of its own.
     expect(screen.queryByTestId('revo-button')).toBeNull();
-  });
+  }, 20000);
 
   it('[REVO-25] with Revo off for the account, the summary has no Ask Revo', async () => {
     await finishedTake();
