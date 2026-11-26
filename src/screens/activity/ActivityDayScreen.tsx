@@ -300,6 +300,8 @@ export default function ActivityDayScreen() {
   // A note's menu (ACT-6). Edit opens the Note sheet filled in. Delete takes it off at once, with Undo; it is saved
   // once the undo window has passed, and leaving the screen saves any still waiting.
   const [editingNote, setEditingNote] = useState<JournalNote | null>(null);
+  /** A new note's tag, set by a take's "Add a note" (ACT-11). */
+  const [noteTag, setNoteTag] = useState<string | null>(null);
   const [writingNote, setWritingNote] = useState(false);
   const noteUndo = useRef(new UndoQueue());
   const [goneNotes, setGoneNotes] = useState<ReadonlySet<string>>(new Set());
@@ -552,6 +554,10 @@ export default function ActivityDayScreen() {
               notes={shownNotes.filter((n) => n.kind === 'note')}
               onEditReading={setEditingReading}
               onEditNote={setEditingNote}
+              onAddTakeNote={(tag) => {
+                setNoteTag(tag);
+                setWritingNote(true);
+              }}
               onDeleteNote={deleteNote}
               onDeleteAllNotes={deleteAllNotes}
               revisedLog={logs.find((l) => l.date === date) ?? null}
@@ -674,11 +680,13 @@ export default function ActivityDayScreen() {
         onClose={() => {
           setEditingNote(null);
           setWritingNote(false);
+          setNoteTag(null);
         }}
         day={date}
         dayName={date === today ? 'today' : date === previousIsoDay(today) ? 'yesterday' : heading.title}
         note={editingNote}
         noteCount={shownNotes.length}
+        presetTag={noteTag}
       />
       <ReadingPagesSheet
         session={editingReading}

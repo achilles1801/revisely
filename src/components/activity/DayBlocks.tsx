@@ -37,7 +37,7 @@ import { listRecordings, type RecordingMeta } from '../../lib/recordings';
 import { sortTakeAudio } from '../../lib/reciteMemory/apart';
 import { describeSurahRuns, describeSurahs, pageRuns } from '../../lib/pageRanges';
 import { logger } from '../../lib/logger';
-import { parseTag } from '../../lib/noteTags';
+import { parseTag, tagFor } from '../../lib/noteTags';
 import type { JournalNote, ReadingSession, RevisionLog } from '../../types';
 import { Tap } from '../v2/Tap';
 import { ContextMenu, type ContextMenuAction } from '../v2/ContextMenu';
@@ -97,6 +97,8 @@ interface Props {
   onEditReading: (session: ReadingSession) => void;
   /** A note's menu (ACT-6): Edit opens the Note sheet filled in; Delete goes at once, with Undo. */
   onEditNote: (note: JournalNote) => void;
+  /** A take's "Add a note": a new note, already shown under that take (its tag). */
+  onAddTakeNote?: (tag: string) => void;
   onDeleteNote: (note: JournalNote) => void;
   /** The Notes header's menu, with two or more notes: every note of the day (confirmed first). */
   onDeleteAllNotes: () => void;
@@ -182,6 +184,7 @@ export function DayBlocks({
   notes,
   onEditReading,
   onEditNote,
+  onAddTakeNote,
   onDeleteNote,
   onDeleteAllNotes,
   revisedLog,
@@ -307,6 +310,9 @@ export function DayBlocks({
   const spotTakes = useMemo(() => (journalDesignEnabled() ? dayTakes.filter((x) => x.spotTest) : []), [dayTakes]);
   const recitedTakes = useMemo(() => (spotTakes.length > 0 ? dayTakes.filter((x) => !x.spotTest) : dayTakes), [dayTakes, spotTakes]);
   const newestTakes = useMemo(() => [...recitedTakes].reverse(), [recitedTakes]);
+  const shownRecited = recitedTakes.length > TAKES_SHOWN ? newestTakes.slice(0, TAKES_SHOWN - 1) : newestTakes;
+  /** The takes the day lists, each with the notes shown under it (ACT-11). */
+  const shownTakeIds = useMemo(() => new Set([...shownRecited, ...spotTakes].map((x) => x.id)), [shownRecited, spotTakes]);
   const takeRecordings = useMemo(() => new Set(dayTakes.map((t) => t.recordingId).filter((id): id is string => id != null)), [dayTakes]);
   const notTake = useCallback((r: RecordingMeta) => !takeRecordings.has(r.id), [takeRecordings]);
   const takeWords = useQuranWordsWhen(dayTakes.length > 0);
@@ -337,6 +343,10 @@ export function DayBlocks({
           openRevo(attach ? { attach } : {});
         },
       });
+    }
+    // A note shown under this take (ACT-11; Majd, Nov 25 2026: "notes: yes to all").
+    if (onAddTakeNote) {
+      out.push({ key: 'note', label: t('activity.day.addTakeNote'), onPress: () => onAddTakeNote(tagFor('take', take.id)) });
     }
     // A take is no recording (RMEM-6): it is deleted here, with its marks and its audio.
     if (user?.id) {
@@ -434,12 +444,14 @@ export function DayBlocks({
   // tagged note shows nowhere, so it never flickers into Notes.
   const targetExists = (n: JournalNote): boolean => {
     const t = parseTag(n.tag);
+    // A take's note shows under the take while the day lists it (a take in the Recited sheet only: in Notes).
+    if (t?.kind === 'take') return shownTakeIds.has(t.id);
     if (!t || !items) return false;
     if (t.kind === 'revision') return t.id === day && items.revisions.some((r) => r.countsFor === day);
     if (t.kind === 'memorization') return items.memorized.some((m) => m.id === t.id);
     return items.reads.some((r) => r.id === t.id);
   };
-  const taggedTo = (kind: 'revision' | 'memorization' | 'read', id?: string) =>
+  const taggedTo = (kind: 'revision' | 'memorization' | 'read' | 'take', id?: string) =>
     notes.filter((n) => {
       const t = parseTag(n.tag);
       return t != null && t.kind === kind && (id === undefined || t.id === id) && targetExists(n);
@@ -874,7 +886,7 @@ export function DayBlocks({
           ])}
           items={[
             // Newest first, as the take's summary leaves it: the one just recited is at the top.
-            ...(recitedTakes.length > TAKES_SHOWN ? newestTakes.slice(0, TAKES_SHOWN - 1) : newestTakes).map((t) => (
+            ...shownRecited.flatMap((t) => [
               <TakeDayRow
                 key={t.id}
                 take={t}
@@ -885,8 +897,9 @@ export function DayBlocks({
                 onPlay={onOpenRecording}
                 onHold={() => setHeldTake(t)}
                 actions={takeActions(t)}
-              />
-            )),
+              />,
+              ...taggedTo('take', t.id).map(noteItem),
+            ]),
             ...(recitedTakes.length > TAKES_SHOWN
               ? [
                   <Tap key="all-takes" onPress={() => setRecitedOpen(true)} accessibilityRole="button" hitSlop={6} testID="activity-takes-all">
@@ -908,7 +921,7 @@ export function DayBlocks({
           title={t('activity.day.spotTest')}
           figure={spotTestsTail({ tests: spotTakes.length, stopped: spotTakes.filter((x) => !x.spotTest?.finished).length, pages: [] })}
           subline={subline([takeWords ? surahsOf(spotTakes.map((x) => takeWords.pageOf(x.from))) : null])}
-          items={[...spotTakes].reverse().map((x) => (
+          items={[...spotTakes].reverse().flatMap((x) => [
             <TakeDayRow
               key={x.id}
               take={x}
@@ -919,8 +932,9 @@ export function DayBlocks({
               onPlay={onOpenRecording}
               onHold={() => setHeldTake(x)}
               actions={takeActions(x)}
-            />
-          ))}
+            />,
+            ...taggedTo('take', x.id).map(noteItem),
+          ])}
           testID="activity-block-spot"
         />
       )}

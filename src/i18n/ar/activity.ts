@@ -151,6 +151,7 @@ export const activity: NonNullable<ArStrings['activity']> = {
     timedInRead: 'وقت محسوب في القراءة',
     showOnPage: 'عرض في الصفحة',
     askRevoTake: 'اسأل ⁨Revo⁩ عن هذا التسميع',
+    addTakeNote: 'إضافة ملاحظة',
     deleteTake: 'حذف هذا التسميع',
     deleteTakeTitle: 'حذف هذا التسميع؟',
     deleteTakeBody: 'تُحذف تحديداته وتسجيله. لا يمكن التراجع عن ذلك.',

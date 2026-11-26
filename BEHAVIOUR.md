@@ -1068,8 +1068,11 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   pages). Pages unmarked are removed from the items that hold them. The Memorized composer takes a page range
   (From and To) and marks it in the same save.
 - **ACT-11.** A log note tagged to one of the day's items shows under that item in Activity: a Revised,
-  Memorized or timed Read item. A tagged note whose item is gone, and an untagged note, stay in the Notes block.
-  While the day's items load, a tagged note shows nowhere (it never flickers into Notes).
+  Memorized or timed Read item, or a Recite take, Recited or Spot test alike (the Note sheet's Show under lists each
+  take of the day; a take's menu has Add a note, already pointed at it; Majd, Nov 25 2026: "add notes under spot test
+  like how under revised is an option", then "notes: yes to all"). A tagged note whose item is gone, or whose take the day
+  doesn't list (one only in the Recited sheet), and an untagged note, stay in the Notes block. While the day's items load,
+  a tagged note shows nowhere (it never flickers into Notes).
 - **ACT-12.** Insights live in Activity (Calendar | Insights), for every account since the November 2026 release
   (testers' before): the tab bar is Home, Activity and Read (TAB-2), with or without Smart Tracking, and there is no Insights tab
   to reach. Without Smart Tracking no page is rated, so Activity's Insights has no Weak spots (no Ask,
