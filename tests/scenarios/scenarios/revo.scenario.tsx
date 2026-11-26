@@ -11,7 +11,7 @@ import { newAccount, pagesRange } from '../harness/account';
 import { markPreviewTester, watchFunction } from '../harness/admin';
 import { withAuthRetry } from '../harness/authRetry';
 import { getServerDoc, listServerDocs, setServerDoc } from '../harness/serverDocs';
-import { Home, homeStack } from '../harness/screens';
+import { flatText, Home, homeStack } from '../harness/screens';
 import { Phone, type Booted, type OpenApp, ramadanIntroSeen, revoMomentSeen } from '../harness/phone';
 import { plainText } from '../../../src/lib/passages';
 
@@ -593,6 +593,58 @@ it('[ACT-28] [ACT-30] [REVO-23] Revisely Dev tells Revo what Insights’ Gaps an
     expect(text).toContain('last revised 6 days ago; 1 gap, the longest 6 days without revising (still going).');
     expect(text).toContain('Full revision: ');
     expect(text).toMatch(/Last revised, each memorized surah, the longest since first [^\n]*Al-Fatihah 7 days ago/);
+    await app.close();
+  } finally {
+    asks.restore();
+  }
+});
+
+it('[THEME-8] in Ramadan with the theme on, Revisely Dev’s Revo opens “Ramadan Kareem” with Ramadan suggestions, wears a crescent, and is told the month so far', async () => {
+  setZone(ZONES.amman);
+  setNow('2026-11-02 10:00');
+  const phone = new Phone('phone');
+  let app = await newAccount(phone, { memorized: pagesRange(1, 20), user: { dailyPageCapacity: 5 } });
+  const uid = app.uid;
+  await app.untilSynced();
+  await app.close();
+  // Revised on 2 November: day 3 of Ramadan on these test dates (Settings → Testing → Ramadan dates, day 12 on the 11th).
+  setNow('2026-11-02 10:30');
+  app = await phone.open(homeStack);
+  const session = await new Home(app).startSession();
+  await session.swipeThrough(5);
+  await session.back();
+  await app.untilSynced();
+  await app.close();
+  setNow('2026-11-11 10:00');
+  await markPreviewTester(uid);
+  revoMomentSeen(phone, uid);
+  ramadanIntroSeen(phone);
+  phone.storage.set('@revisely_ramadan_test:v1', 'day12');
+
+  const asks = watchFunction('revoAsk');
+  try {
+    app = await phone.open((mods) => {
+      mods.require<{ default: { expoConfig: { extra: Record<string, unknown> } } }>('expo-constants').default.expoConfig.extra.variant = 'dev';
+      return revoStack(mods);
+    });
+    await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
+    await new Home(app).ready();
+    // Its button wears a crescent (a decoration: no touches, not read by VoiceOver).
+    await app.until(() => app.screen.queryAllByTestId('ramadan-revo-crescent', { includeHiddenElements: true }).length > 0, 'the crescent on Revo’s button');
+    await tap(app, 'revo-button');
+    await tap(app, 'revo-turn-on');
+    await app.until(() => app.screen.queryByTestId('revo-greeting') != null, 'the greeting');
+    expect(flatText(app.screen.getByTestId('revo-greeting'))).toMatch(/^Ramadan Kareem/);
+    for (const chip of ['Plan a khatmah by Eid', 'What should I revise for taraweeh?', 'How’s my Ramadan going?']) {
+      expect(app.screen.queryByTestId(`revo-chip-${chip}`)).not.toBeNull();
+    }
+
+    await modelSays(uid, reply('Here is a plan for the rest of Ramadan.'));
+    await tap(app, 'revo-chip-Plan a khatmah by Eid');
+    await app.until(() => app.screen.queryByText('Here is a plan for the rest of Ramadan.') != null, 'the answer');
+    expect(asks.sent[asks.sent.length - 1]).toMatchObject({ context: { app: 'dev', ramadan: { day: 12, length: 30, revisedDays: 1, covered: 5 } } });
+    const text = (await modelRequests(uid)).pop()!.messages[0].content;
+    expect(text).toContain('Ramadan: day 12 of 30, 19 days to Eid (counting today). Revised on 1 of the 12 days so far. 5 of the Qur’an’s 604 pages revised or read since 1 Ramadan; the first not yet is');
     await app.close();
   } finally {
     asks.restore();

@@ -13,6 +13,12 @@ import { reciteLiveForAccount } from '../reciteLive/availability';
 import { useMemoryRecords } from '../reciteMemory/store';
 import { logger } from '../logger';
 import { buildRevoContext } from './context';
+import { ramadanDates, ramadanPhase } from '../ramadanDates';
+import { useRamadanTheme } from '../ramadanTheme';
+import { withPendingReadings } from '../offline/queue';
+import * as firestoreService from '../../services/firestoreService';
+import type { ReadingSession } from '../../types';
+import { revoRamadan } from './ramadan';
 import { revoGaps } from './gaps';
 import { recitationForRevo } from './recitation';
 import { revoPatternsOn, revoReciteOn } from './release';
@@ -53,6 +59,10 @@ export function useRevoContext(): {
     [user, pages, history, day],
   );
   const assignment = useMemo(() => (user ? generateDailyAssignment(pages, getQuranData(), user, date).pages : []), [user, pages, date]);
+  // Ramadan so far (THEME-8), during the month with the theme showing: the timed readings count too.
+  const inRamadan = useRamadanTheme() && ramadanPhase(day).kind === 'during';
+  const readings = useRamadanReadings(inRamadan);
+  const ramadan = useMemo(() => (inRamadan ? revoRamadan(logs, readings, ramadanDates(day), day) : null), [inRamadan, logs, readings, day]);
   const sources = useCallback((): FactSources | null => {
     if (!user) return null;
     const now = Date.now();
@@ -62,9 +72,9 @@ export function useRevoContext(): {
   const build = useCallback(() => {
     const src = sources();
     return src
-      ? buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot: src.snapshot, history: src.history, patterns: revoPatternsOn(), recite: revoReciteOn(), recitation: recitation(), gaps })
+      ? buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot: src.snapshot, history: src.history, patterns: revoPatternsOn(), recite: revoReciteOn(), recitation: recitation(), gaps, ramadan })
       : null;
-  }, [sources, recitation, gaps]);
+  }, [sources, recitation, gaps, ramadan]);
   const { context, extras } = useMemo(() => {
     const src = sources();
     if (!src) return { context: null, extras: {} };
@@ -78,11 +88,11 @@ export function useRevoContext(): {
       }
     }
     return {
-      context: buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot, history: src.history, patterns: revoPatternsOn(), recite: revoReciteOn(), recitation: recitation(), gaps }),
+      context: buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot, history: src.history, patterns: revoPatternsOn(), recite: revoReciteOn(), recitation: recitation(), gaps, ramadan }),
       // Smart Tracking unset is off, as Activity reads it.
       extras: { doneCount: snapshot.done.size, next, strength: src.user.smartTrackingEnabled === true },
     };
-  }, [sources, assignment, day, recitation, gaps]);
+  }, [sources, assignment, day, recitation, gaps, ramadan]);
   return { day, context, extras, build, sources };
 }
 
@@ -102,4 +112,23 @@ function useWordsFor(enabled: boolean): QuranWords | null {
     };
   }, [enabled, words]);
   return words;
+}
+
+/** The timed readings, loaded once `active` (Revo's Ramadan facts count their pages); empty until then. */
+function useRamadanReadings(active: boolean): ReadingSession[] {
+  const [readings, setReadings] = useState<ReadingSession[]>([]);
+  useEffect(() => {
+    if (!active) return;
+    let live = true;
+    firestoreService
+      .getReadingSessions()
+      .then((list) => {
+        if (live) setReadings(withPendingReadings(list));
+      })
+      .catch((err) => logger.warn('Could not read the readings for Revo’s Ramadan', err));
+    return () => {
+      live = false;
+    };
+  }, [active]);
+  return readings;
 }

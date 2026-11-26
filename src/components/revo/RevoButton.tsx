@@ -8,6 +8,7 @@ import { useReduceMotion } from '../../design/motion';
 import { dragPosition, dragTarget, positionSide, sidePosition, type RevoButtonSide } from '../../lib/revo/buttonSide';
 import { REVO_BUTTON_GAP, REVO_BUTTON_SIZE } from '../../lib/revo/presence';
 import { RevoMark } from './RevoMark';
+import { MarkCrescent } from '../ramadan/MarkCrescent';
 import { t } from '../../i18n';
 
 export { REVO_BUTTON_GAP, REVO_BUTTON_SIZE };
@@ -161,6 +162,8 @@ export function RevoButton({
             testID="revo-button"
           >
             <RevoMark size={REVO_BUTTON_SIZE} ring={isDark} />
+            {/* The Ramadan theme (THEME-5, THEME-8): a crescent on the mark. */}
+            <MarkCrescent />
             {dot ? (
               <View
                 style={[styles.dot, { backgroundColor: palette.primary, borderColor: palette.bg }]}

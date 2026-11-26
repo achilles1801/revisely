@@ -8,7 +8,7 @@ import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { DEV_GUIDE, DEV_GUIDE_SECTIONS, DEV_GUIDE_SYSTEM, GUIDE_INTERNAL, GUIDE_INTERNAL_KINDS, GUIDE_SECTIONS, REVO_GUIDE } from './guide';
 import { barePageNumbers, replyWords } from './pageWords';
-import { ARABIC_SYSTEM, REVO_SYSTEM_PROMPT, buildAskRequest, buildReviewRequest } from './prompt';
+import { ARABIC_SYSTEM, REVO_SYSTEM_PROMPT, buildAskRequest, buildReviewRequest, contextText, ramadanText } from './prompt';
 import { RECITATION_SYSTEM } from './recitation';
 import { parseReply } from './reply';
 import { REVO_SCREENS, REVO_SETTINGS_SECTIONS, RevoContext, RevoRecitation } from './types';
@@ -196,6 +196,26 @@ describe('the Dev guide goes only with questions from Revisely Dev', () => {
     expect(validateContext(plain).app).toBeUndefined();
     expect(() => validateContext({ ...plain, app: 'store' })).toThrow();
     expect(() => validateContext({ ...plain, app: true })).toThrow();
+  });
+
+  it('[THEME-8] the server takes Ramadan so far from Revisely Dev only, checked, and says it in words', () => {
+    const plain = JSON.parse(JSON.stringify(context())) as Record<string, unknown>;
+    const ramadan = { day: 12, length: 29, revisedDays: 12, covered: 268, nextPage: 131, nextWords: 'Al-An’am, 3rd page' };
+    expect(validateContext({ ...plain, app: 'dev', ramadan }).ramadan).toEqual(ramadan);
+    expect(() => validateContext({ ...plain, ramadan })).toThrow(); // not from the store app
+    expect(() => validateContext({ ...plain, app: 'dev', ramadan: { ...ramadan, day: 31 } })).toThrow();
+    expect(() => validateContext({ ...plain, app: 'dev', ramadan: { ...ramadan, revisedDays: 13 } })).toThrow();
+    expect(() => validateContext({ ...plain, app: 'dev', ramadan: { ...ramadan, covered: 605 } })).toThrow();
+    expect(() => validateContext({ ...plain, app: 'dev', ramadan: { ...ramadan, nextWords: undefined } })).toThrow();
+    expect(() => validateContext({ ...plain, app: 'dev', ramadan: { ...ramadan, extra: 1 } })).toThrow();
+    const { nextPage: _p, nextWords: _w, ...done } = ramadan;
+    expect(validateContext({ ...plain, app: 'dev', ramadan: { ...done, covered: 604 } }).ramadan).toEqual({ ...done, covered: 604 });
+    expect(ramadanText(ramadan)).toBe(
+      'Ramadan: day 12 of 29, 18 days to Eid (counting today). Revised on 12 of the 12 days so far. 268 of the Qur’an’s 604 pages revised or read since 1 Ramadan; the first not yet is Al-An’am, 3rd page (page 131).',
+    );
+    expect(ramadanText({ ...done, covered: 604 })).toContain('every page has been, a khatmah this Ramadan');
+    expect(contextText(DAY, context({ app: 'dev', ramadan }), [])).toContain('Ramadan: day 12 of 29');
+    expect(contextText(DAY, context({ app: 'dev' }), [])).not.toContain('Ramadan:');
   });
 
   it('the app in Arabic asks for the answer in Arabic: its own block last, the rest unchanged; a day in review too', () => {

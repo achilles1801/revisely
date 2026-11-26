@@ -11,7 +11,7 @@ import { DEV_GUIDE_SYSTEM, GUIDE_PROMPT, OPEN_SCREEN_ACTION } from './guide';
 import { RECITATION_SYSTEM, recitationText } from './recitation';
 import { gapsText } from './gaps';
 import { REVO_DEV_OUTPUT_CONFIG, REVO_OUTPUT_CONFIG } from './replySchema';
-import { RevoAttachment, RevoContext, RevoPattern, StoredMessage } from './types';
+import { RevoAttachment, RevoContext, RevoPattern, RevoRamadan, StoredMessage } from './types';
 
 export { REVO_MODEL };
 /**
@@ -273,8 +273,27 @@ export function contextText(day: string, context: RevoContext, memory: readonly 
   }
   if (context.recitation) lines.push(recitationText(context.recitation));
   if (context.gaps) lines.push(gapsText(context.gaps));
+  if (context.ramadan) lines.push(ramadanText(context.ramadan));
   if (memory.length > 0) lines.push(`Remembered about them:\n${memory.map((m) => `- ${m}`).join('\n')}`);
   return lines.join('\n');
+}
+
+/**
+ * Ramadan so far (THEME-8, Revisely Dev), in words: "Ramadan: day 12 of 29, 17 days to Eid. Revised on 12 of the 12 days
+ * so far. 268 of the Qur'an's 604 pages revised or read since 1 Ramadan; the first not yet is Al-An'am, 3rd page
+ * (page 131)."
+ */
+export function ramadanText(r: RevoRamadan): string {
+  const toEid = r.length - r.day + 1;
+  const rest =
+    r.nextPage != null && r.nextWords
+      ? `; the first not yet is ${r.nextWords} (page ${r.nextPage})`
+      : '; every page has been, a khatmah this Ramadan';
+  return (
+    `Ramadan: day ${r.day} of ${r.length}, ${toEid} ${toEid === 1 ? 'day' : 'days'} to Eid (counting today). ` +
+    `Revised on ${r.revisedDays} of the ${r.day} ${r.day === 1 ? 'day' : 'days'} so far. ` +
+    `${r.covered} of the Qur’an’s 604 pages revised or read since 1 Ramadan${rest}.`
+  );
 }
 
 /** A stored message as one turn of the conversation sent to the model. */

@@ -277,6 +277,16 @@ export const revo = {
    * lib/revo/greeting: Revo's first line and suggestions (REVO-20, REVO-35), whole sentences joined
    * with a space after the hello. A suggestion is asked as written when tapped.
    */
+  /** Revo in Ramadan (THEME-8, with the theme showing): its first words and Home's suggestions. */
+  ramadan: {
+    hello: 'Ramadan Kareem, {{name}}.',
+    helloNoName: 'Ramadan Kareem.',
+    eid: 'Eid Mubarak, {{name}}.',
+    eidNoName: 'Eid Mubarak.',
+    khatmahChip: 'Plan a khatmah by Eid',
+    taraweehChip: 'What should I revise for taraweeh?',
+    howChip: 'How’s my Ramadan going?',
+  },
   greeting: {
     hello: 'Assalamu alaikum, {{name}}.',
     helloNoName: 'Assalamu alaikum.',

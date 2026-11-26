@@ -92,7 +92,23 @@ export interface RevoContext {
    * so it is deployed with the release (before its Promote).
    */
   gaps?: RevoGaps;
+  /** Ramadan so far (THEME-8; lib/revo/ramadan): from Revisely Dev only, during the month, with the theme showing. */
+  ramadan?: RevoRamadan;
   localTime: string | null;
+}
+
+/** Ramadan so far, for the model to plan from (a khatmah by Eid): lib/ramadanStats' figures. */
+export interface RevoRamadan {
+  /** Today's day of the month, 1 to `length` (29 or 30). */
+  day: number;
+  length: number;
+  /** Days of the month so far with a revision. */
+  revisedDays: number;
+  /** Different pages revised or read since 1 Ramadan, of the Qur'an's 604. */
+  covered: number;
+  /** The first page not revised or read since 1 Ramadan, and its words ("Al-An'am, 3rd page"); absent once all 604 are. */
+  nextPage?: number;
+  nextWords?: string;
 }
 
 /** A passage of one surah by its ayahs, with its words ("Al-Kahf, ayahs 22–23"); a take across two surahs is named whole. */

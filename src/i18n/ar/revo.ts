@@ -269,6 +269,15 @@ export const revo: NonNullable<ArStrings['revo']> = {
     includesNotes_many: 'يتضمن {{count}} ملاحظة',
     includesNotes_other: 'يتضمن {{count}} ملاحظة',
   },
+  ramadan: {
+    hello: 'رمضان كريم يا ⁨{{name}}⁩.',
+    helloNoName: 'رمضان كريم.',
+    eid: 'عيد مبارك يا ⁨{{name}}⁩.',
+    eidNoName: 'عيد مبارك.',
+    khatmahChip: 'خطّط لختمة قبل العيد',
+    taraweehChip: 'ماذا أراجع للتراويح؟',
+    howChip: 'كيف رمضاني حتى الآن؟',
+  },
   greeting: {
     hello: 'السلام عليكم يا ⁨{{name}}⁩.',
     helloNoName: 'السلام عليكم.',

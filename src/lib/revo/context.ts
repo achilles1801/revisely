@@ -10,7 +10,7 @@ import { shiftDay } from '../journal';
 import type { HistoryItem } from '../streakFromItems';
 import type { TodaySnapshot } from '../todaySnapshot';
 import { daySignals, revoPatterns, sessionStarts } from './patterns';
-import type { RevoContext, RevoGaps, RevoRecitation, RevoTotals } from './types';
+import type { RevoContext, RevoGaps, RevoRamadan, RevoRecitation, RevoTotals } from './types';
 import { contextWords, memorizedWords } from './words';
 import { isDevVariant } from '../variant';
 import { currentLanguage } from '../../i18n';
@@ -91,6 +91,8 @@ export function buildRevoContext(input: {
   recitation?: RevoRecitation | null;
   /** Insights' Gaps and Last revised (ACT-28, ACT-30; lib/revo/gaps): for an account that has them (gapsInsightsEnabled). */
   gaps?: RevoGaps | null;
+  /** Ramadan so far (THEME-8; lib/revo/ramadan), during the month with the theme showing. Revisely Dev only. */
+  ramadan?: RevoRamadan | null;
   now?: Date;
 }): RevoContext {
   const { user, pages, logs, snapshot } = input;
@@ -172,6 +174,8 @@ export function buildRevoContext(input: {
     // Gaps, for an account that has them (the mistake detection release opened them to everyone; ACT-28), once the
     // server takes them from any app (config/app.revoRecite); from Revisely Dev always.
     ...(input.gaps && (dev || input.recite) ? { gaps: input.gaps } : {}),
+    // Ramadan so far (THEME-8): Revisely Dev only, where the server knows the field.
+    ...(input.ramadan && dev ? { ramadan: input.ramadan } : {}),
     localTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
   };
 }
