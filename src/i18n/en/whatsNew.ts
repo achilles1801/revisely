@@ -12,4 +12,10 @@ export const whatsNew = {
     follows: 'The page follows you',
     marks: 'Each mistake, as you recite',
   },
+  /** The tour (1.0.6, components/whatsNew/tour): each slide plays by itself; Skip jumps to its words. */
+  tour: {
+    skip: 'Skip',
+    again: 'Watch again',
+    example: 'Example',
+  },
 } as const;

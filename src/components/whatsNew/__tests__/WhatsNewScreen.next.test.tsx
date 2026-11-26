@@ -44,7 +44,8 @@ beforeEach(async () => {
 
 describe('<WhatsNewScreen /> the mistake detection release (1.0.5), live', () => {
   it("an App Store account's walkthrough: mistake detection first, then Insights, then the rest", async () => {
-    expect(NEXT_RELEASE).toBeNull();
+    // The store app: the walkthrough is the current release's (the next one, the tour, is Revisely Dev's until released).
+    expect(NEXT_RELEASE?.live).toBe(false);
     expect(CURRENT_RELEASE.id).toBe('1.0.5');
     // An iPhone at the usual text size: the moment plays (past 1.6× text, card 1 is its words, as any card).
     jest.spyOn(Dimensions, 'get').mockReturnValue({ width: 402, height: 874, scale: 3, fontScale: 1 });

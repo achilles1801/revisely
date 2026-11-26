@@ -18,7 +18,9 @@ import {
   NEXT_RELEASE,
   RELEASES,
   SEEN_ALL,
+  TOUR_MOMENTS,
   cardsFor,
+  isTourMoment,
   hasSeen,
   needsOf,
   releaseFor,
@@ -52,10 +54,11 @@ describe("What's new: its releases", () => {
     expect(CURRENT_RELEASE).toBe(RELEASES[RELEASES.length - 1]);
   });
 
-  it('a release is short: at most five cards, the last with at most four rows', () => {
+  it('a release is short: at most five cards (a tour, one card a slide: its nine), the last with at most four rows', () => {
     for (const r of ALL_RELEASES) {
+      const tour = r.cards.every((c) => isTourMoment(c.moment));
       expect(r.cards.length).toBeGreaterThan(0);
-      expect(r.cards.length).toBeLessThanOrEqual(5);
+      expect(r.cards.length).toBeLessThanOrEqual(tour ? TOUR_MOMENTS.length : 5);
       for (const c of r.cards) if (c.rows) expect(c.rows.length).toBeLessThanOrEqual(4);
     }
   });
@@ -191,13 +194,22 @@ describe('the cards an account sees', () => {
     }
   });
 
-  it('with no next release (the release PR set it back), everyone, Revisely Dev included, gets the current one', () => {
-    expect(NEXT_RELEASE).toBeNull();
+  it("the next release (the tour) is dark: only Revisely Dev's replay and run at launch show it", () => {
+    expect(NEXT_RELEASE?.live).toBe(false);
     expect(CURRENT_RELEASE).toBe(RECITE_RELEASE);
-    for (const mode of ['required', 'replay', 'forced'] as const) {
-      expect(releaseFor(mode, true)).toBe(CURRENT_RELEASE);
-      expect(releaseFor(mode, false)).toBe(CURRENT_RELEASE);
-    }
+    expect(releaseFor('replay', true)).toBe(NEXT_RELEASE);
+    expect(releaseFor('forced', true)).toBe(NEXT_RELEASE);
+    // The walkthrough after an update, and every store app, are still the current release's.
+    expect(releaseFor('required', true)).toBe(CURRENT_RELEASE);
+    for (const mode of ['required', 'replay', 'forced'] as const) expect(releaseFor(mode, false)).toBe(CURRENT_RELEASE);
+  });
+
+  it('the tour: nine slides in order, two for the tafsir, Ramadan last; each covers its rules', () => {
+    const tour = NEXT_RELEASE!;
+    expect(tour.cards.map((c) => c.moment)).toEqual([...TOUR_MOMENTS]);
+    expect(tour.cards.filter((c) => c.needs === 'tafsir')).toHaveLength(2);
+    expect(tour.cards[tour.cards.length - 1].id).toBe('ramadan');
+    for (const c of tour.cards) expect(c.covers.length).toBeGreaterThan(0);
   });
 
   it('the mistake detection release, live: an App Store account sees every card, mistake detection first', () => {

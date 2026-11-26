@@ -59,5 +59,49 @@
   },
   "1.0.5/more.search": {
     "SEARCH-1": "25d3ce6d14ad81fe"
+  },
+  "1.0.6/ask": {
+    "REVO-45": "88032875373782b9",
+    "REVO-44": "ae2603bef58d1e11"
+  },
+  "1.0.6/books": {
+    "REVO-44": "ae2603bef58d1e11"
+  },
+  "1.0.6/revo": {
+    "REVO-43": "8754c1b0ee7c7f6d",
+    "REVO-46": "3c44f109bc122939",
+    "REVO-25": "d1d79c8fec388c88",
+    "REVO-42": "2059a677a7cd54a4"
+  },
+  "1.0.6/recite": {
+    "RECITE-30": "10614446cab8b6af",
+    "RECITE-2": "be2190fc0fbb9a87",
+    "RECITE-31": "53d9097c106e84fe"
+  },
+  "1.0.6/spot": {
+    "RECITE-8": "90988ad7296586ed",
+    "ACT-34": "33c46664e31144d8",
+    "RMEM-5": "c9aa0959ca534861"
+  },
+  "1.0.6/activity": {
+    "ACT-35": "b5f6a2c60631d3b4"
+  },
+  "1.0.6/home": {
+    "HOME-3": "060cf6a45f7ec70e",
+    "HOME-4": "dbc21650e36f7c97",
+    "HOME-5": "d99ff89d61f095df",
+    "SET-1": "7c9e48ea5ece9d2d"
+  },
+  "1.0.6/badges": {
+    "ACCOUNT-4": "c614707f6c66b6aa",
+    "ACCOUNT-5": "6729758881340022",
+    "ACCOUNT-7": "b2ad86257aab398f",
+    "ACCOUNT-8": "9ca980aae46bfded"
+  },
+  "1.0.6/ramadan": {
+    "THEME-2": "98d1e56d6d7b12b5",
+    "THEME-5": "2543573345c36d02",
+    "THEME-6": "9a0172cf36cea2e2",
+    "THEME-8": "feeca997c885b729"
   }
 }
