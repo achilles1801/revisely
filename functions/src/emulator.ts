@@ -78,7 +78,10 @@ export interface Recording {
   body: unknown;
 }
 
-/** A reply schema's hash, as recordings and compiled-schemas.json name it: of the request's whole `output_config`. */
+/**
+ * A reply schema's hash, as recordings and compiled-schemas.json name it: of the request's whole `output_config` (Revo's
+ * carry only `format`; the emulator hashes `{ format }` alone for compiled-schemas.json).
+ */
 export function schemaSha256(outputConfig: unknown): string {
   return createHash('sha256').update(JSON.stringify(outputConfig)).digest('hex');
 }
@@ -153,10 +156,13 @@ export function recordedAnthropic(db: Firestore, uid: string | undefined): Fetch
     if (request && (!Array.isArray(request.messages) || request.messages.length === 0 || request.messages[0].role !== 'user')) {
       problems.push('messages must start with a user turn');
     }
-    // A reply schema the real API was never seen to compile (it has an unpublished limit on the grammar's size).
-    const schema = request?.output_config ? compiledSchemas()[schemaSha256(request.output_config)] : undefined;
-    if (request?.output_config && !schema) {
-      problems.push(`reply schema ${schemaSha256(request.output_config).slice(0, 12)} was never checked against the API: run functions/scripts/check-revo-schemas.js`);
+    // A reply schema the real API was never seen to compile (it has an unpublished limit on the grammar's size). Only the
+    // format counts: an output_config with no schema (an effort alone) compiles no grammar.
+    const format = request?.output_config?.format;
+    const schemaSha = format ? schemaSha256({ format }) : null;
+    const schema = schemaSha ? compiledSchemas()[schemaSha] : undefined;
+    if (schemaSha && !schema) {
+      problems.push(`reply schema ${schemaSha.slice(0, 12)} was never checked against the API: run functions/scripts/check-revo-schemas.js`);
     }
     const settings = await account.get();
     const mode = String(settings.get('mode') ?? 'recorded');
