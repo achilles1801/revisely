@@ -59,6 +59,7 @@ const props = () => ({
   onPlanIt: jest.fn(),
   onOpenPage: jest.fn(),
   onOpenSection: jest.fn(),
+  onOpenMonth: jest.fn(),
 });
 // Juz 30 memorized and revised yesterday: Coverage and Consistency have something to say.
 const memorized = (rating = 4) =>
@@ -81,9 +82,18 @@ beforeEach(() => {
 });
 
 describe('[ACT-35] one Activity tab', () => {
-  it('the calendar and the picked day first, with no Overview | Insights switch; the day shows no note', async () => {
-    render(<ActivityBlocksViews {...props()} />);
-    expect(await screen.findByTestId('calendar-month')).toBeTruthy();
+  it('this week and the picked day first (Majd’s T1), with no Overview | Insights switch; the day shows no note', async () => {
+    const p = props();
+    render(<ActivityBlocksViews {...p} />);
+    // The week in one line, not the month: seven days, a grey line, and Month ›.
+    expect(await screen.findByTestId('calendar-strip')).toBeTruthy();
+    expect(screen.queryByTestId('calendar-month')).toBeNull();
+    expect(screen.getByTestId('calendar-strip-title')).toHaveTextContent('This week');
+    for (const d of ['2026-11-01', '2026-11-05', '2026-11-07']) expect(screen.getByTestId(`calendar-day-${d}`)).toBeTruthy();
+    expect(screen.queryByTestId('calendar-day-2026-11-08')).toBeNull();
+    expect(screen.getByTestId('calendar-week-line')).toHaveTextContent('0 of 5 days revised');
+    fireEvent.press(screen.getByTestId('calendar-month-link'));
+    expect(p.onOpenMonth).toHaveBeenCalledTimes(1);
     expect(screen.queryAllByRole('tab')).toHaveLength(0);
     expect(screen.queryByText('Overview')).toBeNull();
     expect(screen.getByTestId('calendar-preview')).toBeTruthy();
@@ -146,6 +156,35 @@ describe('[ACT-35] one Activity tab', () => {
     // The page's top bar names it: the section starts at its figure, with no title or subtitle of its own (board A4).
     expect(screen.queryByText('Coverage')).toBeNull();
     expect(screen.queryByText("Which juz you've revised lately")).toBeNull();
+  });
+
+  it('the day in C2’s form: its ring and “N of M revised”, the other kinds in one grey line with the calendar’s marks', async () => {
+    const service = jest.requireMock('../../../services/firestoreService') as { getActivityItemsBetween: jest.Mock };
+    service.getActivityItemsBetween.mockResolvedValue({
+      revisions: [{ id: TODAY, day: TODAY, countsFor: TODAY, pages: [582, 583, 584], skipped: [], assigned: [582, 583, 584, 585], minutes: 12, occurredAt: null }],
+      memorized: [{ id: 'm', day: TODAY, pages: [600] }],
+      reads: [{ id: 'r', day: TODAY, pages: [1, 2], minutes: 22, occurredAt: null }],
+    });
+    try {
+      render(<ActivityBlocksViews {...props()} />);
+      expect(await screen.findByTestId('preview-ring-figure')).toHaveTextContent('3 of 4 revised');
+      expect(screen.getByTestId('preview-extra-memorized')).toHaveTextContent('1 page memorized');
+      expect(screen.getByTestId('preview-extra-read')).toHaveTextContent('22 min read');
+      // No chip backgrounds: plain lines, and no note or Add a note.
+      expect(screen.queryByTestId('preview-add-note')).toBeNull();
+      expect(screen.getByTestId('calendar-week-line')).toHaveTextContent('1 of 5 days revised · 22 min read');
+    } finally {
+      service.getActivityItemsBetween.mockResolvedValue({ revisions: [], memorized: [], reads: [] });
+    }
+  });
+
+  it('“Month ›” opens the full calendar: the month, its arrows and totals, the picked day in C2’s form', async () => {
+    render(<ActivityBlocksViews {...props()} monthPage />);
+    expect(await screen.findByTestId('calendar-month')).toBeTruthy();
+    expect(screen.getByText('November 2026')).toBeTruthy();
+    expect(screen.queryByTestId('calendar-strip')).toBeNull();
+    expect(screen.queryByTestId('insights-rows')).toBeNull();
+    expect(screen.queryByTestId('preview-row-notes')).toBeNull();
   });
 
   it('one range for all of Activity: a choice on the list is the one a section’s page reads', async () => {

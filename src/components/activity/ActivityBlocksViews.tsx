@@ -96,11 +96,15 @@ interface Props {
   onOpenSection?: (id: InsightsSection) => void;
   /** A section's page: Consistency's figure or a gap opens the tab's calendar, there (ACT-23, ACT-28). */
   onOpenCalendar?: (month: string, gap?: Omit<CalendarGap, 'key'>) => void;
-  /** The one tab, sent to the calendar by a section's page: that month, the gap marked. */
+  /** The month page, sent there by a section's page: that month, the gap marked. */
   calendarAt?: { month: string; gap?: Omit<CalendarGap, 'key'> } | null;
+  /** The one tab's "Month ›" (Majd's T1): the full calendar on a page of its own. */
+  onOpenMonth?: () => void;
+  /** That page (ACT-35): the month, Week | Month, Today and the arrows, and the picked day in C2's form. */
+  monthPage?: boolean;
 }
 
-export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, onShowTop, refreshRef, section, onOpenSection, onOpenCalendar, calendarAt }: Props) {
+export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, onShowTop, refreshRef, section, onOpenSection, onOpenCalendar, calendarAt, onOpenMonth, monthPage }: Props) {
   const { pages, logs, user } = useApp();
   const { palette } = useTheme();
   // One Activity tab (ACT-35, Revisely Dev until released): the calendar and the day, then the sections as rows.
@@ -374,12 +378,15 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
   };
   // Recitation only for an account that recites, Gaps where it is open; Weak spots with Smart Tracking off is its invite.
   const sectionsHas = (id: InsightsSection) => (id === 'recitation' ? recitation != null && onOpenAyahs != null : id === 'gaps' ? gapsOn : true);
-  const calendar = (oneTabLayout: boolean) => (
+  // 'tab': the one tab's week (T1); 'month': its month page; 'two': Overview as before.
+  const calendar = (mode: 'tab' | 'month' | 'two') => (
     <RNView testID="activity-calendar">
       <CalendarMonth
+        layout={mode === 'tab' ? 'strip' : 'full'}
+        onMonth={onOpenMonth}
         gridSwipe={gridSwipe}
         month={month}
-        week={week}
+        week={mode === 'tab' ? weekStartOf(today) : week}
         span={span}
         onSpan={setSpan}
         onToday={showsToday(span, { month, week }, today) ? undefined : toToday}
@@ -397,11 +404,14 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
         spotTests={spotTests}
         // The one tab: the calendar, its key and totals and the day are its basics (Majd, Nov 25 2026), always shown; the day
         // shows no note there (ACT-35).
-        sections={oneTabLayout ? DEFAULT_SECTIONS.overview : sections.overview}
-        showNote={!oneTabLayout}
+        sections={mode === 'two' ? sections.overview : DEFAULT_SECTIONS.overview}
+        showNote={mode === 'two'}
       />
     </RNView>
   );
+
+  // The one tab's month page (ACT-35): the full calendar, the picked day in C2's form.
+  if (monthPage) return <RNView testID="activity-blocks-views">{calendar('month')}</RNView>;
 
   // A section's own page (ACT-35): that section alone, in full.
   if (section) {
@@ -417,7 +427,7 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
   if (oneTab) {
     return (
       <RNView testID="activity-blocks-views">
-        {calendar(true)}
+        {calendar('tab')}
         <RNView style={[styles.listHead, { borderTopColor: palette.separator }]} testID="activity-sections-list">
           <ChromeText style={[typeV2.meta, styles.listTitle, { color: palette.secondary }]} accessibilityRole="header">
             {t('activity.oneTab.yourRevision')}
@@ -479,7 +489,7 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
         </RNView>
       </RNView>
       {view === 'calendar' ? (
-        calendar(false)
+        calendar('two')
       ) : (
         <InsightsView
           data={insightsData}

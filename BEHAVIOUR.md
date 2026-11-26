@@ -1134,9 +1134,14 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   block in the day, each saying Finished or Stopped early. No line ever shrinks or lists its places: a few words and how much.
 - **ACT-35.** (Revisely Dev) Activity is one tab, with no Overview | Insights switch (Majd, Nov 25 2026: "the most important
   things that should be shown as default that isn't overstimulating is the calendar view as well as today's journal card
-  because those are essentially the basics, the rest is just nice to know stuff"; he picked version A). On top, the calendar
-  (ACT-18: Month or Week, Today, ‹ ›, its totals and key, always shown) and the picked day's entry (ACT-34), which shows no
-  note ("the note shouldn't be shown on the journal day card -- it adds to the overstimulation"); the day itself has it. Under
+  because those are essentially the basics, the rest is just nice to know stuff"; he picked version A, then on the v2 boards,
+  Nov 26 2026, "T1 and C2", after "i love the calendar but ... it's 'too much' in my face"). On top, this week: "This week" and
+  "Month ›", one grey line (the days revised so far of the days so far, and the time read), then its seven days in one line,
+  each with the calendar's ring and marks; a tap picks a day. "Month ›" opens the full calendar on a page of its own (ACT-18:
+  Week | Month, Today, ‹ ›, its totals and key), with the picked day there too. Under the week, the picked day's entry
+  (ACT-34) in C2's form: its ring and "N of M revised", where and how long under it, then the other kinds in one grey line
+  with the calendar's own marks (pages memorized, time read, takes, a spot test), no chip backgrounds; no note ("the note
+  shouldn't be shown on the journal day card -- it adds to the overstimulation") and no Add a note: the day has both. Under
   them, "Your revision" with the range chip (ACT-22), then the sections in ACT-29's order as quiet rows: the name, one grey
   line, the figure at the end and ›, the whole row one button that opens the section on a page of its own: its name and the
   range chip in the top bar (one range: a change there is the list's too), then the section as Insights drew it, starting at
@@ -1144,8 +1149,8 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   to say yet has no row: Gaps until a gap can be measured, Weak spots until a page is rated weak (none without Smart
   Tracking), Recitation until a take, Memorization until a page was memorized in the last twelve months, Pace until ten timed
   items. While one the account can have is missing, a grey line says the others show once they have something to say. Edit
-  sections is the list's last row (Insights' sections; the calendar and the day stay). A section's Consistency figure or gap
-  opens the tab's calendar there. Revo's button is on a section's page too, opening as Insights' (Weak spots' as its Ask).
+  sections is the list's last row (Insights' sections; the week and the day stay). A section's Consistency figure or gap
+  opens the full calendar's page there. Revo's button is on a section's page too, opening as Insights' (Weak spots' as its Ask).
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
   strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
   stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,
@@ -1404,7 +1409,7 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 
 - **REVO-25.** Revo's button is a 44pt disc (the smallest touch target, with room around it to tap), in a bottom corner
   (REVO-41), 14 above the tab bar and the mini player. It shows on Home, Activity (Overview and Insights), a day in Activity, See
-  all, Pages by strength and a section's own page (ACT-35), and nowhere else. There is no Revo on the Read tab (its list or the reader) or in a
+  all, Pages by strength, and a section's own page and the full calendar (ACT-35), and nowhere else. There is no Revo on the Read tab (its list or the reader) or in a
   revision session, and their help sheets offer no "Ask Revo" (Majd, Nov 8 2026: "no revo in the revision
   sessions. there should also be no revo in the mushaf tab at all"); none in an editor or Settings either. The
   screens it shows on end their lists with room for it (`useRevoFootprint`), so their last row scrolls clear of it;
