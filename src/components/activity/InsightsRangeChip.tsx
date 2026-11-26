@@ -10,28 +10,31 @@ import { dayAndMonth, INSIGHTS_RANGE_KEY, INSIGHTS_RANGES, parseRange, rangeLabe
 import { t } from '../../i18n';
 
 let current: InsightsRange = 30;
-let read = false;
+// A choice made since launch: what the phone holds is that choice (being saved), so it isn't read back over it.
+let chosen = false;
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((l) => l());
 
 function setRange(next: InsightsRange) {
   current = next;
-  read = true;
+  chosen = true;
   notify();
   AsyncStorage.setItem(INSIGHTS_RANGE_KEY, String(next)).catch(() => undefined);
 }
 
 /** The range every chip shows and every section reads, and the way to change it. */
 export function useInsightsRange(): [InsightsRange, (next: InsightsRange) => void] {
+  // Read on each mount, as each screen read it before; a choice made since launch wins over what is stored.
   useEffect(() => {
-    if (read) return;
+    if (chosen) return;
     AsyncStorage.getItem(INSIGHTS_RANGE_KEY)
       .then((v) => {
-        // A choice made before the stored one was read wins over it.
-        if (read) return;
-        read = true;
-        current = parseRange(v);
-        notify();
+        if (chosen) return;
+        const stored = parseRange(v);
+        if (stored !== current) {
+          current = stored;
+          notify();
+        }
       })
       .catch(() => undefined);
   }, []);
@@ -48,7 +51,7 @@ export function useInsightsRange(): [InsightsRange, (next: InsightsRange) => voi
 /** For tests: as a fresh launch has it. */
 export function resetInsightsRangeForTests(): void {
   current = 30;
-  read = false;
+  chosen = false;
 }
 
 export function InsightsRangeChip({ firstDay, testID = 'insights-range' }: { firstDay?: string | null; testID?: string }) {
