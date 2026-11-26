@@ -185,7 +185,10 @@ until its part is set up.
     first use and reachable afterwards: the sheet shows it first, and Settings → About has it.
   - "Keep as test data" (on by default; in the sheet and Settings → Testing) keeps each recording and its result
     in `recite-tests/<uid>/` in the dev bucket (closed to clients). The lab copies them with `fetch_takes.py`.
-    **Nobody listens to them**, Majd included; they are held out of training, like the /record takes.
+    **Nobody listens to them**, Majd included; they are held out of training, like the /record takes. Sessions may
+    replay them through software to debug and improve Recite (Majd, Nov 26 2026: "yes all sessions can look at any
+    recordings it wants to help debug and fix issues and enhance things"), within what testers were told: software
+    checks them, no person plays another tester's take, and none goes into training.
   - **"Not clear"** (Majd, Nov 15 2026): a harakat or letter mark with `sure: "likely"` reads "Not clear" ("Say it more
     clearly. Not counted in the score."), shows only what was expected on its card, isn't amber in the bar, comes last
     in the summary and never counts in the score (`isUnclear` in `lib/reciteLive/contract`). A checker that sends
