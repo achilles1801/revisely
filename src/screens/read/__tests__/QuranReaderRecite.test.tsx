@@ -2069,6 +2069,12 @@ describe('Test me is one spot test (RECITE-8; Majd, Nov 23 2026: "there should o
     await act(async () => setReciteCheckSettings('u1', { testProgress: false }));
     expect(screen.queryByTestId('test-progress')).toBeNull();
     await act(async () => setReciteCheckSettings('u1', { testProgress: true }));
+    // The take ends here, its record kept within this test.
+    const { first } = spot();
+    await event({ type: 'done', result: { v: 2, take: 'p1', from: first, to: last + 1, start: next, secs: 40, marks: [], score: null } } as LiveEvent);
+    await flush();
+    await flush();
+    expect(screen.queryByTestId('test-progress')).toBeNull();
   });
 
   it('[RECITE-8] the length set sets how far the take goes', async () => {

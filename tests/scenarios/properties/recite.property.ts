@@ -59,7 +59,7 @@ import { markFill } from '../../../src/components/reciteLive/markColours';
 import { markTitle } from '../../../src/lib/reciteLive/describe';
 import { coverHighlights, NOTHING_SHOWN, revealAyah, revealNextWord, wordShown } from '../../../src/lib/reciteLive/view';
 import { createMistakeCue, cuesMark, CUE_GAP_MS } from '../../../src/lib/reciteLive/mistakeCue';
-import { pickTest, testFinished, testStarts, wordPagesOn } from '../../../src/lib/reciteLive/testMe';
+import { linesRecited, pickTest, testFinished, testStarts } from '../../../src/lib/reciteLive/testMe';
 import { TEST_LENGTHS } from '../../../src/lib/reciteLive/testLength';
 import { recordFromTake } from '../../../src/lib/reciteMemory/fromTake';
 import { fromStored, toStored, type TakeRecord } from '../../../src/lib/reciteMemory/record';
@@ -534,7 +534,9 @@ describe('[RECITE-8] Test me: one spot test from a verse at random, to the lengt
         // Every ayah from this page to the end of the Qur'an is memorized.
         const memorized = ayahsBetween(ayahKey(words.ref(words.pageRange(page)[0]).sura, words.ref(words.pageRange(page)[0]).ayah), ayahKey(114, 6));
         const test = pickTest(memorized, words, { pages, random: seeded(seed) })!;
-        expect(test.last).toBeGreaterThanOrEqual(wordPagesOn(words, test.cue[0], pages));
+        // Its lines from memory reach the length, or a surah's end within a third of it took its place (RECITE-8).
+        const fromMemory = linesRecited(words, test.cue[test.cue.length - 1] + 1, test.last);
+        expect(fromMemory).toBeGreaterThanOrEqual(pages * 15 - Math.ceil((pages * 15) / 3));
       }),
       { numRuns: runs(60) },
     );
