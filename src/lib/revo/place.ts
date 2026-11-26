@@ -52,6 +52,11 @@ export function revoPlaceOf(route: { name: string; params?: object } | null | un
     case 'PlanEdit':
       // REVO-43: on the schedule, in Revisely Dev; elsewhere it opens as from Home.
       return isDevVariant() ? { kind: 'schedule' } : HOME;
+    case 'ActivitySection': {
+      // A section's own page on the one Activity tab (ACT-35): Weak spots opens as Weak spots' Ask, the rest as Insights.
+      const section = (route.params as { section?: unknown } | undefined)?.section;
+      return section === 'weak' ? { kind: 'weakSpots' } : { kind: 'insights' };
+    }
     default:
       // Home, See all, and anywhere else Revo is opened from (Settings).
       return HOME;

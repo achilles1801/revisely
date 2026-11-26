@@ -31,6 +31,7 @@ export function DayEntry({
   note,
   onOpen,
   onAddNote,
+  showNote = true,
 }: {
   /** "Wednesday 28 October". */
   date: string;
@@ -39,9 +40,12 @@ export function DayEntry({
   note: string | null;
   onOpen: () => void;
   onAddNote: () => void;
+  /** The one Activity tab (ACT-35) shows no note here (Majd, Nov 25 2026: "it adds to the overstimulation"); the day has it. */
+  showNote?: boolean;
 }) {
   const { palette } = useTheme();
-  const spoken = [date, ...lines.map((l) => `${l.label}, ${l.value}${l.tail ? `, ${l.tail}` : ''}`), ...(note ? [`${t('activity.calendar.note')}, ${note}`] : [])].join('. ');
+  const shownNote = showNote ? note : null;
+  const spoken = [date, ...lines.map((l) => `${l.label}, ${l.value}${l.tail ? `, ${l.tail}` : ''}`), ...(shownNote ? [`${t('activity.calendar.note')}, ${shownNote}`] : [])].join('. ');
   const label = [typeV2.body, styles.label, { color: palette.secondary }];
   const value = [typeV2.body, styles.value, { color: palette.text }];
   return (
@@ -78,17 +82,17 @@ export function DayEntry({
             ) : null}
           </View>
         ))}
-        {note ? (
+        {shownNote ? (
           <View style={styles.line} testID="preview-row-notes">
             <Text style={label} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
               {t('activity.calendar.note')}
             </Text>
             <Text style={value} numberOfLines={2} maxFontSizeMultiplier={MAX_SCALE} testID="preview-value-notes">
-              {note}
+              {shownNote}
             </Text>
           </View>
         ) : null}
-        {lines.length === 0 && !note ? (
+        {lines.length === 0 && !shownNote ? (
           <Text style={[typeV2.body, styles.nothing, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE} testID="preview-nothing">
             {t('activity.calendar.entryNothing')}
           </Text>

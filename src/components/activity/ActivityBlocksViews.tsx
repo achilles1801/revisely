@@ -18,9 +18,14 @@ import { useRevoAvailable } from '../../lib/revo/availability';
 import { logger } from '../../lib/logger';
 import { layoutV2 } from '../../theme/v2';
 import { PillTabs } from '../v2/PillTabs';
-import { ActionSheet } from '../v2/ActionSheet';
-import { ChoiceChip } from './ChoiceChip';
-import { dayAndMonth, daysToLoad, INSIGHTS_RANGE_KEY, INSIGHTS_RANGES, parseRange, rangeLabel, rangeSpan, type InsightsRange } from '../../lib/insightsRange';
+import { daysToLoad, rangeSpan } from '../../lib/insightsRange';
+import { InsightsRangeChip, useInsightsRange } from './InsightsRangeChip';
+import { activityOneTabEnabled } from '../../lib/release/activityOneTab';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../context/ThemeContext';
+import { Tap } from '../v2/Tap';
+import { ChromeText } from './ChromeText';
+import { typeV2 } from '../../theme/v2';
 import { journalFirstDay } from '../../lib/journal';
 import { smartTrackingOn } from '../../lib/smartTracking';
 import { gapsInsightsEnabled } from '../../lib/insightsGaps';
@@ -40,7 +45,7 @@ import type { SpotTestsDay } from '../../lib/spotTests';
 import { useMemoryRecords } from '../../lib/reciteMemory/store';
 import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { useQuranWordsWhen } from '../reciteMemory/TakeRows';
-import { activitySectionsEnabled, useActivitySections, type InsightsSection } from '../../lib/activitySections';
+import { activitySectionsEnabled, DEFAULT_SECTIONS, useActivitySections, type InsightsSection } from '../../lib/activitySections';
 import { IconButton } from '../v2/TopBar';
 import { SectionsSheet } from './SectionsSheet';
 import { t } from '../../i18n';
@@ -85,10 +90,21 @@ interface Props {
   onShowTop?: () => void;
   /** Filled with what reads the items again, for the screen's pull to refresh (ACT-27). */
   refreshRef?: React.MutableRefObject<(() => Promise<unknown>) | null>;
+  /** A section's own page (ACT-35): that section alone, drawn in full; no calendar. */
+  section?: InsightsSection;
+  /** The one tab's rows (ACT-35): a section's page. */
+  onOpenSection?: (id: InsightsSection) => void;
+  /** A section's page: Consistency's figure or a gap opens the tab's calendar, there (ACT-23, ACT-28). */
+  onOpenCalendar?: (month: string, gap?: Omit<CalendarGap, 'key'>) => void;
+  /** The one tab, sent to the calendar by a section's page: that month, the gap marked. */
+  calendarAt?: { month: string; gap?: Omit<CalendarGap, 'key'> } | null;
 }
 
-export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, onShowTop, refreshRef }: Props) {
+export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, onShowTop, refreshRef, section, onOpenSection, onOpenCalendar, calendarAt }: Props) {
   const { pages, logs, user } = useApp();
+  const { palette } = useTheme();
+  // One Activity tab (ACT-35, Revisely Dev until released): the calendar and the day, then the sections as rows.
+  const oneTab = activityOneTabEnabled();
   const revo = useRevoAvailable(user);
   const recitation = useRecitation(user);
   // The sections each tab shows, and in what order (ACT-29): the user's, kept on this phone for the account.
@@ -133,18 +149,10 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
     setWeek(weekStartOf(today));
     setPicked(today);
   };
-  // Insights' range (ACT-22): one for the whole tab, kept on the phone like Week | Month.
-  const [range, setRangeState] = useState<InsightsRange>(30);
-  const [rangeMenu, setRangeMenu] = useState(false);
-  useEffect(() => {
-    AsyncStorage.getItem(INSIGHTS_RANGE_KEY)
-      .then((v) => setRangeState(parseRange(v)))
-      .catch(() => undefined);
-  }, []);
-  const setRange = (next: InsightsRange) => {
-    setRangeState(next);
-    AsyncStorage.setItem(INSIGHTS_RANGE_KEY, String(next)).catch(() => undefined);
-  };
+  // Insights' range (ACT-22): one for the whole of Activity, kept on the phone like Week | Month (every chip shows it).
+  const [range] = useInsightsRange();
+  // The sections read in full: Insights on show, or always on the one tab (its rows) and a section's page.
+  const insightsOn = view === 'insights' || oneTab || section != null;
   const [data, setData] = useState<Awaited<ReturnType<typeof firestoreService.getActivityItemsBetween>> | null>(null);
 
   // The days on screen (the month grid) and the days the insights read: the range and as long before
@@ -244,12 +252,12 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
   // Insights' twelve months of memorization (the calendar's window is 90 days).
   const [yearOfMemorizing, setYearOfMemorizing] = useState<{ day: string; pages: number[] }[]>([]);
   const loadYear = useCallback(async () => {
-    if (view !== 'insights') return;
+    if (!insightsOn) return;
     await firestoreService
       .getMemorizationsBetween(shiftDays(today, -400), today)
       .then(setYearOfMemorizing)
       .catch((err) => logger.warn('Could not load the year of memorization for Insights', err));
-  }, [view, today]);
+  }, [insightsOn, today]);
   useActivityReload(loadYear, undefined, true);
   useEffect(() => {
     loadYear();
@@ -276,6 +284,11 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
   // Consistency's figure (ACT-23): Overview at that month, with today (or nothing) picked. A gap from Gaps (ACT-28):
   // where it shows, marked (lib/activityCalendar periodForGap).
   const openCalendar = (m: string, gap?: Omit<CalendarGap, 'key'>) => {
+    // A section's own page: the calendar is the tab's (ACT-35).
+    if (section && onOpenCalendar) {
+      onOpenCalendar(m, gap);
+      return;
+    }
     setView('calendar');
     onShowTop?.();
     if (gap) {
@@ -290,6 +303,12 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
     setWeek(weekStartOf(m === today.slice(0, 7) ? today : `${m}-01`));
     setPicked(null);
   };
+  // Sent here by a section's page (ACT-35): the calendar at that month, the gap marked.
+  const openCalendarRef = useRef(openCalendar);
+  openCalendarRef.current = openCalendar;
+  useEffect(() => {
+    if (calendarAt) openCalendarRef.current(calendarAt.month, calendarAt.gap);
+  }, [calendarAt]);
   // The account's first day: a range longer than the account counts from it ("50 of 56 days").
   const firstDay = useMemo(() => journalFirstDay(user, (data?.revisions ?? []).map((r) => ({ date: r.day }))), [user, data]);
   // The day each memorized page counts from when never revised: under 30 days, "not revised yet" (ACT-25).
@@ -306,15 +325,132 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
   // Gaps' full revision against the plan (ACT-28): only while Insights shows it.
   const gapsOn = gapsInsightsEnabled(user);
   const fullRevision = useMemo(() => {
-    if (!gapsOn || view !== 'insights' || !user) return null;
+    if (!gapsOn || !insightsOn || !user) return null;
     const plan = revisablePages(pages);
     const lastBy = new Map(plan.filter((p) => p.lastRevisedDate).map((p) => [p.pageNumber, lastRevisedDay(user, p.lastRevisedDate as string)]));
     return pushBack({ user, memorized: plan, today, lastRevised: (p) => lastBy.get(p) ?? null, since: (p) => coverageSinceByPage.get(p) ?? null });
-  }, [gapsOn, view, user, pages, today, coverageSinceByPage]);
+  }, [gapsOn, insightsOn, user, pages, today, coverageSinceByPage]);
 
   const revised: Revised[] = useMemo(() => (data?.revisions ?? []).map((r) => ({ day: r.day, countsFor: r.countsFor, pages: r.pages, assigned: r.assigned, minutes: r.minutes })), [data]);
   const memorized: Memorized[] = useMemo(() => (data?.memorized ?? []).map((m) => ({ day: m.day, pages: m.pages })), [data]);
   const read: Read[] = useMemo(() => (data?.reads ?? []).map((r) => ({ day: r.day, pages: r.pages, minutes: r.minutes })), [data]);
+
+  // What every section reads (ACT-22), for Insights, the one tab's rows and a section's page alike.
+  const insightsData = {
+    today,
+    memorized: memorizedSet,
+    learning: learningSet,
+    rating: (p: number) => ratingByPage.get(p),
+    ratedWeak,
+    revised: data?.revisions ?? [],
+    read: data?.reads ?? [],
+    memorizations: yearOfMemorizing,
+    capacity: user?.dailyPageCapacity ?? 20,
+    revo,
+    smartTracking: smartTrackingOn(user),
+    range,
+    firstDay,
+    lastRevisedOn,
+    coverageSince: coverageSinceByPage,
+    firstTomorrow,
+    // Gaps waits for the items: drawn from none, it fell back on the pages' last revisions and read "Today you
+    // revised" over a strip of "revised on 0 days" while they loaded (ACT-28).
+    gaps: gapsOn && data != null,
+    pushBack: fullRevision,
+    itemsFrom: rangeFrom,
+    recitation,
+  };
+  const insightsActions = {
+    onOpenDay,
+    onOpenCalendar: openCalendar,
+    onReviseTomorrow,
+    onPlanIt,
+    onAddToPlan,
+    onOpenPage,
+    onOpenAyahs,
+    onSeeAllPages,
+    onOpenLastRevised,
+    onTurnOnSmartTracking,
+  };
+  // Recitation only for an account that recites, Gaps where it is open; Weak spots with Smart Tracking off is its invite.
+  const sectionsHas = (id: InsightsSection) => (id === 'recitation' ? recitation != null && onOpenAyahs != null : id === 'gaps' ? gapsOn : true);
+  const calendar = (oneTabLayout: boolean) => (
+    <RNView testID="activity-calendar">
+      <CalendarMonth
+        gridSwipe={gridSwipe}
+        month={month}
+        week={week}
+        span={span}
+        onSpan={setSpan}
+        onToday={showsToday(span, { month, week }, today) ? undefined : toToday}
+        today={today}
+        picked={picked}
+        data={{ revised, memorized, read, noteDays }}
+        onStep={(delta) => stepRef.current(delta)}
+        onPick={setPicked}
+        onOpen={onOpenDay}
+        noteOf={noteOf}
+        onAddNote={onAddNote}
+        gap={gapMark}
+        recordings={recordings}
+        recited={recited}
+        spotTests={spotTests}
+        // The one tab: the calendar, its key and totals and the day are its basics (Majd, Nov 25 2026), always shown; the day
+        // shows no note there (ACT-35).
+        sections={oneTabLayout ? DEFAULT_SECTIONS.overview : sections.overview}
+        showNote={!oneTabLayout}
+      />
+    </RNView>
+  );
+
+  // A section's own page (ACT-35): that section alone, in full.
+  if (section) {
+    return (
+      <RNView testID="activity-blocks-views">
+        <InsightsView data={insightsData} {...insightsActions} sections={{ order: [section], hidden: [] }} />
+      </RNView>
+    );
+  }
+
+  // One Activity tab (ACT-35, version A): the calendar and the picked day, then "Your revision" with the range, the sections
+  // as quiet rows that open their own pages, and Edit sections last.
+  if (oneTab) {
+    return (
+      <RNView testID="activity-blocks-views">
+        {calendar(true)}
+        <RNView style={[styles.listHead, { borderTopColor: palette.separator }]} testID="activity-sections-list">
+          <ChromeText style={[typeV2.meta, styles.listTitle, { color: palette.secondary }]} accessibilityRole="header">
+            {t('activity.oneTab.yourRevision')}
+          </ChromeText>
+          <InsightsRangeChip firstDay={firstDay} />
+        </RNView>
+        <InsightsView
+          data={insightsData}
+          {...insightsActions}
+          mode="rows"
+          onOpenSection={onOpenSection}
+          sections={sections.insights}
+          onEditSections={editable ? () => setEditing('insights') : undefined}
+        />
+        {editable ? (
+          <>
+            <Tap onPress={() => setEditing('insights')} accessibilityRole="button" style={styles.editRow} testID="activity-edit-sections">
+              <Ionicons name="options-outline" size={18} color={palette.secondary} />
+              <ChromeText style={[typeV2.name, { color: palette.secondary }]}>{t('activity.insights.editSections')}</ChromeText>
+            </Tap>
+            <SectionsSheet
+              tab="insights"
+              visible={editing === 'insights'}
+              onClose={() => setEditing(null)}
+              layout={sections.insights}
+              has={sectionsHas}
+              notes={smartTrackingOn(user) ? {} : { weak: t('activity.blocks.smartTrackingOff') }}
+            />
+          </>
+        ) : null}
+      </RNView>
+    );
+  }
 
   return (
     <RNView testID="activity-blocks-views">
@@ -335,96 +471,19 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
         />
         <RNView style={styles.ends}>
           {/* Insights' range (ACT-22; mock i1): at the end of the tabs row, on Insights only. */}
-          {view === 'insights' ? (
-            <ChoiceChip
-              label={rangeLabel(range)}
-              onPress={() => setRangeMenu(true)}
-              accessibilityLabel={t('activity.blocks.insightsFor', { range: rangeLabel(range) })}
-              accessibilityHint={t('activity.blocks.chooseRange')}
-              size="md"
-              testID="insights-range"
-            />
-          ) : null}
+          {view === 'insights' ? <InsightsRangeChip firstDay={firstDay} /> : null}
           {/* Edit sections (ACT-29): what the tab on show shows, and in what order. */}
           {editable ? (
             <IconButton icon="options-outline" label={t('activity.insights.editSections')} onPress={() => setEditing(view)} size={22} testID="activity-edit-sections" />
           ) : null}
         </RNView>
       </RNView>
-      <ActionSheet
-        visible={rangeMenu}
-        onClose={() => setRangeMenu(false)}
-        title={t('activity.blocks.insightsForTitle')}
-        actions={INSIGHTS_RANGES.map((r) => ({
-          key: `range-${r}`,
-          label: rangeLabel(r),
-          // All time names where it starts (the NOTE: "Since 9 September").
-          subtitle: r === 'all' && firstDay ? t('activity.blocks.since', { day: dayAndMonth(firstDay) }) : undefined,
-          selected: r === range,
-          onPress: () => setRange(r),
-        }))}
-        testID="insights-range-menu"
-      />
       {view === 'calendar' ? (
-        <RNView testID="activity-calendar">
-          <CalendarMonth
-            gridSwipe={gridSwipe}
-            month={month}
-            week={week}
-            span={span}
-            onSpan={setSpan}
-            onToday={showsToday(span, { month, week }, today) ? undefined : toToday}
-            today={today}
-            picked={picked}
-            data={{ revised, memorized, read, noteDays }}
-            onStep={(delta) => stepRef.current(delta)}
-            onPick={setPicked}
-            onOpen={onOpenDay}
-            noteOf={noteOf}
-            onAddNote={onAddNote}
-            gap={gapMark}
-            recordings={recordings}
-            recited={recited}
-            spotTests={spotTests}
-            sections={sections.overview}
-          />
-        </RNView>
+        calendar(false)
       ) : (
         <InsightsView
-          data={{
-            today,
-            memorized: memorizedSet,
-            learning: learningSet,
-            rating: (p) => ratingByPage.get(p),
-            ratedWeak,
-            revised: data?.revisions ?? [],
-            read: data?.reads ?? [],
-            memorizations: yearOfMemorizing,
-            capacity: user?.dailyPageCapacity ?? 20,
-            revo,
-            smartTracking: smartTrackingOn(user),
-            range,
-            firstDay,
-            lastRevisedOn,
-            coverageSince: coverageSinceByPage,
-            firstTomorrow,
-            // Gaps waits for the items: drawn from none, it fell back on the pages' last revisions and read "Today you
-            // revised" over a strip of "revised on 0 days" while they loaded (ACT-28).
-            gaps: gapsOn && data != null,
-            pushBack: fullRevision,
-            itemsFrom: rangeFrom,
-            recitation,
-          }}
-          onOpenDay={onOpenDay}
-          onOpenCalendar={openCalendar}
-          onReviseTomorrow={onReviseTomorrow}
-          onPlanIt={onPlanIt}
-          onAddToPlan={onAddToPlan}
-          onOpenPage={onOpenPage}
-          onOpenAyahs={onOpenAyahs}
-          onSeeAllPages={onSeeAllPages}
-          onOpenLastRevised={onOpenLastRevised}
-          onTurnOnSmartTracking={onTurnOnSmartTracking}
+          data={insightsData}
+          {...insightsActions}
           sections={sections.insights}
           onEditSections={editable ? () => setEditing('insights') : undefined}
         />
@@ -437,11 +496,7 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
             visible={editing === 'insights'}
             onClose={() => setEditing(null)}
             layout={sections.insights}
-            // Recitation only for an account that recites, Gaps where it is open; Weak spots with Smart Tracking off
-            // is its invite.
-            has={(id: InsightsSection) =>
-              id === 'recitation' ? recitation != null && onOpenAyahs != null : id === 'gaps' ? gapsOn : true
-            }
+            has={sectionsHas}
             notes={smartTrackingOn(user) ? {} : { weak: t('activity.blocks.smartTrackingOff') }}
           />
         </>
@@ -451,6 +506,19 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
 }
 
 const styles = StyleSheet.create({
+  // The sections' list under the day (ACT-35): its title and the range chip, a hairline above.
+  listHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: layoutV2.rowPad,
+    paddingTop: layoutV2.rowPad,
+    paddingHorizontal: layoutV2.gutter,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  listTitle: { letterSpacing: 0.6, textTransform: 'uppercase', flexShrink: 1 },
+  editRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, marginTop: 8 },
   // The range chip wraps under the tabs when the row can't hold all three (large text, an SE).
   switch: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 8, rowGap: 8 },
   // The range chip and Edit sections, together at the end of the row.

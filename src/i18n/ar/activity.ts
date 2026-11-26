@@ -520,6 +520,18 @@ export const activity: NonNullable<ArStrings['activity']> = {
     alwaysShown: 'يظهر دائمًا',
     showAll: 'عرض الكل بالترتيب المعتاد',
   },
+  oneTab: {
+    yourRevision: 'مراجعتك',
+    othersLater: 'تظهر الأقسام الأخرى هنا حين يكون لديها ما تعرضه.',
+    opensSection: 'يفتح {{section}}',
+    weakFirst: '{{label}} أولًا',
+    cycles_zero: 'دورة',
+    cycles_one: 'دورة',
+    cycles_two: 'دورة',
+    cycles_few: 'دورات',
+    cycles_many: 'دورة',
+    cycles_other: 'دورة',
+  },
   blocks: {
     insights: 'الإحصاءات',
     insightsFor: 'إحصاءات {{range}}',

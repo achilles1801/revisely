@@ -9,6 +9,7 @@ import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { typeV2 } from '../../theme/v2';
+import { SectionRow } from './SectionRow';
 import { ChromeText, STACK_AT_SCALE } from './ChromeText';
 import { Tap } from '../v2/Tap';
 import { openRevo } from '../../lib/revo/open';
@@ -62,9 +63,12 @@ export interface RecitationInsightsProps {
   revo: boolean;
   /** The reader at these ayahs, highlighted until the page is turned. */
   onOpenAyahs: (sura: number, from: number, to: number) => void;
+  /** Drawn as its row on the one Activity tab (ACT-35): the row's tap, and whether it is the list's last. */
+  row?: () => void;
+  last?: boolean;
 }
 
-export function RecitationInsights({ records, words, today, window, inWords, smartTracking, rating, revo, onOpenAyahs }: RecitationInsightsProps) {
+export function RecitationInsights({ records, words, today, window, inWords, smartTracking, rating, revo, onOpenAyahs, row, last }: RecitationInsightsProps) {
   const { palette } = useTheme();
   // First on Insights (ACT-29): no hairline above it.
   const first = useFirstSection();
@@ -81,6 +85,18 @@ export function RecitationInsights({ records, words, today, window, inWords, sma
   // The long takes' mistakes a page, beside the % and in words (RECITE-24; Majd, Nov 22 2026: "we should aim to keep it
   // clean"): one quiet line, only once the range has a take of 2 pages or more and the word data has loaded.
   const perPage = perPageLine(ins.perPage);
+  if (row) {
+    return (
+      <SectionRow
+        title={t('activity.recitation.title')}
+        line={scoreLine(ins, inWords, true)}
+        figure={ins.score !== null ? formatAccuracy(ins.score) : null}
+        onPress={row}
+        separator={!last}
+        testID="insights-row-recitation"
+      />
+    );
+  }
   return (
     <View style={[styles.section, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID="insights-recitation">
       <View style={styles.head}>

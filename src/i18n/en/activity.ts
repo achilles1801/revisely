@@ -435,6 +435,19 @@ export const activity = {
     alwaysShown: 'Always shown',
     showAll: 'Show all, in the usual order',
   },
+  /** The one Activity tab (ACT-35, Revisely Dev): the sections' list under the calendar and the day. */
+  oneTab: {
+    yourRevision: 'Your revision',
+    /** Under the rows when a section has nothing to say yet (Gaps, Weak spots, Recitation, Memorization, Pace). */
+    othersLater: 'The other sections show here once they have something to say.',
+    /** VoiceOver, on a row: "Opens Coverage". */
+    opensSection: 'Opens {{section}}',
+    /** Weak spots' row: "Al-Hashr, last page first". */
+    weakFirst: '{{label}} first',
+    /** After Coverage's figure at All time: "3.1 cycles". */
+    cycles_one: 'cycle',
+    cycles_other: 'cycles',
+  },
   blocks: {
     insights: 'Insights',
     insightsFor: 'Insights for {{range}}',

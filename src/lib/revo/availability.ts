@@ -19,11 +19,11 @@ export function useRevoAvailable(user: Pick<User, 'previewTester'> | null | unde
 }
 
 /**
- * The screens the button shows on (REVO-25): Home and Activity's, and Edit schedule (Majd, Nov 25 2026: "yes the revo
+ * The screens the button shows on (REVO-25): Home and Activity's (a section's own page too, ACT-35), and Edit schedule (Majd, Nov 25 2026: "yes the revo
  * there is nice"). Never the Read tab, its list or the reader (Majd, Nov 8 2026: "no revo in the mushaf tab at all"),
  * a session, another editor or Settings.
  */
-export const REVO_BUTTON_ROUTES = new Set(['Dashboard', 'Activity', 'ActivityDay', 'ActivityAll', 'PagesByStrength', 'PlanEdit']); // i18n-ignore (route names)
+export const REVO_BUTTON_ROUTES = new Set(['Dashboard', 'Activity', 'ActivityDay', 'ActivityAll', 'PagesByStrength', 'ActivitySection', 'PlanEdit']); // i18n-ignore (route names)
 
 /** Of those, the screens with no tab bar (or mini player) beneath: the button sits just above the screen's bottom edge. */
 export const REVO_BUTTON_NO_TAB_BAR = new Set(['PlanEdit']); // i18n-ignore (route names)

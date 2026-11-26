@@ -85,6 +85,7 @@ export function CalendarMonth({
   onPick,
   onOpen,
   noteOf,
+  showNote = true,
   onAddNote,
   spotTests,
   recordings,
@@ -110,6 +111,8 @@ export function CalendarMonth({
   onOpen: (day: string, block?: PreviewBlock) => void;
   /** The day's note, for its entry (ACT-34). */
   noteOf?: (day: string) => string | null;
+  /** The picked day's entry shows its note (ACT-34); the one Activity tab's doesn't (ACT-35). */
+  showNote?: boolean;
   /** The entry's Add a note (ACT-34). */
   onAddNote?: (day: string) => void;
   /** Spot tests by day: their own line in the entry (ACT-34). */
@@ -305,6 +308,7 @@ export function CalendarMonth({
       date={formatDayLong(shownDay)}
       lines={entryLines}
       note={noteOf?.(shownDay) ?? null}
+      showNote={showNote}
       onOpen={() => onOpen(shownDay)}
       onAddNote={() => (onAddNote ?? onOpen)(shownDay)}
     />
