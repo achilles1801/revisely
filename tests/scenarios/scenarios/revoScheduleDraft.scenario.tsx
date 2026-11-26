@@ -24,6 +24,8 @@ function stack(mods: Booted): ReactElement {
   const PlanEdit = req<any>('src/screens/main/PlanEditScreen').default;
   const { ReadingTimerProvider } = req<any>('src/context/ReadingTimerContext');
   const { RevoHost } = req<any>('src/components/revo/RevoHost');
+  // Edit schedule's sheets render into this, as in App.tsx.
+  const { BottomSheetModalProvider } = req<any>('@gorhom/bottom-sheet');
   const { navigationRef } = req<any>('src/navigation/navigationRef');
   const nav = req<{ navigation: { current: unknown } }>('./navRef');
   const Stack = createNativeStackNavigator();
@@ -44,14 +46,18 @@ function stack(mods: Booted): ReactElement {
     );
   const Root = createNativeStackNavigator();
   return h(
-    ReadingTimerProvider,
+    BottomSheetModalProvider,
     null,
     h(
-      NavigationContainer,
-      { ref },
-      h(Root.Navigator, { screenOptions: { headerShown: false, animation: 'none' } }, h(Root.Screen, { name: 'Home', component: HomeStack })),
+      ReadingTimerProvider,
+      null,
+      h(
+        NavigationContainer,
+        { ref },
+        h(Root.Navigator, { screenOptions: { headerShown: false, animation: 'none' } }, h(Root.Screen, { name: 'Home', component: HomeStack })),
+      ),
+      h(RevoHost),
     ),
-    h(RevoHost),
   );
 }
 
