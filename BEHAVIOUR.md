@@ -1494,10 +1494,11 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   the bottom edge (Majd, Nov 25 2026, of Revo's button there: "yes the revo there is nice"); opened there, it starts as
   from Home. There is no Revo on the Read tab (its list or the reader) or in a
   revision session, and their help sheets offer no "Ask Revo" (Majd, Nov 8 2026: "no revo in the revision
-  sessions. there should also be no revo in the mushaf tab at all"); none in another editor or Settings either. The one
-  way to Revo from the reader or a session is a finished take's summary (Majd, Nov 25 2026: "the reader stays free of
-  Revo"): its row "Ask Revo about this take" closes the summary and opens Revo with the take attached, only for an
-  account with Revo on, and never while the take still runs. The
+  sessions. there should also be no revo in the mushaf tab at all"); none in another editor or Settings either. In
+  Revisely Dev the reader has Revo in its own place instead, at the page's foot (REVO-45: Majd's Nov 26 2026 word is
+  newer). The one way to Revo from a session is a finished take's summary (Majd, Nov 25 2026: "the reader stays free of
+  Revo"), as from the reader: its row "Ask Revo about this take" closes the summary and opens Revo with the take
+  attached, only for an account with Revo on, and never while the take still runs. The
   screens it shows on end their lists with room for it (`useRevoFootprint`), so their last row scrolls clear of it;
   other screens leave none.
 
@@ -1663,6 +1664,33 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   store app's, goes with exactly the reply format it went with before the draft, and never shows a draft. Drafting never
   costs an answer: if the model's service refuses the schedule's format, Revo asks again with the store app's and
   answers, with no draft.
+- **REVO-44.** (Revisely Dev) A question about the Qur'an (what an ayah means, what happens in a passage, who someone in
+  it is, or why) is answered only from Tafsir al-Tabari, Tafsir Ibn Kathir, Tafsir al-Qurtubi and Tafsir al-Sa'di (Majd,
+  Nov 26 2026: "all answers MUST stem from those tafseer books"). Asked from the mushaf, it is about the page or the
+  held ayah (REVO-45); asked anywhere else in Revo, the ayat it is about are found first, and a question that isn't
+  about the Qur'an is answered as before. The answer comes first, then "From the tafsir": up to three books, one quote
+  each, as the book has it (the Arabic with Revo's English for it, labelled "Revo's translation", or Ibn Kathir's own
+  English words), with the ayat its passage is about; a tap shows the passage around the words, them in the page's
+  grey highlight. Every quote is the books' own text: a long answer that cites none is never shown. When the books
+  don't answer it, Revo says so in a sentence or two, and it gives no rulings. A follow-up in that conversation is
+  answered from the same ayat. Each counts as one of the day's questions (REVO-22). The answers come from
+  claude-haiku-5-5 (Majd's pick, Nov 26 2026), not Revo's own model (REVO-6).
+
+- **REVO-45.** (Revisely Dev) Revo in the mushaf (Majd, Nov 26 2026: "revo can be confirable such that in shows up in
+  the mushaf itself (without blocking any text)"). With Revo on and Settings → Revo AI → "In the mushaf" on (on unless
+  turned off), the reader shows a small R at the foot of the page while reading, on the other side of the page number,
+  in the room kept under the page, so it never covers it; not with the controls up, nor while a take runs. A tap opens
+  Revo about that page: its chip ("An-Naml, 3rd page"), a line that it answers only from the tafsir, and three
+  starters; the first, "What's happening here?", is answered ahead for every page, so it comes at once and isn't
+  counted as a question. A held ayah's menu starts with "Ask Revo" ("About this ayah, from the tafsir"), which opens Revo about
+  that ayah. Their questions are answered from the tafsir (REVO-44). Never in a revision session. Turned off, neither
+  shows. Settings → Revo AI's footer says in one line that answers about the Qur'an come only from the four tafsirs.
+
+- **REVO-46.** (Revisely Dev) While today isn't done, Revo's greeting from Home ends by offering the tafsir of the next
+  page to revise ("Want what the tafsir says about Al-Hashr, 4th page before you go on?"), and its first starter, "What
+  does the tafsir say?", asks about that page: answered from the tafsir (REVO-44), and counted as a question. During
+  Ramadan, Ramadan's three suggestions all follow it (THEME-8). Once today is done, or opened from another screen, the
+  greeting is as before (REVO-35).
 
 ## Memorizing
 

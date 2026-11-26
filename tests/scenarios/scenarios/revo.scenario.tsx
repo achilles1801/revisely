@@ -635,7 +635,8 @@ it('[THEME-8] in Ramadan with the theme on, Revisely Dev’s Revo opens “Ramad
     await tap(app, 'revo-turn-on');
     await app.until(() => app.screen.queryByTestId('revo-greeting') != null, 'the greeting');
     expect(flatText(app.screen.getByTestId('revo-greeting'))).toMatch(/^Ramadan Kareem/);
-    for (const chip of ['Plan a khatmah by Eid', 'What should I revise for taraweeh?', 'How’s my Ramadan going?']) {
+    // After REVO-46's offer of the next page's tafsir (today isn't done here), all three of them.
+    for (const chip of ['What does the tafsir say?', 'Plan a khatmah by Eid', 'What should I revise for taraweeh?', 'How’s my Ramadan going?']) {
       expect(app.screen.queryByTestId(`revo-chip-${chip}`)).not.toBeNull();
     }
 

@@ -355,6 +355,34 @@ export interface RevoMessage {
   attachments?: { kind: string; label: string }[];
   feedback?: 'up' | 'down' | null;
   actionState?: 'added' | 'dismissed';
+  /** An answer from the tafsir (Revisely Dev): the books' words it rests on, at most three (REVO-44). */
+  sources?: TafsirSource[];
+  /** The ayat a question about the Qur'an was about. */
+  quran?: QuranScope;
+}
+
+/** Ayat from `from` to `to`, each [surah, ayah] (a page can cross into the next surah). */
+export interface QuranScope {
+  from: [number, number];
+  to: [number, number];
+}
+
+/** The four tafsirs, and Ibn Kathir's abridged English (cited in English). */
+export type TafsirBookId = 'tabari' | 'ibnKathir' | 'qurtubi' | 'saadi' | 'ibnKathirEn';
+
+/** A book's words under an answer from the tafsir (functions/src/revo/tafsir/reply.ts). */
+export interface TafsirSource {
+  book: TafsirBookId;
+  /** The ayat the cited passage is about. */
+  from: [number, number];
+  to: [number, number];
+  /** The book's words, as the book has them (harakat kept). */
+  quote: string;
+  /** The passage around them, for the passage view. */
+  before: string;
+  after: string;
+  /** Revo's English for the Arabic (or, for the English Ibn Kathir, the sentence that cites it). */
+  said: string;
 }
 
 export interface RevoChat {
@@ -380,6 +408,8 @@ export interface RevoMemoryItem {
 export interface RevoSettings {
   optIn: boolean;
   memoryOn: boolean;
+  /** Revo at the foot of the mushaf's pages (Revisely Dev, REVO-25); on unless turned off. Older servers leave it out. */
+  mushafOn?: boolean;
 }
 
 export interface RevoAskResult {

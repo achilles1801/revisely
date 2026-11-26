@@ -3,7 +3,8 @@
 // listens; nothing is sent until the user asks.
 
 import type { RevoPlace } from './place';
-import type { RevoAttachment } from './types';
+import { firstAyahOfPage, lastAyahOfPage, type AyahKey } from '../ayahKeys';
+import type { QuranScope, RevoAttachment } from './types';
 
 export interface RevoOpenRequest {
   /** Attached to the next question (the user can remove it). */
@@ -14,6 +15,27 @@ export interface RevoOpenRequest {
   chatId?: string;
   /** Open on Memory, or the opt-in. */
   view?: 'memory' | 'optin';
+  /** Opened from the mushaf (REVO-45): a question about this page or ayah, answered from the tafsir (REVO-44). */
+  quran?: RevoQuranOpen;
+}
+
+/** The page or ayah Revo was opened about from the mushaf, and its chip ("An-Naml, 3rd page", "An-Naml 35"). */
+export interface RevoQuranOpen {
+  scope: QuranScope;
+  label: string;
+  kind: 'page' | 'ayah';
+}
+
+const pair = (k: AyahKey): [number, number] => [Math.floor(k / 1000), k % 1000];
+
+/** A page of the mushaf as a scope (its first ayah to its last, in the edition shown). */
+export function pageScope(page: number): QuranScope {
+  return { from: pair(firstAyahOfPage(page)), to: pair(lastAyahOfPage(page)) };
+}
+
+/** One ayah as a scope. */
+export function ayahScope(key: AyahKey): QuranScope {
+  return { from: pair(key), to: pair(key) };
 }
 
 const listeners = new Set<(r: RevoOpenRequest) => void>();

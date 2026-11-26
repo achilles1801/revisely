@@ -17,6 +17,7 @@ export const REVO_BUTTON_FOOTPRINT = REVO_BUTTON_SIZE + REVO_BUTTON_GAP + 2;
 
 let present = false;
 let buttonRoute = false;
+let inMushaf = false;
 const listeners = new Set<() => void>();
 const subscribe = (l: () => void) => {
   listeners.add(l);
@@ -37,6 +38,18 @@ export function setRevoButtonRoute(next: boolean): void {
   if (buttonRoute === next) return;
   buttonRoute = next;
   listeners.forEach((l) => l());
+}
+
+/** RevoHost: Revo shows in the mushaf (REVO-45): Revisely Dev, Revo on, and Settings → Revo AI → In the mushaf on. */
+export function setRevoInMushaf(next: boolean): void {
+  if (inMushaf === next) return;
+  inMushaf = next;
+  listeners.forEach((l) => l());
+}
+
+/** Whether the reader shows Revo at the foot of its pages and in a held ayah's menu (REVO-45). */
+export function useRevoInMushaf(): boolean {
+  return useSyncExternalStore(subscribe, () => inMushaf, () => inMushaf);
 }
 
 export function useRevoPresent(): boolean {

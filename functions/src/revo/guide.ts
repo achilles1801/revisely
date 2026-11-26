@@ -414,7 +414,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     text: lines(
       '- Settings → Testing → “Preview onboarding”: the first setup’s screens on a blank account, saving nothing.',
       '- Settings → Mushaf and Recite → “Mistakes to mark”: “Mistakes”, or “Strict (Beta)”, which also marks tajweed in violet: ghunnah, ikhfa, qalqalah, idgham (with and without ghunnah), iqlab, a natural madd dropped, “Madd munfasil” at 4 or 5 counts, a lazim madd held short, and “Madd ʿarid” once it’s set to a length. It doesn’t check “Madd muttasil”, munfasil at 2 counts or ikhfa of meem yet, so never say it checks every tajweed rule. It’s Beta: it can miss a slip or note a correct word; notes never count. The store app marks mistakes only.',
-      '- Two tiers of marks. Mistakes: a wrong or skipped word, a hesitation (“Hesitated here”, on the word they didn’t know; one after the end stays “Extra word”), a wrong haraka and a wrong letter, each named for what it is on its card (“Wrong word”, “Wrong haraka”, “Wrong letter”, “Wrong shadda”), in the summary’s line and counted in the score; a wrong haraka or letter is a mistake like a wrong word, never a “slip”. Tajweed notes (Strict) are Beta: “(Beta)” after a note’s name, in the summary’s line and in Insights, and never counted. “Not clear” is neither: never a mistake, never counted. Colours: red for words, amber for harakat and letters and Not clear, violet for tajweed.',
+      '- Two tiers of marks. Mistakes: a wrong or skipped word, a hesitation (“Hesitated here”, on the word they didn’t know; after the end, “Extra word”), a wrong haraka or letter, each named on its card (“Wrong word”, “Wrong haraka”, “Wrong letter”, “Wrong shadda”) and in the summary, and counted in the score, never called a “slip”. Tajweed notes (Strict) are Beta: “(Beta)” after the name, never counted. “Not clear” is neither, never counted. Red for words, amber for harakat, letters and Not clear, violet for tajweed.',
       // The main guide's two lines on this go with the release's re-record of its replies.
       '- “Recite the mistakes again” and "Recite your N mistakes here" are gone: never offer them. To work on a mistake, recite the passage again.',
       '- A take needs at least one ayah recited (or about a mushaf line of a very long one). Less isn’t kept.',
@@ -426,7 +426,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Settings → About → “Licences” shows the recitation model’s licence (the Quran Muaalem License) in full, offline too.',
       '- Settings → Testing → “Mistake detection model” says which model the checker runs (for example v7); a tap asks again.',
       '- Settings → Appearance → “Language”: “Phone’s language”, English or العربية (Arabic). It restarts Revisely (“Restart”, or “Not now”). In Arabic, Revo answers in Arabic too. Untranslated text shows in English. The store app is English only for now. In Arabic the mushaf turns as a printed one does.',
-      '- Rating Revisely: Settings → Help and support → “Rate Revisely” opens the store’s review page. After a day’s revision with a streak of 7 days or more, the end card may show “Enjoying Revisely? Rate it”: at most 3 times ever, four months apart, never in an account’s first week, never again once tapped or dismissed. Rating is optional; nothing is given for it.',
+      '- Settings → Help and support → “Rate Revisely” opens the store’s review page. After a day’s revision with a streak of 7 days or more, the end card may show “Enjoying Revisely? Rate it”: at most 3 times, four months apart, not in an account’s first week, never after a tap or dismissal. Nothing is given for rating.',
     ),
   },
   {
@@ -486,16 +486,26 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- “Not clear” words stay amber on the page after the take too (and on a hidden page’s covers), remembered like a wrong haraka until the word is said clearly in 2 takes on 2 days; a take that heard it only as Not clear again counts as not clear. They still never count in a score.',
       '- Mark mistakes checks recitation in Hafs ʿan ʿĀṣim (its intro says so); other riwayat aren’t checked yet.',
       '- On a slow connection, when checking falls a few seconds behind, the bar says “Slow connection: checking is behind” in place of the words until it catches up.',
-      '- Each new mistake plays a short sound and a tap as it is marked (not for Not clear or tajweed notes, at most one every 0.7 s). It plays in silent mode at the media volume; Settings → Mushaf and Recite → “Sound on a mistake” turns it off. While the microphone records, the iPhone plays it from the earpiece, so it is quiet without headphones.',
+      '- Each new mistake plays a short sound and a tap (not for Not clear or tajweed notes, at most one every 0.7 s), in silent mode too; Settings → Mushaf and Recite → “Sound on a mistake” turns it off. While recording, the iPhone plays it from the earpiece.',
       '- After a take, its summary says the mistakes per page beside the count when it covered 2 pages or more ("3 mistakes · 1.5 a page"), and each wrong word or haraka shows “Expected” and what was recited, each with the words around it.',
       '- Activity → “Insights” → “Recitation” says the same for its range, under the score: the mistakes a page across their takes of 2 pages or more ("Takes of 2 pages or more: 1.2 mistakes a page"). You are told it for the last 4 weeks; takes of a page or less aren’t in it.',
-      '- “Your recitation” on a mark’s card plays the phrase the mistake is in, from the pause mark before it to the next (any but ۙ), or the whole ayah when it’s short (12 words or fewer, or 8 seconds or less); never more than 15 seconds. A skipped word plays from the word before it, so the jump is heard.',
+      '- “Your recitation” on a mark’s card plays the phrase the mistake is in (pause mark to pause mark, any but ۙ), or a short ayah whole; never more than 15 seconds. A skipped word plays from the word before it.',
       '- When a take starts, the cursor shows where they seem to be within a second or two of their first word (the page shown only), and settles once the app is sure where they started; "Listening…" stays until then.',
-      '- On a hidden page a word shows once it has been said in full or the next word has begun (a long madd waits for its end), never a word ahead. Nothing is drawn on the word being said; the newest word shown is in green ink, and a word with a mark keeps its highlight. The bar shows no more than the page.',
-      '- A hidden page looks empty: a faint line where each line’s words are still hidden, the ayah markers whole, and each word appears in place, whole, once it is shown.',
-      '- Hiding the page during a take keeps everything they have already passed on show (the page before where they started, and what they recited) and hides only what comes next. When a take stops, what they recited stays shown (with anything shown by hand) until they hide the page again. Hiding it after a take hides everything; the take’s mistakes still show where they are and can be tapped.',
-      '- Highlights on the page are soft pastel washes behind the word, not boxes: the mistakes’ red, amber and violet, past mistakes lighter. With the page shown, a flat grey band lies behind the ayah being recited and a firmer grey rectangle follows the word being recited, never ahead',
+      '- On a hidden page a word shows once it has been said in full or the next word has begun (a long madd waits for its end), never a word ahead. Nothing is drawn on the word being said; the newest word shown is in green ink; a marked word keeps its highlight. The bar shows no more than the page.',
+      '- A hidden page shows a faint line where words are hidden, the ayah markers whole; each word appears in place once shown.',
+      '- Hiding the page during a take keeps what they have passed shown (the page before where they started, and what they recited) and hides what comes next. When a take stops, what they recited stays shown (with anything shown by hand) until they hide the page again. Hiding it after a take hides everything; the take’s mistakes still show and can be tapped.',
+      '- Highlights on the page are soft pastel washes behind the word, not boxes: the mistakes’ red, amber and violet, past mistakes lighter. With the page shown, a flat grey band lies behind the ayah being recited and a firmer grey rectangle follows the word, never ahead',
     ),
+  },
+  {
+    title: 'Questions about the Qur’an',
+    covers: ['REVO-44', 'REVO-45', 'REVO-46'],
+    routes: [],
+    text: [
+      '- Qur’an questions: answered only from al-Tabari, Ibn Kathir, al-Qurtubi and al-Sa’di, the books’ words under “From the tafsir” (a tap shows the passage); if they don’t say, Revo says so. No rulings. Counted.',
+      '- Asked from the R at a page’s foot or a held ayah’s “Ask Revo” (never in a session); Settings → Revo AI → “In the mushaf” hides both.',
+      '- From Home, while today isn’t done, the greeting offers the next page’s tafsir: “What does the tafsir say?”',
+    ].join('\n'),
   },
   {
     // Majd, Nov 21 2026: a Ramadan look to try, Revisely Dev only; Nov 26: Auto, sheets' lights.

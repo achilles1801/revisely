@@ -17,6 +17,7 @@ import { auth, db } from '../firebase';
 import { callFunction } from '../../services/firestoreService';
 import { knownOffline } from '../networkState';
 import type {
+  QuranScope,
   RevoAskResult,
   RevoAttachment,
   RevoChat,
@@ -36,7 +37,16 @@ export interface RevoBackend {
   watchMessages(uid: string, chatId: string, cb: (messages: RevoMessage[]) => void): () => void;
   watchMemory(uid: string, cb: (items: RevoMemoryItem[]) => void): () => void;
   /** One attachment goes as `attach`; several (at most REVO_MAX_ATTACHMENTS) as `attachments`. */
-  ask(input: { chatId: string | null; day: string; question: string; context: RevoContext; attach: RevoAttachment | null; attachments?: RevoAttachment[] }): Promise<RevoAskResult>;
+  ask(input: {
+    chatId: string | null;
+    day: string;
+    question: string;
+    context: RevoContext;
+    attach: RevoAttachment | null;
+    attachments?: RevoAttachment[];
+    /** A question about these ayat, answered from the tafsir (Revisely Dev: the page open in the mushaf, or a held ayah). */
+    quran?: QuranScope;
+  }): Promise<RevoAskResult>;
   dayInReview(input: { day: string; context: RevoContext }): Promise<{ chatId: string } | null>;
   setOptions(input: Partial<RevoSettings>): Promise<RevoSettings>;
   clear(what: 'memory' | 'history'): Promise<void>;
@@ -163,8 +173,8 @@ const firebaseRevo: RevoBackend = {
     return onSnapshot(
       doc(db, 'coachSettings', uid),
       // Revo's own switch (functions/src/revo/admin.ts REVO_ON); `optIn` is the Ask coach's.
-      (snap) => cb({ optIn: snap.get('revoOn') === true, memoryOn: snap.get('memoryOn') !== false }),
-      () => cb({ optIn: false, memoryOn: true }),
+      (snap) => cb({ optIn: snap.get('revoOn') === true, memoryOn: snap.get('memoryOn') !== false, mushafOn: snap.get('mushafOn') !== false }),
+      () => cb({ optIn: false, memoryOn: true, mushafOn: true }),
     );
   },
   watchUsage(uid, cb) {
@@ -218,7 +228,7 @@ const firebaseRevo: RevoBackend = {
   },
   async setOptions(input) {
     const out = (await call('revoSetOptions', input)) as Partial<RevoSettings> | null;
-    return { optIn: out?.optIn === true, memoryOn: out?.memoryOn !== false };
+    return { optIn: out?.optIn === true, memoryOn: out?.memoryOn !== false, mushafOn: out?.mushafOn !== false };
   },
   async clear(what) {
     await call('revoClear', { what });

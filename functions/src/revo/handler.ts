@@ -8,9 +8,16 @@
  * tokens, and the account's uid (added in index.ts), never content.
  */
 import { createHash } from 'crypto';
-import { CoachCallError, CoachReply, MessagesRequest } from '../coach/call';
+import { BlocksRequest, CoachCallError, CoachReply, MessagesRequest } from '../coach/call';
 import { CallLedger, MONTHLY_CAP_USD, ledgerOf } from '../coach/handler';
-import { REVO_MODEL, costUsd, worstCaseCostUsd } from '../coach/pricing';
+import { costUsd, worstCaseCostUsd } from '../coach/pricing';
+import { LOCATE_MAX_TOKENS, LOCATE_MODEL, buildLocateRequest, parseLocate } from './tafsir/locate';
+import { PageLoader } from './tafsir/pages';
+import { TafsirAnswer, parseTafsirReply } from './tafsir/reply';
+import { AHEAD_QUESTION, aheadPageOf } from './tafsir/ahead';
+import { TAFSIR_MAX_TOKENS, TafsirTurn, buildTafsirRequest } from './tafsir/request';
+import { loadScopePages, placeOf, scopeOfLocated, spanOf, validateQuranScope } from './tafsir/scope';
+import { selectPieces } from './tafsir/select';
 import { REVO_HISTORY, REVO_MAX_TOKENS, buildAskRequest, buildReviewRequest, withStoreSchema } from './prompt';
 import { RevoRelease, revoAllowed } from './release';
 import { parseReply } from './reply';
@@ -20,6 +27,7 @@ import {
   RevoChat,
   RevoContext,
   RevoMemoryItem,
+  QuranScope,
   RevoMessage,
   RevoReplyParts,
   RevoSettings,
@@ -79,6 +87,8 @@ export const MESSAGES = {
   timeout: 'Revo didn’t answer in time. Try again.',
   busy: 'Revo is busy. Try again in a moment.',
   noAnswer: 'Revo couldn’t answer that. Try again.',
+  /** An answer from the tafsir that had no source and wasn't short: never shown. */
+  notInBooks: 'I couldn’t find that in the four tafsirs on these ayat.',
 } as const;
 
 export type ReserveResult = { ok: true; count: number } | { ok: false; reason: 'daily' | 'behind' };
@@ -160,7 +170,12 @@ export interface RevoLog {
 
 export interface RevoDeps {
   store: RevoStore;
+  /** The model call (callCoach); a BlocksRequest (answers from the tafsir) goes through it the same way. */
   call: (request: MessagesRequest) => Promise<CoachReply>;
+  /** Revo's copy of the tafsirs, a page at a time (tafsir/pages.ts). Without it, no answers from the tafsir. */
+  tafsirPages?: PageLoader;
+  /** "What's happening here?" answered ahead for a page (scripts/tafsir/answers-batch.js), or null. */
+  tafsirAhead?: (page: number) => Promise<TafsirAnswer | null>;
   now: () => Date;
   log: RevoLog;
 }
@@ -271,13 +286,13 @@ const NO_USAGE: CallLedger = { calls: 0, input: 0, output: 0, cacheRead: 0, cach
  */
 async function metered(
   deps: RevoDeps,
-  request: MessagesRequest,
+  request: MessagesRequest | BlocksRequest,
   event: string,
   fallback: MessagesRequest | null = null,
 ): Promise<{ reply: CoachReply; ledger: CallLedger; cost: number; fellBack?: true } | 'capped' | 'resting'> {
   const today = utcDay(deps.now());
   const month = today.slice(0, 7);
-  const reserved = worstCaseCostUsd(JSON.stringify(request).length, REVO_MAX_TOKENS, REVO_MODEL);
+  const reserved = worstCaseCostUsd(JSON.stringify(request).length, request.max_tokens ?? REVO_MAX_TOKENS, request.model);
   // The day's share first (settled spend: calls in flight can pass it by their reserves, no more).
   if (deps.store.dailyCapUsd && deps.store.spentOn) {
     const [daily, spent] = await Promise.all([deps.store.dailyCapUsd(), deps.store.spentOn(today)]);
@@ -293,7 +308,7 @@ async function metered(
   }
   let reply: CoachReply;
   try {
-    reply = await deps.call(request);
+    reply = await deps.call(request as MessagesRequest);
   } catch (err) {
     await deps.store.settleSpend(month, reserved, 0, NO_USAGE, today);
     const code = err instanceof CoachCallError ? err.status : null;
@@ -308,7 +323,7 @@ async function metered(
     }
     throw callFailure(err);
   }
-  const cost = costUsd(reply.usage, REVO_MODEL);
+  const cost = costUsd(reply.usage, request.model);
   const ledger = ledgerOf(reply.usage);
   await deps.store.settleSpend(month, reserved, cost, ledger, today);
   deps.log({
@@ -370,16 +385,119 @@ async function smartTrackingOf(deps: RevoDeps, uid: string): Promise<boolean> {
   return deps.store.smartTracking ? deps.store.smartTracking(uid) : true;
 }
 
+/** The ayat a question asked outside the mushaf is about, when it is about the Qur'an (one small Haiku call). */
+async function locate(deps: RevoDeps, question: string): Promise<QuranScope | null> {
+  let result: Awaited<ReturnType<typeof metered>>;
+  try {
+    result = await metered(deps, buildLocateRequest(question), 'locate');
+  } catch {
+    return null; // Not found: Revo answers as it always has.
+  }
+  if (typeof result === 'string') return null;
+  const found = parseLocate(result.reply.text);
+  return found ? scopeOfLocated(found) : null;
+}
+
+interface TafsirAsk {
+  uid: string;
+  day: string;
+  question: string;
+  scope: QuranScope;
+  chat: RevoChat | null;
+  history: StoredMessage[];
+  memory: RevoMemoryItem[];
+  english: boolean;
+  usage: { day: string; count: number } | null;
+  atAsk: number;
+  attached: RevoAttachment[];
+}
+
+/** The conversation so far as question and answer pairs, text only. */
+function turnsOf(history: readonly StoredMessage[]): TafsirTurn[] {
+  const out: TafsirTurn[] = [];
+  for (let i = 0; i < history.length - 1; i++) {
+    if (history[i].role === 'user' && history[i + 1].role === 'revo') out.push({ question: history[i].text, answer: history[i + 1].text });
+  }
+  return out;
+}
+
+/**
+ * An answer from the four tafsirs (handbook/revo.md, "Answers from the tafsir"): it counts as one of the day's
+ * questions, and the answer keeps the books' words it rests on.
+ */
+async function answerFromTafsir(deps: RevoDeps, a: TafsirAsk): Promise<RevoAskResult> {
+  // The mushaf's first starter on a whole page: answered ahead, at once, and free (no model call, not counted).
+  const aheadPage = !a.chat && a.question === AHEAD_QUESTION ? aheadPageOf(a.scope) : null;
+  const ahead = aheadPage && deps.tafsirAhead ? await deps.tafsirAhead(aheadPage).catch(() => null) : null;
+  if (ahead) {
+    deps.log({ event: 'answer', cached: true, attach: 'tafsir-ahead' });
+    const used = a.usage && a.usage.day === a.day ? a.usage.count : 0;
+    return saveTafsirTurn(deps, a, ahead, Math.max(0, REVO_DAILY_QUESTIONS - used));
+  }
+  const reserved = await deps.store.reserveQuestion(a.uid, a.day, REVO_DAILY_QUESTIONS);
+  if (!reserved.ok) {
+    if (reserved.reason === 'behind') throw new RevoError('invalid-argument', MESSAGES.behind, { reason: 'clock' });
+    throw new RevoError('resource-exhausted', MESSAGES.daily, { reason: 'daily' });
+  }
+  let result: Awaited<ReturnType<typeof metered>>;
+  let documents: ReturnType<typeof buildTafsirRequest>['documents'];
+  try {
+    const pages = await loadScopePages(deps.tafsirPages as PageLoader, a.scope);
+    const books = selectPieces(pages, spanOf(a.scope), a.question, a.english);
+    const built = buildTafsirRequest({ question: a.question, place: placeOf(a.scope), books, history: turnsOf(a.history), memory: a.memory.map((m) => m.text) });
+    documents = built.documents;
+    result = await metered(deps, built.request, 'tafsir');
+  } catch (err) {
+    await deps.store.releaseQuestion(a.uid, a.day);
+    if (err instanceof RevoError) throw err;
+    deps.log({ event: 'failed', code: 'tafsir' });
+    throw new RevoError('unavailable', MESSAGES.noAnswer);
+  }
+  if (result === 'capped' || result === 'resting') {
+    await deps.store.releaseQuestion(a.uid, a.day);
+    throw result === 'capped'
+      ? new RevoError('resource-exhausted', MESSAGES.monthly, { reason: 'monthly' })
+      : new RevoError('resource-exhausted', MESSAGES.resting(deps.now()), { reason: 'resting' });
+  }
+  const answer = parseTafsirReply(result.reply.content, documents) ?? { text: MESSAGES.notInBooks, sources: [] };
+  return saveTafsirTurn(deps, a, answer, Math.max(0, REVO_DAILY_QUESTIONS - reserved.count));
+}
+
+/** Keeps the question and the answer in the conversation (a new one, or the one it was asked in). */
+async function saveTafsirTurn(deps: RevoDeps, a: TafsirAsk, answer: TafsirAnswer, remainingToday: number): Promise<RevoAskResult> {
+  const atReply = Math.max(deps.now().getTime(), a.atAsk + 1);
+  const id = a.chat?.id ?? deps.store.newId();
+  const title = a.chat?.title ?? a.question.slice(0, 60).trimEnd();
+  const q = userMessage(deps.store.newId(), a.uid, a.atAsk, a.question, a.attached);
+  q.quran = a.scope;
+  const r: StoredMessage = { id: deps.store.newId(), uid: a.uid, role: 'revo', text: answer.text, at: atReply, quran: a.scope };
+  if (answer.sources.length) r.sources = answer.sources;
+  const saved: RevoChat = a.chat
+    ? { ...a.chat, updatedAt: atReply, turns: a.chat.turns + 1, quran: a.scope }
+    : { id, kind: 'chat', title, day: a.day, createdAt: a.atAsk, updatedAt: atReply, turns: 1, quran: a.scope };
+  await deps.store.saveTurn(a.uid, saved, [q, r]);
+  deps.log({ event: 'saved', attach: 'tafsir', history: a.history.length, memory: a.memory.length, remembered: 0 });
+  return {
+    chatId: id,
+    title: saved.title,
+    question: publicMessage(q),
+    reply: publicMessage(r),
+    remainingToday,
+    cached: false,
+  };
+}
+
 export async function handleRevoAsk(auth: { uid: string } | undefined, data: unknown, deps: RevoDeps): Promise<RevoAskResult> {
   const { uid, tester, settings } = await gate(auth, deps, true);
   const smartTracking = await smartTrackingOf(deps, uid);
-  const b = body(data, ['chatId', 'day', 'question', 'context', 'attach', 'attachments']);
+  const b = body(data, ['chatId', 'day', 'question', 'context', 'attach', 'attachments', 'quran']);
   const started = deps.now();
   const chatId = checked(() => validateChatId(b.chatId));
   const day = revisionDay(b.day, started);
   const question = checked(() => validateQuestion(b.question));
   const context = checked(() => validateContext(b.context));
   const attached = checked(() => validateAttachments(b.attach, b.attachments, day));
+  const quran = b.quran === undefined ? null : checked(() => validateQuranScope(b.quran));
 
   // Moving the clock back can't refill the day.
   const usage = await deps.store.getUsage(uid);
@@ -405,6 +523,14 @@ export async function handleRevoAsk(auth: { uid: string } | undefined, data: unk
       const used = usage && usage.day === day ? usage.count : 0;
       return { chatId: id, title: hit.title, question: publicMessage(q), reply: publicMessage(r), remainingToday: Math.max(0, REVO_DAILY_QUESTIONS - used), cached: true };
     }
+  }
+
+  // A question about the Qur'an is answered from the tafsir (Revisely Dev): the ayat the app sent (the mushaf), the
+  // conversation's, or the ones a small Haiku step finds in a question asked anywhere else.
+  if (deps.tafsirPages && context.app === 'dev') {
+    let scope: QuranScope | null = quran ?? chat?.quran ?? null;
+    if (!scope && attached.length === 0) scope = await locate(deps, question);
+    if (scope) return answerFromTafsir(deps, { uid, day, question, scope, chat, history, memory, english: context.language !== 'ar', usage, atAsk, attached });
   }
 
   const reserved = await deps.store.reserveQuestion(uid, day, REVO_DAILY_QUESTIONS);
@@ -528,9 +654,9 @@ export async function handleDayInReview(auth: { uid: string } | undefined, data:
  */
 export async function handleSetOptions(auth: { uid: string } | undefined, data: unknown, deps: RevoDeps): Promise<RevoSettings> {
   if (!auth?.uid) throw new RevoError('unauthenticated', MESSAGES.signIn);
-  const b = body(data ?? {}, ['optIn', 'memoryOn']);
+  const b = body(data ?? {}, ['optIn', 'memoryOn', 'mushafOn']);
   const patch: Partial<RevoSettings> = {};
-  for (const k of ['optIn', 'memoryOn'] as const) {
+  for (const k of ['optIn', 'memoryOn', 'mushafOn'] as const) {
     if (b[k] === undefined) continue;
     if (typeof b[k] !== 'boolean') throw new RevoError('invalid-argument', `${k} must be true or false.`);
     patch[k] = b[k] as boolean;

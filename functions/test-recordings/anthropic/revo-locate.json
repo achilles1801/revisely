@@ -1,0 +1,47 @@
+{
+  "recordedAt": "2026-11-26T07:22:24.880Z",
+  "how": "scripts/tafsir/record-replies.js: the real API, a question that is not about the Qur’an.",
+  "request": {
+    "model": "claude-haiku-5-5",
+    "max_tokens": 200,
+    "thinking": {
+      "type": "disabled"
+    },
+    "systemSha256": "c4e45fe3481ed6403d670adf61793d34430bb35bc3da73ac06dbddba742b3ec4",
+    "outputSchemaSha256": "685c4ff5473466b261c2db1c8ddbaf696aba07bc341f598ae61860f520856abe"
+  },
+  "status": 200,
+  "body": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_011ChR8uzJXfdMZrUherRkg5",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"about_quran\": false, \"ayat\": []}"
+      }
+    ],
+    "container": null,
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "stop_details": null,
+    "usage": {
+      "input_tokens": 560,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "cache_creation": {
+        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "output_tokens": 17,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "service_tier": "standard",
+      "inference_geo": "global",
+      "speed": "standard"
+    },
+    "diagnostics": null
+  }
+}

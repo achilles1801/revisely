@@ -136,3 +136,49 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
   Activity, the daily log, Settings at a section, prayer times, the Qibla or the reader at a surah or juz
   (`REVO_SCREENS`, the same list in `functions/src/revo/types.ts` and `src/lib/revo/types.ts`; `src/lib/revo/screens`
   maps each to its route). A new screen goes in both lists, `screenTarget` and the guide's `SCREEN_HINTS`.
+- **Answers from the tafsir** (Revisely Dev; Majd, Nov 26 2026: "all answers MUST stem from those tafseer books"; plan,
+  boards and measurements in `~/Documents/revisely-revo-mocks/tafsir/NOTE.md`). Revo answers questions about the Qur'an
+  only from Tafsir al-Tabari, Ibn Kathir, al-Qurtubi and al-Sa'di, and shows each book's words.
+  - **The texts:** QUL's (Tarteel's Quranic Universal Library), from spa5k/tafsir_api's per-surah JSON.
+    `functions/scripts/tafsir/build-tafsir.js --raw <dir> --out <dir>` writes one file per Madani 1405 page (the passages
+    that touch it, from the four and Ibn Kathir's abridged English; harakat kept, the editors' `[[...]]` notes removed;
+    pieces of about a sentence as offsets), 604 files, 109 MB; uploaded to dev Storage `tafsir/v1/` (`gcloud storage cp
+    -r <out>/v1 gs://revisely-dev.firebasestorage.app/tafsir/`). Production's Storage gets them with the release.
+  - **Retrieval** (`functions/src/revo/tafsir/select.ts`): the ayat asked about are the index (page → passages); al-Sa'di's
+    passages whole, then up to 6 pieces from each of the other three, focused by keyword search (BM25) over Ibn Kathir's
+    English. Measured with count_tokens on seven pages: 8,500–11,000 tokens a question, against 27,000–29,000 for a
+    whole page (Arabic is ~1.3 characters a token; the model gets it without harakat, ~20% fewer).
+  - **The request** (`request.ts`): its own small system prompt, the books as documents with Anthropic's Citations on
+    (each quote comes back as exact words and their place, guaranteed real; quoted words cost no output tokens), no
+    structured output (Citations can't be combined with it), the rules and al-Sa'di cached. `reply.ts` maps each
+    citation back to the book's own text, harakat and all; an answer with no source is shown only when short (the
+    books don't say). A question asked elsewhere in Revo first goes to Haiku 5.5 (`locate.ts`) for its ayat. The answer
+    is Haiku 5.5's too (`TAFSIR_MODEL`; Majd, Nov 26 2026: "haiku", from the 60-question test: the same passes as Sonnet
+    5.5 at about a twentieth of the cost), thinking off (Haiku refuses `between_tools`). The answers written ahead stay
+    Sonnet 5.5's (already paid for).
+  - **The answer** (`handleRevoAsk` → `answerFromTafsir`, REVO-44): in Revisely Dev, a question with `quran` (the app's
+    ayat: the mushaf's page or a held ayah), in a chat that has one, or that the Haiku step places, is answered from the
+    tafsir and counts in the 20 a day; the reply keeps `sources` (each the book's words, the passage around them, Revo's
+    sentence) and the chat its `quran`, so follow-ups use the same ayat. The app draws them under the answer
+    (`components/revo/TafsirSources`: "From the tafsir", a tap shows the passage). The emulator answers the two new
+    requests from `revo-locate.json` and `revo-tafsir.json` (real replies, `scripts/tafsir/record-replies.js`; record
+    them again when the request's model, thinking or system prompt changes); `replies.<kind>` on an account sets one
+    kind's reply.
+  - **In the mushaf** (REVO-45; Majd, Nov 26 2026, reversing REVO-25's "no revo in the mushaf tab at all" for Dev):
+    `RevoHost` sets `useRevoInMushaf()` (Dev, Revo on, `mushafOn` not false). The reader then puts a 30pt R
+    (44pt to tap) in `ReaderFrame`'s `quietEnd`, the quiet footer's empty end slot beside the page number, in the room
+    kept under the page; hidden while a take runs. It opens Revo with `openRevo({ quran })` (`lib/revo/open`:
+    `pageScope`, `ayahScope`); the chat starts on the page's or ayah's chip and starters and sends `quran`. The held
+    ayah's menu gets "Ask Revo" through `useVerseActions({ onAskRevo })`, which only the reader passes (never a
+    session). Settings → Revo AI → "In the mushaf" saves `mushafOn` through `revoSetOptions`; the section's footer is
+    the one quiet line naming the four tafsirs (Majd: "more subtle").
+  - **The greeting** (REVO-46): in Revisely Dev, opened from Home while today isn't done, `RevoChat` adds one sentence
+    offering the next page's tafsir (`context.today.nextPages[0]`) and puts "What does the tafsir say?" first among the
+    starters; that starter sends the page's `quran`. A one-line summary of each page from the tafsir, written ahead in a
+    batch, would let the greeting say the meaning itself; it waits on Majd's yes for the spend (~$7 with the chips).
+  - **The spend Majd OK'd** (Nov 26 2026, $13; ledger `~/Documents/revisely-revo-mocks/tafsir/spend.md`), each script with
+    a `--max-usd` guard: `scripts/tafsir/lines-batch.js` (an English line on every piece of al-Tabari, Ibn Kathir and
+    al-Qurtubi, Haiku 5.5 Batch, ~$2.40; `collect` writes `lines` into the page files, re-upload them; `select.ts` then
+    ranks those pieces by their lines), `scripts/tafsir/answers-batch.js` ("What's happening here?" for all 604 pages,
+    Sonnet 5.5 Batch, ~$6; served by `tafsir/ahead.ts` from Storage `tafsir/answers/v1/`, free and at once, only for a
+    whole Madani 1405 page) and `scripts/tafsir/eval.js` (60 questions on Sonnet and Haiku, judged; ~$2).

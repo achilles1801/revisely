@@ -40,7 +40,7 @@ describe('Revo’s callables', () => {
     mockCall.mockResolvedValueOnce({ result: { none: true } });
     await expect(revoBackend().dayInReview({ day: '2026-11-06', context: {} as never })).resolves.toBeNull();
     mockCall.mockResolvedValueOnce({ result: { optIn: true, memoryOn: false } });
-    await expect(revoBackend().setOptions({ optIn: true })).resolves.toEqual({ optIn: true, memoryOn: false });
+    await expect(revoBackend().setOptions({ optIn: true })).resolves.toEqual({ optIn: true, memoryOn: false, mushafOn: true });
   });
 });
 

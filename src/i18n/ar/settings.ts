@@ -188,6 +188,10 @@ export const settings: NonNullable<ArStrings['settings']> = {
     deleteSpeechModel: 'حذف نموذج الكلام',
   },
   revo: {
+    footerTafsir: 'قد يخطئ ⁨Revo⁩. يجيب من بيانات مراجعتك، وعن القرآن من تفسير الطبري وابن كثير والقرطبي والسعدي فقط.',
+    mushaf: 'في المصحف',
+    mushafSub: '⁨Revo⁩ أسفل كل صفحة، لتسأله عنها',
+    mushafFailed: 'تعذّر التغيير',
     footer: 'قد يخطئ ⁨Revo AI⁩. يجيب من بيانات مراجعتك أنت.',
     revo: '⁨Revo⁩',
     paused: 'متوقف مؤقتًا',

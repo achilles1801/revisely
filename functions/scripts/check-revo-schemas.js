@@ -28,6 +28,7 @@ const { ANTHROPIC_URL, ANTHROPIC_VERSION } = require(path.join(lib, 'coach/call.
 const { REVO_MODEL } = require(path.join(lib, 'coach/pricing.js'));
 const { REVO_OUTPUT_CONFIG, REVO_SCHEDULE_OUTPUT_CONFIG } = require(path.join(lib, 'revo/replySchema.js'));
 const { schemaSha256 } = require(path.join(lib, 'emulator.js'));
+const { LOCATE_MODEL, buildLocateRequest } = require(path.join(lib, 'revo/tafsir/locate.js'));
 
 const FILE = path.join(__dirname, '..', 'test-recordings', 'anthropic', 'compiled-schemas.json');
 const DRY = process.argv.includes('--dry');
@@ -37,14 +38,21 @@ if (!key && !DRY) {
   process.exit(2);
 }
 
-const SCHEMAS = { 'every question but the schedule\'s': REVO_OUTPUT_CONFIG, 'Edit schedule in Revisely Dev': REVO_SCHEDULE_OUTPUT_CONFIG };
+/** Every reply schema Revo's requests send, with the model each goes to (the limit may differ by model). */
+const SCHEMAS = [
+  { name: 'every question but the schedule\'s', outputConfig: REVO_OUTPUT_CONFIG, model: REVO_MODEL },
+  { name: 'Edit schedule in Revisely Dev', outputConfig: REVO_SCHEDULE_OUTPUT_CONFIG, model: REVO_MODEL },
+  // Revisely Dev asks it first for every question: is it about the Qur'an, and where (REVO-44).
+  { name: 'is it about the Qur’an (tafsir/locate.ts)', outputConfig: buildLocateRequest('x').output_config, model: LOCATE_MODEL },
+];
 
 (async () => {
   const file = fs.existsSync(FILE) ? JSON.parse(fs.readFileSync(FILE, 'utf8')) : { how: '', schemas: {} };
   file.how = 'functions/scripts/check-revo-schemas.js: a two-letter question to the real API with each reply schema, max_tokens 16';
   let refused = 0;
-  for (const [name, outputConfig] of Object.entries(SCHEMAS)) {
-    const sha = schemaSha256(outputConfig);
+  for (const { name, outputConfig, model } of SCHEMAS) {
+    // Only the format compiles a grammar; the emulator hashes it alone (emulator.ts).
+    const sha = schemaSha256({ format: outputConfig.format });
     if (DRY) {
       console.log(`${name}: ${sha}${file.schemas[sha] ? ` (recorded: ${file.schemas[sha].compiled ? 'compiled' : 'refused'})` : ' (not recorded)'}`);
       continue;
@@ -52,14 +60,14 @@ const SCHEMAS = { 'every question but the schedule\'s': REVO_OUTPUT_CONFIG, 'Edi
     const res = await fetch(ANTHROPIC_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': ANTHROPIC_VERSION },
-      body: JSON.stringify({ model: REVO_MODEL, max_tokens: 16, messages: [{ role: 'user', content: 'hi' }], output_config: outputConfig }),
+      body: JSON.stringify({ model, max_tokens: 16, messages: [{ role: 'user', content: 'hi' }], output_config: { format: outputConfig.format } }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok && res.status !== 400) {
       console.error(`${name}: the API answered ${res.status} (${body?.error?.message ?? 'no message'}); nothing recorded. Try again.`);
       process.exit(1);
     }
-    const entry = { name, model: REVO_MODEL, checkedAt: new Date().toISOString(), compiled: res.ok };
+    const entry = { name, model, checkedAt: new Date().toISOString(), compiled: res.ok };
     if (!res.ok) {
       entry.error = String(body?.error?.message ?? '').slice(0, 200);
       refused++;

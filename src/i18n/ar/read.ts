@@ -3,6 +3,7 @@ import type { ArStrings } from './types';
 
 export const read: NonNullable<ArStrings['read']> = {
   reader: {
+    askRevo: 'اسأل ⁨Revo⁩ عن هذه الصفحة',
     subtitle: 'الصفحة {{page}} · الجزء {{juz}} · الحزب {{hizb}}',
     tapHint: 'اضغط على الصفحة لإظهار عناصر التحكم',
   },

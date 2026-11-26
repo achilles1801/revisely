@@ -19,6 +19,13 @@
       "model": "claude-sonnet-5-5",
       "checkedAt": "2026-11-26T08:25:50.118Z",
       "compiled": true
+    },
+    "685c4ff5473466b261c2db1c8ddbaf696aba07bc341f598ae61860f520856abe": {
+      "name": "is it about the Qur’an (tafsir/locate.ts)",
+      "model": "claude-haiku-5-5",
+      "checkedAt": "2026-11-26T07:22:24.880Z",
+      "compiled": true,
+      "how": "the real API's 200 reply with this schema in revo-locate.json (scripts/tafsir/record-replies.js)"
     }
   }
 }

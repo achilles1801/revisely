@@ -1237,7 +1237,7 @@ export default function SettingsScreen() {
         {page === 'revo' ? (
           <>
             {revoShown && (
-              <Section footer={t('settings.revo.footer')}>
+              <Section footer={t(isDevVariant() ? 'settings.revo.footerTafsir' : 'settings.revo.footer')}>
                 <View style={v2.iconRow} testID="revo-settings-row">
                   <SettingIcon name="sparkles-outline" />
                   <View style={v2.iconRowText}>
@@ -1260,6 +1260,26 @@ export default function SettingsScreen() {
                   <>
                     {revoOpen ? (
                       <Row icon="bulb-outline" label={t('settings.revo.memory')} value={revoSettings.memoryOn ? t('settings.on') : t('settings.off')} onPress={() => openRevo({ view: 'memory' })} />
+                    ) : null}
+                    {revoOpen && isDevVariant() ? (
+                      // Revo in the mushaf (REVO-45): at the foot of each page, and Ask Revo in a held ayah's menu.
+                      <View style={v2.iconRow} testID="revo-mushaf-row">
+                        <SettingIcon name="book-outline" />
+                        <View style={v2.iconRowText}>
+                          <Text style={[typeV2.body, { color: palette.text }]}>{t('settings.revo.mushaf')}</Text>
+                          <Text style={[typeV2.meta, { color: palette.secondary }]}>{t('settings.revo.mushafSub')}</Text>
+                        </View>
+                        <SettingSwitch
+                          value={revoSettings.mushafOn !== false}
+                          onValueChange={(v) =>
+                            void revoBackend()
+                              .setOptions({ mushafOn: v })
+                              .catch((err) => Alert.alert(t('settings.revo.mushafFailed'), (err as Error)?.message ?? t('common.tryAgainSentence')))
+                          }
+                          accessibilityLabel={t('settings.revo.mushaf')}
+                          testID="revo-mushaf-switch"
+                        />
+                      </View>
                     ) : null}
                     <Row icon="trash-outline" label={t('settings.revo.deleteConversations')} destructive onPress={confirmRevoHistoryDelete} />
                   </>

@@ -3,6 +3,9 @@ export const verse = {
   /** The menu beside a held verse. */
   menu: {
     play: 'Play',
+    /** Revo in the mushaf (Revisely Dev, REVO-45). */
+    askRevo: 'Ask Revo',
+    askRevoSubtitle: 'About this ayah, from the tafsir',
     translation: 'Translation',
     copy: 'Copy',
     share: 'Share',

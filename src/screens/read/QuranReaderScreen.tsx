@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useIsFocused, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MushafPager, MushafPagerHandle } from '../../components/MushafPager';
@@ -21,6 +21,10 @@ import { useReaderChrome } from '../../components/reader/useReaderChrome';
 import { useTapHint } from '../../components/reader/useTapHint';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ROUND_BUTTON_SIZE, RoundButton } from '../../components/reader/RoundButton';
+import { RevoMark } from '../../components/revo/RevoMark';
+import { ayahScope, openRevo, pageScope } from '../../lib/revo/open';
+import { useRevoInMushaf } from '../../lib/revo/presence';
+import { describeAyahs, describePassage, plainText } from '../../lib/passages';
 import { useReadingTimer } from '../../context/ReadingTimerContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getReadPalette, ReadPalette } from '../../theme/readPalette';
@@ -152,11 +156,22 @@ function QuranReaderScreenBody() {
     if (isScreenFocused) readerOpened(); // Recite's pack starts downloading (Revisely Dev only, ONDEV-3)
   }, [isScreenFocused]);
 
+  // Revo in the mushaf (Revisely Dev, REVO-45): at the page's foot while reading, and in a held ayah's menu; asked
+  // about the page or the ayah, it answers from the tafsir (REVO-44).
+  const revoInMushaf = useRevoInMushaf();
+  const askRevoAboutPage = () =>
+    openRevo({ quran: { scope: pageScope(currentPage), label: plainText(describePassage([currentPage])), kind: 'page' } });
   const verseActions = useVerseActions({
     pages: ALL_PAGES,
     onShowPage: (page) => pagerRef.current?.scrollToPage(page),
     currentPage,
     focused: isScreenFocused,
+    onAskRevo: revoInMushaf
+      ? (verse) => {
+          const key = verse.sura * 1000 + verse.ayah;
+          openRevo({ quran: { scope: ayahScope(key), label: plainText(describeAyahs([key], { form: 'ayahsCompact' })), kind: 'ayah' } });
+        }
+      : undefined,
   });
 
   // A verse found by search (testers), or the verses a match runs across: highlighted,
@@ -342,6 +357,20 @@ function QuranReaderScreenBody() {
         activity={
           recite.activity ?? <ReaderActivity recorder={recorder} playback={verseActions.player.state} onPress={chrome.show} />
         }
+        quietEnd={
+          revoInMushaf && !recite.active ? (
+            <Pressable
+              onPress={askRevoAboutPage}
+              accessibilityRole="button"
+              accessibilityLabel={t('read.reader.askRevo')}
+              hitSlop={7}
+              style={styles.revo}
+              testID="reader-revo"
+            >
+              <RevoMark size={30} />
+            </Pressable>
+          ) : null
+        }
       >
         <MushafPager
           ref={pagerRef}
@@ -462,6 +491,8 @@ const makeStyles = (palette: ReadPalette) =>
       ...typography.caption,
       color: palette.textSecondary,
     },
+    // 30pt drawn, 44pt to tap (hitSlop), in the room under the page.
+    revo: { width: 30, height: 30 },
     pageNum: {
       textAlign: 'center',
       // Small, in the page's ink colour, like the printed mushaf's number.
