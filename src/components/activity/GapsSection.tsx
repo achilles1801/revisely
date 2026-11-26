@@ -16,6 +16,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { typeV2 } from '../../theme/v2';
 import { t } from '../../i18n';
 import { chevron, forwardIcon } from '../../i18n/direction';
+import { SectionRow } from './SectionRow';
 import { ChromeText, STACK_AT_SCALE } from './ChromeText';
 import { Tap } from '../v2/Tap';
 import {
@@ -67,6 +68,9 @@ export interface GapsSectionProps {
   /** Last revised (ACT-30): the link at the section's end, and the full revision line (longest waiting first: the
    * late pages at the top). */
   onOpenLastRevised?: (sort?: 'waiting') => void;
+  /** Drawn as its row on the one Activity tab (ACT-35): the row's tap, and whether it is the list's last. */
+  row?: () => void;
+  last?: boolean;
 }
 
 export function GapsSection(props: GapsSectionProps) {
@@ -80,7 +84,7 @@ export function GapsSection(props: GapsSectionProps) {
   return <Gaps view={view} {...props} />;
 }
 
-function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpenLastRevised, ...props }: GapsSectionProps & { view: GapsView }) {
+function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpenLastRevised, row, last, ...props }: GapsSectionProps & { view: GapsView }) {
   const { palette } = useTheme();
   // Every length in exact days (Majd, Nov 16 2026: "'days' specifically should always be an option"), kept.
   const [inDays, setInDaysState] = useState(false);
@@ -114,6 +118,20 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
   const shown = allShown ? gaps : gaps.slice(0, GAPS_SHOWN);
   const longest = Math.max(1, ...gaps.map((g) => g.days));
 
+  if (row) {
+    return (
+      <SectionRow
+        title={t('insights.gaps.title')}
+        line={summary}
+        figure={figure.value}
+        unit={figure.text}
+        red={figure.red}
+        onPress={row}
+        separator={!last}
+        testID="insights-row-gaps"
+      />
+    );
+  }
   const figureInner = (
     <>
       <ChromeText style={[styles.big, { color: figure.red ? palette.red : palette.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>

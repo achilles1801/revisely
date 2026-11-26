@@ -364,11 +364,11 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
 export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     title: 'Revised elsewhere, a day’s entry and Today’s journal',
-    covers: ['ACT-33', 'ACT-34', 'HOME-2'],
+    covers: ['ACT-33', 'ACT-34', 'ACT-35', 'HOME-2'],
     routes: ['Dashboard', 'Activity'],
     text: lines(
       '- A day’s + → “Revised elsewhere”: a search for a surah or juz above the 30 juz. A tap chooses a juz; a hold opens it for its halves or parts. Extra pages never change the day’s schedule.',
-      '- Under Overview’s calendar, the picked day is one entry: tap it to open the day, or “Add a note” to write one. Spot tests have their own line and their own block in the day, marked “Finished” or “Stopped early”.',
+      '- Activity is one tab: the calendar, the picked day as one entry (tap to open; no note shown), then “Your revision”: a row per section opening its page (empty ones hidden), “Edit sections” last. Spot tests have their own line and block, “Finished” or “Stopped early”.',
       '- Home: the “Today’s journal” row under Today opens today’s journal.',
     ),
   },

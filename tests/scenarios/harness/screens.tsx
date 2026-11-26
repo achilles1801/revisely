@@ -54,6 +54,8 @@ export function activityStack(mods: Booted): ReactElement {
   return homeStackWith(mods, {
     Activity: mods.require<any>('src/screens/activity/ActivityScreen').default,
     LastRevised: mods.require<any>('src/screens/activity/LastRevisedScreen').default,
+    // A section's own page on the one Activity tab (ACT-35).
+    ActivitySection: mods.require<any>('src/screens/activity/ActivitySectionScreen').default,
   });
 }
 
@@ -97,7 +99,7 @@ function homeStackWith(mods: Booted, real: Record<string, unknown>, appRef = fal
       h(Stack.Screen, { name: 'ActiveRevision', component: Session }),
       h(Stack.Screen, { name: 'Memorization', component: Manager }),
       h(Stack.Screen, { name: 'ActivityDay', component: ActivityDayScreen }),
-      ...['Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'Insights', 'QuranReader', 'LastRevised'].map(
+      ...['Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'Insights', 'QuranReader', 'LastRevised', 'ActivitySection'].map(
         (name) => h(Stack.Screen, { key: name, name, component: real[name] ?? Elsewhere }),
       ),
     ),

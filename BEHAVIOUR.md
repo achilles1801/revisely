@@ -1106,7 +1106,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   launch, so Pages by strength, Coverage and weakest-first plans see revision done elsewhere. They carry
   no rating: a page keeps the one its sessions gave it. Deleting the log takes them back. (Nov 7 2026: the
   pages were re-derived from sessions alone.)
-- **ACT-18.** Activity has two tabs, Overview and Insights. Overview's calendar shows a month or a week:
+- **ACT-18.** Activity has two tabs, Overview and Insights (in Revisely Dev one tab, ACT-35). Overview's calendar shows a month or a week:
   a chip beside its title ("Month ⌄") opens the two, and the choice is kept on the phone. Switching keeps
   the picked day (or else today) on screen. When the calendar shows another month or week than today's,
   Today, beside the arrows, brings back today's with today picked: its cell highlighted as a tapped day's
@@ -1128,10 +1128,23 @@ International", "The Clear Quran®") and in `lib/quranenc`.
 - **ACT-34.** (Revisely Dev) The picked day under Overview's calendar is one entry (Majd, Nov 23 2026: its rows "show up
   as if they're separate clicks + there's an Open button and they all do the same thing"; "i dont think we need to put
   journal for each entry"). Its date and one line for each thing that happened (Revised, Memorized, Read, Recited), the
-  note last when there is one, are one button that opens the day. With no note it offers Add a note, which opens that day's
+  note last when there is one (none on the one Activity tab, ACT-35), are one button that opens the day. With no note it offers Add a note, which opens that day's
   Note sheet; a day with nothing says so. The calendar and the rest of Overview don't change. A spot test is its own kind
   of entry, apart from Recited (Majd, Nov 23 2026: "its own thing like recited or memorized"): its own line here and its own
   block in the day, each saying Finished or Stopped early. No line ever shrinks or lists its places: a few words and how much.
+- **ACT-35.** (Revisely Dev) Activity is one tab, with no Overview | Insights switch (Majd, Nov 25 2026: "the most important
+  things that should be shown as default that isn't overstimulating is the calendar view as well as today's journal card
+  because those are essentially the basics, the rest is just nice to know stuff"; he picked version A). On top, the calendar
+  (ACT-18: Month or Week, Today, ‹ ›, its totals and key, always shown) and the picked day's entry (ACT-34), which shows no
+  note ("the note shouldn't be shown on the journal day card -- it adds to the overstimulation"); the day itself has it. Under
+  them, "Your revision" with the range chip (ACT-22), then the sections in ACT-29's order as quiet rows: the name, one grey
+  line, the figure at the end and ›, the whole row one button that opens the section on a page of its own, drawn as Insights
+  drew it, with its name and the range chip at the top (one range: a change there is the list's too). A section with nothing
+  to say yet has no row: Gaps until a gap can be measured, Weak spots until a page is rated weak (none without Smart
+  Tracking), Recitation until a take, Memorization until a page was memorized in the last twelve months, Pace until ten timed
+  items. While one the account can have is missing, a grey line says the others show once they have something to say. Edit
+  sections is the list's last row (Insights' sections; the calendar and the day stay). A section's Consistency figure or gap
+  opens the tab's calendar there. Revo's button is on a section's page too, opening as Insights' (Weak spots' as its Ask).
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
   strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
   stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,
@@ -1150,7 +1163,8 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   reader open the reader there, once the sheet has gone; a stale juz offers Plan it for tomorrow first.
   (Majd, Nov 7 2026: "not being able to click on anything in coverage"; mocks i5 and i6.)
 - **ACT-22.** Insights read one range for the whole tab: 7 days, 30 days (at first), 3 months or All time, from a
-  chip at the end of the Overview | Insights row ("30 days ⌄", on Insights only) that opens the four (All time
+  chip at the end of the Overview | Insights row ("30 days ⌄", on Insights only; in Revisely Dev on the sections' list and each
+  section's page, ACT-35) that opens the four (All time
   names its start, "Since 9 September"); the choice is kept on the phone. Coverage's figure, Consistency's days and hours, Weak spots' counts, Memorization's
   "+N" and Pace (against the same length before it) follow it, and so does the juz sheet's "times"; the juz
   tiles always show where each juz stands now. A range longer than the account counts from its first day,
@@ -1243,7 +1257,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   (after 10 s at most), on a transparent ground as Home's. (Majd, Nov 9 2026: "shouldnt this update whenever
   a user scrolls down to refresh the page instead of having to close out the app?")
 - **ACT-29.** Activity's sections are the user's to arrange (every account from the mistake detection release): Edit sections (an icon at the end
-  of the tabs row) opens the tab's sections, each with a switch to show or hide it; holding a section (350 ms,
+  of the tabs row; in Revisely Dev the sections' list's last row, ACT-35) opens the tab's sections, each with a switch to show or hide it; holding a section (350 ms,
   still) lifts it to drag to another place, and VoiceOver has Move up and Move down. Every change shows at once.
   Overview's month header stays on top; under it the month's totals, the calendar (always shown), its key and the
   picked day's summary. Insights: Coverage, Consistency, Gaps (where it is open, ACT-28), Weak spots (its Smart
@@ -1389,7 +1403,7 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 
 - **REVO-25.** Revo's button is a 44pt disc (the smallest touch target, with room around it to tap), in a bottom corner
   (REVO-41), 14 above the tab bar and the mini player. It shows on Home, Activity (Overview and Insights), a day in Activity, See
-  all and Pages by strength, and nowhere else. There is no Revo on the Read tab (its list or the reader) or in a
+  all, Pages by strength and a section's own page (ACT-35), and nowhere else. There is no Revo on the Read tab (its list or the reader) or in a
   revision session, and their help sheets offer no "Ask Revo" (Majd, Nov 8 2026: "no revo in the revision
   sessions. there should also be no revo in the mushaf tab at all"); none in an editor or Settings either. The
   screens it shows on end their lists with room for it (`useRevoFootprint`), so their last row scrolls clear of it;

@@ -46,6 +46,11 @@ export function revoPlaceOf(route: { name: string; params?: object } | null | un
     }
     case 'PagesByStrength':
       return { kind: 'strength' };
+    case 'ActivitySection': {
+      // A section's own page on the one Activity tab (ACT-35): Weak spots opens as Weak spots' Ask, the rest as Insights.
+      const section = (route.params as { section?: unknown } | undefined)?.section;
+      return section === 'weak' ? { kind: 'weakSpots' } : { kind: 'insights' };
+    }
     default:
       // Home, See all, and anywhere else Revo is opened from (Settings).
       return HOME;

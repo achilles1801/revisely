@@ -19,10 +19,10 @@ export function useRevoAvailable(user: Pick<User, 'previewTester'> | null | unde
 }
 
 /**
- * The screens the button shows on (REVO-25): Home and Activity's. Never the Read tab, its list or the
+ * The screens the button shows on (REVO-25): Home and Activity's (a section's own page too, ACT-35). Never the Read tab, its list or the
  * reader (Majd, Nov 8 2026: "no revo in the mushaf tab at all"), a session, an editor or Settings.
  */
-export const REVO_BUTTON_ROUTES = new Set(['Dashboard', 'Activity', 'ActivityDay', 'ActivityAll', 'PagesByStrength']); // i18n-ignore (route names)
+export const REVO_BUTTON_ROUTES = new Set(['Dashboard', 'Activity', 'ActivityDay', 'ActivityAll', 'PagesByStrength', 'ActivitySection']); // i18n-ignore (route names)
 
 /**
  * When Revo is back after the day's questions: the next revision day's start. "after Fajr, at

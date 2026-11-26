@@ -11,7 +11,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { CHROME_MAX_SCALE, ChromeText, STACK_AT_SCALE } from './ChromeText';
 import { Tap } from '../v2/Tap';
 import { AddToPlanLink } from './AddToPlanLink';
-import { typeV2 } from '../../theme/v2';
+import { layoutV2, typeV2 } from '../../theme/v2';
 import { lastRevisedByPage } from '../../lib/activityInsights';
 import {
   busiestHours,
@@ -69,6 +69,7 @@ import type { PushBack } from '../../lib/gapsCycle';
 import { gapsView } from '../../lib/insightsGaps';
 import { RecitationInsights } from './RecitationInsights';
 import { FirstSection, useFirstSection } from './sectionPlace';
+import { SectionRow } from './SectionRow';
 import { DEFAULT_SECTIONS, sectionsToShow, type InsightsSection, type TabLayout } from '../../lib/activitySections';
 import { stillMarkedWords } from '../../lib/reciteInsights/insights';
 import type { Recitation } from '../../lib/reciteInsights/useRecitation';
@@ -178,6 +179,8 @@ export function InsightsView({
   sections = DEFAULT_SECTIONS.insights,
   onEditSections,
   onOpenLastRevised,
+  mode = 'page',
+  onOpenSection,
 }: {
   data: InsightsData;
   onReviseTomorrow: (pages: number[]) => void;
@@ -202,7 +205,14 @@ export function InsightsView({
   onEditSections?: () => void;
   /** When each surah, juz, hizb or page was last revised (Gaps' link: ACT-30). */
   onOpenLastRevised?: (sort?: 'waiting') => void;
+  /**
+   * 'rows' (the one Activity tab, ACT-35): each section a quiet row, its name, one grey line and its figure, that opens it on
+   * a page of its own (`onOpenSection`); a section with nothing to say yet has no row. 'page': the sections drawn in full.
+   */
+  mode?: 'page' | 'rows';
+  onOpenSection?: (id: InsightsSection) => void;
 }) {
+  const { palette } = useTheme();
   // The juz sheet (ACT-21): mounted from its first opening on, so it can slide away after.
   const [juz, setJuz] = useState<number | null>(null);
   const [juzUsed, setJuzUsed] = useState(false);
@@ -282,6 +292,89 @@ export function InsightsView({
         return <Pace data={data} onOpenDay={onOpenDay} />;
     }
   };
+  if (mode === 'rows') {
+    // Nothing to say yet, no row (ACT-35): Weak spots until a page is rated weak (and never without Smart Tracking: it has no
+    // ratings), Memorization until a page was memorized in the twelve months read; Gaps, Recitation and Pace as `has` says.
+    const weakCount =
+      data.smartTracking === false
+        ? 0
+        : weakSpotRows({
+            memorized: data.memorized,
+            rating: data.rating,
+            ratedWeak: data.ratedWeak,
+            revisions: data.revised.filter((r) => r.day === r.countsFor),
+            today: data.today,
+            window: span.window,
+            inWords: span.inWords,
+          }).length;
+    const says = (id: InsightsSection) =>
+      id === 'weak' ? weakCount > 0 : id === 'memorization' ? data.memorizations.some((m) => m.pages.length > 0) : true;
+    const rows = shown.filter(says);
+    // The sections this account can have at all (Recitation once it recites, Gaps where open, Weak spots with Smart Tracking):
+    // one of them without a row is still to come, and a grey line says so.
+    const could = (id: InsightsSection) =>
+      id === 'recitation' ? data.recitation != null && onOpenAyahs != null : id === 'gaps' ? data.gaps === true : id === 'weak' ? data.smartTracking !== false : true;
+    const open = (id: InsightsSection) => () => onOpenSection?.(id);
+    const rowOf = (id: InsightsSection, last: boolean): React.ReactNode => {
+      const row = { row: open(id), last };
+      switch (id) {
+        case 'coverage':
+          return <Coverage data={data} onPlanIt={onPlanIt} onOpenJuz={openJuz} {...row} />;
+        case 'consistency':
+          return <Consistency data={data} {...row} />;
+        case 'gaps':
+          return (
+            <GapsSection
+              revised={data.revised}
+              today={data.today}
+              window={span.window}
+              inWords={span.inWords}
+              lastWords={span.lastWords}
+              all={span.all}
+              firstDay={data.firstDay}
+              knownSince={data.itemsFrom}
+              lastRevisedOn={data.lastRevisedOn}
+              pushBack={data.pushBack}
+              {...row}
+            />
+          );
+        case 'weak':
+          return <WeakSpots data={data} onReviseTomorrow={onReviseTomorrow} onOpenPage={onOpenPage} {...row} />;
+        case 'recitation':
+          return data.recitation ? (
+            <RecitationInsights
+              records={data.recitation.records}
+              words={data.recitation.words}
+              today={data.today}
+              window={span.window}
+              inWords={span.inWords}
+              smartTracking={data.smartTracking !== false}
+              rating={data.rating}
+              revo={false}
+              onOpenAyahs={onOpenAyahs ?? (() => undefined)}
+              {...row}
+            />
+          ) : null;
+        case 'memorization':
+          return <Memorization data={data} {...row} />;
+        case 'pace':
+          return <Pace data={data} {...row} />;
+      }
+    };
+    return (
+      <View testID="insights-rows">
+        {rows.map((id, i) => (
+          <React.Fragment key={id}>{rowOf(id, i === rows.length - 1)}</React.Fragment>
+        ))}
+        {rows.length < sectionsToShow(sections, could).length ? (
+          <ChromeText style={[typeV2.meta, styles.later, { color: palette.secondary }]} testID="insights-rows-later">
+            {t('activity.oneTab.othersLater')}
+          </ChromeText>
+        ) : null}
+        {shown.length === 0 ? <NothingShown onEdit={onEditSections} /> : null}
+      </View>
+    );
+  }
   return (
     <View testID="activity-insights">
       {shown.map((id, i) => (
@@ -397,12 +490,21 @@ function Figure({
 
 // ── Coverage ─────────────────────────────────────────────────────────────
 
+/** A section drawn as its row on the one Activity tab (ACT-35): the row's tap, and whether it is the list's last. */
+interface AsRow {
+  row?: () => void;
+  last?: boolean;
+}
+
 function Coverage({
   data,
   onPlanIt,
   onAddToPlan,
   onOpenJuz,
   onOpenPage,
+  row,
+  // `last` is taken: each page's last revision.
+  last: lastRow,
 }: {
   data: InsightsData;
   onPlanIt: (pages: number[]) => void;
@@ -410,7 +512,7 @@ function Coverage({
   onOpenJuz: (juz: number) => void;
   /** The Page view's cells open the reader there (ACT-26). */
   onOpenPage?: (page: number) => void;
-}) {
+} & AsRow) {
   const { palette } = useTheme();
   // Juz | Surah | Page (ACT-26), kept on the phone like Week | Month.
   const [view, setViewState] = useState<CoverageView>('juz');
@@ -550,6 +652,26 @@ function Coverage({
         ? t('activity.insights.coverageDetailPage')
         : t('activity.insights.coverageDetailJuz');
 
+  if (row) {
+    // What stands out: the juz left longest, else how much of what's memorized came round in the range.
+    const line = untouched
+      ? [
+          t('activity.insights.untouchedLongest', { juz: untouched.first.juz }),
+          untouched.first.daysSince == null ? t('activity.insights.neverRevised') : t('activity.insights.lastRevisedAgo', { count: untouched.first.daysSince }),
+        ].join(' · ')
+      : t('activity.insights.revisedOfMemorized', { n: count.revised, pages: t('activity.insights.memorizedPages', { count: count.of }), span: span.inWords });
+    return (
+      <SectionRow
+        title={t('activity.insights.coverage')}
+        line={line}
+        figure={inCycles ? cyclesText : formatPercentage(pct)}
+        unit={inCycles ? t('activity.oneTab.cycles', { count: Number(cyclesText) }) : null}
+        onPress={row}
+        separator={!lastRow}
+        testID="insights-row-coverage"
+      />
+    );
+  }
   return (
     <Section
       title={t('activity.insights.coverage')}
@@ -807,7 +929,13 @@ function UncoveredLine({ row, separator, onPress }: { row: UncoveredRow; separat
 
 // ── Consistency ──────────────────────────────────────────────────────────
 
-function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; onOpenDay?: (day: string) => void; onOpenCalendar?: (month: string) => void }) {
+function Consistency({
+  data,
+  onOpenDay,
+  onOpenCalendar,
+  row,
+  last,
+}: { data: InsightsData; onOpenDay?: (day: string) => void; onOpenCalendar?: (month: string) => void } & AsRow) {
   const { palette } = useTheme();
   // ACT-4: a day counts with a revision or a read.
   const active = useMemo(() => new Set([...data.revised.map((r) => r.day), ...data.read.map((r) => r.day)]), [data.revised, data.read]);
@@ -867,6 +995,20 @@ function Consistency({ data, onOpenDay, onOpenCalendar }: { data: InsightsData; 
   const busiest = busiestHours(hours);
   const max = Math.max(1, ...hours);
 
+  if (row) {
+    return (
+      <SectionRow
+        title={t('activity.insights.consistency')}
+        // When they revise, once three days have times; otherwise the figure says it all.
+        line={busiest && hoursShown ? busiest : null}
+        figure={String(inRange.done)}
+        unit={figureText}
+        onPress={row}
+        separator={!last}
+        testID="insights-row-consistency"
+      />
+    );
+  }
   return (
     <Section title={t('activity.insights.consistency')} detail={t('activity.insights.consistencyDetail')} testID="insights-consistency">
       <Figure
@@ -1042,12 +1184,14 @@ function WeakSpots({
   onReviseTomorrow,
   onOpenPage,
   onSeeAllPages,
+  row,
+  last,
 }: {
   data: InsightsData;
   onReviseTomorrow: (pages: number[]) => void;
   onOpenPage: (page: number) => void;
   onSeeAllPages?: () => void;
-}) {
+} & AsRow) {
   const { palette } = useTheme();
   const rows = weakSpotRows({
     memorized: data.memorized,
@@ -1072,6 +1216,19 @@ function WeakSpots({
     const n = markedOn(r.pages);
     return n > 0 ? `${r.reason} · ${t('activity.insights.stillMarked', { count: n })}` : r.reason;
   };
+  if (row) {
+    return (
+      <SectionRow
+        title={t('activity.insights.weakSpots')}
+        line={rows.length > 0 ? t('activity.oneTab.weakFirst', { label: rows[0].label }) : null}
+        figure={String(pages.length)}
+        unit={t('activity.insights.pagesWord', { count: pages.length })}
+        onPress={row}
+        separator={!last}
+        testID="insights-row-weak"
+      />
+    );
+  }
   return (
     <Section
       title={t('activity.insights.weakSpots')}
@@ -1152,7 +1309,7 @@ function WeakSpots({
 
 // ── Memorization ─────────────────────────────────────────────────────────
 
-function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (day: string) => void }) {
+function Memorization({ data, onOpenDay, row, last }: { data: InsightsData; onOpenDay?: (day: string) => void } & AsRow) {
   const { palette } = useTheme();
   // A month's bar (i10): the figure becomes that month and its memorizations list under the bars;
   // the same bar again clears it.
@@ -1166,6 +1323,19 @@ function Memorization({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (da
   const added = memorizedIn(data.memorizations, data.today, span.window);
   const top = Math.max(10, ...months.map((m) => m.pages));
   const share = quranShare(data.memorized.size);
+  if (row) {
+    return (
+      <SectionRow
+        title={t('activity.insights.memorization')}
+        line={[added > 0 ? `+${formatNumber(added)} ${span.inWords}` : null, share].filter(Boolean).join(' · ') || null}
+        figure={String(data.memorized.size)}
+        unit={t('activity.insights.pagesWord', { count: data.memorized.size })}
+        onPress={row}
+        separator={!last}
+        testID="insights-row-memorization"
+      />
+    );
+  }
   return (
     <Section title={t('activity.insights.memorization')} detail={t('activity.insights.memorizationDetail')} testID="insights-memorization">
       {shownMonth ? (
@@ -1298,7 +1468,7 @@ function WeekByWeek({ revised, today }: { revised: InsightsData['revised']; toda
   );
 }
 
-function Pace({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (day: string) => void }) {
+function Pace({ data, onOpenDay, row, last }: { data: InsightsData; onOpenDay?: (day: string) => void } & AsRow) {
   const { palette } = useTheme();
   const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
   const range = span.window;
@@ -1316,6 +1486,19 @@ function Pace({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (day: strin
       : Math.abs(p.perPage - p.before) < 0.05
         ? t('activity.insights.sameAs', { before: span.before })
         : t(p.perPage < p.before ? 'activity.insights.downFrom' : 'activity.insights.upFrom', { pace: formatPace(p.before), before: span.before });
+  if (row) {
+    return (
+      <SectionRow
+        title={t('activity.insights.pace')}
+        line={change ?? t('activity.insights.revisingSpan', { span: span.lastWords })}
+        figure={formatPace(p.perPage)}
+        unit={t('activity.insights.minAPage')}
+        onPress={row}
+        separator={!last}
+        testID="insights-row-pace"
+      />
+    );
+  }
   return (
     <Section title={t('activity.insights.pace')} detail={t('activity.insights.paceDetail')} testID="insights-pace">
       <View style={[styles.paceTiles, stacked && styles.paceTilesStacked]} testID="insights-pace-tiles">
@@ -1373,6 +1556,7 @@ function Pace({ data, onOpenDay }: { data: InsightsData; onOpenDay?: (day: strin
 }
 
 const styles = StyleSheet.create({
+  later: { paddingHorizontal: layoutV2.gutter, paddingTop: 12, paddingBottom: 4 },
   flex: { flex: 1 },
   section: { paddingTop: 18, paddingBottom: 18, paddingHorizontal: 16 },
   sectionHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
