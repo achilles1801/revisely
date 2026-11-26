@@ -22,6 +22,7 @@ import {
   ActivityKind,
   buildActivityItems,
   filterActivityItems,
+  type SpotTestItemSource,
 } from '../../lib/activityItems';
 import { JournalFilter, journalFilterLabel } from '../../lib/journal';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
@@ -29,18 +30,23 @@ import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { isDevVariant } from '../../lib/variant';
 import { useMemoryRecords } from '../../lib/reciteMemory/store';
-import type { TakeRecord } from '../../lib/reciteMemory/record';
+import type { SpotTestRecord, TakeRecord } from '../../lib/reciteMemory/record';
 import { takeWhen } from '../../lib/reciteMemory/describe';
 import { useTakeRecordings } from '../../lib/reciteMemory/takeAudio';
-import { TakeListRow, useQuranWordsWhen } from '../../components/reciteMemory/TakeRows';
+import { TakeListRow, takeResult, useQuranWordsWhen } from '../../components/reciteMemory/TakeRows';
 import { passageOf } from '../../components/reciteLive/TakeSummarySheet';
 import { plainText } from '../../lib/passages';
+import { useJournalDesign } from '../../lib/release/journalDesign';
 import { t } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActivityAll'>;
-/** `recitation`: Recite's takes (Revisely Dev), listed from its memory rather than the activity items. */
+/**
+ * `recitation`: Recite's takes (Revisely Dev), listed from its memory rather than the activity items. Spot tests are
+ * activity items of their own (`spotTest`, ACT-34), so All and the search find them (RMEM-5).
+ */
 type Kind = ActivityKind | 'all' | 'recitation';
 type TakesFilter = 'all' | 'mistakes' | 'hidden';
+type SpotTake = TakeRecord & { spotTest: SpotTestRecord };
 const takesFilters = (): { value: TakesFilter; label: string }[] => [
   { value: 'all', label: t('activity.all.allTakes') },
   { value: 'mistakes', label: t('activity.all.withMistakes') },
@@ -57,7 +63,7 @@ function addDays(day: string, n: number): string {
 /**
  * Everything done, newest first, behind "See all" on Activity and Home (new
  * design only): a search over pages, surahs, dates and notes, a filter by kind
- * and one by date. An item opens its day.
+ * and one by date. An item opens its day; a spot test opens on its page, as a take does.
  */
 export default function ActivityAllScreen() {
   const navigation = useNavigation<NavigationProp>();
@@ -74,20 +80,45 @@ export default function ActivityAllScreen() {
   const [range, setRange] = useState<JournalFilter>('all');
   const [rangeOpen, setRangeOpen] = useState(false);
 
+  // Recite's takes (Revisely Dev): every take with Mark mistakes, newest first, with their own choices.
+  const memoryOn = reciteLiveForAccount(user);
+  const memoryRecords = useMemoryRecords(user?.id, memoryOn);
+  const reciting = kind === 'recitation';
+  // Spot tests are their own kind (ACT-34): items in All and the search, with a filter of their own (RMEM-5).
+  const journalDesign = useJournalDesign();
+  const spotOn = memoryOn && journalDesign;
+  const spotTakes = useMemo(
+    () => (spotOn ? memoryRecords.filter((r): r is SpotTake => r.kind === 'take' && !r.deleted && r.spotTest != null) : []),
+    [spotOn, memoryRecords],
+  );
+  const takeWords = useQuranWordsWhen(reciting || spotTakes.length > 0);
+  const takeRecordings = useTakeRecordings(reciting);
+  // Named from the word data, so they join the list once it has loaded.
+  const spotTests = useMemo<SpotTestItemSource[]>(
+    () =>
+      takeWords
+        ? spotTakes.map((take) => {
+            const first = takeWords.pageOf(take.from);
+            const last = Math.max(first, takeWords.pageOf(take.to));
+            return {
+              take: { id: take.id, day: take.day, createdAt: take.createdAt, spotTest: take.spotTest },
+              passage: passageOf(takeWords, take.from, take.to),
+              result: takeResult(take),
+              pages: Array.from({ length: last - first + 1 }, (_, i) => first + i),
+            };
+          })
+        : [],
+    [spotTakes, takeWords],
+  );
+
   const items = useMemo(
-    () => buildActivityItems({ logs, readings, journal, recordings }, user),
-    [logs, readings, journal, recordings, user],
+    () => buildActivityItems({ logs, readings, journal, recordings, spotTests }, user),
+    [logs, readings, journal, recordings, spotTests, user],
   );
   const shown = useMemo(
     () => (kind === 'recitation' ? [] : filterActivityItems(items, { kind, range, query }, today)),
     [items, kind, range, query, today],
   );
-  // Recite's takes (Revisely Dev): every take with Mark mistakes, newest first, with their own choices.
-  const memoryOn = reciteLiveForAccount(user);
-  const memoryRecords = useMemoryRecords(user?.id, memoryOn);
-  const reciting = kind === 'recitation';
-  const takeWords = useQuranWordsWhen(reciting);
-  const takeRecordings = useTakeRecordings(reciting);
   const [takesFilter, setTakesFilter] = useState<TakesFilter>('all');
   const now = Date.now();
   const takesShown = useMemo(() => {
@@ -95,6 +126,8 @@ export default function ActivityAllScreen() {
     const q = query.trim().toLowerCase();
     return memoryRecords
       .filter((r): r is TakeRecord => r.kind === 'take' && !r.deleted)
+      // Spot tests are under their own filter.
+      .filter((t) => !(spotOn && t.spotTest))
       .filter((t) => (takesFilter === 'mistakes' ? t.mistakes > 0 : takesFilter === 'hidden' ? t.hidden : true))
       .filter((t) =>
         range === 'all'
@@ -113,11 +146,15 @@ export default function ActivityAllScreen() {
       .sort((a, b) => b.createdAt - a.createdAt);
     // `now` moves every render; the list needn't.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reciting, memoryRecords, takesFilter, range, query, today, takeWords]);
+  }, [reciting, memoryRecords, spotOn, takesFilter, range, query, today, takeWords]);
   const months = useMemo(() => [...new Set(items.map((i) => i.day.slice(0, 7)))].sort().reverse(), [items]);
 
   const open = (it: ActivityItem) =>
-    navigation.navigate('ActivityDay', { date: it.day, ...(it.recordingId ? { focusRecordingId: it.recordingId } : {}) });
+    it.take && isDevVariant()
+      ? // A spot test, on its page with its marks, as Recitations' takes open (RMEM-8).
+        navigation.navigate('QuranReader', { pageNumber: it.take.page, showTake: it.take.id })
+      : navigation.navigate('ActivityDay', { date: it.day, ...(it.recordingId ? { focusRecordingId: it.recordingId } : {}) });
+  const kindLabel = (k: Kind) => (k === 'recitation' ? t('activity.all.recitations') : ACTIVITY_KIND_LABELS[k as ActivityKind]);
 
   const filtered = query.trim() !== '' || kind !== 'all' || range !== 'all';
 
@@ -154,17 +191,20 @@ export default function ActivityAllScreen() {
           accessibilityLabel={t('activity.all.datesLabel', { range: journalFilterLabel(range) })}
           testID="filter-range"
         />
-        {(['all', ...ACTIVITY_KINDS.flatMap((x) => (x === 'revision' && memoryOn ? [x, 'recitation'] : [x]))] as Kind[]).map((k) => (
+        {(
+          [
+            'all',
+            ...ACTIVITY_KINDS.flatMap((x) => (x === 'revision' && memoryOn ? [x, 'recitation', ...(spotOn ? ['spotTest'] : [])] : [x])),
+          ] as Kind[]
+        ).map((k) => (
           <PillButton
             key={k}
-            title={k === 'all' ? t('activity.all.kindAll') : k === 'recitation' ? t('activity.all.recitations') : ACTIVITY_KIND_LABELS[k]}
+            title={k === 'all' ? t('activity.all.kindAll') : kindLabel(k)}
             size="sm"
             variant={kind === k ? 'solid' : 'outline'}
             onPress={() => setKind(k)}
             accessibilityLabel={
-              k === 'all'
-                ? t('activity.all.showEverything')
-                : t('activity.all.showKind', { kind: k === 'recitation' ? t('activity.all.recitations') : ACTIVITY_KIND_LABELS[k] })
+              k === 'all' ? t('activity.all.showEverything') : t('activity.all.showKind', { kind: kindLabel(k) })
             }
             testID={`filter-${k}`}
           />

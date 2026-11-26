@@ -95,7 +95,7 @@ export function takeLine(take: TakeRecord, cleared: number): string {
 }
 
 /** How a take went, in its line: its mistakes, "unfinished" after them when it has no final answer, or "not checked". */
-function takeResult(take: TakeRecord): string {
+export function takeResult(take: TakeRecord): string {
   if (!takeChecked(take)) return t('reciteMemory.rows.notChecked');
   return take.unfinished ? t('reciteMemory.rows.unfinished', { mistakes: mistakesLabel(take.mistakes) }) : mistakesLabel(take.mistakes);
 }
