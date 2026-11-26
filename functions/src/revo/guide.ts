@@ -503,8 +503,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['THEME-1', 'THEME-2', 'THEME-3', 'THEME-4'],
     routes: ['Settings', 'Dashboard'],
     text: lines(
-      '- Settings → Appearance → “Ramadan theme”: Auto (two weeks before Ramadan to three days after Eid), On or Off, on that phone. Falling light, lanterns and a crescent on Home, a crescent by Settings’ title, string lights on the tab bar and sheets. It changes nothing the app does.',
-      '- Never over the Qur’an’s pages, a session or a Recite take.',
+      '- Settings → Appearance → “Ramadan theme”: Auto (two weeks before Ramadan to three days after Eid), On or Off. Decoration only, never on the Qur’an’s pages, a session or a take.',
     ),
   },
   {
