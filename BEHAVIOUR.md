@@ -1669,8 +1669,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 
 - **REVO-46.** (Revisely Dev) While today isn't done, Revo's greeting from Home ends by offering the tafsir of the next
   page to revise ("Want what the tafsir says about Al-Hashr, 4th page before you go on?"), and its first starter, "What
-  does the tafsir say?", asks about that page: answered from the tafsir (REVO-44), and counted as a question. Once
-  today is done, or opened from another screen, the greeting is as before (REVO-35).
+  does the tafsir say?", asks about that page: answered from the tafsir (REVO-44), and counted as a question. During
+  Ramadan, Ramadan's three suggestions all follow it (THEME-8). Once today is done, or opened from another screen, the
+  greeting is as before (REVO-35).
 
 ## Memorizing
 
