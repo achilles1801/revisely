@@ -52,6 +52,15 @@ export function takeTagOptions(takes: readonly Pick<TakeRecord, 'id' | 'createdA
 
 const capitalized = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+/** The account, for its takes. A sheet drawn without the app's context (on its own, as in a test) has none. */
+function useAccount() {
+  try {
+    return useApp().user ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function AddNoteSheet({
   visible,
   onClose,
@@ -74,7 +83,7 @@ export function AddNoteSheet({
   presetTag?: string | null;
 }) {
   const { palette, isDark } = useTheme();
-  const { user } = useApp();
+  const user = useAccount();
   // The day's Recite takes (Revisely Dev's Recite memory), for Show under.
   const memoryRecords = useMemoryRecords(user?.id, reciteLiveForAccount(user));
   const takeOptions = useMemo(
