@@ -61,6 +61,14 @@ export const home = {
     edit: 'Edit session',
     delete: 'Delete session',
   },
+  /** Today's ayah at the foot of Home (HOME-7). */
+  ayah: {
+    /** Where it is: "Al-Qamar (54:17)". */
+    place: '{{surah}} ({{sura}}:{{ayah}})',
+    withSaheeh: '{{place}} · Saheeh International',
+    label: 'Today’s ayah, {{place}}',
+    hint: 'Opens its page in the mushaf',
+  },
   /** screens/main/DashboardScreen: Home itself. */
   screen: {
     loadFailed: "Couldn't load your data",

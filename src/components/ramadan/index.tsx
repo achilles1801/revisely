@@ -9,11 +9,14 @@ import { MOTES, MOTES_DENSE, RamadanSky } from './RamadanSky';
 export { StringLights } from './StringLights';
 export { WithCrescent } from './WithCrescent';
 
-/** Home's: the falling light over the glow and the lanterns in the top bar, both behind everything else. */
-export function RamadanHome() {
+/**
+ * Home's: the falling light over the glow and the lanterns in the top bar, both behind everything else. `fall`: how far
+ * the light falls (Home v3's ground reaches the tab bar, HOME-6); else as far as the glow.
+ */
+export function RamadanHome({ fall }: { fall?: number } = {}) {
   return (
     <>
-      <RamadanSky />
+      <RamadanSky height={fall} />
       <HangingLanterns />
     </>
   );

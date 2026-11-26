@@ -304,6 +304,18 @@ export const settings = {
       on: 'On',
       off: 'Off',
     },
+    /** Home's background (HOME-6, Revisely Dev): its row and the sheet's three choices. */
+    homeBackground: 'Home background',
+    homeBackgroundChoice: {
+      glow: 'Glow',
+      glows: 'Two glows',
+      ayah: 'Glow and an ayah',
+    },
+    homeBackgroundSub: {
+      glow: 'The glow runs down to the tab bar',
+      glows: 'And a softer one rises from the tab bar',
+      ayah: 'And one ayah at the foot of Home, a new one each day',
+    },
   },
   /** Settings → Appearance → Language (Revisely Dev until Arabic ships). Each language's own name is LANGUAGE_NAMES. */
   language: {

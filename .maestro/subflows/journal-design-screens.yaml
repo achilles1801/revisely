@@ -9,10 +9,44 @@ appId: com.revisionbuddy.app
     timeout: 15000
 - assertNotVisible:
     id: home-recent
+# Glow and an ayah, the default (HOME-6, HOME-7): today's ayah at the foot of Home.
+- extendedWaitUntil:
+    visible:
+      id: home-ayah
+    timeout: 10000
 - runFlow:
     file: shot.yaml
     env:
       NAME: 23-home-${THEME}
+# Two glows, then Glow (Settings → Appearance → Home background, by its E2E link), then the default again.
+- openLink:
+    link: revisely://e2e/home-background?choice=glows
+    optional: true
+- runFlow: open-link-prompt.yaml
+- extendedWaitUntil:
+    notVisible:
+      id: home-ayah
+    timeout: 10000
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 23-home-glows-${THEME}
+- openLink:
+    link: revisely://e2e/home-background?choice=glow
+    optional: true
+- runFlow: open-link-prompt.yaml
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 23-home-glow-${THEME}
+- openLink:
+    link: revisely://e2e/home-background?choice=ayah
+    optional: true
+- runFlow: open-link-prompt.yaml
+- extendedWaitUntil:
+    visible:
+      id: home-ayah
+    timeout: 10000
 
 # The day's entry, under the calendar.
 - retry:
