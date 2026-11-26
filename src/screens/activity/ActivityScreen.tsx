@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 import { TopSafeAreaView } from '../../components/SafeAreaView';
-import { useNavigation, useRoute, useScrollToTop, type RouteProp } from '@react-navigation/native';
+import { useNavigation, useScrollToTop } from '@react-navigation/native';
 // Gesture Handler's: the tab pager's swipe must be able to start on this screen (over React Native's own, the pager's
 // pan never started; CLAUDE.md, UI traps).
 import { ScrollView } from 'react-native-gesture-handler';
@@ -54,8 +54,6 @@ const RECENT_ITEMS = 3;
  */
 export default function ActivityScreen() {
   const navigation = useNavigation<NavigationProp>();
-  // A section's page sent the tab to its calendar (ACT-35): that month, a gap marked.
-  const calendarAt = useRoute<RouteProp<HomeStackParamList, 'Activity'>>().params?.calendarAt ?? null;
   const { user, logs } = useApp();
   const { palette } = useTheme();
   // Room for the tab bar (and the mini player) and for Revo's button.
@@ -167,7 +165,8 @@ export default function ActivityScreen() {
               refreshRef={blocksRefresh}
               // The one tab's rows (ACT-35): each section on a page of its own.
               onOpenSection={(section) => navigation.navigate('ActivitySection', { section })}
-              calendarAt={calendarAt}
+              // This week's "Month ›" (Majd's T1): the full calendar on its own page.
+              onOpenMonth={() => navigation.navigate('ActivityMonth')}
             />
           ) : (
             <View style={v2.graph}>

@@ -50,8 +50,8 @@ export default function ActivitySectionScreen() {
           section={section}
           noteDays={new Set()}
           onOpenDay={(date) => navigation.navigate('ActivityDay', { date })}
-          // Consistency's figure and a gap (ACT-23, ACT-28): the tab's calendar, at that month, the gap marked.
-          onOpenCalendar={(month, gap) => navigation.navigate('Activity', { calendarAt: { month, ...(gap ? { gap } : {}) } })}
+          // Consistency's figure and a gap (ACT-23, ACT-28): the full calendar, at that month, the gap marked.
+          onOpenCalendar={(month, gap) => navigation.navigate('ActivityMonth', { calendarAt: { month, ...(gap ? { gap } : {}) } })}
           refreshRef={refresh}
         />
       </ScrollView>

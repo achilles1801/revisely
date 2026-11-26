@@ -27,6 +27,7 @@ import ActivityAllScreen from '../screens/activity/ActivityAllScreen';
 import PagesByStrengthScreen from '../screens/activity/PagesByStrengthScreen';
 import LastRevisedScreen from '../screens/activity/LastRevisedScreen';
 import ActivitySectionScreen from '../screens/activity/ActivitySectionScreen';
+import ActivityMonthScreen from '../screens/activity/ActivityMonthScreen';
 import type { InsightsSection } from '../lib/activitySections';
 import { activityBlocksEnabled } from '../components/activity/DayBlocks';
 import type { ActivityKind } from '../lib/activityItems';
@@ -77,8 +78,10 @@ export type HomeStackParamList = {
   /** `basePages`: the day as saved, when `initialPages` already adds to it ("Add to plan"); `note`: one line under the title. */
   PlanDayEdit: { dayIndex: number; initialPages: number[]; basePages?: number[]; note?: string };
   // Revision sessions, timed sessions and the daily log, day by day.
-  // calendarAt: a section's page opening the tab's calendar at a month, a gap marked (ACT-35, ACT-23, ACT-28).
-  Activity: { calendarAt?: { month: string; gap?: { from: string; to: string; cue: string } } } | undefined;
+  Activity: undefined;
+  // The one Activity tab's full calendar (ACT-35, Revisely Dev); calendarAt: a section's page opening it at a month, a gap
+  // marked (ACT-23, ACT-28).
+  ActivityMonth: { calendarAt?: { month: string; gap?: { from: string; to: string; cue: string } } } | undefined;
   // One section of the one Activity tab on a page of its own (ACT-35, Revisely Dev).
   ActivitySection: { section: InsightsSection };
   // date is a revision day, YYYY-MM-DD.
@@ -180,6 +183,7 @@ function sharedScreens() {
       <HomeStack.Screen name="PagesByStrength" component={PagesByStrengthScreen} />
       <HomeStack.Screen name="LastRevised" component={LastRevisedScreen} />
       <HomeStack.Screen name="ActivitySection" component={ActivitySectionScreen} />
+      <HomeStack.Screen name="ActivityMonth" component={ActivityMonthScreen} />
       <HomeStack.Screen name="QuranReader" component={QuranReaderScreen} />
     </>
   );

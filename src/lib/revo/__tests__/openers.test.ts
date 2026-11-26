@@ -263,12 +263,14 @@ describe('where Revo is opened from (REVO-38) and where its button shows (REVO-2
     // [ACT-35] A section's own page opens as Insights; Weak spots' as its Ask.
     expect(revoPlaceOf({ name: 'ActivitySection', params: { section: 'coverage' } })).toEqual({ kind: 'insights' });
     expect(revoPlaceOf({ name: 'ActivitySection', params: { section: 'weak' } })).toEqual({ kind: 'weakSpots' });
+    // Its full calendar opens with the month's line.
+    expect(revoPlaceOf({ name: 'ActivityMonth' })).toEqual({ kind: 'overview' });
     for (const name of ['Dashboard', 'ActivityAll', 'Settings']) expect(revoPlaceOf({ name })).toEqual({ kind: 'home' });
     expect(revoPlaceOf(null)).toEqual({ kind: 'home' });
   });
 
   it('[REVO-25] the button shows on Home and Activity’s screens and Edit schedule, never on the Read tab, in a session, another editor or Settings', () => {
-    expect([...REVO_BUTTON_ROUTES].sort()).toEqual(['Activity', 'ActivityAll', 'ActivityDay', 'ActivitySection', 'Dashboard', 'PagesByStrength', 'PlanEdit']);
+    expect([...REVO_BUTTON_ROUTES].sort()).toEqual(['Activity', 'ActivityAll', 'ActivityDay', 'ActivityMonth', 'ActivitySection', 'Dashboard', 'PagesByStrength', 'PlanEdit']);
     // Edit schedule has no tab bar: the button sits just above the bottom edge there, and only there.
     expect([...REVO_BUTTON_NO_TAB_BAR]).toEqual(['PlanEdit']);
     // Opened there, Revo starts as from Home.

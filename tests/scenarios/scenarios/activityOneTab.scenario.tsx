@@ -23,7 +23,7 @@ const text = (app: OpenApp, testID: string) => {
   return el ? flatText(el).replace(/\u00a0/g, ' ') : null;
 };
 
-it('[ACT-35] Activity is one tab: the calendar and the day, then the sections as rows; a row opens its own page, whose range is the list’s', async () => {
+it('[ACT-35] Activity is one tab: this week and the day, then the sections as rows; a row opens its own page, whose range is the list’s; Month opens the calendar', async () => {
   setZone(ZONES.chicago);
   setNow('2026-11-02 20:00');
   const phone = new Phone();
@@ -55,9 +55,12 @@ it('[ACT-35] Activity is one tab: the calendar and the day, then the sections as
   });
   await app.until(() => shows(app, 'activity-blocks-views'), 'Activity');
 
-  // The calendar and the picked day first; no Overview | Insights switch.
-  expect(shows(app, 'calendar-month')).toBe(true);
-  expect(shows(app, 'calendar-preview')).toBe(true);
+  // This week and the picked day first (Majd's T1, C2); no month, no Overview | Insights switch.
+  expect(shows(app, 'calendar-strip')).toBe(true);
+  expect(shows(app, 'calendar-month')).toBe(false);
+  await app.until(() => /^5 of 5\b|revised/.test(text(app, 'preview-ring-figure') ?? ''), 'today’s ring on the day');
+  expect(text(app, 'preview-ring-figure')).toBe('5 of 5 revised');
+  expect(text(app, 'calendar-week-line')).toMatch(/^1 of \d days? revised/);
   expect(shows(app, 'activity-views')).toBe(false);
   expect(shows(app, 'pill-insights')).toBe(false);
 
@@ -89,5 +92,11 @@ it('[ACT-35] Activity is one tab: the calendar and the day, then the sections as
   });
   await app.until(() => shows(app, 'activity-sections-list') && !shows(app, 'activity-section'), 'back on Activity');
   expect(text(app, 'insights-range')).toMatch(/7 days/);
+
+  // "Month ›" opens the full calendar on its own page, today's day there too.
+  await tap(app, 'calendar-month-link');
+  await app.until(() => shows(app, 'activity-month') && shows(app, 'calendar-month'), 'the month page');
+  expect(text(app, 'calendar-month-title')).toBe('November 2026');
+  expect(text(app, 'preview-ring-figure')).toBe('5 of 5 revised');
   await app.close();
 });

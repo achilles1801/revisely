@@ -6,6 +6,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Tap } from '../v2/Tap';
+import { ProgressRing } from './DayParts';
 import { useTheme } from '../../context/ThemeContext';
 import { typeV2 } from '../../theme/v2';
 import { forwardIcon } from '../../i18n/direction';
@@ -13,6 +14,22 @@ import { formatNumber, t } from '../../i18n';
 
 /** Chrome text stops growing here, as the calendar's does. */
 const MAX_SCALE = 1.4;
+
+/** C2's day (ACT-35, Majd's pick on the v2 boards): the revision as a ring and its figure, the rest in one grey line. */
+export interface DayEntryRing {
+  /** Of the day's plan, 0–1 (1 for pages logged with no plan). */
+  share: number;
+  /** "20 of 20", or how many pages with no plan. */
+  figure: string;
+  /** Where and how long: "Juz 28 · 31 min". */
+  detail?: string;
+}
+
+/** One of the other kinds, as the calendar marks it: memorized and read a dot, recited a mic, a spot test its icon. */
+export interface DayEntryExtra {
+  key: 'memorized' | 'read' | 'recited' | 'spot';
+  text: string;
+}
 
 export interface DayEntryLine {
   key: string;
@@ -32,6 +49,8 @@ export function DayEntry({
   onOpen,
   onAddNote,
   showNote = true,
+  ring,
+  extras = [],
 }: {
   /** "Wednesday 28 October". */
   date: string;
@@ -42,10 +61,69 @@ export function DayEntry({
   onAddNote: () => void;
   /** The one Activity tab (ACT-35) shows no note here (Majd, Nov 25 2026: "it adds to the overstimulation"); the day has it. */
   showNote?: boolean;
+  /** C2's form (the one Activity tab): the revision as a ring, the other kinds in one grey line; no note, no Add a note. */
+  ring?: DayEntryRing | null;
+  extras?: DayEntryExtra[];
 }) {
   const { palette } = useTheme();
   const shownNote = showNote ? note : null;
   const spoken = [date, ...lines.map((l) => `${l.label}, ${l.value}${l.tail ? `, ${l.tail}` : ''}`), ...(shownNote ? [`${t('activity.calendar.note')}, ${shownNote}`] : [])].join('. ');
+  if (ring !== undefined) {
+    const said = [date, ring ? `${ring.figure} ${t('activity.oneTab.revised')}${ring.detail ? `, ${ring.detail}` : ''}` : null, ...extras.map((e) => e.text)]
+      .filter(Boolean)
+      .join('. ');
+    const mark = (key: DayEntryExtra['key']) =>
+      key === 'memorized' || key === 'read' ? (
+        <View style={[styles.markDot, { backgroundColor: key === 'memorized' ? palette.primary : palette.text }]} />
+      ) : (
+        <Ionicons name={key === 'recited' ? 'mic-outline' : 'shuffle'} size={14} color={palette.secondary} />
+      );
+    return (
+      <View style={styles.entry} testID="calendar-preview">
+        <Tap onPress={onOpen} accessibilityRole="button" accessibilityLabel={said || date} accessibilityHint={t('activity.calendar.openTheDay')} style={styles.open} testID="preview-open">
+          <View style={styles.head}>
+            <Text style={[styles.date, { color: palette.text }]} numberOfLines={2} maxFontSizeMultiplier={MAX_SCALE} testID="preview-date">
+              {date}
+            </Text>
+            <Ionicons name={forwardIcon()} size={18} color={palette.secondary} />
+          </View>
+          {ring ? (
+            <View style={styles.ringRow} testID="preview-ring">
+              <ProgressRing fraction={ring.share} done={ring.share >= 1} size={44} />
+              <View style={styles.shrink}>
+                <Text style={[styles.ringFigure, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE} testID="preview-ring-figure">
+                  {ring.figure}
+                  <Text style={[typeV2.body, { color: palette.secondary }]}>{` ${t('activity.oneTab.revised')}`}</Text>
+                </Text>
+                {ring.detail ? (
+                  <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
+                    {ring.detail}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+          {extras.length > 0 ? (
+            <View style={[styles.extras, ring ? styles.extrasUnderRing : null]} testID="preview-extras">
+              {extras.map((e) => (
+                <View key={e.key} style={styles.extra} testID={`preview-extra-${e.key}`}>
+                  {mark(e.key)}
+                  <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
+                    {e.text}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          {!ring && extras.length === 0 ? (
+            <Text style={[typeV2.body, styles.nothing, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE} testID="preview-nothing">
+              {t('activity.calendar.entryNothing')}
+            </Text>
+          ) : null}
+        </Tap>
+      </View>
+    );
+  }
   const label = [typeV2.body, styles.label, { color: palette.secondary }];
   const value = [typeV2.body, styles.value, { color: palette.text }];
   return (
@@ -122,5 +200,12 @@ const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
   mics: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingTop: 2 },
   nothing: { paddingVertical: 4 },
+  ringRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 8 },
+  ringFigure: { fontSize: 22, lineHeight: 28, fontWeight: '700' },
+  extras: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 4, marginTop: 10, paddingBottom: 4 },
+  // Under the ring's words, as the board draws it.
+  extrasUnderRing: { paddingStart: 58 },
+  extra: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  markDot: { width: 6, height: 6, borderRadius: 3 },
   addNote: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', minHeight: 36, paddingHorizontal: 16 },
 });
