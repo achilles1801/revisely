@@ -1115,7 +1115,8 @@ describe('the hidden view (the eye on the bar)', () => {
         for (const c of covers) {
           const inRow = (c.top as number) <= y && y <= (c.top as number) + (c.height as number);
           const overlap = Math.min((c.left as number) + (c.width as number), b * 0.38) - Math.max(c.left as number, a * 0.38);
-          if (inRow) expect(overlap).toBeLessThanOrEqual(0);
+          // A cover may meet a marker's opening at its edge (to a rounding), never reach into it at its middle row.
+          if (inRow) expect(overlap).toBeLessThanOrEqual(1e-9);
         }
       }
     }
