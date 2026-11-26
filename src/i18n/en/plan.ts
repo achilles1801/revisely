@@ -107,6 +107,9 @@ export const plan = {
     yourDays: 'Your days',
     dayFooter: 'Tap a day to change what’s on it.',
     amountCustomFooter: 'Your plan’s days stay as they are. To use this amount, choose “Create new plan”.',
+    /** Daily amount while Revo's draft is open (REVO-43): the draft's amount, not saved. */
+    amountDraft: 'Revo’s draft, not saved yet',
+    amountDraftFooter: 'Part of Revo’s schedule: it changes the days, and nothing is saved until you tap Save.',
     notInPlan: 'Not in your plan',
     notInPlanFooter: 'Your custom plan doesn’t add new pages by itself. Add them where they fit, then Save.',
     add: 'Add',

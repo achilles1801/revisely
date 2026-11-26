@@ -87,7 +87,8 @@ How the tests are made: `tests/scenarios/README.md`.
   an edit of it. "Save current plan…" (in Saved plans) on a custom plan names it too (at once when it has no
   unsaved edits, with the next Save when it has). A plan made with "Create new plan" has no name. On the automatic
   schedule, saving a copy only keeps a copy. A saved plan is a copy: editing the plan in use doesn't change it, and
-  deleting it doesn't rename the plan in use. With a custom plan, "Daily amount" says the plan's days stay as they are.
+  deleting it doesn't rename the plan in use. With a custom plan, "Daily amount" says the plan's days stay as they are,
+  and (Revisely Dev) its row shows the amount the plan's days hold, in the header's words, so the two agree (REVO-43).
 
 ## A revision session
 
@@ -1649,7 +1650,12 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   evenly over the other days, so a plan saved today keeps those weekdays off (a missed day that Keep daily amount carries
   can still land on one, as in any plan).
   "Check in Edit schedule" opens Edit schedule filled in, marked "Revo's schedule, not saved yet": only Save keeps it,
-  and Back leaves the schedule as it was (with Discard changes?, as any edit). Not now hides the card. Revo drafts only
+  and Back leaves the schedule as it was (with Discard changes?, as any edit). Its daily amount is part of it (Majd, Nov 26
+  2026: "update the daily amount row if it decides to change the amount because it can be confusing to the user if the two
+  disagree"): "Daily amount" shows the draft's amount in the header's words ("7–8 pages"), marked "Revo's draft, not saved
+  yet"; changing it there builds the draft's days again with that amount, still unsaved; Save keeps it with the days (pages
+  a day as the most on any of its days, or its juz a day), and Back leaves the amount as it was. Not now hides the card.
+  Revo drafts only
   when opened from Edit schedule: a change or a new plan asked there (each starter too) is answered with the card. Those
   questions go with a reply format that has the draft and, of the charts, only a day's pages, the weeks and the juz map,
   one the model's service compiles (Nov 26 2026: with the draft beside every chart it refused every question from
