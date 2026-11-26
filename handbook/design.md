@@ -21,7 +21,8 @@ classic default), and a fresh install starts in light.
   16pt gutter; each row has an avatar-size mark (40 top-level, 36 reply, 28 nested; `v2/Mark`),
   a name (15/600), metadata (13) and a ⋯ menu, and rows of one thread are joined by a 2pt line
   (`v2/ThreadRow`, ported from the Layl app's ThreadCard). No cards, no glass, no gradient but
-  Home's glow and the accent's progress fill: the primary button is a solid pill
+  Home's glow, the accent's progress fill, Premium's mark and ring (`premium`) and the badges' materials (`BADGE_MATERIALS`,
+  Settings → Account; Majd approved them on Nov 26 2026): the primary button is a solid pill
   (`v2/PillButton`). Every menu is `v2/ActionSheet` (handle, 18/600 title, icon rows, red
   destructive rows, a Cancel bar); its action runs after the sheet has gone. The one exception is
   the held verse's menu (`verse/VerseMenu`, Oct 27 2026): a small card beside the verse
@@ -31,6 +32,11 @@ classic default), and a fresh install starts in light.
   share sheet can open straight after. The tab bar (`navigation/TabBar`) is flat and icon-only,
   with a small accent dot under the current tab that follows a swipe (below); `ActionBar` takes
   its place for a screen's own actions. No Threads/Meta names, logos or icons, no likes or reposts.
+- A mark inside a ring, a disc or a badge (a check, a glyph) is centred by its box: the box is square and centres its
+  child, the ring is drawn behind it (absolute), and the icon is never absolute itself. An icon is text: given
+  `absoluteFill` its glyph sits at the box's top start, cut by the ring (the Calendar's day card, Nov 26 2026).
+  `jest/rings.ts` (`offCentreMarks`) checks a rendered ring; `components/__tests__/ringMarks.test.tsx` checks the shared
+  ones and that no `<Ionicons>` in `src/` is placed absolutely.
 - Shared pieces live in `src/components/v2/`; Home's feed in `src/components/home/feed/`. Every sheet
   is `v2/Sheet` (handle, centred title, optional Cancel/Save, optional foot bar, and `pinned`: a sheet's own
   main action kept on screen under its scrolling content; the backdrop is its sibling) and every menu `v2/ActionSheet`; segmented controls are `v2/PillTabs`. Sheets with their
@@ -53,8 +59,8 @@ classic default), and a fresh install starts in light.
   bounce, so it never followed the finger.
 - The owner's rules from testing (Oct 26 2026):
   - **Minimal.** Home is one Today post (pages, juz, surahs, the action, how much is memorized); no
-    second card restating it, and no ⋯ (Nov 2026): today's pages carry a › that opens exactly two
-    actions, "Jump to…" (`lib/jump`, `home/JumpSheet`) and "Edit schedule"; the memorized line,
+    second card restating it, and no ⋯ (Nov 2026): where today starts ends with "Change", which opens Jump to
+    (`lib/jump`, `home/JumpSheet`) directly (HOME-3, Nov 25 2026; Edit schedule is in Settings → Revision); the memorized line,
     "17.9% of the Quran memorized ›" (one decimal, of 604 pages; always shown, no setting; it wraps,
     never truncates), opens the memorized pages ready to edit. The old "Behind? / back a day" (Home
     and the plan editor's "Running behind?") is gone: Jump to covers it. Under the memorized line,

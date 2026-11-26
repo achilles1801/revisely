@@ -1,5 +1,6 @@
 // Every Arabic string, one file per English file (src/i18n/README.md, "Arabic"). A key not here yet shows in
 // English. Words, voice, plurals and typography: src/i18n/ar-glossary.md.
+import { account } from './account';
 import { activity } from './activity';
 import { auth } from './auth';
 import { coach } from './coach';
@@ -21,6 +22,7 @@ import { prayer } from './prayer';
 import { preview } from './preview';
 import { premium } from './premium';
 import { qibla } from './qibla';
+import { ramadan } from './ramadan';
 import { read } from './read';
 import { reader } from './reader';
 import { recite } from './recite';
@@ -42,6 +44,7 @@ import { whatsNew } from './whatsNew';
 import type { ArStrings } from './types';
 
 export const ar: ArStrings = {
+  account,
   activity,
   auth,
   coach,
@@ -63,6 +66,7 @@ export const ar: ArStrings = {
   premium,
   preview,
   qibla,
+  ramadan,
   read,
   reader,
   recite,

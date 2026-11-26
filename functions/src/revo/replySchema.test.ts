@@ -1,9 +1,10 @@
 // Revo's reply schema (structured outputs) allows exactly what reply.ts accepts, stays inside the
 // API's limits, and goes on every Revo request and no coach request.
 import { buildCoachRequest } from '../coach/prompt';
-import { buildAskRequest, buildReviewRequest } from './prompt';
+import { createHash } from 'crypto';
+import { buildAskRequest, buildReviewRequest, withStoreSchema } from './prompt';
 import { parseReply } from './reply';
-import { ACTION_SCHEMAS, CHART_SCHEMAS, REVO_OUTPUT_CONFIG, REVO_REPLY_SCHEMA } from './replySchema';
+import { ACTION_SCHEMAS, CHART_SCHEMAS, REVO_DEV_OUTPUT_CONFIG, REVO_DEV_REPLY_SCHEMA, REVO_OUTPUT_CONFIG, REVO_REPLY_SCHEMA } from './replySchema';
 import { REVO_MEMORIZED_MONTHS, REVO_NEW_CHART_KINDS, REVO_SCREENS, REVO_SETTINGS_SECTIONS, REVO_TABLE_COLUMNS, REVO_TIMELINE_DAYS, RevoContext } from './types';
 
 type Schema = Record<string, unknown>;
@@ -88,6 +89,56 @@ describe('Revo’s reply schema', () => {
     }
   });
 
+  it('[REVO-43] a drafted schedule: in Revisely Dev’s schema only, every field asked for, kept in range', () => {
+    const drafts = [
+      { kind: 'draftSchedule', title: 'A new schedule', detail: '6 pages a day, Fridays off', mode: 'pages', perDay: 6, restDays: [5], reverse: false },
+      { kind: 'draftSchedule', title: 'A new schedule', detail: 'A juz a day, from An-Nas back', mode: 'juz', perDay: 1, restDays: [], reverse: true },
+    ];
+    // What the app gets: no restDays for none, no reverse for the usual order (as before the fields were required).
+    const kept = [
+      { kind: 'draftSchedule', title: 'A new schedule', detail: '6 pages a day, Fridays off', mode: 'pages', perDay: 6, restDays: [5] },
+      { kind: 'draftSchedule', title: 'A new schedule', detail: 'A juz a day, from An-Nas back', mode: 'juz', perDay: 1, reverse: true },
+    ];
+    drafts.forEach((action, i) => {
+      const reply = JSON.stringify({ ...base, action });
+      expect(valid(REVO_DEV_REPLY_SCHEMA, { ...base, action })).toBe(true);
+      expect(valid(REVO_REPLY_SCHEMA, { ...base, action })).toBe(false);
+      expect(parseReply(reply, allowed, { firstTurn: true, drafts: true })!.action).toEqual(kept[i]);
+      expect(parseReply(reply, allowed, { firstTurn: true })!.action).toBeUndefined();
+    });
+    // Every field is required: a draft without its rest days or order doesn't fit the schema.
+    const { restDays: _r, ...noRest } = drafts[0];
+    const { reverse: _v, ...noOrder } = drafts[0];
+    expect(valid(REVO_DEV_REPLY_SCHEMA, { ...base, action: noRest })).toBe(false);
+    expect(valid(REVO_DEV_REPLY_SCHEMA, { ...base, action: noOrder })).toBe(false);
+    const out = (a: object) => parseReply(JSON.stringify({ ...base, action: { kind: 'draftSchedule', title: 'x', detail: '', restDays: [], reverse: false, ...a } }), allowed, { firstTurn: true, drafts: true })!.action;
+    expect(out({ mode: 'pages', perDay: 41 })).toBeUndefined();
+    expect(out({ mode: 'juz', perDay: 4 })).toBeUndefined();
+    expect(out({ mode: 'pages', perDay: 6, restDays: [7] })).toBeUndefined();
+    expect(out({ mode: 'pages', perDay: 6, restDays: [1, 2, 3, 4] })).toBeUndefined();
+    expect(out({ mode: 'juz', perDay: 1, restDays: [5] })).toBeUndefined();
+    expect(out({ mode: 'hours', perDay: 6 })).toBeUndefined();
+    expect(out({ mode: 'pages', perDay: 6 })).toEqual({ kind: 'draftSchedule', title: 'x', detail: '', mode: 'pages', perDay: 6 });
+  });
+
+  it('[REVO-43] the store app’s schema is exactly the one that answered before the draft, and Revisely Dev’s adds no optional or union parameter', () => {
+    // Nov 26 2026: the draft as one more branch with two optional fields made the API refuse every question from
+    // Revisely Dev with a 400 ("Schema is too complex for compilation" is the API's unpublished grammar limit), though
+    // both counts below were inside their limits. ca725b35… is the schema every answer before it was given with.
+    const sha = (o: object) => createHash('sha256').update(JSON.stringify(o)).digest('hex');
+    expect(sha(REVO_OUTPUT_CONFIG)).toBe('ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e');
+    const counts = (schema: Schema) => {
+      const objects = walk(schema).filter((s) => s.type === 'object');
+      const props = objects.flatMap((o) => Object.values(o.properties as Record<string, Schema>));
+      return {
+        optional: objects.reduce((n, o) => n + Object.keys(o.properties as object).length - (o.required as string[]).length, 0),
+        unions: props.filter((p) => Array.isArray(p.anyOf) || Array.isArray(p.type)).length,
+      };
+    };
+    expect(counts(REVO_DEV_REPLY_SCHEMA)).toEqual(counts(REVO_REPLY_SCHEMA));
+    expect(counts(REVO_REPLY_SCHEMA)).toEqual({ optional: 7, unions: 3 });
+  });
+
   it('allows nothing more: no unknown kind, field or screen, and every field present', () => {
     const bad = [
       { ...base, chart: { kind: 'pieChart', title: 'Pie' } },
@@ -104,8 +155,11 @@ describe('Revo’s reply schema', () => {
     for (const reply of bad) expect(valid(REVO_REPLY_SCHEMA, reply)).toBe(false);
   });
 
-  it('stays inside the API’s limits: objects closed, at most 16 unions and 24 optional parameters', () => {
-    const objects = walk(REVO_REPLY_SCHEMA).filter((s) => s.type === 'object');
+  it.each([
+    ['the store app’s', REVO_REPLY_SCHEMA],
+    ['Revisely Dev’s', REVO_DEV_REPLY_SCHEMA],
+  ])('%s stays inside the API’s limits: objects closed, at most 16 unions and 24 optional parameters', (_name, schema) => {
+    const objects = walk(schema).filter((s) => s.type === 'object');
     for (const o of objects) {
       expect(o.additionalProperties).toBe(false);
       for (const k of o.required as string[]) expect(Object.keys(o.properties as object)).toContain(k);
@@ -116,7 +170,7 @@ describe('Revo’s reply schema', () => {
     expect(unions.length).toBeLessThanOrEqual(16);
     expect(optional).toBeLessThanOrEqual(24);
     // Nothing structured outputs refuses.
-    const keywords = new Set(walk(REVO_REPLY_SCHEMA).flatMap((s) => Object.keys(s)));
+    const keywords = new Set(walk(schema).flatMap((s) => Object.keys(s)));
     for (const k of ['minimum', 'maximum', 'minLength', 'maxLength', 'maxItems', 'pattern', 'oneOf']) expect(keywords.has(k)).toBe(false);
   });
 
@@ -130,6 +184,12 @@ describe('Revo’s reply schema', () => {
     } as RevoContext;
     expect(buildAskRequest({ day: '2026-11-05', question: 'How was my week?', context, attached: [], memory: [], history: [] }).output_config).toEqual(REVO_OUTPUT_CONFIG);
     expect(buildReviewRequest({ day: '2026-11-05', context, memory: [] }).output_config).toEqual(REVO_OUTPUT_CONFIG);
+    // Revisely Dev's questions carry Dev's schema (the draft), its day in review the store's; asked again, the store's.
+    const dev = buildAskRequest({ day: '2026-11-05', question: 'Make it lighter', context: { ...context, app: 'dev' }, attached: [], memory: [], history: [] });
+    expect(dev.output_config).toBe(REVO_DEV_OUTPUT_CONFIG);
+    expect(buildReviewRequest({ day: '2026-11-05', context: { ...context, app: 'dev' }, memory: [] }).output_config).toBe(REVO_OUTPUT_CONFIG);
+    expect(withStoreSchema(dev)).toEqual({ ...dev, output_config: REVO_OUTPUT_CONFIG });
+    expect(withStoreSchema(buildAskRequest({ day: '2026-11-05', question: 'How was my week?', context, attached: [], memory: [], history: [] }))).toBeNull();
     expect(REVO_OUTPUT_CONFIG.format.type).toBe('json_schema');
     const coach = buildCoachRequest({ kind: 'coverage' } as never, {} as never) as unknown as Record<string, unknown>;
     expect(coach.output_config).toBeUndefined();

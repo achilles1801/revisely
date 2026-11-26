@@ -43,6 +43,7 @@ import { useReciteLayer } from '../../components/reciteLive/useReciteLayer';
 import { t } from '../../i18n';
 import { backIcon } from '../../i18n/direction';
 import { readerOpened } from '../../lib/onDevice/packTrigger';
+import { RamadanQuiet } from '../../components/ramadan/quiet';
 
 type NavigationProp = NativeStackNavigationProp<ReadStackParamList, 'QuranReader'>;
 type RouteProps = RouteProp<ReadStackParamList, 'QuranReader'>;
@@ -63,7 +64,16 @@ function searchHighlightOf(key: string | null): AyahRef[] | null {
   return keys.map((k) => toAyahRef({ sura: suraOf(k), ayah: ayahOf(k) }));
 }
 
+/** Wrapped so the Ramadan theme never dresses its page or the sheets over it (THEME-1, THEME-4). */
 export default function QuranReaderScreen() {
+  return (
+    <RamadanQuiet>
+      <QuranReaderScreenBody />
+    </RamadanQuiet>
+  );
+}
+
+function QuranReaderScreenBody() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
   const { isDark, palette: v2 } = useTheme();

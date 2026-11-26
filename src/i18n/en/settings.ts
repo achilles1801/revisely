@@ -72,6 +72,7 @@ export const settings = {
   /** Section titles. Revo opens Settings at one by its title (REVO-31). */
   /** Settings' pages (SET-1): each is a row on the first level and its page's title. */
   sections: {
+    accountDetails: 'Name and email',
     account: 'Account',
     revision: 'Revision',
     reminders: 'Reminders',
@@ -289,6 +290,15 @@ export const settings = {
     dark: 'Dark',
     /** Decorations over the usual design (Revisely Dev until its release switch). */
     ramadan: 'Ramadan theme',
+    /** On the first level's Appearance row while the theme shows: "Light · Indigo · Ramadan" (THEME-3). */
+    ramadanValue: 'Ramadan',
+    /** Under Automatic, when it shows (THEME-2): "On from 25 January to 12 March". */
+    ramadanAuto: 'On from {{from}} to {{to}}',
+    ramadanChoice: {
+      auto: 'Auto',
+      on: 'On',
+      off: 'Off',
+    },
   },
   /** Settings → Appearance → Language (Revisely Dev until Arabic ships). Each language's own name is LANGUAGE_NAMES. */
   language: {
@@ -352,6 +362,8 @@ export const settings = {
     version: 'Revisely · v{{version}}',
   },
   testing: {
+    /** Revisely Dev: try any part of Ramadan (THEME-2). */
+    ramadanDates: 'Ramadan dates',
     /** Revisely Dev's list of the revision reminders this phone will show (components/settings/ScheduledRemindersRow). */
     reminders: 'Scheduled reminders',
     remindersSub: 'What this phone will show, and when',

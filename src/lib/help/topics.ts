@@ -121,8 +121,8 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         title: 'Today',
         text:
           'Each day brings a set amount of your memorized pages, going round in a cycle. ' +
-          'Tap where today starts for {{Jump to…}} or {{Edit schedule}}.',
-        covers: ['SCHED-1', 'SCHED-2', 'SCHED-3', 'JUMP-1'],
+          'Tap {{Change}} after where today starts to begin today somewhere else.',
+        covers: ['SCHED-1', 'SCHED-2', 'SCHED-3', 'JUMP-1', 'HOME-3'],
       },
       {
         id: 'home.missed',

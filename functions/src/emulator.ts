@@ -16,7 +16,9 @@
  *   `mode` picks a failure instead: `rejected` (a recorded 401), `overloaded` (a 529 every attempt)
  *   or `network` (the connection fails every attempt); its `reply` (`{ text, stopReason? }`) puts
  *   that text in the recorded reply, for a test of how our code reads a given answer (a reply cut
- *   off at max_tokens, a chart on a page the model wasn't given). Per account, so tests running side
+ *   off at max_tokens, a chart on a page the model wasn't given); its `refuseSchemaWith` (a string)
+ *   answers a request whose reply schema contains it with the API's 400 for a schema too complex to
+ *   compile (Revisely Dev's draft, Nov 26 2026). Per account, so tests running side
  *   by side on one emulator don't change each other's answers.
  * - **The clock.** Scenarios and E2E flows run at a test time; a phone's clock and the server's
  *   agree, so a request may carry `X-Revisely-Test-Now` (ms) and the handler's clock follows it.
@@ -133,6 +135,7 @@ export function recordedAnthropic(db: Firestore, uid: string | undefined): Fetch
     const settings = await account.get();
     const mode = String(settings.get('mode') ?? 'recorded');
     const given = settings.get('reply') as { text?: unknown; stopReason?: unknown } | undefined;
+    const refuseSchemaWith = settings.get('refuseSchemaWith');
     const kind = request ? kindOf(request) : null;
     const answer = kind ? recording(kind) : null;
     const drift = request && answer ? driftOf(shortRequest(request), answer.request) : [];
@@ -146,10 +149,16 @@ export function recordedAnthropic(db: Firestore, uid: string | undefined): Fetch
       max_tokens: request?.max_tokens ?? null,
       thinking: (request as { thinking?: unknown } | null)?.thinking ?? null,
       messages: request?.messages ?? null,
+      outputSchemaSha256: request ? (shortRequest(request).outputSchemaSha256 ?? null) : null,
     });
     if (problems.length > 0) {
       // As Anthropic answers a malformed request: a 400, which our code treats as no answer.
       return respond({ status: 400, body: { type: 'error', error: { type: 'invalid_request_error', message: problems.join('; ') } } });
+    }
+    if (typeof refuseSchemaWith === 'string' && request?.output_config && JSON.stringify(request.output_config).includes(refuseSchemaWith)) {
+      // As the API answered every question from Revisely Dev on Nov 26 2026, before the model ran (so nothing billed): a
+      // reply schema whose grammar was too big to compile.
+      return respond({ status: 400, body: { type: 'error', error: { type: 'invalid_request_error', message: 'Schema is too complex for compilation.' } } });
     }
     if (mode === 'network') throw new TypeError('fetch failed');
     if (mode === 'overloaded') return respond(recording('error-529'));

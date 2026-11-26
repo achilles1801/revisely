@@ -320,7 +320,7 @@ current basic sounds". October 2026's version was removed for the voices it offe
   scenarios stay loadable for the automated tests; their Offline queue holds its changes on the phone until
   "Send held changes" (or the next start of the app), then sends them in order.
 - **ACCOUNT-1.** Delete account (Settings → Account, confirmed twice) removes the account from the server with everything of it
-  (pages, sessions, notes, Revo's and the coach's data, backed-up recordings) and signs the phone out. Offline, or when
+  (pages, sessions, notes, Revo's and the coach's data, backed-up recordings, its picture) and signs the phone out. Offline, or when
   the server refuses (App Check), nothing is deleted and the user stays signed in.
 - **ACCOUNT-3.** Delete account always ends, in "Account deleted" (signed out) or an error with Try again: never an
   endless spinner. The app waits for the server at most 30 seconds. With no answer (lost, or offline), it asks whether
@@ -329,6 +329,32 @@ current basic sounds". October 2026's version was removed for the voices it offe
   it, nothing on the phone (its copy, signing out) keeps the spinner up more than a few seconds. The deletion itself
   doesn't hold the phone up either: the phone stops listening to the account (its user document, pages and sessions)
   while the server deletes it, and listens again if the account is still there.
+- **ACCOUNT-4.** (Revisely Dev, the Account page's new look; Majd approved the boards on Nov 26 2026.) Settings → Account
+  opens on the account's picture (its photo, or the first letter of its name when it has none) in Premium's ring when it
+  has Premium, the name with its latest badge (ACCOUNT-5), a Premium pill, "Revising since <month>" ("since today" on
+  the day it was set up), the bar to the next badge, and three figures: pages revised, the longest streak and time in
+  Revisely. Pages revised counts every revision: each page of each day's revised pages, from a session, revising ahead
+  or the daily log, so a page revised on three days is three (twice in one day is one, as Activity shows it). The
+  longest streak is the longest run of days done by the streak's own rule (SESS-2), never shorter than the streak now.
+  There is no email under the name and no Premium row. Below: "Name and email" (the name, the email with how the
+  account signs in, and Delete account as a quiet link at its foot, still confirmed twice: ACCOUNT-1), then Sign out.
+  Settings' first row shows the picture, the name with its latest badge and "<n> pages revised".
+- **ACCOUNT-5.** (Revisely Dev.) Badges for pages revised: 10, 50, 100, 250, 500, 1,000, 2,500, 5,000, 10,000, 25,000,
+  50,000 and 100,000, two a tier, I then II: Bronze, Silver, Gold, Platinum, Diamond, Emerald, each tier its own shape
+  and material. The bar on Account runs from the latest badge to the next ("13 more for Bronze II"; before the first,
+  "Revise 10 pages for your first badge"), and a tap on it opens Badges: every badge, the day each was won, the rest in
+  grey with how many pages are left.
+- **ACCOUNT-6.** (Revisely Dev.) A badge won is shown as new once on this phone: on the session's end card, as a row
+  under the totals, once the end card comes into view, or else on Account the next time it opens, with a halo on the
+  badge and "New badge · <name>" under the bar. Badges an account had before this phone first read it aren't new.
+- **ACCOUNT-7.** (Revisely Dev.) Home's Today post shows the account's picture in its mark's place, with Premium's ring
+  when it has Premium and the latest badge at its lower corner; a tap on the picture opens Settings → Account.
+- **ACCOUNT-8.** (Revisely Dev.) The account's picture is its sign-in photo (Google's), or the first letter of its name
+  when there is none. A tap on the picture on Account opens Picture: "Choose a photo" and "Take a photo" (where the phone
+  has Revisely Dev's photo picker), "Use your Google photo" (a Google account whose picture is another) and "Remove
+  photo" (back to the first letter). A photo chosen is cropped square, kept in the account's own folder, which only the
+  account can open, and shown on Account, Settings' first row and Home at once; the picture it replaces, if it was one
+  of these, is deleted. A change that fails says so and leaves the picture as it was.
 - **ACCOUNT-2.** A sign-up or sign-in that fails (an address already registered, a wrong password, Google or Apple
   refused, no connection) leaves the sign-in screen as it was: the same mode, the name, the email and the password
   still typed, with the error under them. A password reset that fails keeps the email. While an attempt runs, it
@@ -403,6 +429,11 @@ current basic sounds". October 2026's version was removed for the voices it offe
 - **HOME-2.** (Revisely Dev) One quiet row under Today, "Today's journal", opens today's journal (Majd, Nov 23 2026: it is
   "a rly big piece of this app and it's almost hidden", "but i wanna avoid clutter on the home page"). It shows today's
   first note, one still waiting to be sent included, or "Add a note" when there is none.
+- **HOME-3.** Where today starts on Home's Today post ends with "Change", which opens Jump to directly (Majd, Nov 25
+  2026: "yes jump to should be option 3 the 'change' one"). There is no menu: Edit schedule is in Settings → Revision
+  (SET-1). Once today is done the word goes, as the › did, and a tap on the line still opens Jump to. Today's page numbers,
+  which only that menu showed ("pp. 542–551"), are gone from Home (Majd, Nov 26 2026: "yeah drop them"). (Before: a › that
+  opened a menu of Jump to… and Edit schedule, under today's exact pages.)
 
 ## Sheets and updates
 
@@ -1140,7 +1171,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   launch, so Pages by strength, Coverage and weakest-first plans see revision done elsewhere. They carry
   no rating: a page keeps the one its sessions gave it. Deleting the log takes them back. (Nov 7 2026: the
   pages were re-derived from sessions alone.)
-- **ACT-18.** Activity has two tabs, Overview and Insights. Overview's calendar shows a month or a week:
+- **ACT-18.** Activity has two tabs, Overview and Insights (in Revisely Dev one tab, ACT-35). Overview's calendar shows a month or a week:
   a chip beside its title ("Month ⌄") opens the two, and the choice is kept on the phone. Switching keeps
   the picked day (or else today) on screen. When the calendar shows another month or week than today's,
   Today, beside the arrows, brings back today's with today picked: its cell highlighted as a tapped day's
@@ -1162,10 +1193,29 @@ International", "The Clear Quran®") and in `lib/quranenc`.
 - **ACT-34.** (Revisely Dev) The picked day under Overview's calendar is one entry (Majd, Nov 23 2026: its rows "show up
   as if they're separate clicks + there's an Open button and they all do the same thing"; "i dont think we need to put
   journal for each entry"). Its date and one line for each thing that happened (Revised, Memorized, Read, Recited), the
-  note last when there is one, are one button that opens the day. With no note it offers Add a note, which opens that day's
+  note last when there is one (none on the one Activity tab, ACT-35), are one button that opens the day. With no note it offers Add a note, which opens that day's
   Note sheet; a day with nothing says so. The calendar and the rest of Overview don't change. A spot test is its own kind
   of entry, apart from Recited (Majd, Nov 23 2026: "its own thing like recited or memorized"): its own line here and its own
   block in the day, each saying Finished or Stopped early. No line ever shrinks or lists its places: a few words and how much.
+- **ACT-35.** (Revisely Dev) Activity is one tab, with no Overview | Insights switch (Majd, Nov 25 2026: "the most important
+  things that should be shown as default that isn't overstimulating is the calendar view as well as today's journal card
+  because those are essentially the basics, the rest is just nice to know stuff"; he picked version A, then on the v2 boards,
+  Nov 26 2026, "T1 and C2", after "i love the calendar but ... it's 'too much' in my face"). On top, this week: "This week" and
+  "Month ›", one grey line (the days revised so far of the days so far, and the time read), then its seven days in one line,
+  each with the calendar's ring and marks; a tap picks a day. "Month ›" opens the full calendar on a page of its own (ACT-18:
+  Week | Month, Today, ‹ ›, its totals and key), with the picked day there too. Under the week, the picked day's entry
+  (ACT-34) in C2's form: its ring and "N of M revised", where and how long under it, then the other kinds in one grey line
+  with the calendar's own marks (pages memorized, time read, takes, a spot test), no chip backgrounds; no note ("the note
+  shouldn't be shown on the journal day card -- it adds to the overstimulation") and no Add a note: the day has both. Under
+  them, "Your revision" with the range chip (ACT-22), then the sections in ACT-29's order as quiet rows: the name, one grey
+  line, the figure at the end and ›, the whole row one button that opens the section on a page of its own: its name and the
+  range chip in the top bar (one range: a change there is the list's too), then the section as Insights drew it, starting at
+  its figure with no title or subtitle of its own (board A4); its own controls (Ask, Days) stay. A section with nothing
+  to say yet has no row: Gaps until a gap can be measured, Weak spots until a page is rated weak (none without Smart
+  Tracking), Recitation until a take, Memorization until a page was memorized in the last twelve months, Pace until ten timed
+  items. While one the account can have is missing, a grey line says the others show once they have something to say. Edit
+  sections is the list's last row (Insights' sections; the week and the day stay). A section's Consistency figure or gap
+  opens the full calendar's page there. Revo's button is on a section's page too, opening as Insights' (Weak spots' as its Ask).
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
   strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
   stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,
@@ -1184,7 +1234,8 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   reader open the reader there, once the sheet has gone; a stale juz offers Plan it for tomorrow first.
   (Majd, Nov 7 2026: "not being able to click on anything in coverage"; mocks i5 and i6.)
 - **ACT-22.** Insights read one range for the whole tab: 7 days, 30 days (at first), 3 months or All time, from a
-  chip at the end of the Overview | Insights row ("30 days ⌄", on Insights only) that opens the four (All time
+  chip at the end of the Overview | Insights row ("30 days ⌄", on Insights only; in Revisely Dev on the sections' list and each
+  section's page, ACT-35) that opens the four (All time
   names its start, "Since 9 September"); the choice is kept on the phone. Coverage's figure, Consistency's days and hours, Weak spots' counts, Memorization's
   "+N" and Pace (against the same length before it) follow it, and so does the juz sheet's "times"; the juz
   tiles always show where each juz stands now. A range longer than the account counts from its first day,
@@ -1277,7 +1328,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   (after 10 s at most), on a transparent ground as Home's. (Majd, Nov 9 2026: "shouldnt this update whenever
   a user scrolls down to refresh the page instead of having to close out the app?")
 - **ACT-29.** Activity's sections are the user's to arrange (every account from the mistake detection release): Edit sections (an icon at the end
-  of the tabs row) opens the tab's sections, each with a switch to show or hide it; holding a section (350 ms,
+  of the tabs row; in Revisely Dev the sections' list's last row, ACT-35) opens the tab's sections, each with a switch to show or hide it; holding a section (350 ms,
   still) lifts it to drag to another place, and VoiceOver has Move up and Move down. Every change shows at once.
   Overview's month header stays on top; under it the month's totals, the calendar (always shown), its key and the
   picked day's summary. Insights: Coverage, Consistency, Gaps (where it is open, ACT-28), Weak spots (its Smart
@@ -1423,7 +1474,7 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 
 - **REVO-25.** Revo's button is a 44pt disc (the smallest touch target, with room around it to tap), in a bottom corner
   (REVO-41), 14 above the tab bar and the mini player. It shows on Home, Activity (Overview and Insights), a day in Activity, See
-  all, Pages by strength and Edit schedule, and nowhere else. On Edit schedule, which has no tab bar, it sits 14 above
+  all, Pages by strength, a section's own page and the full calendar (ACT-35), and Edit schedule, and nowhere else. On Edit schedule, which has no tab bar, it sits 14 above
   the bottom edge (Majd, Nov 25 2026, of Revo's button there: "yes the revo there is nice"); opened there, it starts as
   from Home. There is no Revo on the Read tab (its list or the reader) or in a
   revision session, and their help sheets offer no "Ask Revo" (Majd, Nov 8 2026: "no revo in the revision
@@ -1571,6 +1622,23 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   isnt working"). The field ends in send, grey until there is a question. To speak a question, the keyboard's own mic
   key dictates, on iPhone and Android.
 
+- **REVO-43.** (Revisely Dev) Revo helps make or change the schedule, and never changes it itself (Majd, Nov 25 2026:
+  "adding revo to edit my schedule page and making it so that revo can help the user make or edit their schedule"; of the
+  orchestrator's description of the starters and the draft, "all ur picks ... are fine"). Opened from Edit schedule, its
+  first line is the schedule in Edit schedule's words ("10 pages a day: every page comes round every 11 days"), with four
+  starters: "Make it lighter", "Finish a round sooner", "Rest one day a week" and "Start a new plan". A schedule Revo
+  proposes is a card, "A new schedule": a day, a round and rest days, as they are and with the draft (struck through,
+  then the new), worked out on the phone from the account's pages whatever Revo wrote. Its days are built as Create new
+  plan builds them (Balanced, or By Juz), from where today starts. Rest days are weekdays (the board: "6 pages a day with
+  Fridays off"; pages a day only, one to three): the round is then whole weeks counted from today, the pages spread
+  evenly over the other days, so a plan saved today keeps those weekdays off (a missed day that Keep daily amount carries
+  can still land on one, as in any plan).
+  "Check in Edit schedule" opens Edit schedule filled in, marked "Revo's schedule, not saved yet": only Save keeps it,
+  and Back leaves the schedule as it was (with Discard changes?, as any edit). Not now hides the card. The store app
+  never gets such a card, and its questions go with exactly the reply format they went with before the draft. Drafting
+  never costs an answer: if the model's service refuses Revisely Dev's reply format (it did, Nov 26 2026: every Dev
+  question came back "Revo couldn't answer that"), Revo asks again with the store app's and answers, with no draft.
+
 ## Memorizing
 
 - **MEM-1.** What is memorized is kept by the ayah (most people memorize ayahs, not pages: Majd, Nov 7
@@ -1693,11 +1761,11 @@ shows up once and they must go through it and complete it … just the main stuf
   numbers when it comes to revising or memorizing ... it should just be the page"). One page is "Maryam, 5th page" (its
   first "1st page", its last "last page"; a surah of a page or less, its name alone). A run is "Maryam, 3rd to 5th page",
   "Maryam, first 3 pages", "Maryam, last 3 pages", and at a juz's edge "Juz 2, first 5 pages". Across surahs it is the
-  names, "Maryam to Ta-Ha"; only the › sheet's header gives the page at each end. Part of a page reads "Maryam, 3rd page ·
+  names, "Maryam to Ta-Ha". Part of a page reads "Maryam, 3rd page ·
   start" (or middle, or end). A page holding two surahs counts for both, and alone is named by the one it opens with, else
   the one that fills more of it. A place to start is the surah or juz the page opens, else its page: "Starts at Al-Mujadila", "Tomorrow starts at
   Juz 2", "Continue at Al-Hashr, 3rd page". Amounts are fine ("20 pages"). The mushaf's page numbers stay a quiet detail
-  (the › sheet's "… · pp. 542–561"), inside the reader and the session, and where the user chooses by page (Jump to's Page
+  inside the reader and the session, and where the user chooses by page (Jump to's Page
   tab, From and To). Ayah numbers stay only where a verse is cited or played: a held verse, search results, Audio Options
   and "Play from", and for now the Memorized sheet's picker, which is being rebuilt.
 - **NAME-2.** A place to start, a weak spot or a page chosen by number also shows how its page begins: its first words as
@@ -1726,14 +1794,34 @@ shows up once and they must go through it and complete it … just the main stuf
 
 ## The Ramadan theme (Revisely Dev)
 
-- **THEME-1.** Settings → Appearance → Ramadan theme (on until turned off, kept on that phone, not the account) dresses
+- **THEME-1.** Settings → Appearance → Ramadan theme (kept on that phone, not the account; when it shows: THEME-2) dresses
   the app for Ramadan and changes nothing it does (Majd, Nov 21 2026): on Home, light falling softly over the glow,
   lanterns hanging in the top bar's empty side (gone while the timer chip shows there) and a crescent by the greeting;
   string lights along the tab bar. None of it is drawn over the mushaf page, a revision session's page or a Recite take,
-  none of it takes a touch or is read by VoiceOver, and with Reduce Motion it stays still. The store app has no switch
-  and never shows it (`lib/ramadanTheme`, `components/ramadan`). The Settings row is just its name and the switch. It is
-  on by default (Majd, Nov 22 2026: "yes ramadan theme as default for dev too"), and at the next release
-  (`RAMADAN_THEME_RELEASED`, Majd, Nov 21 2026) every app has it, the same way.
+  none of it takes a touch or is read by VoiceOver, and with Reduce Motion it stays still. The store app has no row and
+  never shows it (`lib/ramadanTheme`, `components/ramadan`). At the next release (`RAMADAN_THEME_RELEASED`, Majd, Nov 21
+  2026) every app has it, the same way.
+- **THEME-2.** (Revisely Dev) The Ramadan theme row offers Auto, On and Off (Majd, Nov 26 2026, his pick of the v2 mocks).
+  - Auto shows the theme from two weeks before 1 Ramadan through the third day of Eid. Under the row it says when, for
+    example "On from 25 January to 11 March".
+  - On shows it every day, and Off never.
+  - A phone that hasn't chosen is On in Revisely Dev (Majd, Nov 22 2026: "yes ramadan theme as default for dev too"), and
+    Auto in every app once the theme is released.
+  - A choice made before Auto existed is kept: on is On, off is Off.
+  - The dates are the first day of fasting and Eid al-Fitr. They come from config/app's `ramadan`, read once a launch
+    (set with `set-app-config.js --ramadan`), so they can be corrected after the moon sighting without an update. The
+    phone keeps the last good dates it read, and ignores two days that aren't 29 or 30 apart.
+  - Until a read answers, the Umm al-Qura calendar's expected dates stand: 8 February and 9 March 2027, the same as the
+    site.
+  - Revisely Dev only: Settings → Testing → Ramadan dates puts today at any point in the month (75 or 10 days before,
+    day 1, 12, 23 or 29, Eid, after Eid). It sets the dates around today, so anything counted from the phone's own days
+    still counts them, and the choice is kept on the phone.
+- **THEME-3.** (Revisely Dev) While the theme shows, Settings has a crescent beside its title, and the Appearance row
+  reads "Light · Indigo · Ramadan" (the theme, the accent, then Ramadan).
+- **THEME-4.** (Revisely Dev) While the theme shows, every sheet and menu (`v2/Sheet`, `v2/ActionSheet`) has string
+  lights along its top edge, inside its rounded corners, as the tab bar does (Majd, Nov 26 2026: "sheets i want option
+  B"). The reader and a revision session draw none of it, nor does a sheet opened over them, so the mushaf page and a
+  Recite take stay plain. The lights are drawn the same way as the tab bar's (THEME-1).
 
 ## Recite on the phone (Revisely Dev)
 
@@ -1822,7 +1910,9 @@ of this deal. those users can have premium for life".
   script. Early access itself has no end date yet. Marking mistakes' intro says Premium is free for everyone during
   early access, which has no end date yet, will be paid after it, and is kept for life, and its Get Premium gives it at
   once; "Can't afford it? Apply for support" is hidden. Settings' Account page's Premium row says the same (a take's
-  summary doesn't: Majd, Nov 21 2026). A grant once given is never changed or taken away, after early access too; once early access ends, new
+  summary doesn't: Majd, Nov 21 2026). With the Account page's new look (Revisely Dev, ACCOUNT-4; Majd, Nov 26 2026:
+  "feels like theres no need to write "free in early access""), neither the intro nor Settings says it: the intro keeps
+  Get Premium, and Premium shows as the picture's ring and the Premium pill. A grant once given is never changed or taken away, after early access too; once early access ends, new
   accounts don't get it and the intro's Get Premium no longer gives it. The words say early access and for life, never
   trial, a price or a date.
 

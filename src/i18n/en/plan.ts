@@ -102,6 +102,8 @@ export const plan = {
     everyPage_other: 'Every page comes round every {{count}} days',
     /** MEM-6: said before Save when an edit would turn the automatic schedule into a custom plan. */
     customNote: 'Saving makes this your own plan: pages you memorize later won’t join it by themselves.',
+    /** Above a schedule Revo drafted (REVO-43), until it is saved. */
+    revoDraft: 'Revo’s schedule, not saved yet. Nothing changes until you tap Save.',
     yourDays: 'Your days',
     dayFooter: 'Tap a day to change what’s on it.',
     amountCustomFooter: 'Your plan’s days stay as they are. To use this amount, choose “Create new plan”.',

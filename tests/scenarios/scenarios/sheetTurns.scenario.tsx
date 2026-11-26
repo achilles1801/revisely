@@ -33,7 +33,7 @@ async function account(): Promise<Phone> {
 }
 
 describe('one sheet at a time', () => {
-  it('[SHEET-1] [UPD-1] [JUMP-1] an update ready while the Today menu is up waits for Jump to; Home takes taps after the jump', async () => {
+  it('[SHEET-1] [UPD-1] [JUMP-1] [HOME-3] an update ready while Jump to is up waits for it to go; Home takes taps after the jump', async () => {
     const phone = await account();
     setNow('2026-11-04 20:00');
     const app = await phone.open(homeStackLive);
@@ -49,21 +49,18 @@ describe('one sheet at a time', () => {
     await app.untilSynced();
     expect(plain(home.title())).toMatch(/^Done/);
 
-    // The Today menu, and a preview update downloads while it is up.
+    // Today's line opens Jump to directly (HOME-3), and a preview update downloads while it is up.
     await home.tap('today-summary');
-    await app.until(() => shows(app, 'today-menu'), 'the Today menu');
+    await app.until(() => shows(app, 'jump-go'), 'the Jump to… sheet');
+    expect(shows(app, 'today-menu')).toBe(false);
     const ota = app.mods.require<Ota>('src/lib/updates/ota');
     await app.act(async () => ota.notePendingUpdate('preview-update'));
-    // Longer than the update sheet's own delay (1.2 s): it doesn't open over the menu.
+    // Longer than the update sheet's own delay (1.2 s): it doesn't open over Jump to.
     await app.idle(1600);
     expect(refused(app)).toEqual([]);
     expect(shows(app, 'update-ready-sheet')).toBe(false);
 
     // Jump to a later juz.
-    await home.tap('sheet-action-jump');
-    await app.until(() => shows(app, 'jump-go'), 'the Jump to… sheet');
-    await app.idle(1600);
-    expect(shows(app, 'update-ready-sheet')).toBe(false);
     await home.tap('jump-juz-30');
     await home.tap('jump-go');
     await app.untilSynced();

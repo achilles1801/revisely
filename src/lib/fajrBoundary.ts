@@ -29,6 +29,11 @@ export function getFajrTimeFor(date: Date, user: User): Date | null {
   }).fajr;
 }
 
+/** The phone's calendar day at `date`, as a day key (no Fajr boundary). */
+export function localDay(date: Date): string {
+  return formatLocalDay(date);
+}
+
 function formatLocalDay(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');

@@ -1,4 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { accountDesignEnabled } from '../../lib/release/accountDesign';
+import { useAccountJourney } from '../../lib/accountJourney';
+import { latestMilestone } from '../../lib/badges';
+import { useBadgeMoment } from '../../lib/badgeSeen';
 import {
   AccessibilityInfo,
   AppState,
@@ -67,6 +71,7 @@ import { pagesToUnrevise, removeRevisedPages, removeRoundPages } from '../../lib
 import { dismissPresentedRevisionReminders } from '../../lib/reminders/sync';
 import { t, formatNumber } from '../../i18n';
 import { backIcon } from '../../i18n/direction';
+import { RamadanQuiet } from '../../components/ramadan/quiet';
 
 const NO_PAGES: number[] = [];
 
@@ -82,7 +87,16 @@ const FOOTER_HEIGHT = CAPSULE_HEIGHT + spacing.sm;
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActiveRevision'>;
 
+/** Wrapped so the Ramadan theme never dresses its page or the sheets over it (THEME-1, THEME-4). */
 export default function ActiveRevisionScreen() {
+  return (
+    <RamadanQuiet>
+      <ActiveRevisionScreenBody />
+    </RamadanQuiet>
+  );
+}
+
+function ActiveRevisionScreenBody() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProp<HomeStackParamList, 'ActiveRevision'>>();
   const { user, pages, logs, updatePages, addLog, updateLog, loadData, error } = useApp();
@@ -581,6 +595,12 @@ export default function ActiveRevisionScreen() {
   // the session saved at once. A jump there, or a page already done, marks
   // nothing (so coming back to it later doesn't celebrate again).
   const [celebrate, setCelebrate] = useState(0);
+  // A badge this session wins (ACCOUNT-6; the Account page's new look): kept from the moment it is won, shown on the end
+  // card, and marked seen once the end card has come into view (it is drawn before the session reaches it).
+  const accountV2 = accountDesignEnabled();
+  const journey = useAccountJourney({ enabled: accountV2 });
+  const latestBadge = accountV2 && journey ? latestMilestone(journey.pagesRevised) : undefined;
+  const badgeMoment = useBadgeMoment(accountV2 ? user?.id : null, latestBadge, celebrate > 0);
   const handleReachEnd = useCallback(
     (lastPage: number, bySwipe: boolean) => {
       // The header names the page just left, not where the session would resume.
@@ -962,6 +982,7 @@ export default function ActiveRevisionScreen() {
           onTapPoint={recite.pager.onTapPoint}
           endCard={
             <SessionEndCard
+              newBadge={badgeMoment}
               total={lastSectionPages.length}
               done={lastSectionPages.filter((p) => completedPages.has(p)).length}
               celebrate={celebrate}

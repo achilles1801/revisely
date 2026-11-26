@@ -11,7 +11,7 @@ import { createHash } from 'crypto';
 import { CoachCallError, CoachReply, MessagesRequest } from '../coach/call';
 import { CallLedger, MONTHLY_CAP_USD, ledgerOf } from '../coach/handler';
 import { REVO_MODEL, costUsd, worstCaseCostUsd } from '../coach/pricing';
-import { REVO_HISTORY, REVO_MAX_TOKENS, buildAskRequest, buildReviewRequest } from './prompt';
+import { REVO_HISTORY, REVO_MAX_TOKENS, buildAskRequest, buildReviewRequest, withStoreSchema } from './prompt';
 import { RevoRelease, revoAllowed } from './release';
 import { parseReply } from './reply';
 import {
@@ -148,6 +148,10 @@ export interface RevoLog {
     cacheRead?: number;
     cacheWrite?: number;
     code?: string;
+    /** The API's own error message, when a call failed with one. */
+    detail?: string;
+    /** 'store-schema': a Revisely Dev question asked again with the store's schema after the API refused Dev's. */
+    retry?: string;
     deleted?: number;
     /** Why the model stopped, when it wasn't the end of its turn (e.g. max_tokens: cut off). */
     stop?: string;
@@ -269,7 +273,8 @@ async function metered(
   deps: RevoDeps,
   request: MessagesRequest,
   event: string,
-): Promise<{ reply: CoachReply; ledger: CallLedger; cost: number } | 'capped' | 'resting'> {
+  fallback: MessagesRequest | null = null,
+): Promise<{ reply: CoachReply; ledger: CallLedger; cost: number; fellBack?: true } | 'capped' | 'resting'> {
   const today = utcDay(deps.now());
   const month = today.slice(0, 7);
   const reserved = worstCaseCostUsd(JSON.stringify(request).length, REVO_MAX_TOKENS, REVO_MODEL);
@@ -292,7 +297,15 @@ async function metered(
   } catch (err) {
     await deps.store.settleSpend(month, reserved, 0, NO_USAGE, today);
     const code = err instanceof CoachCallError ? err.status : null;
-    deps.log({ event: 'failed', code: code == null ? 'network' : String(code) });
+    const detail = err instanceof CoachCallError ? err.detail : undefined;
+    // Revisely Dev's schema refused (Nov 26 2026: every Dev question failed so once the draft was in it). A refused
+    // request costs nothing; once more with the store's schema, which answers without a draft.
+    const retry = fallback !== null && code === 400;
+    deps.log({ event: 'failed', code: code == null ? 'network' : String(code), ...(detail ? { detail } : {}), ...(retry ? { retry: 'store-schema' } : {}) });
+    if (retry) {
+      const again = await metered(deps, fallback, event);
+      return typeof again === 'string' ? again : { ...again, fellBack: true };
+    }
     throw callFailure(err);
   }
   const cost = costUsd(reply.usage, REVO_MODEL);
@@ -403,7 +416,7 @@ export async function handleRevoAsk(auth: { uid: string } | undefined, data: unk
   const request = buildAskRequest({ day, question, context, attached, memory: memory.map((m) => m.text), history, chat, smartTracking, tester });
   let result: Awaited<ReturnType<typeof metered>>;
   try {
-    result = await metered(deps, request, 'answer');
+    result = await metered(deps, request, 'answer', withStoreSchema(request));
   } catch (err) {
     await deps.store.releaseQuestion(uid, day);
     throw err;
@@ -418,7 +431,8 @@ export async function handleRevoAsk(auth: { uid: string } | undefined, data: unk
   }
 
   const allowed = new Set([...contextPages(context), ...attached.flatMap(attachmentPages), ...history.flatMap((m) => attachmentsOf(m).flatMap(attachmentPages))]);
-  const parts = parseReply(result.reply.text, allowed, { firstTurn: !chat, smartTracking });
+  // A drafted schedule only for Revisely Dev, which can show it (REVO-43), and only with Dev's schema.
+  const parts = parseReply(result.reply.text, allowed, { firstTurn: !chat, smartTracking, drafts: context.app === 'dev' && !result.fellBack });
   if (!parts) {
     await deps.store.releaseQuestion(uid, day);
     deps.log({ event: 'failed', code: 'no-text' });

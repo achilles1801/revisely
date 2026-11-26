@@ -1,4 +1,5 @@
 // The reader's one mic (Revisely Dev): Record, Recite, Check; the recite bar; marks and the hidden view.
+import { setAccountDesignEnabledForTests } from '../../../lib/release/accountDesign';
 import React from 'react';
 import { AccessibilityInfo, Alert, Modal, StatusBar, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
@@ -1805,6 +1806,8 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
   });
 
   it('[PREM-1] in early access the intro says Premium is free now, with no end date yet, and kept for life, hides Apply for support, and Get Premium gives it', async () => {
+    // The store app's look: the Account page's new look drops these words (below).
+    setAccountDesignEnabledForTests(false);
     mockPremium.has = false;
     mockEarly.on = true;
     const alert = jest.spyOn(Alert, 'alert');
@@ -1823,6 +1826,26 @@ describe('Check: a mark’s card, the summary, and Check’s page', () => {
     expect(alert).not.toHaveBeenCalledWith('Premium in Revisely Dev', expect.anything(), expect.anything());
     expect(screen.queryByTestId('check-intro')).toBeNull();
     alert.mockRestore();
+    setAccountDesignEnabledForTests(undefined);
+    mockEarly.on = false;
+  });
+
+  it('[PREM-1] with the Account page’s new look (Revisely Dev) the intro says nothing about early access, still hides Apply for support, and Get Premium still gives it', async () => {
+    mockPremium.has = false;
+    mockEarly.on = true;
+    setReciteCheckSettings('u1', { noticeSeen: true });
+    await open();
+    fireEvent(screen.getByTestId('recite-mic'), 'longPress');
+    fireEvent.press(screen.getByTestId('recite-mistakes'));
+    await flush();
+    expect(screen.getByTestId('check-intro')).toBeTruthy();
+    expect(screen.queryByTestId('check-intro-early')).toBeNull();
+    expect(screen.queryByText(/early access/i)).toBeNull();
+    expect(screen.queryByText('Can’t afford it? Apply for support')).toBeNull();
+    const { claimEarlyAccess } = jest.requireMock('../../../lib/earlyAccess');
+    await act(async () => fireEvent.press(screen.getByTestId('check-intro-get')));
+    expect(claimEarlyAccess).toHaveBeenCalled();
+    mockEarly.on = false;
   });
 
   it('Apply for support opens the program’s page with the account’s one-time link', async () => {
@@ -2918,14 +2941,15 @@ describe('what friends asked, Nov 25 2026', () => {
     // Kept on the account at once, so it's never shown again, even if the app closes now.
     const { parseReciteCheckSettings } = jest.requireActual('../../../lib/reciteCheck/settings');
     await settle(async () => expect(parseReciteCheckSettings(await AsyncStorage.getItem('@revisely_recite_check:v1:u1')).amberExplained).toBe(true));
-    // About 6 seconds, then the words again.
-    await settle(() => expect(screen.queryByTestId('recite-note')).toBeNull(), 9000);
+    // About 6 seconds (AMBER_NOTE_MS, a real timer), then the words again. The wait leaves room for a loaded CI runner,
+    // where this file runs about five times slower than on a laptop (it failed there with 9 s, Nov 26 2026).
+    await settle(() => expect(screen.queryByTestId('recite-note')).toBeNull(), 20000);
     await event({ type: 'at', w: A23 + 9 });
     expect(screen.getByTestId('recite-words')).toBeTruthy();
     await amber('h2', A23 + 8);
     await flush();
     expect(screen.queryByTestId('recite-note')).toBeNull();
-  }, 20000);
+  }, 40000);
 
   const finishedTake = async () => {
     await startTake('check');

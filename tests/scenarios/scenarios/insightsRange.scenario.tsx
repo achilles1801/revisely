@@ -4,6 +4,7 @@ import React from 'react';
 import { Modal } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { resetInsightsRangeForTests } from '../../../src/components/activity/InsightsRangeChip';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ActivityBlocksViews } from '../../../src/components/activity/ActivityBlocksViews';
 import * as firestoreService from '../../../src/services/firestoreService';
@@ -71,6 +72,8 @@ async function choose(label: string) {
 describe('Insights’ range', () => {
   beforeEach(async () => {
     await AsyncStorage.clear();
+    // The range is one store for all of Activity (InsightsRangeChip): a fresh launch for each test.
+    resetInsightsRangeForTests();
     (firestoreService.getActivityItemsBetween as jest.Mock).mockClear();
   });
   // A sheet's closing animation ends on a timer: let it end while the test's world still stands.

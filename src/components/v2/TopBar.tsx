@@ -75,20 +75,20 @@ export function TopBar({
         {onBack ? <IconButton icon={backIcon()} onPress={onBack} label={t('common.back')} size={26} testID="back" /> : left}
       </View>
       <View style={styles.center}>
-        {center ??
-          (title ? (
-            <Text
-              style={[typeV2.barTitle, { color: palette.text }]}
-              numberOfLines={1}
-              accessibilityRole="header"
-              maxFontSizeMultiplier={1.4}
-            >
-              {title}
-            </Text>
-          ) : null)}
+        {center ?? (title ? <BarTitle title={title} /> : null)}
       </View>
       <View style={[styles.side, styles.right, { width: sideWidth }]}>{right}</View>
     </View>
+  );
+}
+
+/** The top bar's title, for a `center` that adds to it (Settings' crescent in Ramadan, THEME-3). */
+export function BarTitle({ title }: { title: string }) {
+  const { palette } = useTheme();
+  return (
+    <Text style={[typeV2.barTitle, { color: palette.text }]} numberOfLines={1} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
+      {title}
+    </Text>
   );
 }
 

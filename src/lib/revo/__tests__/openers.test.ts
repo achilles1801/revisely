@@ -260,12 +260,17 @@ describe('where Revo is opened from (REVO-38) and where its button shows (REVO-2
     expect(revoPlaceOf({ name: 'ActivityDay', params: { date: '2026-11-01' } })).toEqual({ kind: 'day', day: '2026-11-01' });
     expect(revoPlaceOf({ name: 'ActivityDay', params: { date: 'soon' } })).toEqual({ kind: 'home' });
     expect(revoPlaceOf({ name: 'PagesByStrength' })).toEqual({ kind: 'strength' });
+    // [ACT-35] A section's own page opens as Insights; Weak spots' as its Ask.
+    expect(revoPlaceOf({ name: 'ActivitySection', params: { section: 'coverage' } })).toEqual({ kind: 'insights' });
+    expect(revoPlaceOf({ name: 'ActivitySection', params: { section: 'weak' } })).toEqual({ kind: 'weakSpots' });
+    // Its full calendar opens with the month's line.
+    expect(revoPlaceOf({ name: 'ActivityMonth' })).toEqual({ kind: 'overview' });
     for (const name of ['Dashboard', 'ActivityAll', 'Settings']) expect(revoPlaceOf({ name })).toEqual({ kind: 'home' });
     expect(revoPlaceOf(null)).toEqual({ kind: 'home' });
   });
 
   it('[REVO-25] the button shows on Home and Activity’s screens and Edit schedule, never on the Read tab, in a session, another editor or Settings', () => {
-    expect([...REVO_BUTTON_ROUTES].sort()).toEqual(['Activity', 'ActivityAll', 'ActivityDay', 'Dashboard', 'PagesByStrength', 'PlanEdit']);
+    expect([...REVO_BUTTON_ROUTES].sort()).toEqual(['Activity', 'ActivityAll', 'ActivityDay', 'ActivityMonth', 'ActivitySection', 'Dashboard', 'PagesByStrength', 'PlanEdit']);
     // Edit schedule has no tab bar: the button sits just above the bottom edge there, and only there.
     expect([...REVO_BUTTON_NO_TAB_BAR]).toEqual(['PlanEdit']);
     // Opened there, Revo starts as from Home.
@@ -273,6 +278,14 @@ describe('where Revo is opened from (REVO-38) and where its button shows (REVO-2
     for (const name of ['ReadIndex', 'QuranReader', 'ActiveRevision', 'PlanDayEdit', 'Memorization', 'Settings', 'JournalEntry']) {
       expect(REVO_BUTTON_ROUTES.has(name)).toBe(false);
     }
+  });
+});
+
+describe('Revo opened from Edit schedule (REVO-43)', () => {
+  it('[REVO-43] the schedule in Edit schedule’s words, an offer to draft it, and four starters', () => {
+    const { text, chips } = opened({ kind: 'schedule' });
+    expect(text).toBe('Assalamu alaikum, Majd. Your schedule is 2 pages a day: every page comes round every 5 days. Tell me what you’d like to change, and I’ll draft it for you to check.');
+    expect(chips).toEqual(['Make it lighter', 'Finish a round sooner', 'Rest one day a week', 'Start a new plan']);
   });
 });
 

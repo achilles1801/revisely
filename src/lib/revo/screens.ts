@@ -4,6 +4,7 @@
 import { getJuzRange, getSurah } from '../quranData';
 import { requestPrayerSheet } from '../widgets/links';
 import { REVO_SCREENS, REVO_SETTINGS_SECTIONS, type RevoAction, type RevoScreen } from './types';
+import { validDraft } from './scheduleDraft';
 import { t } from '../../i18n';
 
 type OpenScreen = Extract<RevoAction, { kind: 'openScreen' }>;
@@ -18,6 +19,7 @@ export const screenButton = (screen: RevoScreen): string => t(`revo.screens.${sc
 export function knownAction(a: RevoAction | null | undefined): a is RevoAction {
   if (!a) return false;
   if (a.kind === 'reviseFirst' || a.kind === 'openPage' || a.kind === 'startRevision') return true;
+  if (a.kind === 'draftSchedule') return validDraft(a);
   if (a.kind !== 'openScreen') return false;
   if (!(REVO_SCREENS as readonly string[]).includes(a.screen)) return false;
   return a.section == null || (REVO_SETTINGS_SECTIONS as readonly string[]).includes(a.section);

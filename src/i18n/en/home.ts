@@ -3,15 +3,16 @@ export const home = {
   today: {
     memorized: '{{percent}} of the Quran memorized',
     streak: 'Today · {{days}}-day streak',
-    jump: 'Jump to…',
-    jumpSubtitle: 'Start today at another juz, surah or page',
-    editSchedule: 'Edit schedule',
+    /** After where today starts (HOME-3): opens Jump to. */
+    change: 'Change',
+    /** Home's picture (ACCOUNT-7): opens Account. */
+    openAccount: 'Your account',
     adding: 'Adding…',
     addToToday: 'Add to today',
     /** VoiceOver: the catch-up line, then the button. */
     addToTodayLabel: '{{line}}. Add to today',
     editMemorizedLabel: '{{line}}. Edit memorized pages',
-    summaryHint: 'Jump to another start, or edit the schedule',
+    changeHint: 'Opens Jump to, to start today somewhere else',
   },
   jump: {
     title: 'Jump to',

@@ -34,7 +34,11 @@ export function bulbBrightness(clock: number, index: number): number {
   return 0.55 + 0.45 * (0.5 + 0.5 * Math.sin((clock * speed + phase) * Math.PI * 2));
 }
 
-export function StringLights() {
+/**
+ * `inset`: room left at each end (a sheet's rounded corners), so the wire starts and ends on the straight edge.
+ * `testID`: the tab bar's are ramadan-lights, a sheet's ramadan-sheet-lights (THEME-4).
+ */
+export function StringLights({ inset = 0, testID = 'ramadan-lights' }: { inset?: number; testID?: string } = {}) {
   const { isDark, palette } = useTheme();
   const tokens = ramadanV2(isDark, palette.accent);
   const reduceMotion = useReduceMotion();
@@ -60,12 +64,12 @@ export function StringLights() {
 
   return (
     <View
-      style={styles.layer}
+      style={[styles.layer, inset ? { left: inset, right: inset } : null]}
       pointerEvents="none"
       onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      testID="ramadan-lights"
+      testID={testID}
     >
       {width > 0 ? (
         <>

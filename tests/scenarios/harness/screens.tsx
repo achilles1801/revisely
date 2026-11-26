@@ -54,6 +54,10 @@ export function activityStack(mods: Booted): ReactElement {
   return homeStackWith(mods, {
     Activity: mods.require<any>('src/screens/activity/ActivityScreen').default,
     LastRevised: mods.require<any>('src/screens/activity/LastRevisedScreen').default,
+    // A section's own page on the one Activity tab (ACT-35).
+    ActivitySection: mods.require<any>('src/screens/activity/ActivitySectionScreen').default,
+    // Its full calendar, from "Month ›" over this week (ACT-35).
+    ActivityMonth: mods.require<any>('src/screens/activity/ActivityMonthScreen').default,
   });
 }
 
@@ -97,7 +101,7 @@ function homeStackWith(mods: Booted, real: Record<string, unknown>, appRef = fal
       h(Stack.Screen, { name: 'ActiveRevision', component: Session }),
       h(Stack.Screen, { name: 'Memorization', component: Manager }),
       h(Stack.Screen, { name: 'ActivityDay', component: ActivityDayScreen }),
-      ...['Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'Insights', 'QuranReader', 'LastRevised'].map(
+      ...['Settings', 'PlanEdit', 'PlanDayEdit', 'Activity', 'ActivityAll', 'Insights', 'QuranReader', 'LastRevised', 'ActivitySection', 'ActivityMonth'].map(
         (name) => h(Stack.Screen, { key: name, name, component: real[name] ?? Elsewhere }),
       ),
     ),
@@ -220,8 +224,10 @@ export class Home {
     return this.text('today-post') ?? '';
   }
 
+  /** Where today starts, without the "Change" after it (HOME-3: it opens Jump to). */
   title(): string | null {
-    return this.text('today-title');
+    const text = this.text('today-title');
+    return text == null ? null : text.replace(/\s*Change$/, '');
   }
 
   detail(): string | null {
@@ -304,12 +310,11 @@ export class Home {
   }
 
   /**
-   * Jump to…: the Today menu's action, then a row of the sheet (`rowTestID`, e.g.
+   * Jump to: today's line ("Change", HOME-3), then a row of the sheet (`rowTestID`, e.g.
    * "jump-juz-28"), then "Start today at …".
    */
   async jumpTo(rowTestID: string): Promise<void> {
     await this.tap('today-summary');
-    await this.tap('sheet-action-jump');
     await this.app.until(() => this.app.screen.queryByTestId('jump-go') != null, 'the Jump to… sheet');
     await this.tap(rowTestID);
     await this.tap('jump-go');

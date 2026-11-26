@@ -20,7 +20,7 @@ import { AppInfo } from '../../components/settings/AppInfo';
 import { useDesign } from '../../design/DesignContext';
 import { ACCENT_LABELS, layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { AccentSetting } from '../../components/settings/AccentPicker';
-import { TopBar } from '../../components/v2/TopBar';
+import { BarTitle, TopBar } from '../../components/v2/TopBar';
 import { Mark } from '../../components/v2/Mark';
 import { PillButton } from '../../components/v2/PillButton';
 import { Tap } from '../../components/v2/Tap';
@@ -99,6 +99,16 @@ import { releaseSync } from '../../lib/offline/sync';
 import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { premiumErrorText, setDevPremium, usePremium } from '../../lib/premium';
 import { earlyAccessLine, useEarlyAccess } from '../../lib/earlyAccess';
+import { accountDesignEnabled } from '../../lib/release/accountDesign';
+import { useAccountJourney } from '../../lib/accountJourney';
+import { useBadgeMoment } from '../../lib/badgeSeen';
+import { badgeName, latestMilestone, type Milestone } from '../../lib/badges';
+import { AccountHeader } from '../../components/account/AccountHeader';
+import { BadgesSheet } from '../../components/account/BadgesSheet';
+import { ProfilePicture } from '../../components/account/ProfilePicture';
+import { BadgeMark } from '../../components/account/BadgeMark';
+import { GoogleGIcon } from '../../components/GoogleGIcon';
+import { canPickPhoto, googlePhotoOf, pickPhoto, removePhoto, restoreGooglePhoto, setPhoto, useAccountPhoto } from '../../lib/accountPicture';
 import { checkLevel, maddChecked, setReciteCheckSettings, strictOffered, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { TEST_LENGTHS, type TestLength } from '../../lib/reciteLive/testLength';
 import { getJuzForPage } from '../../lib/quranData';
@@ -106,7 +116,8 @@ import { getRevisionDateForUser } from '../../lib/fajrBoundary';
 import { revisablePages } from '../../lib/memorizedAyahs';
 import { scheduleSummary } from '../../lib/scheduleSummary';
 import { ReciteCheckNotice } from '../../components/reciteCheck/ReciteCheckNotice';
-import { currentLanguage, t, formatNumber } from '../../i18n';
+import { currentLanguage, dayMonth, t, formatDate, formatNumber } from '../../i18n';
+import { dateToLocalISODay } from '../../lib/schedulePlans';
 import {
   chooseLanguage,
   languageChoice,
@@ -118,7 +129,10 @@ import {
 } from '../../i18n/choice';
 import { LANGUAGE_NAMES } from '../../i18n/language';
 import { isDevVariant } from '../../lib/variant';
-import { ramadanThemeOffered, setRamadanTheme, useRamadanThemeSaved } from '../../lib/ramadanTheme';
+import { RAMADAN_CHOICES, ramadanThemeOffered, setRamadanChoice, useRamadanChoice, useRamadanTheme, type RamadanChoice } from '../../lib/ramadanTheme';
+import { RAMADAN_TESTS, ramadanDates, ramadanTestLabel, ramadanWindow, setRamadanTest, useRamadanTest } from '../../lib/ramadanDates';
+import { localDay } from '../../lib/fajrBoundary';
+import { WithCrescent } from '../../components/ramadan/WithCrescent';
 import { CheckerModelRow } from '../../components/settings/CheckerModelRow';
 import { ReciteWhereRow } from '../../components/settings/ReciteWhereRow';
 import { ScheduledRemindersRow } from '../../components/settings/ScheduledRemindersRow';
@@ -225,10 +239,13 @@ function ThemeSegmentedControl<T extends string>({
   options,
   value,
   onChange,
+  testIDPrefix,
 }: {
   options: Array<{ value: T; label: string }>;
   value: T;
   onChange: (v: T) => void;
+  /** Each pill's testID is `${testIDPrefix}-${value}`. */
+  testIDPrefix?: string;
 }) {
   return (
     <View style={v2.pills}>
@@ -240,6 +257,7 @@ function ThemeSegmentedControl<T extends string>({
           variant={opt.value === value ? 'solid' : 'outline'}
           onPress={() => onChange(opt.value)}
           accessibilityLabel={opt.value === value ? t('settings.selected', { label: opt.label }) : opt.label}
+          testID={testIDPrefix ? `${testIDPrefix}-${opt.value}` : undefined}
         />
       ))}
     </View>
@@ -271,7 +289,11 @@ export default function SettingsScreen() {
   const { firebaseUser, signOutUser, deleteAccount } = useAuth();
   const { theme, palette, themeMode, setThemeMode } = useTheme();
   const design = useDesign();
-  const ramadanTheme = useRamadanThemeSaved();
+  // The Ramadan theme (THEME-2, THEME-3): Automatic, On or Off; whether it shows now; Revisely Dev's test dates.
+  const ramadanChoice = useRamadanChoice();
+  const ramadanShows = useRamadanTheme();
+  const ramadanTest = useRamadanTest();
+  const [ramadanTestSheet, setRamadanTestSheet] = useState(false);
   // Activity is a tab (TAB-2): its rows here go to it.
   const openActivity = () => navigation.getParent()?.navigate('ActivityTab', { screen: 'Activity' });
   const tabFootprint = useTabBarFootprint();
@@ -459,6 +481,20 @@ export default function SettingsScreen() {
   const notificationsRefused = refusalShown && notifyPermission?.status === 'denied';
   const [refusedSheet, setRefusedSheet] = useState(false);
 
+  // The Account page's new look (lib/release/accountDesign; Revisely Dev until released): the picture in Premium's ring,
+  // pages revised, the longest streak and badges (ACCOUNT-4 to ACCOUNT-6), Name and email, no early-access words.
+  const accountV2 = accountDesignEnabled();
+  // Hooks run before the loading return below, so the page is read from the route here.
+  const accountShown = route.params?.page === 'account' || (route.params?.section != null && pageOfSection(route.params.section, prayerEnabled) === 'account');
+  const journey = useAccountJourney({ enabled: accountV2, streak: accountShown });
+  const latestBadge = journey ? latestMilestone(journey.pagesRevised) : undefined;
+  const badgeMoment = useBadgeMoment(accountV2 && accountShown ? user?.id : null, latestBadge);
+  const [badgesOpen, setBadgesOpen] = useState(false);
+  // The picture (ACCOUNT-8): its photo now, and the menu a tap on it opens.
+  const photoUrl = useAccountPhoto(firebaseUser);
+  const [pictureMenu, setPictureMenu] = useState(false);
+  const [pictureBusy, setPictureBusy] = useState(false);
+
   if (!localUser) {
     return (
       <TopSafeAreaView style={styles.container}>
@@ -641,8 +677,78 @@ export default function SettingsScreen() {
   const storageValue = storedBytes > 0 ? formatBytes(storedBytes) : undefined;
   const themeLabel =
     themeMode === 'system' ? t('settings.appearance.system') : themeMode === 'dark' ? t('settings.appearance.dark') : t('settings.appearance.light');
-  const appearanceValue = `${themeLabel} · ${ACCENT_LABELS[design.accent]}`; // i18n-ignore (a list's separator)
+  const appearanceValue = [themeLabel, ACCENT_LABELS[design.accent], ramadanShows ? t('settings.appearance.ramadanValue') : null]
+    .filter(Boolean)
+    .join(' · '); // i18n-ignore (a list's separator)
+  // Automatic's span, under the choice: "On from 25 January to 12 March".
+  const ramadanSpan = (() => {
+    const today = localDay(new Date());
+    const { from, to } = ramadanWindow(ramadanDates(today));
+    const day = (key: string) => dayMonth(new Date(`${key}T00:00:00`));
+    return t('settings.appearance.ramadanAuto', { from: day(from), to: day(to) });
+  })();
+  const ramadanLabels: Record<RamadanChoice, string> = {
+    auto: t('settings.appearance.ramadanChoice.auto'),
+    on: t('settings.appearance.ramadanChoice.on'),
+    off: t('settings.appearance.ramadanChoice.off'),
+  };
   // Your account at the top of the first level (it opens the Account page) and of the Account page.
+  const hasPremium = reciteCheck && premium.has;
+  const googlePhoto = googlePhotoOf(firebaseUser);
+  const changePicture = (run: () => Promise<void>) => {
+    setPictureBusy(true);
+    run()
+      .catch((err) => {
+        logger.warn('Account picture could not be changed', err);
+        Alert.alert(t('account.picture.failed'), t('account.picture.failedBody'));
+      })
+      .finally(() => setPictureBusy(false));
+  };
+  const pictureActions = [
+    ...(canPickPhoto()
+      ? [
+          { key: 'choose', label: t('account.picture.choose'), icon: 'images-outline' as const, onPress: () => changePicture(async () => { const a = await pickPhoto('library'); if (a) await setPhoto(a); }) },
+          { key: 'take', label: t('account.picture.take'), icon: 'camera-outline' as const, onPress: () => changePicture(async () => { const a = await pickPhoto('camera'); if (a) await setPhoto(a); }) },
+        ]
+      : []),
+    ...(googlePhoto && googlePhoto !== photoUrl
+      ? [{ key: 'google', label: t('account.picture.google'), icon: 'logo-google' as const, onPress: () => changePicture(restoreGooglePhoto) }]
+      : []),
+    ...(photoUrl ? [{ key: 'remove', label: t('account.picture.remove'), icon: 'trash-outline' as const, destructive: true, onPress: () => changePicture(removePhoto) }] : []),
+  ];
+  const createdDay = localUser.createdAt ? new Date(localUser.createdAt) : null;
+  const sinceMonth =
+    createdDay && !Number.isNaN(createdDay.getTime()) && dateToLocalISODay(createdDay) !== dateToLocalISODay(new Date())
+      ? formatDate(createdDay, { month: 'long', year: 'numeric' })
+      : null;
+  const providerId = firebaseUser?.providerData?.[0]?.providerId;
+  const signInProvider: 'google' | 'apple' | 'password' = providerId === 'google.com' ? 'google' : providerId === 'apple.com' ? 'apple' : 'password';
+  const accountWhoV2 = [localUser.name?.trim(), hasPremium ? t('account.premium') : null, latestBadge ? badgeName(latestBadge) : null]
+    .filter(Boolean)
+    .join(', '); // i18n-ignore (a list for VoiceOver)
+  const accountRowV2 = (
+    <View style={[v2.profileRow, { borderBottomColor: palette.separator }]}>
+      <ProfilePicture size={40} photoUrl={photoUrl} initial={avatarInitial(localUser.name, firebaseUser?.email)} premium={hasPremium} testID="settings-account-picture" />
+      <View style={{ flex: 1, minWidth: 0, marginLeft: layoutV2.markGap }}>
+        <View style={v2.nameLine}>
+          {localUser.name?.trim() ? (
+            <Text style={[typeV2.name, { color: theme.textPrimary, flexShrink: 1 }]} numberOfLines={1}>
+              {localUser.name.trim()}
+            </Text>
+          ) : null}
+          {latestBadge ? (
+            <View style={{ marginStart: 5 }} testID="settings-account-badge">
+              <BadgeMark milestone={latestBadge} size={16} number={false} />
+            </View>
+          ) : null}
+        </View>
+        <Text style={[typeV2.meta, { color: theme.textSecondary }]} numberOfLines={1} testID="settings-account-revised">
+          {journey ? t('account.pagesRevised', { count: journey.pagesRevised, n: formatNumber(journey.pagesRevised) }) : ' '}
+        </Text>
+      </View>
+      <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
+    </View>
+  );
   const premiumLine = reciteCheck && premium.has ? (earlyAccessOn ? t('settings.root.premiumEarly') : t('settings.root.premium')) : null;
   const accountWho = [localUser.name?.trim(), firebaseUser?.email, premiumLine].filter(Boolean).join(', '); // i18n-ignore (a list for VoiceOver)
   const accountHeader = (opens: boolean) => (
@@ -670,7 +776,13 @@ export default function SettingsScreen() {
 
   return (
     <TopSafeAreaView style={styles.container}>
-      <TopBar title={page ? pageTitle(page) : t('settings.title')} onBack={() => navigation.goBack()} separator />
+      <TopBar
+        title={page ? pageTitle(page) : t('settings.title')}
+        // The Ramadan theme (THEME-3): a crescent by the first level's title while it shows.
+        center={page == null && ramadanShows ? <WithCrescent><BarTitle title={t('settings.title')} /></WithCrescent> : undefined}
+        onBack={() => navigation.goBack()}
+        separator
+      />
 
       <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={[v2.content, { paddingBottom: tabFootprint + spacing.lg }]} testID={page ? `settings-${page}-scroll` : 'settings-scroll'}>
         {page == null ? (
@@ -679,10 +791,10 @@ export default function SettingsScreen() {
               <Tap
                 onPress={() => openPage('account')}
                 accessibilityRole="button"
-                accessibilityLabel={t('settings.root.accountLabel', { who: accountWho })}
+                accessibilityLabel={t('settings.root.accountLabel', { who: accountV2 ? accountWhoV2 : accountWho })}
                 testID="settings-account"
               >
-                {accountHeader(true)}
+                {accountV2 ? accountRowV2 : accountHeader(true)}
               </Tap>
             ) : null}
             <Section>
@@ -719,7 +831,86 @@ export default function SettingsScreen() {
             )}
           </>
         ) : null}
-        {page === 'account' && firebaseUser ? (
+        {page === 'account' && firebaseUser && accountV2 ? (
+          <>
+            <AccountHeader
+              name={localUser.name?.trim() || t('settings.account.notSet')}
+              initial={avatarInitial(localUser.name, firebaseUser?.email)}
+              photoUrl={photoUrl}
+              premium={hasPremium}
+              since={sinceMonth}
+              pictureBusy={pictureBusy}
+              onPicture={pictureActions.length > 0 ? () => setPictureMenu(true) : undefined}
+              journey={journey}
+              timeInApp={appSeconds != null ? formatDuration(appSeconds) : '—'}
+              moment={badgeMoment}
+              onBadges={() => setBadgesOpen(true)}
+            />
+            <Section>
+              <Row
+                icon="person-outline"
+                label={t('settings.sections.accountDetails')}
+                value={localUser.name ?? t('settings.account.notSet')}
+                onPress={() => openPage('accountDetails')}
+                testID="settings-account-details"
+              />
+            </Section>
+            <Section>
+              <Row icon="log-out-outline" label={t('common.signOut')} onPress={handleSignOut} testID="settings-sign-out" />
+            </Section>
+            <ActionSheet
+              visible={pictureMenu}
+              onClose={() => setPictureMenu(false)}
+              title={t('account.picture.title')}
+              actions={pictureActions}
+              testID="account-picture-menu"
+            />
+            <BadgesSheet
+              visible={badgesOpen}
+              onClose={() => setBadgesOpen(false)}
+              pagesRevised={journey?.pagesRevised ?? 0}
+              reachedOn={journey?.reachedOn ?? NO_MILESTONE_DAYS}
+            />
+          </>
+        ) : null}
+        {page === 'accountDetails' && firebaseUser ? (
+          <>
+            <Section>
+              <Row
+                icon="person-outline"
+                label={t('account.details.name')}
+                value={localUser.name ?? t('settings.account.notSet')}
+                onPress={() => {
+                  setTempName(localUser.name ?? '');
+                  setShowNameModal(true);
+                }}
+                testID="settings-name"
+              />
+              <View style={v2.iconRow} testID="settings-email">
+                {signInProvider === 'google' ? (
+                  <View style={v2.providerIcon}>
+                    <GoogleGIcon size={20} />
+                  </View>
+                ) : (
+                  <SettingIcon name={signInProvider === 'apple' ? 'logo-apple' : 'mail-outline'} />
+                )}
+                <View style={v2.iconRowText}>
+                  <Text style={[typeV2.body, { color: palette.text }]} numberOfLines={1} ellipsizeMode="middle">
+                    {firebaseUser.email}
+                  </Text>
+                  <Text style={[typeV2.meta, { color: palette.secondary }]}>
+                    {t('account.details.signedInWith', { provider: t(`account.details.${signInProvider}`) })}
+                  </Text>
+                </View>
+              </View>
+            </Section>
+            {/* Delete account: findable, as the stores ask, but quiet, at the foot of the page (ACCOUNT-4). */}
+            <Tap onPress={handleDeleteAccount} accessibilityRole="button" style={v2.quietDelete} testID="settings-delete-account">
+              <Text style={[typeV2.meta, { color: palette.secondary, textAlign: 'center' }]}>{t('settings.account.deleteAccount')}</Text>
+            </Tap>
+          </>
+        ) : null}
+        {page === 'account' && firebaseUser && !accountV2 ? (
           <>
             {accountHeader(false)}
             <Section>
@@ -1286,19 +1477,22 @@ export default function SettingsScreen() {
                 testID="settings-language"
               />
             ) : null}
-            {/* Revisely Dev's until the release switch (THEME-1): decorations, kept on this phone. Just the
-                name, no subtitle (Majd, Nov 21 2026). */}
+            {/* Revisely Dev's until the release switch (THEME-1, THEME-2): Automatic, On or Off, kept on this phone.
+                Automatic says when it shows (Majd, Nov 26 2026). */}
             {ramadanThemeOffered() ? (
               <Row
                 icon="moon-outline"
                 label={t('settings.appearance.ramadan')}
+                subtitle={ramadanChoice === 'auto' ? ramadanSpan : undefined}
                 rightSlot={
-                  <SettingSwitch
-                    value={ramadanTheme}
-                    onValueChange={(on) => void setRamadanTheme(on)}
-                    accessibilityLabel={t('settings.appearance.ramadan')}
-                    testID="settings-ramadan-theme"
-                  />
+                  <View testID="settings-ramadan-theme">
+                    <ThemeSegmentedControl
+                      value={ramadanChoice}
+                      onChange={(choice) => void setRamadanChoice(choice)}
+                      options={RAMADAN_CHOICES.map((value) => ({ value, label: ramadanLabels[value] }))}
+                      testIDPrefix="settings-ramadan"
+                    />
+                  </View>
                 }
               />
             ) : null}
@@ -1390,6 +1584,18 @@ export default function SettingsScreen() {
         ) : null}
         {page === 'testing' ? (
           <>
+            {/* Revisely Dev: try any part of Ramadan (THEME-2); the dates are set around today. */}
+            {isDevVariant() && ramadanThemeOffered() ? (
+              <Section>
+                <Row
+                  icon="moon-outline"
+                  label={t('settings.testing.ramadanDates')}
+                  value={ramadanTestLabel(ramadanTest)}
+                  onPress={() => setRamadanTestSheet(true)}
+                  testID="settings-ramadan-dates"
+                />
+              </Section>
+            ) : null}
             {firebaseUser && showsResetMyData(user) && (
               <Section>
                 <View testID="reset-data-row">
@@ -1531,6 +1737,18 @@ export default function SettingsScreen() {
           },
         ]}
         testID="check-level-sheet"
+      />
+      <ActionSheet
+        visible={ramadanTestSheet}
+        onClose={() => setRamadanTestSheet(false)}
+        title={t('settings.testing.ramadanDates')}
+        actions={[null, ...RAMADAN_TESTS].map((test) => ({
+          key: test ?? 'real',
+          label: ramadanTestLabel(test),
+          selected: ramadanTest === test,
+          onPress: () => void setRamadanTest(test),
+        }))}
+        testID="ramadan-dates-sheet"
       />
       <ActionSheet
         visible={testWhereSheet}
@@ -1712,6 +1930,8 @@ function TextSheetV2({
 // Styles
 // ---------------------------------------------------------------------------
 
+const NO_MILESTONE_DAYS: ReadonlyMap<Milestone, string> = new Map();
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -1745,6 +1965,9 @@ const v2 = StyleSheet.create({
   // A row without an icon lines up with the labels of those with one.
   indent: { marginLeft: 40 },
   // Your account: the first row of the first level, and the head of the Account page.
+  nameLine: { flexDirection: 'row', alignItems: 'center' },
+  providerIcon: { width: 24, marginRight: 8, alignItems: 'center' },
+  quietDelete: { alignSelf: 'center', marginTop: 96, marginBottom: 24, paddingVertical: 12, paddingHorizontal: 16 },
   profileRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -111,7 +111,7 @@ function checkTable(v: Obj, title: string): RevoNewChart | null {
   return hasJuz ? { kind: 'table', title, juz: rows, columns } : { kind: 'table', title, surahs: rows, columns };
 }
 
-export function checkAction(v: unknown, allowed: ReadonlySet<number>): RevoAction | null {
+export function checkAction(v: unknown, allowed: ReadonlySet<number>, opts: { drafts?: boolean } = {}): RevoAction | null {
   if (!isObj(v)) return null;
   const title = clean(v.title, 80);
   const detail = typeof v.detail === 'string' && v.detail.trim().length <= 100 ? v.detail.trim() : null;
@@ -126,7 +126,27 @@ export function checkAction(v: unknown, allowed: ReadonlySet<number>): RevoActio
   }
   if (v.kind === 'startRevision') return { kind: 'startRevision', title, detail };
   if (v.kind === 'openScreen') return checkScreen(v, title, detail);
+  if (v.kind === 'draftSchedule') return opts.drafts ? checkDraft(v, title, detail) : null;
   return null;
+}
+
+/**
+ * A drafted schedule (REVO-43, Revisely Dev): pages a day 1–40 or juz a day 1–3; rest on 1–3 weekdays (pages only).
+ * The schema asks for every field (replySchema.ts): restDays [] is no rest day and reverse false the usual order, so
+ * the app gets neither then, as before.
+ */
+function checkDraft(v: Obj, title: string, detail: string): RevoAction | null {
+  const mode = v.mode === 'pages' || v.mode === 'juz' ? v.mode : null;
+  if (!mode || !wholeIn(v.perDay, 1, mode === 'pages' ? 40 : 3)) return null;
+  const out: RevoAction = { kind: 'draftSchedule', title, detail, mode, perDay: v.perDay };
+  if (v.restDays != null && !(Array.isArray(v.restDays) && v.restDays.length === 0)) {
+    const r = v.restDays;
+    if (mode !== 'pages' || !Array.isArray(r) || r.length < 1 || r.length > 3 || new Set(r).size !== r.length) return null;
+    if (!r.every((w) => wholeIn(w, 0, 6))) return null;
+    out.restDays = [...(r as number[])].sort((a, b) => a - b);
+  }
+  if (v.reverse === true) out.reverse = true;
+  return out;
 }
 
 const wholeIn = (v: unknown, min: number, max: number): v is number => typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max;
@@ -254,7 +274,11 @@ function withoutStrength(out: RevoReplyParts): void {
   }
 }
 
-export function parseReply(raw: string, allowed: ReadonlySet<number>, opts: { firstTurn: boolean; smartTracking?: boolean }): RevoReplyParts | null {
+export function parseReply(
+  raw: string,
+  allowed: ReadonlySet<number>,
+  opts: { firstTurn: boolean; smartTracking?: boolean; drafts?: boolean },
+): RevoReplyParts | null {
   const t = unfenced(raw);
   const o = jsonObject(t);
   if (!o || typeof o.text !== 'string' || o.text.trim() === '') {
@@ -279,7 +303,7 @@ export function parseReply(raw: string, allowed: ReadonlySet<number>, opts: { fi
   // One action: an object, or the first valid one of a list.
   const actions = Array.isArray(o.action) ? o.action : [o.action];
   for (const a of actions) {
-    const action = checkAction(a, allowed);
+    const action = checkAction(a, allowed, { drafts: opts.drafts });
     if (action) {
       out.action = action;
       break;

@@ -18,6 +18,7 @@ import ReadIndexScreen from '../screens/read/ReadIndexScreen';
 import QuranReaderScreen from '../screens/read/QuranReaderScreen';
 import QuranSearchScreen from '../screens/read/QuranSearchScreen';
 import { RevoHost } from '../components/revo/RevoHost';
+import type { ScheduleDraft } from '../lib/revo/scheduleDraft';
 import { ReportProblemHost } from '../components/report/ReportProblemHost';
 import ListenBackScreen from '../screens/activity/ListenBackScreen';
 import ActivityScreen from '../screens/activity/ActivityScreen';
@@ -25,6 +26,9 @@ import ActivityDayScreen from '../screens/activity/ActivityDayScreen';
 import ActivityAllScreen from '../screens/activity/ActivityAllScreen';
 import PagesByStrengthScreen from '../screens/activity/PagesByStrengthScreen';
 import LastRevisedScreen from '../screens/activity/LastRevisedScreen';
+import ActivitySectionScreen from '../screens/activity/ActivitySectionScreen';
+import ActivityMonthScreen from '../screens/activity/ActivityMonthScreen';
+import type { InsightsSection } from '../lib/activitySections';
 import { activityBlocksEnabled } from '../components/activity/DayBlocks';
 import type { ActivityKind } from '../lib/activityItems';
 import { ReadingTimerProvider } from '../context/ReadingTimerContext';
@@ -69,11 +73,17 @@ export type HomeStackParamList = {
   // editedDay is set by PlanDayEdit when navigating back, so PlanEdit can
   // merge the day-level edit into its in-memory days[] without round-tripping
   // through a context or store.
-  PlanEdit: { editedDay?: { index: number; pages: number[] } } | undefined;
+  /** `draft`: a schedule Revo drafted (REVO-43), shown filled in and not saved. */
+  PlanEdit: { editedDay?: { index: number; pages: number[] }; draft?: ScheduleDraft } | undefined;
   /** `basePages`: the day as saved, when `initialPages` already adds to it ("Add to plan"); `note`: one line under the title. */
   PlanDayEdit: { dayIndex: number; initialPages: number[]; basePages?: number[]; note?: string };
   // Revision sessions, timed sessions and the daily log, day by day.
   Activity: undefined;
+  // The one Activity tab's full calendar (ACT-35, Revisely Dev); calendarAt: a section's page opening it at a month, a gap
+  // marked (ACT-23, ACT-28).
+  ActivityMonth: { calendarAt?: { month: string; gap?: { from: string; to: string; cue: string } } } | undefined;
+  // One section of the one Activity tab on a page of its own (ACT-35, Revisely Dev).
+  ActivitySection: { section: InsightsSection };
   // date is a revision day, YYYY-MM-DD.
   /** focusRecordingId: scroll to that recording and highlight it. focusBlock: scroll to that block
    *  (a row of Overview's picked day, ACT-18). */
@@ -172,6 +182,8 @@ function sharedScreens() {
       <HomeStack.Screen name="ActivityAll" component={ActivityAllScreen} />
       <HomeStack.Screen name="PagesByStrength" component={PagesByStrengthScreen} />
       <HomeStack.Screen name="LastRevised" component={LastRevisedScreen} />
+      <HomeStack.Screen name="ActivitySection" component={ActivitySectionScreen} />
+      <HomeStack.Screen name="ActivityMonth" component={ActivityMonthScreen} />
       <HomeStack.Screen name="QuranReader" component={QuranReaderScreen} />
     </>
   );

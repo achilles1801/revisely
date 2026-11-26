@@ -1,26 +1,25 @@
 // What Today's post says about today's pages, in two lines (the owner's
 // choice "E", Nov 2026; mocks in ~/Documents/revisely-today-mocks):
 //
-//   not started   Starts at Al-Mujadila ›             20 pages · to At-Tahrim · Juz 28
-//   in progress   Continue at Al-Hashr, 3rd page ›    ▬▬▭▭▭ 6 of 20
-//   done          ● Done · 20 pages                   Adh-Dhariyat → Al-Hadid · Juz 27
-//   two ranges    Starts at Ash-Shams ›               20 pages · then Al-Fatihah
-//   carried in    Starts at Al-Hadid, 2nd page ›      20 pages · 4 from yesterday first
+//   not started   Starts at Al-Mujadila  Change             20 pages · to At-Tahrim · Juz 28
+//   in progress   Continue at Al-Hashr, 3rd page  Change    ▬▬▭▭▭ 6 of 20
+//   done          ● Done · 20 pages                         Adh-Dhariyat → Al-Hadid · Juz 27
+//   two ranges    Starts at Ash-Shams  Change               20 pages · then Al-Fatihah
+//   carried in    Starts at Al-Hadid, 2nd page  Change      20 pages · 4 from yesterday first
 //
 // "Starts at" names where the page you open to begins (lib/passages placeOfPage:
 // the surah or juz it opens, else which page of the surah, NAME-1); in progress,
 // the first page not yet revised. Pages are read in the order the session serves
 // them (the end of the cycle, then its start). "3rd page", "20 pages", "Juz 28"
-// and the › are held together with no-break spaces, so the › never sits alone.
+// and "Change" (HOME-3: it opens Jump to) are held together with no-break spaces, so "Change" never sits alone.
 // The juz shows when the day spans one or two; two-range days say "then …".
-// The exact ranges, with their page numbers, are in the › sheet's header.
 // A partly memorized page among them (MEM-4) is named by what is memorized of it:
 // "Starts at An-Nas" when An-Nas is all that is memorized on the last page.
 
 import { getJuzForPage, getSurahsForPage } from './quranData';
 import type { PageRun } from './pageRanges';
 import type { Leftovers } from './carryOver';
-import { describePagesToRevise, firstWordsOfPlace, NBHY, NBSP, pagesNote, placeOfPageToRevise, spokenText, surahNameIn, type PartialPages } from './passages';
+import { describePagesToRevise, firstWordsOfPlace, NBHY, NBSP, placeOfPageToRevise, spokenText, surahNameIn, type PartialPages } from './passages';
 import { suraOf } from './ayahKeys';
 import { t } from '../i18n';
 
@@ -53,14 +52,12 @@ export function catchUpLine(leftovers: Leftovers, partial: PartialPages = NONE):
 export type TodayStatus = 'not_started' | 'partial' | 'completed';
 
 export interface TodayLines {
-  /** Line 1, in ink: the words, a done dot before them, a › after them. */
+  /** Line 1, in ink: the words, a done dot before them, "Change" after them (`chevron`, HOME-3). */
   title: { text: string; dot: boolean; chevron: boolean };
   /** Under the title, how the page you open to begins (NAME-2); none when it opens a surah or juz, or is part-memorized. */
   words?: string;
   /** Line 2: grey words, or how far today is (a thin bar and "6 of 20"). */
   detail: { kind: 'text'; text: string } | { kind: 'progress'; done: number; total: number };
-  /** The › sheet's header: the exact pages and surahs. */
-  ranges: string;
   /** Both lines, in words (VoiceOver). */
   label: string;
   /** Nothing to revise yet. */
@@ -123,17 +120,6 @@ function surahSpan(run: PageRun, partial: PartialPages = NONE): string {
 }
 
 /**
- * The › sheet's header, the exact ranges: the surahs (with the juz when it helps),
- * then the page numbers as a quiet detail. "Al-Mujadila to At-Tahrim · Juz 28 ·
- * pp. 542–561", "Ash-Shams to An-Nas, then Al-Fatihah to Al-Baqarah, 9th page · pp. 595–604, 1–10".
- */
-export function rangesText(list: number[], partial: PartialPages = NONE): string {
-  if (list.length === 0) return '';
-  const what = describePagesToRevise(list, partial, { order: 'given', juz: true, wholeJuz: false, exact: true });
-  return [what, pagesNote(list, { order: 'given' })].filter(Boolean).join(' · ');
-}
-
-/**
  * Done today: the quiet line that opens the next revision day ("Tomorrow starts
  * at Juz 2 ›"). `lead` is "Tomorrow", or the weekday after that.
  */
@@ -165,7 +151,6 @@ export function todayLines(
     return {
       title: { text: title, dot: false, chevron: false },
       detail: { kind: 'text', text: detail },
-      ranges: '',
       label: spoken(t('lib.today.titleDetail', { title, detail })),
       empty: true,
       cta: t('lib.today.markCta'),
@@ -173,7 +158,6 @@ export function todayLines(
     };
   }
   const runs = runsInOrder(ordered);
-  const ranges = rangesText(ordered, partial);
   const doneHere = ordered.filter((p) => done.has(p)).length;
 
   if (status === 'completed') {
@@ -188,7 +172,6 @@ export function todayLines(
     return {
       title: { text: title, dot: true, chevron: false },
       detail: { kind: 'text', text: detail },
-      ranges,
       label: spoken(t('lib.today.titleDetail', { title, detail })),
       empty: false,
       // Today is done, and pages added from earlier days are still to revise (SESS-6, SESS-7:
@@ -205,7 +188,6 @@ export function todayLines(
       title: { text: title, dot: false, chevron: true },
       words: wordsOf(next, partial),
       detail: { kind: 'progress', done: doneHere, total },
-      ranges,
       label: spoken(t('lib.today.progressLabel', { title, done: doneHere, total })),
       empty: false,
       cta: t('lib.today.continueCta'),
@@ -237,7 +219,6 @@ export function todayLines(
     title: { text: title, dot: false, chevron: true },
     words: wordsOf(start, partial),
     detail: { kind: 'text', text: detail },
-    ranges,
     label: spoken(t('lib.today.titleDetail', { title, detail })),
     empty: false,
     cta: t('lib.today.startCta'),

@@ -23,6 +23,8 @@ import { Backdrop } from '../Backdrop';
 import { layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { Tap } from './Tap';
 import { ModalNest, useInsideModal, useModalTurn } from './modalTurn';
+import { StringLights } from '../ramadan/StringLights';
+import { useRamadanDecor } from '../ramadan/quiet';
 import { Ionicons } from '@expo/vector-icons';
 import { t } from '../../i18n';
 
@@ -172,6 +174,7 @@ export function Sheet({
 }) {
   const { palette } = useTheme();
   const insets = useSafeAreaInsets();
+  const ramadanLights = useRamadanDecor();
   const { height } = useWindowDimensions();
   const keyboardHeight = useKeyboardHeight(keyboard);
   // Shown only once it has its turn: no other sheet up or still going.
@@ -310,6 +313,9 @@ export function Sheet({
           ]}
           testID={testID}
         >
+          {/* The Ramadan theme (THEME-4): string lights along the top edge, inside the rounded corners. Not over the
+              reader or a session (RamadanQuiet). */}
+          {ramadanLights ? <StringLights inset={radiusV2.sheet} testID="ramadan-sheet-lights" /> : null}
           {/* The handle and the header: drag them down to close. */}
           <GestureDetector gesture={pan}>
             <View collapsable={false} testID={`${testID ?? 'sheet'}-grab`}>

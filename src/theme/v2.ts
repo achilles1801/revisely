@@ -790,7 +790,35 @@ export function ramadanV2(isDark: boolean, accent: AccentName = DEFAULT_ACCENT):
     mote: b.mote,
     moteOpacity: b.moteOpacity,
     wire: b.wire,
-    // doneText: the accent itself for every accent (Jade's accentText is ink).
-    bulbs: [b.amber, paletteV2(isDark, accent).doneText, b.third],
+    // doneText: the accent itself for every accent (Jade's accentText is ink). An accent it doesn't know (a test's stand-in
+    // palette) takes the default's, so a bulb never goes missing.
+    bulbs: [b.amber, paletteV2(isDark, ACCENTS.includes(accent) ? accent : DEFAULT_ACCENT).doneText, b.third],
   };
 }
+
+/**
+ * The badges for pages revised (Settings → Account, ACCOUNT-5; Majd approved the boards on Nov 26 2026, their soft
+ * two-colour materials an exception to the no-gradient rule): one material a tier, the same in light and dark. Each is a
+ * gradient from `light` (top left) to `deep`, edged in `rim`, with the milestone in `ink`. A badge not won yet is drawn in
+ * the palette's fill, outline and secondary instead.
+ */
+export type BadgeTier = 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond' | 'emerald';
+
+export interface BadgeMaterial {
+  light: string;
+  deep: string;
+  rim: string;
+  ink: string;
+}
+
+export const BADGE_MATERIALS: Record<BadgeTier, BadgeMaterial> = {
+  bronze: { light: '#E2A878', deep: '#9C5D30', rim: '#7A4520', ink: '#3E2210' },
+  silver: { light: '#F3F5F8', deep: '#A9B0BA', rim: '#7D8590', ink: '#2B3038' },
+  gold: { light: '#FCE39A', deep: '#C99227', rim: '#9C6E14', ink: '#4A3200' },
+  platinum: { light: '#EEF7F8', deep: '#98B6BF', rim: '#6A8892', ink: '#1E3940' },
+  diamond: { light: '#E6F3FF', deep: '#7DB0E6', rim: '#4A82BE', ink: '#0E355E' },
+  emerald: { light: '#86E3B9', deep: '#1D8760', rim: '#C99227', ink: '#FFFFFF' },
+};
+
+/** The diamond's facet lines, over its material. */
+export const BADGE_FACET = '#FFFFFF';

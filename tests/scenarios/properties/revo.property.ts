@@ -1086,7 +1086,7 @@ describe('opening a screen (REVO-31)', () => {
   });
 
   it('[REVO-31] the prompt maps each path to its screen and never has Revo claim a card it didn’t add', () => {
-    expect(REVO_SYSTEM_PROMPT).toMatch(/Which screen: “Edit schedule”, “Create new plan” or “Daily amount” → planEditor; “Jump to…” → jumpTo/);
+    expect(REVO_SYSTEM_PROMPT).toMatch(/Which screen: “Edit schedule”, “Create new plan” or “Daily amount” → planEditor; “Jump to…” or “Change” → jumpTo/);
     expect(REVO_SYSTEM_PROMPT).toContain('Never write that you added a shortcut or will open something');
     expect(REVO_SYSTEM_PROMPT).toMatch(/say how to catch up: tap “Add to today” on Home/);
     expect(REVO_SYSTEM_PROMPT).toMatch(/those days’ pages can still be added that way \(the last three days\): always say so/);

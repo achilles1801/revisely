@@ -7,7 +7,7 @@
 
 import { surahName, placeOfPage, withoutAmount } from '../passages';
 import { shiftDay } from '../journal';
-import { isRevisable } from '../memorizedAyahs';
+import { isRevisable, revisablePages } from '../memorizedAyahs';
 import { getJuzForPage, getSurahForPage } from '../quranData';
 import { timesWord } from '../recency';
 import { juzPages } from './attachments';
@@ -16,7 +16,9 @@ import { asides, revoChips, revoGreeting, revoHello, todayDone, type Aside, type
 import type { RevoPlace } from './place';
 import type { RevoContext, RevoDayFacts, RevoPassageFacts } from './types';
 import { passageLong, passageShort } from './words';
-import { currentLanguage, formatDate, weekdayName } from '../../i18n';
+import { currentLanguage, formatDate, t, weekdayName } from '../../i18n';
+import { scheduleSummary } from '../scheduleSummary';
+import type { UserPage } from '../../types';
 import * as arabic from './openers.ar';
 
 const NBSP = ' ';
@@ -36,6 +38,8 @@ export type PlaceFacts =
       revised: readonly number[];
     }
   | { kind: 'overview'; daysRevised: number; daysSoFar: number; pages: number }
+  /** Edit schedule (REVO-43): the schedule in its header's words, null with nothing to schedule. */
+  | { kind: 'schedule'; perDay: string | null; repeats: string | null }
   | {
       kind: 'insights';
       /** Smart Tracking: the weak part left longest, and days since it was revised (null: never). */
@@ -138,6 +142,11 @@ export function placeFacts(place: RevoPlace | null | undefined, prepared: Prepar
     }
     case 'juz':
       return { kind: 'juz', juz: place.juz, facts: passageFacts(juzPages(place.juz), prepared) };
+    case 'schedule': {
+      const [y, m, d] = today.split('-').map(Number);
+      const s = scheduleSummary(prepared.src.user, revisablePages(prepared.src.pages) as UserPage[], new Date(y, m - 1, d));
+      return { kind: 'schedule', perDay: s?.perDay ?? null, repeats: s?.repeats ?? null };
+    }
     default:
       return null;
   }
@@ -368,6 +377,21 @@ export interface Opener {
   chips: string[];
 }
 
+/**
+ * Opened from Edit schedule (REVO-43, Revisely Dev): the schedule, an offer to draft a change, and four starters (a
+ * draft only ever opens in Edit schedule, unsaved).
+ */
+function scheduleOpener(name: string | null, f: Extract<PlaceFacts, { kind: 'schedule' }>): Opener {
+  const lead =
+    f.perDay && f.repeats
+      ? t('revo.schedule.line', { perDay: f.perDay, repeats: f.repeats.charAt(0).toLocaleLowerCase() + f.repeats.slice(1) })
+      : t('revo.schedule.empty');
+  return {
+    text: [revoHello(name), lead].join(' '),
+    chips: [t('revo.schedule.lighter'), t('revo.schedule.sooner'), t('revo.schedule.rest'), t('revo.schedule.newPlan')],
+  };
+}
+
 const uniq = (list: (string | null | undefined)[]) => [...new Set(list.filter((c): c is string => !!c))].slice(0, 3);
 
 /**
@@ -382,6 +406,7 @@ export function revoOpener(
   extras: GreetingExtras = {},
 ): Opener {
   if (facts == null) return { text: revoGreeting(name, ctx, open, extras), chips: revoChips(ctx, open, extras) };
+  if (facts.kind === 'schedule') return scheduleOpener(name, facts);
   const strength = extras.strength !== false;
   // In Arabic, the same facts in Arabic sentences (openers.ar.ts).
   const L = currentLanguage() === 'ar' ? arabic : { dayLine, overviewLine, insightLines, weakLine, juzLine };
