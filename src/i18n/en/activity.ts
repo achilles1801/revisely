@@ -116,6 +116,8 @@ export const activity = {
     timedInRead: 'Timed in Read',
     showOnPage: 'Show on the page',
     askRevoTake: 'Ask Revo about this take',
+    /** A take's menu: a note shown under the take (ACT-11). */
+    addTakeNote: 'Add a note',
     deleteTake: 'Delete this take',
     deleteTakeTitle: 'Delete this take?',
     deleteTakeBody: 'Its marks and its recording are deleted. This can’t be undone.',

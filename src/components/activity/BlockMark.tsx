@@ -8,13 +8,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { t } from '../../i18n';
 
-export type BlockKind = 'revised' | 'memorized' | 'read' | 'notes';
+export type BlockKind = 'revised' | 'memorized' | 'read' | 'notes' | 'recited';
 
 /** The one icon per block. (`stopwatch-outline` is only a timed Read item's own icon.) */
 export const BLOCK_ICON: Record<Exclude<BlockKind, 'revised'>, React.ComponentProps<typeof Ionicons>['name']> = {
   memorized: 'leaf-outline',
   read: 'book-outline',
   notes: 'document-text-outline',
+  // Recite's takes, Recited and Spot test (RecitedMark draws the same icon).
+  recited: 'mic-outline',
 };
 
 /** The Revised block's glyph, inside its ring. */

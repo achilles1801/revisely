@@ -1,15 +1,19 @@
 // The Note sheet (Activity d8): a note for the day, optionally shown under one of the day's items
-// (Revised, Memorized or Read). Each Add is a new note with its own id and time. Given a `note`, the
+// (Revised, Memorized, Read, or a Recite take: Recited or Spot test). Each Add is a new note with its own id and time. Given a `note`, the
 // same sheet edits it (ACT-6): its text and where it shows, or an older Revised or Memorized log
 // entry's text and minutes. Its id, kind and time stay.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Sheet } from '../v2/Sheet';
 import { useTheme } from '../../context/ThemeContext';
 import { queueChange } from '../../lib/offline/queue';
 import { autoId } from '../../lib/offline/apply';
 import { tagFor } from '../../lib/noteTags';
+import { useApp } from '../../context/AppContext';
+import { useMemoryRecords } from '../../lib/reciteMemory/store';
+import type { TakeRecord } from '../../lib/reciteMemory/record';
+import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { JOURNAL_ENTRIES_PER_DAY, journalTextMax, parseMinutesInput } from '../../lib/journal';
 import { logger } from '../../lib/logger';
 import { westernDigits } from '../../i18n/digits';
@@ -32,7 +36,30 @@ async function tagOptionsFor(day: string): Promise<TagOption[]> {
   ];
 }
 
+/**
+ * And each of the day's Recite takes, a spot test as "Spot test", the rest as "Recited" (ACT-11): with more than one of
+ * a kind, each says its time.
+ */
+export function takeTagOptions(takes: readonly Pick<TakeRecord, 'id' | 'createdAt' | 'spotTest'>[]): TagOption[] {
+  const label = (spot: boolean) => t(spot ? 'activity.day.spotTest' : 'activity.day.recited');
+  const several = (spot: boolean) => takes.filter((x) => !!x.spotTest === spot).length > 1;
+  return takes.map((x) => ({
+    tag: tagFor('take', x.id),
+    label: several(!!x.spotTest) ? `${label(!!x.spotTest)} ${formatTime(new Date(x.createdAt))}` : label(!!x.spotTest),
+    kind: 'recited' as const,
+  }));
+}
+
 const capitalized = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** The account, for its takes. A sheet drawn without the app's context (on its own, as in a test) has none. */
+function useAccount() {
+  try {
+    return useApp().user ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export function AddNoteSheet({
   visible,
@@ -41,6 +68,7 @@ export function AddNoteSheet({
   dayName = 'today',
   note = null,
   noteCount = 0,
+  presetTag = null,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -51,8 +79,22 @@ export function AddNoteSheet({
   note?: JournalNote | null;
   /** How many entries the day holds: a full day takes no more (JOURNAL_ENTRIES_PER_DAY). */
   noteCount?: number;
+  /** A new note already shown under this item (a take's "Add a note"). */
+  presetTag?: string | null;
 }) {
   const { palette, isDark } = useTheme();
+  const user = useAccount();
+  // The day's Recite takes (Revisely Dev's Recite memory), for Show under.
+  const memoryRecords = useMemoryRecords(user?.id, reciteLiveForAccount(user));
+  const takeOptions = useMemo(
+    () =>
+      takeTagOptions(
+        memoryRecords
+          .filter((r): r is TakeRecord => r.kind === 'take' && !r.deleted && r.day === day)
+          .sort((a, b) => a.createdAt - b.createdAt),
+      ),
+    [memoryRecords, day],
+  );
   const [text, setText] = useState('');
   const [tag, setTag] = useState<string | null>(null);
   const [options, setOptions] = useState<TagOption[]>([]);
@@ -69,6 +111,8 @@ export function AddNoteSheet({
       setText(note.text);
       setTag(note.tag ?? null);
       setMinutes(note.minutes?.toString() ?? '');
+    } else if (presetTag) {
+      setTag(presetTag);
     }
     let cancelled = false;
     tagOptionsFor(day)
@@ -77,7 +121,7 @@ export function AddNoteSheet({
     return () => {
       cancelled = true;
     };
-  }, [day, visible, note]);
+  }, [day, visible, note, presetTag]);
 
   const trimmed = text.trim();
   const minutesNow = kind === 'note' ? null : parseMinutesInput(minutes);
@@ -187,12 +231,12 @@ export function AddNoteSheet({
           />
         ) : null}
 
-        {kind === 'note' && options.length > 0 && (
+        {kind === 'note' && options.length + takeOptions.length > 0 && (
           <View style={styles.tagRow}>
             <Text style={[typeV2.meta, styles.tagLabel, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
               {t('activity.add.showUnder')}
             </Text>
-            {options.map((o) => (
+            {[...options, ...takeOptions].map((o) => (
               <TagChip
                 key={o.tag}
                 kind={o.kind}

@@ -99,7 +99,7 @@ it('[RINS-3] a slip into a similar ayah says so under the take; a hold offers Sh
   // Revo on: Ask Revo about this take, with the take attached; VoiceOver has both as actions.
   await app.act(() => app.mods.require('src/lib/revo/presence').setRevoPresent(true));
   const head = app.screen.getByTestId('activity-take-head');
-  expect(head.props.accessibilityActions.map((a: { label: string }) => a.label)).toEqual(['Show on the page', 'Ask Revo about this take', 'Delete this take']);
+  expect(head.props.accessibilityActions.map((a: { label: string }) => a.label)).toEqual(['Show on the page', 'Ask Revo about this take', 'Add a note', 'Delete this take']);
   await hold(app);
   await app.act(async () => {
     fireEvent.press(app.screen.getByTestId('sheet-action-ask-revo'));
