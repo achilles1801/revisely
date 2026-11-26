@@ -140,7 +140,7 @@ it('[REVO-21] [REVO-20] [REVO-22] Revo from Home: the opt-in first, a greeting f
 
 const reply = (text: string, more: Record<string, unknown> = {}) => JSON.stringify({ text, chart: null, textAfter: null, action: null, remember: [], title: 'My week', chips: ['How is my pace?'], ...more });
 
-it('[REVO-23] [REVO-3] answers come through the real callables, a first question and a follow-up; a failure says why and can be tried again', async () => {
+it('[REVO-23] [REVO-3] [REVO-42] answers come through the real callables, a first question and a follow-up; a failure says why and can be tried again; the field has no dead mic', async () => {
   setZone(ZONES.amman);
   setNow('2026-11-06 10:00');
   const phone = new Phone('phone');
@@ -164,6 +164,10 @@ it('[REVO-23] [REVO-3] answers come through the real callables, a first question
     await tap(app, 'revo-turn-on');
     await app.until(() => app.screen.queryByTestId('revo-greeting') != null, 'the greeting');
     expect([setOptions.calls, asks.calls, reviews.calls]).toEqual([1, 0, 0]);
+    // REVO-42: no mic that only put the cursor in the field; send is there, and does nothing until there is a question
+    expect(app.screen.queryByTestId('revo-mic')).toBeNull();
+    await tap(app, 'revo-send');
+    expect(asks.calls).toBe(0);
 
     // A first question: the answer the server stored shows in a new conversation.
     await modelSays(uid, reply('You revised steadily this week.'));

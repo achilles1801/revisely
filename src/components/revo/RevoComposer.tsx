@@ -10,8 +10,8 @@ import { t } from '../../i18n';
 export const QUESTION_MAX = 600;
 
 /**
- * Where the user asks: + (Add to chat: RevoAddSheet), the field ("Ask Revo anything", with the mic
- * for dictation), and what's attached as chips above it, each with ×. Off (`disabled`) when the
+ * Where the user asks: + (Add to chat: RevoAddSheet), the field ("Ask Revo anything", ending in send;
+ * dictation is the keyboard's own mic key), and what's attached as chips above it, each with ×. Off (`disabled`) when the
  * day's questions are used: 45% and the placeholder says when Revo is back.
  */
 export function RevoComposer({
@@ -83,30 +83,17 @@ export function RevoComposer({
             accessibilityLabel={t('revo.composer.placeholder')}
             testID="revo-input"
           />
-          {text.trim().length > 0 ? (
-            <Tap
-              onPress={send}
-              disabled={!canSend}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={t('revo.composer.send')}
-              testID="revo-send"
-            >
-              <Ionicons name="arrow-up-circle" size={30} color={canSend ? palette.primary : palette.secondary} />
-            </Tap>
-          ) : (
-            <Tap
-              // Dictation is the keyboard's own: the mic opens the field with the keyboard up.
-              onPress={() => input.current?.focus()}
-              disabled={disabled}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={t('revo.composer.dictate')}
-              testID="revo-mic"
-            >
-              <Ionicons name="mic-outline" size={20} color={palette.secondary} />
-            </Tap>
-          )}
+          {/* Send, grey until there is a question (REVO-42: no mic; the keyboard's own mic key dictates). */}
+          <Tap
+            onPress={send}
+            disabled={!canSend}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('revo.composer.send')}
+            testID="revo-send"
+          >
+            <Ionicons name="arrow-up-circle" size={30} color={canSend ? palette.primary : palette.secondary} />
+          </Tap>
         </View>
       </View>
     </View>

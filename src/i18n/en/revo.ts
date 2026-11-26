@@ -58,7 +58,6 @@ export const revo = {
   composer: {
     placeholder: 'Ask Revo anything',
     send: 'Send',
-    dictate: 'Dictate with the keyboard',
   },
   /** Adding a day from the month in the + sheet. */
   month: {

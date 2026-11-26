@@ -1529,6 +1529,10 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   corner is kept on that phone, per account, across launches. Until it's moved it sits at the end of the line: right, or
   left in Arabic. VoiceOver and TalkBack have an action for it ("Move to the left", "Move to the right"), and say where
   it went. Lists leave the same room at their end on either side.
+- **REVO-42.** Nothing in Revo's field is a control that does nothing. It has no mic: the old one only put the cursor in
+  the field, so with the keyboard already up it did nothing (two testers, Nov 25 2026: "Mic burton doesn't work", "Mic
+  isnt working"). The field ends in send, grey until there is a question. To speak a question, the keyboard's own mic
+  key dictates, on iPhone and Android.
 
 ## Memorizing
 
