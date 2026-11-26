@@ -45,7 +45,7 @@ export interface MessagesRequest {
   system: { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }[];
   messages: { role: 'user' | 'assistant'; content: string }[];
   /** Revo's requests only: structured output, its reply as one JSON object (revo/replySchema.ts). The coach sends none. */
-  output_config?: { format: { type: 'json_schema'; schema: Record<string, unknown> } };
+  output_config?: { format?: { type: 'json_schema'; schema: Record<string, unknown> }; effort?: 'low' | 'medium' | 'high' };
 }
 
 /** A request whose messages are content blocks: Revo's answers from the tafsir send documents with citations on. */

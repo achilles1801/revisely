@@ -92,25 +92,26 @@ it('[REVO-44] a question about the Qur’an asked in Revo (Revisely Dev): the ay
     await tap(app, 'revo-button');
     await app.until(() => app.screen.queryByTestId('revo-input') != null, 'the chat');
 
-    await ask(app, 'Why did the queen send Sulayman a gift?');
+    await ask(app, 'Why did she send a gift instead of answering?');
     await app.until(() => app.screen.queryByTestId('revo-tafsir-sources') != null, 'the answer from the tafsir');
 
-    // The answer first, then each book's own words: al-Tabari's Arabic (as the book has it) with Revo's English,
-    // labelled, and Ibn Kathir's own English words.
-    expect(app.screen.getByText(/She was testing him\./)).toBeTruthy();
+    // The answer first (the recorded reply, functions/test-recordings/anthropic/revo-tafsir.json), then each book's own
+    // words: al-Sa'di's and al-Qurtubi's Arabic (as the books have it) with Revo's English, labelled, and Ibn Kathir's
+    // own English words.
+    expect(app.screen.getByText(/The gift was a test and a way to buy time/)).toBeTruthy();
     expect(app.screen.getByText('From the tafsir')).toBeTruthy();
-    expect(app.screen.getByTestId('revo-tafsir-source-tabari')).toBeTruthy();
+    expect(app.screen.getByTestId('revo-tafsir-source-saadi')).toBeTruthy();
     expect(app.screen.getByTestId('revo-tafsir-source-ibnKathirEn')).toBeTruthy();
     expect(app.screen.getByTestId('revo-tafsir-source-qurtubi')).toBeTruthy();
-    expect(app.screen.getByText('إن يكن نبيا لم يقبل الهدية')).toBeTruthy();
-    expect(app.screen.getByText(/“I will send him a gift befitting for one of his status/)).toBeTruthy();
+    expect(app.screen.getByText(/I will send him a gift befitting for one of his status/)).toBeTruthy();
     expect(app.screen.getAllByText(/Revo’s translation/).length).toBe(2);
     // al-Qurtubi's words keep the book's harakat.
-    expect(app.screen.getByText('هَذَا مِنْ حُسْنِ نَظَرِهَا وَتَدْبِيرِهَا')).toBeTruthy();
+    const qurtubi = app.mods.rtl.within(app.screen.getByTestId('revo-tafsir-source-qurtubi')).queryAllByText(/.+/).map((e: { props: { children: unknown } }) => String(e.props.children));
+    expect(qurtubi.some((text: string) => text.replace(/[\u064B-\u0652]/g, '').startsWith('فيه ست مسائل') && /[\u064B-\u0652]/.test(text))).toBe(true);
 
     // A tap shows the passage around the words.
     expect(app.screen.queryByTestId('revo-tafsir-passage')).toBeNull();
-    await tap(app, 'revo-tafsir-source-tabari');
+    await tap(app, 'revo-tafsir-source-saadi');
     await app.until(() => app.screen.queryByTestId('revo-tafsir-passage') != null, 'the passage');
 
     // The server found the ayat, then sent the books as documents with citations on, and no structured output.

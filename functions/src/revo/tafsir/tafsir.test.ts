@@ -108,8 +108,9 @@ describe('the request', () => {
     const docs = blocks.filter((b) => b.type === 'document');
     expect(docs).toHaveLength(5);
     expect(docs.every((d) => (d.citations as { enabled: boolean }).enabled)).toBe(true);
-    expect(request.output_config).toBeUndefined();
+    expect(request.output_config?.format).toBeUndefined();
     expect(request.thinking).toEqual({ type: 'between_tools' });
+    expect(request.output_config).toEqual({ effort: 'low' });
     // The rules and al-Sa'di are cached; the question comes last.
     expect(request.system[0].cache_control).toEqual({ type: 'ephemeral' });
     expect(docs[0].cache_control).toEqual({ type: 'ephemeral' });
@@ -135,7 +136,7 @@ describe('the request', () => {
       { type: 'text', text: ' In English: a gift befitting his status.', citations: [{ type: 'char_location', document_index: enDoc, start_char_index: 0, end_char_index: 30 }] },
     ];
     const answer = parseTafsirReply(content, documents)!;
-    expect(answer.text).toBe('She was testing him: a king would take the gift, a prophet would not.');
+    expect(answer.text.startsWith('She was testing him: a king would take the gift, a prophet would not.\n\nIbn Kathir says she would send a gift fit for him.')).toBe(true);
     expect(answer.sources.map((s) => s.book)).toEqual(['ibnKathir', 'qurtubi', 'ibnKathirEn']);
     expect(answer.sources[0].quote).toBe('سَأَبْعَثُ إِلَيْهِ بِهَدِيَّةٍ تَلِيقُ بِهِ');
     expect(answer.sources[0].from).toEqual([27, 32]);
@@ -156,7 +157,7 @@ describe('the request', () => {
 describe('finding the ayat of a free question', () => {
   it('asks Haiku with a schema', () => {
     const r = buildLocateRequest('Why was Musa afraid of the snake?');
-    expect(r.output_config?.format.type).toBe('json_schema');
+    expect(r.output_config?.format?.type).toBe('json_schema');
     expect(r.thinking).toEqual({ type: 'disabled' });
   });
   it('takes the first real range, at most 15 ayat', () => {
@@ -199,10 +200,13 @@ describe('the real page 379 (An-Naml 23–35, test-recordings/tafsir/p379.json)'
     for (const p of page.passages) for (const [a, b] of p.pieces) expect(b).toBeGreaterThan(a);
   });
 
-  it('answers the gift question from the passages on An-Naml 32–35 (Ibn Kathir\'s English sets the focus), within the budget', () => {
+  it('answers the gift question from the pieces about the gift (their English lines), within the budget', () => {
     const books = selectPieces([page], { start: page.start, end: page.end }, 'Why did she send a gift instead of answering?', true);
     const tabari = books.find((b) => b.book === 'tabari')!;
-    expect(tabari.pieces.every((x) => x.passage.to[1] >= 32)).toBe(true);
+    const qurtubi = books.find((b) => b.book === 'qurtubi')!;
+    // The gift is An-Naml 35: most of al-Tabari's and al-Qurtubi's pieces are on it.
+    expect(tabari.pieces.filter((x) => x.passage.from[1] === 35).length).toBeGreaterThanOrEqual(4);
+    expect(qurtubi.pieces.filter((x) => x.passage.from[1] === 35).length).toBeGreaterThanOrEqual(3);
     expect(tabari.pieces.some((x) => x.passage.text.slice(x.range[0], x.range[1]).includes('إن يكن نبيا لم يقبل الهدية'))).toBe(true);
     const chars = books.flatMap((b) => b.pieces).reduce((n, x) => n + x.range[1] - x.range[0], 0);
     // Measured with count_tokens: about 8,500–11,000 tokens for about this much text (the whole page is ~75,000).

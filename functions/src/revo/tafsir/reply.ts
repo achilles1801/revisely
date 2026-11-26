@@ -1,5 +1,5 @@
 /**
- * Revo's answer from the tafsir, from the model's cited reply: the answer (the text without citations) and up to three
+ * Revo's answer from the tafsir, from the model's cited reply: the answer (its whole text) and up to three
  * sources, each the book's own words (its text from the place the citation points to, harakat and all), a stretch of
  * the passage either side for the passage view, and Revo's sentence for it. A citation can only point into the
  * documents sent (the API guarantees it), and here it is mapped back through the piece it falls in.
@@ -87,10 +87,9 @@ export function parseTafsirReply(content: unknown, documents: readonly TafsirDoc
   for (const block of blocks) {
     if (block.type !== 'text' || typeof block.text !== 'string') continue;
     const cited = (block.citations ?? []).map((c) => sourceOf(c, documents, block.text as string)).filter((s): s is TafsirSource => s !== null);
-    if (cited.length === 0) {
-      text += block.text;
-      continue;
-    }
+    // The answer is the whole text as written: the model weaves each book's words into its sentences ("Ibn Kathir
+    // says " then the cited clause), so the cited blocks are part of it; the sources list them under it.
+    text += block.text;
     for (const s of cited) {
       // One quote a book, the first; at most three.
       if (books.has(s.book) || sources.length >= MAX_SOURCES) continue;
