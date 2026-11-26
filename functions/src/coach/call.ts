@@ -43,11 +43,13 @@ export interface MessagesRequest {
   /** Revo (Sonnet 5.5) sends `between_tools`: no extended thinking. Left out, the model's default. */
   thinking?: { type: 'between_tools' } | { type: 'adaptive' } | { type: 'disabled' };
   system: { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }[];
-  /** A message is text, or content blocks (Revo's answers from the tafsir send documents with citations on). */
-  messages: { role: 'user' | 'assistant'; content: string | Record<string, unknown>[] }[];
+  messages: { role: 'user' | 'assistant'; content: string }[];
   /** Revo's requests only: structured output, its reply as one JSON object (revo/replySchema.ts). The coach sends none. */
   output_config?: { format: { type: 'json_schema'; schema: Record<string, unknown> } };
 }
+
+/** A request whose messages are content blocks: Revo's answers from the tafsir send documents with citations on. */
+export type BlocksRequest = Omit<MessagesRequest, 'messages'> & { messages: { role: 'user' | 'assistant'; content: string | Record<string, unknown>[] }[] };
 
 export interface CoachReply {
   text: string;
@@ -74,7 +76,7 @@ export function backoffMs(attempt: number, retryAfter: string | null): number {
   return BASE_BACKOFF_MS * 2 ** (attempt - 1);
 }
 
-export async function callCoach(request: MessagesRequest, deps: CallDeps): Promise<CoachReply> {
+export async function callCoach(request: MessagesRequest | BlocksRequest, deps: CallDeps): Promise<CoachReply> {
   const doFetch = deps.fetch ?? ((url, init) => fetch(url, init));
   const sleep = deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {

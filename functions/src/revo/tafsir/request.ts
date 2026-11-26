@@ -8,7 +8,7 @@
  * caching; then the other books' pieces, which follow the question; then the question. A follow-up within 5 minutes
  * reads the rules and al-Sa'di from the cache.
  */
-import type { MessagesRequest } from '../../coach/call';
+import type { BlocksRequest } from '../../coach/call';
 import { REVO_MODEL } from '../../coach/pricing';
 import { BOOK_TITLES, TafsirSourceBook } from './books';
 import { BookPieces } from './select';
@@ -81,7 +81,7 @@ function documentOf(b: BookPieces): { text: string; doc: TafsirDocument } {
   return { text, doc: { book: b.book, segments } };
 }
 
-export function buildTafsirRequest(input: TafsirRequestInput): { request: MessagesRequest; documents: TafsirDocument[] } {
+export function buildTafsirRequest(input: TafsirRequestInput): { request: BlocksRequest; documents: TafsirDocument[] } {
   const documents: TafsirDocument[] = [];
   const blocks: Record<string, unknown>[] = [];
   input.books.forEach((b, i) => {
