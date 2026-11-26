@@ -12,7 +12,7 @@ import { markPreviewTester, watchFunction } from '../harness/admin';
 import { withAuthRetry } from '../harness/authRetry';
 import { getServerDoc, listServerDocs, setServerDoc } from '../harness/serverDocs';
 import { Home, homeStack } from '../harness/screens';
-import { Phone, type Booted, type OpenApp, revoMomentSeen } from '../harness/phone';
+import { Phone, type Booted, type OpenApp, ramadanIntroSeen, revoMomentSeen } from '../harness/phone';
 import { plainText } from '../../../src/lib/passages';
 
 /** Home and the session in a stack, with Revo mounted as MainNavigator mounts it. */
@@ -561,6 +561,7 @@ it('[ACT-28] [ACT-30] [REVO-23] Revisely Dev tells Revo what Insights’ Gaps an
   setNow('2026-11-09 10:00');
   await markPreviewTester(uid);
   revoMomentSeen(phone, uid);
+  ramadanIntroSeen(phone);
 
   const asks = watchFunction('revoAsk');
   try {

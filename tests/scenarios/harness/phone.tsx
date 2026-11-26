@@ -87,6 +87,11 @@ export function revoMomentSeen(phone: Phone, uid: string): void {
   phone.storage.set(`@revisely_revo_moment_seen:v1:${uid}`, '1');
 }
 
+/** The Ramadan theme's one card (THEME-7) seen on this phone: a Revisely Dev scenario's Home without it in the way. */
+export function ramadanIntroSeen(phone: Phone): void {
+  phone.storage.set('@revisely_ramadan_intro:v1', '1');
+}
+
 export class Phone {
   /** What the app saved on this phone (AsyncStorage), kept across launches. */
   readonly storage = new Map<string, string>();

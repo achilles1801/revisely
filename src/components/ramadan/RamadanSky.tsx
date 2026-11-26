@@ -12,7 +12,7 @@ import { useReduceMotion } from '../../design/motion';
 import { HERO_SHAPE, ramadanV2 } from '../../theme/v2';
 import { Sparkle } from './art';
 
-interface Mote {
+export interface Mote {
   /** Across the screen, 0–1. */
   x: number;
   size: number;
@@ -33,11 +33,15 @@ function noise(i: number, n: number): number {
   return x - Math.floor(x);
 }
 
-export const MOTES: readonly Mote[] = Array.from({ length: 18 }, (_, i) => {
+/** `n` motes spread evenly across, nudged a little, so no gaps or clumps. */
+function makeMotes(n: number): readonly Mote[] {
+  return Array.from({ length: n }, (_, i) => mote(i, n));
+}
+
+function mote(i: number, n: number): Mote {
   const sparkle = i % 4 === 1;
   return {
-    // Spread evenly across, nudged a little, so no gaps or clumps.
-    x: (i + 0.2 + noise(i, 1) * 0.6) / 18,
+    x: (i + 0.2 + noise(i, 1) * 0.6) / n,
     size: sparkle ? 7 + Math.round(noise(i, 2) * 3) : 3 + noise(i, 2) * 2.2,
     sparkle,
     duration: 10000 + noise(i, 3) * 9000,
@@ -45,7 +49,12 @@ export const MOTES: readonly Mote[] = Array.from({ length: 18 }, (_, i) => {
     sway: 5 + noise(i, 5) * 9,
     alpha: 0.55 + noise(i, 6) * 0.45,
   };
-});
+}
+
+/** Home's sky, and every screen's. */
+export const MOTES = makeMotes(18);
+/** The last ten nights' (THEME-5): denser. */
+export const MOTES_DENSE = makeMotes(28);
 
 /** How bright a mote is `p` (0–1) of the way down: in quickly, out slowly before the bottom, twinkling. */
 export function moteOpacity(p: number, phase: number): number {
@@ -56,22 +65,31 @@ export function moteOpacity(p: number, phase: number): number {
   return fadeIn * fadeOut * twinkle;
 }
 
-export function RamadanSky() {
+/**
+ * `height`: how far the light falls before it has faded (Home's: its glow's); `top`: where it starts; `motes`: the sky
+ * (MOTES_DENSE in the last ten nights).
+ */
+export function RamadanSky({
+  height: fall,
+  top = 0,
+  motes = MOTES,
+  testID = 'ramadan-sky',
+}: { height?: number; top?: number; motes?: readonly Mote[]; testID?: string } = {}) {
   const { isDark, palette } = useTheme();
   const tokens = ramadanV2(isDark, palette.accent);
   const { width } = useWindowDimensions();
   const reduceMotion = useReduceMotion();
   const focused = useIsFocused();
-  const height = isDark ? HERO_SHAPE.dark.height : HERO_SHAPE.light.height;
+  const height = fall ?? (isDark ? HERO_SHAPE.dark.height : HERO_SHAPE.light.height);
   return (
     <View
-      style={[styles.layer, { height }]}
+      style={[styles.layer, { top, height }]}
       pointerEvents="none"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      testID="ramadan-sky"
+      testID={testID}
     >
-      {MOTES.map((m, i) => (
+      {motes.map((m, i) => (
         <MoteView
           key={i}
           mote={m}

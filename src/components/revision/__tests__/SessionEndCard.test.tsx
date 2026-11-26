@@ -10,7 +10,17 @@ jest.mock('@expo/vector-icons', () => {
   return { Ionicons: ({ name }: { name: string }) => <RNText testID={`icon-${name}`}>{name}</RNText> };
 });
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
-jest.mock('../../v2/Confetti', () => ({ Confetti: () => null }));
+jest.mock('../../v2/Confetti', () => {
+  const { View } = require('react-native');
+  return { Confetti: () => <View testID="confetti" /> };
+});
+// The Ramadan theme's end card (THEME-7; the scenario ramadanTheme runs it for real): what the hook says, by hand.
+const mockRamadan = { dressed: false, line: null as string | null, khatmah: false };
+jest.mock('../../ramadan/useRamadanEndCard', () => ({ useRamadanEndCard: () => mockRamadan }));
+jest.mock('../../ramadan/EndCardDecor', () => {
+  const { View } = require('react-native');
+  return { EndCardDecor: ({ khatmah }: { khatmah: boolean }) => <View testID={khatmah ? 'decor-khatmah' : 'decor'} /> };
+});
 
 async function show(props: React.ComponentProps<typeof SessionEndCard>) {
   render(
@@ -53,5 +63,32 @@ describe('SessionEndCard: the done check', () => {
     const { Ionicons } = require('@expo/vector-icons');
     expect(boxedMarks(screen.UNSAFE_root as never, Ionicons)).toBe(1);
     expect(offCentreMarks(screen.UNSAFE_root as never, Ionicons)).toEqual([]);
+  });
+});
+
+describe('SessionEndCard in Ramadan (THEME-7)', () => {
+  afterEach(() => Object.assign(mockRamadan, { dressed: false, line: null, khatmah: false }));
+
+  it('draws the theme’s light and lanterns instead of the confetti, and the day of the month under the count', async () => {
+    Object.assign(mockRamadan, { dressed: true, line: 'Day 12 of Ramadan' });
+    await show({ total: 3, done: 3, celebrate: 1 });
+    expect(screen.getByTestId('decor')).toBeTruthy();
+    expect(screen.queryByTestId('confetti')).toBeNull();
+    expect(screen.getByText('Day 12 of Ramadan')).toBeTruthy();
+    expect(screen.queryByTestId('session-end-khatmah')).toBeNull();
+  });
+
+  it('adds the khatmah card when the hook says it is the moment', async () => {
+    Object.assign(mockRamadan, { dressed: true, line: 'Day 26 of Ramadan', khatmah: true });
+    await show({ total: 3, done: 3, celebrate: 1 });
+    expect(screen.getByTestId('decor-khatmah')).toBeTruthy();
+    expect(screen.getByText('You’ve been through the whole Qur’an this Ramadan')).toBeTruthy();
+    expect(screen.getByText('All 604 pages since 1 Ramadan')).toBeTruthy();
+  });
+
+  it('keeps the confetti outside Ramadan', async () => {
+    await show({ total: 3, done: 3, celebrate: 1 });
+    expect(screen.getByTestId('confetti')).toBeTruthy();
+    expect(screen.queryByTestId('decor')).toBeNull();
   });
 });

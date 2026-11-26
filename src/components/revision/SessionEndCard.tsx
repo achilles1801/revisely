@@ -12,6 +12,10 @@ import type { Milestone } from '../../lib/badges';
 import { Tap } from '../v2/Tap';
 import { t } from '../../i18n';
 import { chevron } from '../../i18n/direction';
+import { Crescent } from '../ramadan/art';
+import { EndCardDecor } from '../ramadan/EndCardDecor';
+import { useRamadanEndCard } from '../ramadan/useRamadanEndCard';
+import { ramadanV2 } from '../../theme/v2';
 
 /**
  * After a revision session's last page, as one more page: swiping onto it
@@ -22,7 +26,9 @@ import { chevron } from '../../i18n/direction';
  * goes, and Back leaves it. When every page is done and a next revision day
  * exists, Keep going continues into its pages (#168). A session that was
  * recorded offers Listen back: the recording over its pages. After a good
- * moment, one quiet line asks for a rating (SESS-8, lib/rateAsk).
+ * moment, one quiet line asks for a rating (SESS-8, lib/rateAsk). In Ramadan, with the theme on (THEME-7), gold
+ * falling light and lanterns take the confetti's place, a line says the day of the month, and once a Ramadan a card
+ * marks the khatmah.
  */
 export function SessionEndCard({
   total,
@@ -60,9 +66,11 @@ export function SessionEndCard({
   /** A badge this session won (ACCOUNT-6): one quiet row under the totals, this once. */
   newBadge?: Milestone | null;
 }) {
-  const { palette } = useTheme();
+  const { palette, isDark } = useTheme();
   const reduceMotion = useReduceMotion();
   const complete = total > 0 && done >= total;
+  const ramadan = useRamadanEndCard(complete);
+  const gold = ramadanV2(isDark, palette.accent);
   const colors = useMemo(
     () => [palette.done, palette.heat[2], palette.heat[3], palette.heat[4], palette.heat[1]],
     [palette],
@@ -83,7 +91,11 @@ export function SessionEndCard({
 
   return (
     <View style={styles.card} testID="session-end-card">
-      {complete ? <Confetti trigger={celebrate} colors={colors} origin={{ x: 0.5, y: 0.38 }} /> : null}
+      {ramadan.dressed ? (
+        <EndCardDecor khatmah={ramadan.khatmah} />
+      ) : complete ? (
+        <Confetti trigger={celebrate} colors={colors} origin={{ x: 0.5, y: 0.38 }} />
+      ) : null}
       <View style={styles.body} accessible accessibilityRole="summary" testID="session-end-summary">
         {complete ? (
           <Reanimated.View style={[styles.check, { borderColor: palette.done }, checkStyle]} testID="session-end-check">
@@ -105,6 +117,29 @@ export function SessionEndCard({
               : t('revision.end.revisedToday', { count: total })
             : t('revision.end.swipeBack')}
         </Text>
+        {ramadan.line ? (
+          <View style={styles.ramadanLine} testID="session-end-ramadan">
+            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              <Crescent size={14} tokens={gold} />
+            </View>
+            <Text style={[typeV2.body, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+              {ramadan.line}
+            </Text>
+          </View>
+        ) : null}
+        {ramadan.khatmah ? (
+          <View style={[styles.khatmah, { borderColor: gold.gold }]} testID="session-end-khatmah">
+            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              <Crescent size={28} tokens={gold} />
+            </View>
+            <Text style={[typeV2.name, styles.center, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
+              {t('ramadan.khatmah.title')}
+            </Text>
+            <Text style={[typeV2.meta, styles.center, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+              {t('ramadan.khatmah.line')}
+            </Text>
+          </View>
+        ) : null}
       </View>
       {complete && newBadge ? <NewBadgeRow milestone={newBadge} /> : null}
       {complete && next && onKeepGoing ? (
@@ -161,6 +196,8 @@ const styles = StyleSheet.create({
   body: { alignItems: 'center', gap: 8 },
   keep: { alignItems: 'center', gap: 12 },
   rate: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  ramadanLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  khatmah: { alignItems: 'center', gap: 4, marginTop: 14, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 16, borderWidth: 1 },
   check: {
     width: 64,
     height: 64,
