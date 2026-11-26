@@ -37,7 +37,7 @@ import {
 } from '../../lib/reciteInsights/describe';
 import { markFill } from '../reciteLive/markColours';
 import { WordChip } from '../reciteLive/WordChip';
-import { useFirstSection } from './sectionPlace';
+import { useFirstSection, useSectionAlone } from './sectionPlace';
 import { t } from '../../i18n';
 import { chevron, forwardIcon } from '../../i18n/direction';
 
@@ -72,6 +72,7 @@ export function RecitationInsights({ records, words, today, window, inWords, sma
   const { palette } = useTheme();
   // First on Insights (ACT-29): no hairline above it.
   const first = useFirstSection();
+  const alone = useSectionAlone();
   const [allSlipping, setAllSlipping] = useState(false);
   const ins = useMemo(() => recitationInsights(records, today, window, words), [records, today, window, words]);
   const strong = useMemo(
@@ -98,14 +99,19 @@ export function RecitationInsights({ records, words, today, window, inWords, sma
     );
   }
   return (
-    <View style={[styles.section, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID="insights-recitation">
+    <View style={[styles.section, !first && !alone && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID="insights-recitation">
       <View style={styles.head}>
+        {/* Alone on its own page (ACT-35): the top bar names it. */}
+        {alone ? (
+          <View style={styles.flex} />
+        ) : (
         <View style={styles.flex}>
           <ChromeText style={[styles.title, { color: palette.text }]} accessibilityRole="header">
             {t('activity.recitation.title')}
           </ChromeText>
           <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{t('activity.recitation.detail', { span: inWords })}</ChromeText>
         </View>
+        )}
         {revo ? (
           <Tap
             onPress={() => openRevo({ attach: insightAttachment('recitation') })}

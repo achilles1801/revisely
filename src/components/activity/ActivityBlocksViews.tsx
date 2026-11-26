@@ -407,7 +407,7 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
   if (section) {
     return (
       <RNView testID="activity-blocks-views">
-        <InsightsView data={insightsData} {...insightsActions} sections={{ order: [section], hidden: [] }} />
+        <InsightsView data={insightsData} {...insightsActions} sections={{ order: [section], hidden: [] }} alone />
       </RNView>
     );
   }

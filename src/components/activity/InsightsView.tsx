@@ -68,7 +68,7 @@ import { GapsSection } from './GapsSection';
 import type { PushBack } from '../../lib/gapsCycle';
 import { gapsView } from '../../lib/insightsGaps';
 import { RecitationInsights } from './RecitationInsights';
-import { FirstSection, useFirstSection } from './sectionPlace';
+import { FirstSection, SectionAlone, useFirstSection, useSectionAlone } from './sectionPlace';
 import { SectionRow } from './SectionRow';
 import { DEFAULT_SECTIONS, sectionsToShow, type InsightsSection, type TabLayout } from '../../lib/activitySections';
 import { stillMarkedWords } from '../../lib/reciteInsights/insights';
@@ -181,6 +181,7 @@ export function InsightsView({
   onOpenLastRevised,
   mode = 'page',
   onOpenSection,
+  alone = false,
 }: {
   data: InsightsData;
   onReviseTomorrow: (pages: number[]) => void;
@@ -211,6 +212,8 @@ export function InsightsView({
    */
   mode?: 'page' | 'rows';
   onOpenSection?: (id: InsightsSection) => void;
+  /** A section's own page (ACT-35): drawn without its title, which the page's top bar gives. */
+  alone?: boolean;
 }) {
   const { palette } = useTheme();
   // The juz sheet (ACT-21): mounted from its first opening on, so it can slide away after.
@@ -379,7 +382,7 @@ export function InsightsView({
     <View testID="activity-insights">
       {shown.map((id, i) => (
         <FirstSection.Provider key={id} value={i === 0}>
-          {part(id)}
+          <SectionAlone.Provider value={alone}>{part(id)}</SectionAlone.Provider>
         </FirstSection.Provider>
       ))}
       {shown.length === 0 ? <NothingShown onEdit={onEditSections} /> : null}
@@ -420,6 +423,16 @@ function Section({
   const { palette } = useTheme();
   // The first section shown has no hairline above it, whichever it is (ACT-29).
   const isFirst = useFirstSection() || first;
+  // Alone on its own page (ACT-35): the top bar names it; its own controls stay, at the end of the first line.
+  const alone = useSectionAlone();
+  if (alone) {
+    return (
+      <View style={styles.section} testID={testID}>
+        {right ? <View style={styles.aloneControls}>{right}</View> : null}
+        {children}
+      </View>
+    );
+  }
   return (
     <View style={[styles.section, !isFirst && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID={testID}>
       <View style={styles.sectionHead}>
@@ -1557,6 +1570,7 @@ function Pace({ data, onOpenDay, row, last }: { data: InsightsData; onOpenDay?: 
 
 const styles = StyleSheet.create({
   later: { paddingHorizontal: layoutV2.gutter, paddingTop: 12, paddingBottom: 4 },
+  aloneControls: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 4 },
   flex: { flex: 1 },
   section: { paddingTop: 18, paddingBottom: 18, paddingHorizontal: 16 },
   sectionHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },

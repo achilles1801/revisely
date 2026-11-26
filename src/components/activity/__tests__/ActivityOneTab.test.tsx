@@ -143,6 +143,9 @@ describe('[ACT-35] one Activity tab', () => {
     expect(screen.queryByTestId('calendar-month')).toBeNull();
     expect(screen.queryByTestId('insights-rows')).toBeNull();
     expect(screen.queryByTestId('insights-consistency')).toBeNull();
+    // The page's top bar names it: the section starts at its figure, with no title or subtitle of its own (board A4).
+    expect(screen.queryByText('Coverage')).toBeNull();
+    expect(screen.queryByText("Which juz you've revised lately")).toBeNull();
   });
 
   it('one range for all of Activity: a choice on the list is the one a section’s page reads', async () => {
