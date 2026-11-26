@@ -30,6 +30,19 @@ const SYSTEM = [
   'Reply with the JSON object only: one line per piece, as many lines as pieces.',
 ].join('\n');
 const SCHEMA = { type: 'object', properties: { lines: { type: 'array', items: { type: 'string' } } }, required: ['lines'], additionalProperties: false };
+// The second pass (passages whose first reply had a different number of lines): each line names its piece.
+const NUMBERED = {
+  type: 'object',
+  properties: {
+    lines: {
+      type: 'array',
+      items: { type: 'object', properties: { piece: { type: 'integer' }, line: { type: 'string' } }, required: ['piece', 'line'], additionalProperties: false },
+    },
+  },
+  required: ['lines'],
+  additionalProperties: false,
+};
+const NUMBERED_SYSTEM = SYSTEM.replace('one line per piece, as many lines as pieces.', 'one line per piece, each with its piece number, for every piece from 1 to the last.');
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(name);
@@ -56,17 +69,17 @@ function passages(dir) {
   return out;
 }
 
-function request(id, p) {
-  const numbered = p.pieces.map(([a, b], i) => `[${i + 1}] ${p.text.slice(a, b).replace(MARK, '')}`).join('\n');
+function request(id, p, numbered = false) {
+  const pieces = p.pieces.map(([a, b], i) => `[${i + 1}] ${p.text.slice(a, b).replace(MARK, '')}`).join('\n');
   return {
     custom_id: id,
     params: {
       model: MODEL,
       max_tokens: Math.min(16000, 200 + 30 * p.pieces.length),
       thinking: { type: 'disabled' },
-      system: SYSTEM,
-      messages: [{ role: 'user', content: `Tafsir passage on surah ${p.from[0]}, ayat ${p.from[1]} to ${p.to[1]}: ${p.pieces.length} pieces.\n\n${numbered}` }],
-      output_config: { format: { type: 'json_schema', schema: SCHEMA } },
+      system: numbered ? NUMBERED_SYSTEM : SYSTEM,
+      messages: [{ role: 'user', content: `Tafsir passage on surah ${p.from[0]}, ayat ${p.from[1]} to ${p.to[1]}: ${p.pieces.length} pieces.\n\n${pieces}` }],
+      output_config: { format: { type: 'json_schema', schema: numbered ? NUMBERED : SCHEMA } },
     },
   };
 }
@@ -76,7 +89,10 @@ async function submit() {
   const state = arg('--state');
   const max = Number(arg('--max-usd', '3.5'));
   const all = passages(dir);
-  const reqs = [...all].map(([id, p]) => request(id, p));
+  // --ids <file>: only these passages (a JSON list of ids), with numbered lines.
+  const only = arg('--ids') ? new Set(JSON.parse(fs.readFileSync(arg('--ids'), 'utf8'))) : null;
+  if (only) for (const id of [...all.keys()]) if (!only.has(id)) all.delete(id);
+  const reqs = [...all].map(([id, p]) => request(id, p, only !== null));
   const chars = reqs.reduce((n, r) => n + r.params.messages[0].content.length + SYSTEM.length, 0);
   const pieces = [...all.values()].reduce((n, p) => n + p.pieces.length, 0);
   const est = (chars / 1.3) * IN_USD + pieces * 22 * OUT_USD;
@@ -111,13 +127,13 @@ async function collect() {
     output += m.usage?.output_tokens ?? 0;
     try {
       const got = JSON.parse(m.content.find((b) => b.type === 'text').text).lines;
-      if (Array.isArray(got)) lines.set(r.custom_id, got.map((l) => String(l).slice(0, 200)));
+      if (Array.isArray(got)) lines.set(r.custom_id, got);
     } catch {
       bad++;
     }
   }
   let written = 0;
-  let mismatched = 0;
+  const mismatched = new Set();
   for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
     const file = path.join(dir, f);
     const page = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -125,9 +141,21 @@ async function collect() {
     for (const p of page.passages) {
       const got = lines.get(idOf(p));
       if (!got) continue;
-      if (got.length !== p.pieces.length) mismatched++;
-      // One line a piece; a short reply leaves the last pieces without one (they rank on nothing, as before).
-      p.lines = p.pieces.map((_, i) => got[i] ?? '');
+      let byPiece = null;
+      if (got.length > 0 && typeof got[0] === 'object') {
+        // Numbered: each line goes to the piece it names.
+        byPiece = p.pieces.map(() => '');
+        for (const g of got) if (Number.isInteger(g && g.piece) && g.piece >= 1 && g.piece <= p.pieces.length) byPiece[g.piece - 1] = String(g.line || '').slice(0, 200);
+      } else if (got.length === p.pieces.length) {
+        byPiece = got.map((l) => String(l).slice(0, 200));
+      }
+      if (byPiece) {
+        p.lines = byPiece;
+      } else {
+        // A different number of lines can't be matched to the pieces: none until the numbered pass.
+        mismatched.add(idOf(p));
+        p.lines = undefined;
+      }
       changed = true;
     }
     if (changed) {
@@ -136,8 +164,8 @@ async function collect() {
     }
   }
   const usd = input * IN_USD + output * OUT_USD;
-  fs.writeFileSync(arg('--state'), JSON.stringify({ ...state, collectedAt: new Date().toISOString(), input, output, usd, failed: bad, mismatched }, null, 2));
-  console.log(`lines for ${lines.size} passages (${bad} failed, ${mismatched} with a different count); ${written} page files; ${input} in, ${output} out: $${usd.toFixed(2)}`);
+  fs.writeFileSync(arg('--state'), JSON.stringify({ ...state, collectedAt: new Date().toISOString(), input, output, usd, failed: bad, mismatched: [...mismatched] }, null, 2));
+  console.log(`lines for ${lines.size} passages (${bad} failed, ${mismatched.size} with a different count); ${written} page files; ${input} in, ${output} out: $${usd.toFixed(2)}`);
 }
 
 (process.argv[2] === 'collect' ? collect() : submit()).catch((err) => {
