@@ -301,10 +301,13 @@ export default function ActiveRevisionScreen() {
   );
   // Set once markRevised exists (below): the take moved on from `from` to the session's next page.
   const recitedPastRef = useRef<(from: number, to: number) => void>(() => undefined);
+  // Set once handleReachEnd exists (below): the last ayah said on the session's last page.
+  const endOfPagesRef = useRef<(page: number) => void>(() => undefined);
   const recite = useReciteLayer({
     currentPage: recitePage,
     showPage: (page: number) => pagerRef.current?.scrollToPage(page) ?? false,
     onRecitedPast: (from: number, to: number) => recitedPastRef.current(from, to),
+    onEndOfPages: (page: number) => endOfPagesRef.current(page),
     openElsewhere,
     day: sessionDay,
     focused: isScreenFocused,
@@ -534,6 +537,15 @@ export default function ActiveRevisionScreen() {
     const at = shownPages.indexOf(from);
     if (at < 0 || shownPages[at + 1] !== to || !assignedPages.includes(from)) return;
     markRevised(from);
+  };
+
+  // ===== The last ayah said on the session's last page: its end card, as a swipe onto it (RECITE-30) =====
+  // Majd, Nov 26 2026, on the session's last page: "when i finish reciting the last verse it should automatically take me
+  // to the next page"; the next thing a session holds is its end card. The page is marked as the swipe would mark it.
+  endOfPagesRef.current = (page: number) => {
+    if (page !== shownPages[shownPages.length - 1]) return;
+    if (!pagerRef.current?.scrollToEnd()) return;
+    handleReachEnd(page, true);
   };
 
   // ===== Swipe-to-credit =====

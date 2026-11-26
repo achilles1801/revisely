@@ -54,7 +54,7 @@ jest.mock('../../../components/MushafPager', () => {
           endCard?: React.ReactNode;
           pageUnderlay?: (page: number, scale: number) => React.ReactNode;
         },
-        ref: React.Ref<{ scrollToPage: (p: number) => boolean }>,
+        ref: React.Ref<{ scrollToPage: (p: number) => boolean; scrollToEnd: () => boolean }>,
       ) => {
         mockPager.pages = props.pages;
         mockPager.initialPage = props.initialPage;
@@ -67,6 +67,11 @@ jest.mock('../../../components/MushafPager', () => {
             if (!props.pages?.includes(p)) return false;
             mockPager.scrolled.push(p);
             props.onPageChange?.(p);
+            return true;
+          },
+          scrollToEnd: () => {
+            if (props.endCard == null) return false;
+            mockPager.scrolled.push('end' as never);
             return true;
           },
         }));
@@ -1025,7 +1030,8 @@ describe('ActiveRevisionScreen — Recite (Revisely Dev)', () => {
     expect(mockPager.scrolled).toEqual([380]);
   });
 
-  it('[RECITE-30] the last ayah said on the session’s last page: nothing turns', async () => {
+  it('[RECITE-30] the last ayah said on the session’s last page: the end card shows, the page marked as a swipe onto it would', async () => {
+    // Majd's take, Nov 26 2026: page 341, the session's last page, "it didn't work".
     await live([379]);
     fireEvent.press(screen.getByTestId('recite-mic'));
     await flush();
@@ -1034,8 +1040,24 @@ describe('ActiveRevisionScreen — Recite (Revisely Dev)', () => {
     await event({ type: 'locked', w: A23, s: 27, a: 23 });
     const last379 = words.pageRange(379)[1] - 1;
     await event({ type: 'at', w: last379 });
-    await event({ type: 'said', upTo: last379 });
     expect(mockPager.scrolled).toEqual([]);
+    await event({ type: 'said', upTo: last379 });
+    expect(mockPager.scrolled).toEqual(['end']);
+    expect(pagesSheet().props.done.has(379)).toBe(true);
+  });
+
+  it('[RECITE-30] on the session’s last page in a noisy room: the end card after 1.5 s on its last word', async () => {
+    await live([379]);
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    await flush();
+    await flush();
+    await event({ type: 'ready', take: 't1', protocol: 6 });
+    await event({ type: 'locked', w: A23, s: 27, a: 23 });
+    const last379 = words.pageRange(379)[1] - 1;
+    await event({ type: 'said', upTo: last379 - 1 });
+    await event({ type: 'at', w: last379 });
+    await act(() => new Promise((r) => setTimeout(r, 1700)));
+    expect(mockPager.scrolled).toEqual(['end']);
   });
 });
 

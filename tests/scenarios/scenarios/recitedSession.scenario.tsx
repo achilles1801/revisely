@@ -29,7 +29,7 @@ jest.mock('../../../src/lib/reciteLive/socket', () => ({
 
 const say = (app: OpenApp, e: LiveEvent) => app.act(async () => mockChecker.onEvent?.(e));
 
-it('[RECITE-9] [RECITE-30] [SESS-1] a take in a session turns its pages with the reciter and marks each page they finish; a swipe still marks the page it leaves', async () => {
+it('[RECITE-9] [RECITE-30] [SESS-1] a take in a session turns its pages with the reciter and marks each page they finish, the last page onto the end card; a swipe still marks the page it leaves', async () => {
   setZone(ZONES.kolkata);
   setNow('2026-11-17 20:00');
   const phone = new Phone();
@@ -76,8 +76,17 @@ it('[RECITE-9] [RECITE-30] [SESS-1] a take in a session turns its pages with the
   // A swipe on, during the take: the page it leaves is marked, as always.
   await session.swipe();
   expect(session.current()).toBe(3);
+  // On to the session's last page by hand, and its last ayah said: the end card, the page marked as a swipe onto it
+  // would (Majd's take of Nov 26 2026 was on a session's last page: "it didn't work").
+  await session.swipe();
+  await session.swipe();
+  expect(session.current()).toBe(5);
+  const last5 = words.pageRange(5)[1] - 1;
+  await say(app, { type: 'at', w: last5 });
+  await say(app, { type: 'said', upTo: last5 });
+  await app.idle(30);
   await session.back();
   await app.untilSynced();
-  expect(app.app.logs.map((l) => [l.date, l.pagesRevised])).toEqual([['2026-11-17', [1, 2]]]);
+  expect(app.app.logs.map((l) => [l.date, l.pagesRevised])).toEqual([['2026-11-17', [1, 2, 3, 4, 5]]]);
   await app.close();
 });
