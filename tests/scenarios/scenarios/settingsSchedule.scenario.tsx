@@ -19,6 +19,8 @@ function stack(mods: Booted): ReactElement {
   const PlanEdit = req<any>('src/screens/main/PlanEditScreen').default;
   const { ReadingTimerProvider } = req<any>('src/context/ReadingTimerContext');
   const { RevoHost } = req<any>('src/components/revo/RevoHost');
+  // Edit schedule's sheets render into this, as in App.tsx.
+  const { BottomSheetModalProvider } = req<any>('@gorhom/bottom-sheet');
   const { navigationRef } = req<any>('src/navigation/navigationRef');
   const nav = req<{ navigation: { current: unknown } }>('./navRef');
   const Stack = createNativeStackNavigator();
@@ -29,23 +31,27 @@ function stack(mods: Booted): ReactElement {
     navigationRef.current = r;
   };
   return h(
-    ReadingTimerProvider,
+    BottomSheetModalProvider,
     null,
     h(
-      NavigationContainer,
-      { ref },
+      ReadingTimerProvider,
+      null,
       h(
-        Stack.Navigator,
-        { screenOptions: { headerShown: false, animation: 'none' } },
-        h(Stack.Screen, { name: 'Dashboard', component: Dashboard }),
-        h(Stack.Screen, { name: 'Settings', component: Settings }),
-        h(Stack.Screen, { name: 'PlanEdit', component: PlanEdit }),
-        ...['ActiveRevision', 'PlanDayEdit', 'Memorization', 'Activity', 'ActivityAll', 'ActivityDay', 'Insights'].map((name) =>
-          h(Stack.Screen, { key: name, name, component: Elsewhere }),
+        NavigationContainer,
+        { ref },
+        h(
+          Stack.Navigator,
+          { screenOptions: { headerShown: false, animation: 'none' } },
+          h(Stack.Screen, { name: 'Dashboard', component: Dashboard }),
+          h(Stack.Screen, { name: 'Settings', component: Settings }),
+          h(Stack.Screen, { name: 'PlanEdit', component: PlanEdit }),
+          ...['ActiveRevision', 'PlanDayEdit', 'Memorization', 'Activity', 'ActivityAll', 'ActivityDay', 'Insights'].map((name) =>
+            h(Stack.Screen, { key: name, name, component: Elsewhere }),
+          ),
         ),
       ),
+      h(RevoHost),
     ),
-    h(RevoHost),
   );
 }
 
