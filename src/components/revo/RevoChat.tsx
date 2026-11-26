@@ -27,7 +27,9 @@ import { refreshRevoRelease } from '../../lib/revo/release';
 import { RevoComposer } from './RevoComposer';
 import { TafsirSources } from './TafsirSources';
 import { Chips, ContextChip, FeedbackRow, LimitCard, ReviewRow, RevoHeader, RevoText, Typing, UserBubble } from './RevoParts';
-import type { RevoQuranOpen } from '../../lib/revo/open';
+import { pageScope, type RevoQuranOpen } from '../../lib/revo/open';
+import { describePassage, plainText } from '../../lib/passages';
+import { isDevVariant } from '../../lib/variant';
 import { t } from '../../i18n';
 
 /**
@@ -148,7 +150,14 @@ export function RevoChat({
   );
   // From the mushaf, a new conversation is about the page or ayah (REVO-45): its own line and starters.
   const fromMushaf = quran != null && !chatId;
-  const greeting = fromMushaf ? t(quran.kind === 'page' ? 'revo.tafsir.greetingPage' : 'revo.tafsir.greetingAyah') : (opener?.text ?? null);
+  // Revisely Dev (REVO-46): while today isn't done, the greeting offers the tafsir of the next page to revise.
+  const nextPage = !fromMushaf && !chatId && (place == null || place.kind === 'home') && isDevVariant() && context && !context.today.done ? (context.today.nextPages[0] ?? null) : null;
+  const nextOffer: RevoQuranOpen | null = nextPage ? { scope: pageScope(nextPage), label: plainText(describePassage([nextPage])), kind: 'page' } : null;
+  const greeting = fromMushaf
+    ? t(quran.kind === 'page' ? 'revo.tafsir.greetingPage' : 'revo.tafsir.greetingAyah')
+    : opener?.text && nextOffer
+      ? `${opener.text} ${t('revo.tafsir.nextOffer', { place: nextOffer.label })}`
+      : (opener?.text ?? null);
   const lastRevo = [...messages].reverse().find((m) => m.role === 'revo');
   const chips = chatId
     ? (lastRevo?.chips ?? [])
@@ -156,14 +165,15 @@ export function RevoChat({
       ? quran.kind === 'page'
         ? [t('revo.tafsir.startPage1'), t('revo.tafsir.startPage2'), t('revo.tafsir.startPage3')]
         : [t('revo.tafsir.startAyah1'), t('revo.tafsir.startAyah2'), t('revo.tafsir.startAyah3')]
-      : (opener?.chips ?? []);
+      : [...(nextOffer ? [t('revo.tafsir.nextChip')] : []), ...(opener?.chips ?? [])].slice(0, 3);
 
   const ask = async (question: string) => {
     const ctx = build();
     if (!ctx) return;
     const sent = attachments;
     setRefusal(null);
-    const about = quran;
+    // The greeting's offer (REVO-46) asks about the next page; otherwise the page or ayah from the mushaf, if any.
+    const about = nextOffer && question === t('revo.tafsir.nextChip') ? nextOffer : quran;
     setPending({
       text: question,
       attached: [...(about && !chatId ? [{ kind: 'quran', label: about.label }] : []), ...sent.map((a) => ({ kind: a.kind, label: a.label }))],

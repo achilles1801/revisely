@@ -417,6 +417,9 @@ export const revo = {
   /** Answers from the tafsir (Revisely Dev, REVO-44): the books' words under an answer. */
   tafsir: {
     fromTheTafsir: 'From the tafsir',
+    /** Revisely Dev (REVO-46): the greeting's offer of the next page's tafsir, and its starter. */
+    nextOffer: 'Want what the tafsir says about {{place}} before you go on?',
+    nextChip: 'What does the tafsir say?',
     greetingPage: 'Ask me anything about this page. I answer only from the tafsir, and show you where.',
     greetingAyah: 'Ask me anything about this ayah. I answer only from the tafsir, and show you where.',
     startPage1: 'What’s happening here?',

@@ -499,11 +499,12 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Questions about the Qur’an',
-    covers: ['REVO-44', 'REVO-45'],
+    covers: ['REVO-44', 'REVO-45', 'REVO-46'],
     routes: [],
     text: [
       '- Qur’an questions: answered only from al-Tabari, Ibn Kathir, al-Qurtubi and al-Sa’di, the books’ words under “From the tafsir” (a tap shows the passage); if they don’t say, Revo says so. No rulings. Counted.',
       '- Asked from the R at a page’s foot or a held ayah’s “Ask Revo” (never in a session); Settings → Revo AI → “In the mushaf” hides both.',
+      '- From Home, while today isn’t done, the greeting offers the next page’s tafsir: “What does the tafsir say?”',
     ].join('\n'),
   },
   {

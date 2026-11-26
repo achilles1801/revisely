@@ -168,3 +168,7 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
     ayah's menu gets "Ask Revo" through `useVerseActions({ onAskRevo })`, which only the reader passes (never a
     session). Settings → Revo AI → "In the mushaf" saves `mushafOn` through `revoSetOptions`; the section's footer is
     the one quiet line naming the four tafsirs (Majd: "more subtle").
+  - **The greeting** (REVO-46): in Revisely Dev, opened from Home while today isn't done, `RevoChat` adds one sentence
+    offering the next page's tafsir (`context.today.nextPages[0]`) and puts "What does the tafsir say?" first among the
+    starters; that starter sends the page's `quran`. A one-line summary of each page from the tafsir, written ahead in a
+    batch, would let the greeting say the meaning itself; it waits on Majd's yes for the spend (~$7 with the chips).

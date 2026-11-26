@@ -1667,6 +1667,11 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   that ayah. Their questions are answered from the tafsir (REVO-44). Never in a revision session. Turned off, neither
   shows. Settings → Revo AI's footer says in one line that answers about the Qur'an come only from the four tafsirs.
 
+- **REVO-46.** (Revisely Dev) While today isn't done, Revo's greeting from Home ends by offering the tafsir of the next
+  page to revise ("Want what the tafsir says about Al-Hashr, 4th page before you go on?"), and its first starter, "What
+  does the tafsir say?", asks about that page: answered from the tafsir (REVO-44), and counted as a question. Once
+  today is done, or opened from another screen, the greeting is as before (REVO-35).
+
 ## Memorizing
 
 - **MEM-1.** What is memorized is kept by the ayah (most people memorize ayahs, not pages: Majd, Nov 7

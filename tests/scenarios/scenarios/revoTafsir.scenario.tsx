@@ -255,3 +255,30 @@ it('[REVO-45] [REVO-25] [REVO-44] Revo in the mushaf (Revisely Dev): an R at the
     await app.close();
   }
 });
+
+it('[REVO-46] [REVO-35] Revo’s greeting from Home (Revisely Dev), while today isn’t done, offers the tafsir of the next page, and its starter asks about that page', async () => {
+  setZone(ZONES.amman);
+  setNow('2026-11-26 10:00');
+  const phone = new Phone('phone');
+  let app = await newAccount(phone, { memorized: pagesRange(1, 20), user: { dailyPageCapacity: 5 } });
+  const uid = app.uid;
+  await app.untilSynced();
+  await app.close();
+  await markPreviewTester(uid);
+  await setServerDoc(`coachSettings/${uid}`, { revoOn: true });
+  revoMomentSeen(phone, uid);
+  const asks = watchFunction('revoAsk');
+  try {
+    app = await phone.open(revoStack);
+    await new Home(app).ready();
+    await tap(app, 'revo-button');
+    // Today starts at Al-Fatihah (pages 1–5 today): the greeting ends with the offer, and the first starter takes it.
+    await app.until(() => app.screen.queryByText(/Want what the tafsir says about Al-Fatihah before you go on\?/) != null, 'the offer');
+    await tap(app, 'revo-chip-What does the tafsir say?');
+    await app.until(() => asks.calls === 1, 'the question');
+    expect(asks.sent[0]).toMatchObject({ question: 'What does the tafsir say?', quran: { from: [1, 1], to: [1, 7] } });
+  } finally {
+    asks.restore();
+    await app.close();
+  }
+});
