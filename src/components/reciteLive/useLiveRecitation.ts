@@ -208,6 +208,12 @@ export function keepsAudio(mode: LiveMode, saveRecording: boolean, day: string |
   return mode === 'check' && saveRecording && day != null;
 }
 
+/** Revisely Dev only: a breadcrumb on each page-turn decision at a page's end (numbers only, never words or audio). */
+function turnTrail(step: string, data: Record<string, unknown>): void {
+  if (!isDevVariant()) return;
+  Sentry.addBreadcrumb({ category: 'recite', message: `page turn: ${step}`, data });
+}
+
 /**
  * A live take on the reader (Revisely Dev): the microphone streams to the checker's `/live`, and its events become
  * what the page and the bar show (lib/reciteLive/state). The reciter's place turns the page; a page turned by hand
@@ -1138,7 +1144,9 @@ export function useLiveRecitation({
     const from = pageRef.current;
     turningTo.current = page;
     // A page the screen doesn't hold (past a session's last page) isn't turned to: nothing to wait for.
-    if (onShowPageRef.current(page) === false) {
+    const shown = onShowPageRef.current(page);
+    turnTrail('jump', { from, to: page, recitedPast, shown: shown !== false });
+    if (shown === false) {
       turningTo.current = null;
       return;
     }
@@ -1166,8 +1174,13 @@ export function useLiveRecitation({
     saidBefore.current = live ? saidUpTo : null;
     if (!live || saidUpTo == null || !words || endWord.current != null) return;
     const page = pageRef.current;
-    if (cursorPage.current !== page || page >= 604) return;
     const last = words.pageRange(page)[1] - 1;
+    // Where the page turn at a page's end decides, for Revisely Dev's breadcrumbs (J6, Nov 26 2026: the frames came, the
+    // page didn't turn on a phone).
+    if (saidUpTo >= last - 1) {
+      turnTrail('said', { page, said: saidUpTo, last, before, cursor: state.cursor, cursorPage: cursorPage.current });
+    }
+    if (cursorPage.current !== page || page >= 604) return;
     if (saidUpTo >= last && (before == null || before < last)) turnTo(page + 1, true);
   }, [live, saidUpTo, words, turnTo]);
 
