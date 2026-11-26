@@ -90,7 +90,7 @@ describe('Revo’s reply schema', () => {
 
   it('[REVO-43] a drafted schedule: kept for Revisely Dev only, in range, and never for the store app', () => {
     const drafts = [
-      { kind: 'draftSchedule', title: 'A new schedule', detail: '6 pages a day, a weekly rest day', mode: 'pages', perDay: 6, restEvery: 7 },
+      { kind: 'draftSchedule', title: 'A new schedule', detail: '6 pages a day, Fridays off', mode: 'pages', perDay: 6, restDays: [5] },
       { kind: 'draftSchedule', title: 'A new schedule', detail: 'A juz a day, from An-Nas back', mode: 'juz', perDay: 1, reverse: true },
     ];
     for (const action of drafts) {
@@ -102,7 +102,9 @@ describe('Revo’s reply schema', () => {
     const out = (a: object) => parseReply(JSON.stringify({ ...base, action: { kind: 'draftSchedule', title: 'x', detail: '', ...a } }), allowed, { firstTurn: true, drafts: true })!.action;
     expect(out({ mode: 'pages', perDay: 41 })).toBeUndefined();
     expect(out({ mode: 'juz', perDay: 4 })).toBeUndefined();
-    expect(out({ mode: 'pages', perDay: 6, restEvery: 1 })).toBeUndefined();
+    expect(out({ mode: 'pages', perDay: 6, restDays: [7] })).toBeUndefined();
+    expect(out({ mode: 'pages', perDay: 6, restDays: [1, 2, 3, 4] })).toBeUndefined();
+    expect(out({ mode: 'juz', perDay: 1, restDays: [5] })).toBeUndefined();
     expect(out({ mode: 'hours', perDay: 6 })).toBeUndefined();
     // A reverse that isn't true is left out.
     expect(out({ mode: 'pages', perDay: 6, reverse: false })).toEqual({ kind: 'draftSchedule', title: 'x', detail: '', mode: 'pages', perDay: 6 });

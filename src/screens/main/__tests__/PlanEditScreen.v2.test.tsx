@@ -201,14 +201,14 @@ describe('the schedule’s help (HELP-1, HELP-3)', () => {
 
 describe('the schedule in the new design', () => {
   it('[REVO-43] a schedule Revo drafted opens filled in, marked not saved, with Save on; nothing is saved yet', async () => {
-    // 30 pages in days of 5, a rest day after every 3: 6 days and 2 rest days.
-    mockRoute.params = { draft: { mode: 'pages', perDay: 5, restEvery: 4 } };
+    // 30 pages at 5 a day with one weekday off: 6 days fit in one week, so a round of 7 days with 1 rest day.
+    mockRoute.params = { draft: { mode: 'pages', perDay: 5, restDays: [5] } };
     await mount(<PlanEditScreen />);
     expect(mockNavigation.setParams).toHaveBeenCalledWith({ draft: undefined });
     expect(screen.getByTestId('plan-revo-draft')).toBeTruthy();
     expect(screen.getByText('Revo’s schedule, not saved yet. Nothing changes until you tap Save.')).toBeTruthy();
     expect(screen.getByText('5 pages a day')).toBeTruthy();
-    expect(screen.getByText('Every page comes round every 8 days')).toBeTruthy();
+    expect(screen.getByText('Every page comes round every 7 days')).toBeTruthy();
     expect(screen.getByTestId('plan-save').props.accessibilityState).toMatchObject({ disabled: false });
     expect(mockApp.saveUser).not.toHaveBeenCalled();
   });

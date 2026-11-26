@@ -316,7 +316,7 @@ export type RevoAction =
   | { kind: 'startRevision'; title: string; detail: string }
   | { kind: 'openScreen'; title: string; detail: string; screen: RevoScreen; section?: RevoSettingsSection; surah?: number; juz?: number }
   /** (Revisely Dev, REVO-43) A schedule to check in Edit schedule: nothing changes until Save there. */
-  | { kind: 'draftSchedule'; title: string; detail: string; mode: 'pages' | 'juz'; perDay: number; restEvery?: number; reverse?: boolean };
+  | { kind: 'draftSchedule'; title: string; detail: string; mode: 'pages' | 'juz'; perDay: number; restDays?: number[]; reverse?: boolean };
 
 export interface RevoMessage {
   id: string;

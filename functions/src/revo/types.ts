@@ -384,9 +384,9 @@ export type RevoAction =
     }
   /**
    * (Revisely Dev, REVO-43) A schedule to check: the app builds its days and opens Edit schedule filled in, not saved.
-   * Pages a day 1–40 or juz a day 1–3; a rest day after every `restEvery - 1` days (2–14).
+   * Pages a day 1–40 or juz a day 1–3; rest on 1–3 weekdays (0 Sunday … 6 Saturday; pages a day only).
    */
-  | { kind: 'draftSchedule'; title: string; detail: string; mode: 'pages' | 'juz'; perDay: number; restEvery?: number; reverse?: boolean };
+  | { kind: 'draftSchedule'; title: string; detail: string; mode: 'pages' | 'juz'; perDay: number; restDays?: number[]; reverse?: boolean };
 
 export interface RevoMessage {
   id: string;

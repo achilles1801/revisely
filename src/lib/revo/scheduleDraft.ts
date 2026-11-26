@@ -1,11 +1,12 @@
 // A schedule Revo drafts (REVO-43, Revisely Dev; Majd, Nov 25 2026, of the orchestrator's description: "all ur picks for
 // ... #2 are fine"). Revo never changes the schedule: its card shows what would change, and its button opens Edit
 // schedule filled in with these days, not saved. Only Save keeps them. The days are built as "Create new plan" builds
-// them (Balanced or By Juz), from where today starts, with a rest day after every so many days if asked.
+// them (Balanced or By Juz), from where today starts. Rest days are weekdays (the board: "6 pages a day with Fridays
+// off"): the round is then whole weeks counted from today, the day it's saved, so they stay on those weekdays.
 
 import { buildBalancedPlanFromStart, buildJuzPlanFromStart, defaultStartPage, planStats, type PlanDirection } from '../planBuilder';
 import { liveScheduleDays, scheduleAmount } from '../scheduleSummary';
-import { t } from '../../i18n';
+import { t, weekdayName } from '../../i18n';
 import type { User, UserPage } from '../../types';
 
 /** What Revo's draftSchedule action asks for (functions/src/revo/reply.ts checks the same ranges). */
@@ -13,8 +14,8 @@ export interface ScheduleDraft {
   mode: 'pages' | 'juz';
   /** Pages a day (1–40) or juz a day (1–3). */
   perDay: number;
-  /** A rest day after every `restEvery - 1` revision days (2–14); none when absent. */
-  restEvery?: number;
+  /** Weekdays with nothing to revise (0 Sunday … 6 Saturday, 1–3 of them; pages a day only); none when absent. */
+  restDays?: number[];
   reverse?: boolean;
 }
 
@@ -24,19 +25,43 @@ const whole = (v: unknown, min: number, max: number): v is number => typeof v ==
 export function validDraft(d: Partial<ScheduleDraft> | null | undefined): d is ScheduleDraft {
   if (!d || (d.mode !== 'pages' && d.mode !== 'juz')) return false;
   if (!whole(d.perDay, 1, d.mode === 'pages' ? 40 : 3)) return false;
-  if (d.restEvery != null && !whole(d.restEvery, 2, 14)) return false;
+  if (d.restDays != null) {
+    const r = d.restDays;
+    if (d.mode !== 'pages' || !Array.isArray(r) || r.length < 1 || r.length > 3 || new Set(r).size !== r.length) return false;
+    if (!r.every((w) => whole(w, 0, 6))) return false;
+  }
   return d.reverse == null || typeof d.reverse === 'boolean';
 }
 
-/** A rest day after every `every - 1` revision days. */
-export function withRestDays(days: number[][], every: number): number[][] {
+/** `pages` in exactly `n` days, as even as can be (the first ones a page longer). */
+function evenDays(pages: number[], n: number): number[][] {
+  const base = Math.floor(pages.length / n);
+  const extra = pages.length % n;
   const out: number[][] = [];
-  days.forEach((day, i) => {
-    out.push(day);
-    if ((i + 1) % (every - 1) === 0) out.push([]);
-  });
-  // A cycle shorter than one stretch still rests once a round.
-  if (!out.some((d) => d.length === 0) && out.length > 0) out.push([]);
+  let at = 0;
+  for (let i = 0; i < n; i++) {
+    const size = base + (i < extra ? 1 : 0);
+    out.push(pages.slice(at, at + size));
+    at += size;
+  }
+  return out;
+}
+
+/**
+ * Rest on these weekdays: the round becomes whole weeks from `firstWeekday` (today's), as few as hold the pages at no
+ * more than the draft's amount a day, the pages spread evenly over the other days. A custom plan loops from the day it
+ * is saved, so a round of whole weeks keeps the rest days on their weekdays.
+ */
+export function withRestWeekdays(days: number[][], rest: readonly number[], firstWeekday: number): number[][] {
+  const pages = days.flat();
+  if (pages.length === 0) return days;
+  const most = Math.max(...days.map((d) => d.length));
+  const perWeek = 7 - rest.length;
+  const weeks = Math.max(1, Math.ceil(Math.ceil(pages.length / most) / perWeek));
+  const spread = evenDays(pages, weeks * perWeek);
+  const out: number[][] = [];
+  let k = 0;
+  for (let i = 0; i < weeks * 7; i++) out.push(rest.includes((firstWeekday + i) % 7) ? [] : spread[k++]);
   return out;
 }
 
@@ -54,7 +79,7 @@ export function draftScheduleDays(
     d.mode === 'juz'
       ? buildJuzPlanFromStart(memorizedPages, { juzPerDay: d.perDay, startPage: start, direction })
       : buildBalancedPlanFromStart(numbers, { pagesPerDay: d.perDay, startPage: start, direction });
-  if (d.restEvery != null && days.length > 0) days = withRestDays(days, d.restEvery);
+  if (d.restDays != null && d.mode === 'pages' && days.length > 0) days = withRestWeekdays(days, d.restDays, revisionDate.getDay());
   return { days, direction };
 }
 
@@ -66,6 +91,8 @@ export interface DraftRow {
 }
 
 const restWords = (n: number) => (n === 0 ? t('revo.card.restNone') : t('revo.card.restCount', { count: n }));
+/** The weekdays' names, Sunday first: 2 Nov 2025 was a Sunday. */
+const weekdays = (list: readonly number[]) => [...list].sort((a, b) => a - b).map((w) => weekdayName(new Date(2025, 10, 2 + w))).join(', ');
 
 /** The card's rows: how much a day, how often each page comes round, and rest days. */
 export function draftRows(user: User, memorizedPages: UserPage[], revisionDate: Date, d: ScheduleDraft): DraftRow[] {
@@ -77,6 +104,6 @@ export function draftRows(user: User, memorizedPages: UserPage[], revisionDate: 
   return [
     { label: t('revo.card.aDay'), now: scheduleAmount(user, now), draft: nextAmount },
     { label: t('revo.card.aRound'), now: t('revo.card.everyDays', { count: now.length }), draft: t('revo.card.everyDays', { count: next.length }) },
-    { label: t('revo.card.rest'), now: restWords(planStats(now).restDays), draft: restWords(planStats(next).restDays) },
+    { label: t('revo.card.rest'), now: restWords(planStats(now).restDays), draft: d.restDays?.length ? weekdays(d.restDays) : restWords(planStats(next).restDays) },
   ];
 }

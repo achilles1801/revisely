@@ -401,8 +401,8 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
       navigationRef.navigate('Read', { screen: 'QuranReader', params: { pageNumber: action.page } });
     } else if (action.kind === 'draftSchedule') {
       // REVO-43: Edit schedule filled in with the draft, not saved; Home stays beneath, so Back comes home.
-      const { mode, perDay, restEvery, reverse } = action;
-      navigationRef.navigate('Home', { screen: 'PlanEdit', params: { draft: { mode, perDay, restEvery, reverse } }, initial: false });
+      const { mode, perDay, restDays, reverse } = action;
+      navigationRef.navigate('Home', { screen: 'PlanEdit', params: { draft: { mode, perDay, restDays, reverse } }, initial: false });
     } else if (action.kind === 'startRevision') {
       navigationRef.navigate('Home', { screen: 'ActiveRevision', params: undefined, initial: false });
     } else if (action.kind === 'openScreen') {

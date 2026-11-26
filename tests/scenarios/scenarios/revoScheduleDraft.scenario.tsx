@@ -101,22 +101,22 @@ it('[REVO-43] Revo from Edit schedule: the schedule and four starters; its draft
     expect(app.screen.queryByTestId(`revo-chip-${chip}`)).not.toBeNull();
   }
 
-  // A starter asks; the answer drafts 6 pages a day with a rest day a week.
+  // A starter asks; the answer drafts 6 pages a day with Fridays off (the board's example).
   await modelSays(uid, {
-    text: 'Then 6 pages a day with a rest day each week fits.',
+    text: 'Then 6 pages a day with Fridays off fits.',
     chart: null,
     textAfter: null,
-    action: { kind: 'draftSchedule', title: 'A new schedule', detail: '6 pages a day, a weekly rest day', mode: 'pages', perDay: 6, restEvery: 7 },
+    action: { kind: 'draftSchedule', title: 'A new schedule', detail: '6 pages a day with Fridays off', mode: 'pages', perDay: 6, restDays: [5] },
     remember: [],
     title: 'A lighter schedule',
     chips: [],
   });
   await tap(app, 'revo-chip-Make it lighter');
   await app.until(() => app.screen.queryByTestId('revo-plan') != null, 'the draft’s card');
-  // What changes, worked out on the phone: 108 pages in days of 6 is 18 days, and a rest day after every 6: 21.
+  // What changes, worked out on the phone: 108 pages at 6 a day is 18 days, 6 a week around Friday: 3 weeks, 21 days.
   const rows = app.screen.getByTestId('revo-draft-rows');
   const labels = [...new Set(rows.findAll((n: any) => n.props?.accessible === true && typeof n.props.accessibilityLabel === 'string').map((n: any) => n.props.accessibilityLabel))];
-  expect(labels).toEqual(['A day: 10 pages, then 6 pages', 'A round: Every 11 days, then Every 21 days', 'Rest days: None, then 3 a round']);
+  expect(labels).toEqual(['A day: 10 pages, then 6 pages', 'A round: Every 11 days, then Every 21 days', 'Rest days: None, then Friday']);
   // Nothing is saved by the answer.
   expect((await getServerDoc(`users/${uid}`))?.customPlan ?? null).toBeNull();
 
@@ -134,6 +134,7 @@ it('[REVO-43] Revo from Edit schedule: the schedule and four starters; its draft
   expect((await getServerDoc(`users/${uid}`))?.customPlan ?? null).not.toBeNull();
   const days = app.app.user?.customPlan?.days ?? [];
   expect(days).toHaveLength(21);
-  expect(days.filter((d: number[]) => d.length === 0)).toHaveLength(3);
+  // The rest days are the Fridays: today, the day it's saved, is a Wednesday, so days 2, 9 and 16.
+  expect(days.map((d: number[], i: number) => (d.length === 0 ? i : -1)).filter((i: number) => i >= 0)).toEqual([2, 9, 16]);
   await app.close();
 });

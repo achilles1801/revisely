@@ -67,10 +67,10 @@ export const ACTION_SCHEMAS: Record<string, Schema> = {
       detail: text,
       mode: { type: 'string', enum: ['pages', 'juz'] },
       perDay: whole,
-      restEvery: whole,
+      restDays: wholes,
       reverse: { type: 'boolean' },
     },
-    ['restEvery', 'reverse'],
+    ['restDays', 'reverse'],
   ),
 };
 

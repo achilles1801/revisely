@@ -1574,7 +1574,10 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   starters: "Make it lighter", "Finish a round sooner", "Rest one day a week" and "Start a new plan". A schedule Revo
   proposes is a card, "A new schedule": a day, a round and rest days, as they are and with the draft (struck through,
   then the new), worked out on the phone from the account's pages whatever Revo wrote. Its days are built as Create new
-  plan builds them (Balanced, or By Juz), from where today starts, with a rest day after every so many days if asked.
+  plan builds them (Balanced, or By Juz), from where today starts. Rest days are weekdays (the board: "6 pages a day with
+  Fridays off"; pages a day only, one to three): the round is then whole weeks counted from today, the pages spread
+  evenly over the other days, so a plan saved today keeps those weekdays off (a missed day that Keep daily amount carries
+  can still land on one, as in any plan).
   "Check in Edit schedule" opens Edit schedule filled in, marked "Revo's schedule, not saved yet": only Save keeps it,
   and Back leaves the schedule as it was (with Discard changes?, as any edit). Not now hides the card. The store app
   never gets such a card.
