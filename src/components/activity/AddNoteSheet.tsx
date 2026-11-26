@@ -254,9 +254,11 @@ export function AddNoteSheet({
 }
 
 const styles = StyleSheet.create({
-  body: { paddingBottom: 12 },
+  // Both shrink when the sheet is at its tallest over the keyboard: a long note scrolls inside its field,
+  // and the header (Cancel, Add) and Show under stay on screen (SHEET-2).
+  body: { paddingBottom: 12, flexShrink: 1 },
   stamp: { marginTop: 8 },
-  input: { marginTop: 6, minHeight: 72, padding: 0, fontSize: 17, lineHeight: 24, textAlignVertical: 'top' },
+  input: { marginTop: 6, minHeight: 72, flexShrink: 1, padding: 0, fontSize: 17, lineHeight: 24, textAlignVertical: 'top' },
   minutes: { marginTop: 12, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, fontSize: 17 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 16 },
   tagLabel: { marginRight: 4 },
