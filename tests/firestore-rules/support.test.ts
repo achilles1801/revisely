@@ -1,5 +1,6 @@
 import { assertFails, assertSucceeds, RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { getBytes, ref, uploadBytes } from 'firebase/storage';
 import { getTestEnv, cleanupTestEnv } from './setup';
 
 // Revisely Premium and the support program (functions/src/support): the owner may read
@@ -83,11 +84,13 @@ describe('Premium and the support program', () => {
     await assertFails(setDoc(doc(alice, 'supportLimits/alice'), { day: '2026-11-14', links: 0, applies: 0 }));
   });
 
-  it('the console audit log (decisions and role changes) is closed to everyone, staff included', async () => {
+  it('the console audit log (decisions, role changes), invites and access requests are closed to everyone, staff included', async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
       await setDoc(doc(db, 'supportDecisions/d1'), { uid: 'alice', action: 'approve', note: 'internal' });
       await setDoc(doc(db, 'consoleAudit/a1'), { kind: 'role', uid: 'staff', to: 'owner' });
+      await setDoc(doc(db, 'consoleInvites/new@example.com'), { email: 'new@example.com', role: 'labeller', status: 'pending' });
+      await setDoc(doc(db, 'consoleRequests/alice'), { uid: 'alice', email: 'alice@example.com', status: 'pending' });
     });
     const alice = env.authenticatedContext('alice').firestore();
     const owner = env.authenticatedContext('staff', { role: 'owner', admin: true }).firestore();
@@ -97,6 +100,38 @@ describe('Premium and the support program', () => {
       await assertFails(setDoc(doc(db, 'supportDecisions/d2'), { uid: 'alice', action: 'approve' }));
       await assertFails(getDoc(doc(db, 'consoleAudit/a1')));
       await assertFails(setDoc(doc(db, 'consoleAudit/a2'), { kind: 'role', uid: 'staff', to: 'owner' }));
+      // Invites and access requests (console/invites.ts): an invite written by a client would hand out a role.
+      await assertFails(getDoc(doc(db, 'consoleInvites/new@example.com')));
+      await assertFails(setDoc(doc(db, 'consoleInvites/me@example.com'), { email: 'me@example.com', role: 'owner', status: 'pending' }));
+      await assertFails(getDoc(doc(db, 'consoleRequests/alice')));
+      await assertFails(setDoc(doc(db, 'consoleRequests/alice'), { uid: 'alice', status: 'granted' }));
+    }
+  });
+
+  it('recitation clips, their audio and their labels (the console’s /label page) are closed to everyone, staff and labellers included', async () => {
+    const audio = new Uint8Array([0, 1, 2, 3]);
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'reciteLabelClips/c1'), { batch: 'test', status: 'open', marks: '[]' });
+      await setDoc(doc(ctx.firestore(), 'reciteLabelClips/c1/labels/staff'), { by: { uid: 'staff' }, marks: {} });
+      await uploadBytes(ref(ctx.storage(), 'recite-labels/test/c1.m4a'), audio, { contentType: 'audio/mp4' });
+    });
+    const people = [
+      env.authenticatedContext('alice'),
+      env.authenticatedContext('staff', { role: 'owner', admin: true }),
+      env.authenticatedContext('teacher', { role: 'labeller' }),
+      env.unauthenticatedContext(),
+    ];
+    for (const who of people) {
+      const db = who.firestore();
+      await assertFails(getDoc(doc(db, 'reciteLabelClips/c1')));
+      await assertFails(getDocs(collection(db, 'reciteLabelClips')));
+      await assertFails(setDoc(doc(db, 'reciteLabelClips/c2'), { batch: 'test', status: 'open' }));
+      await assertFails(updateDoc(doc(db, 'reciteLabelClips/c1'), { status: 'done' }));
+      // A labeller's own label too: labels go through the console only, which checks and logs them.
+      await assertFails(getDoc(doc(db, 'reciteLabelClips/c1/labels/staff')));
+      await assertFails(setDoc(doc(db, 'reciteLabelClips/c1/labels/teacher'), { by: { uid: 'teacher' }, marks: {} }));
+      await assertFails(getBytes(ref(who.storage(), 'recite-labels/test/c1.m4a')));
+      await assertFails(uploadBytes(ref(who.storage(), 'recite-labels/test/c2.m4a'), audio, { contentType: 'audio/mp4' }));
     }
   });
 
