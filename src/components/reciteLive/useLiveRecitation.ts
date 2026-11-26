@@ -208,6 +208,9 @@ export function keepsAudio(mode: LiveMode, saveRecording: boolean, day: string |
   return mode === 'check' && saveRecording && day != null;
 }
 
+/** How long the reciter's place stays on a page's last word before the next page shows anyway (RECITE-30). */
+export const LAST_WORD_WAIT_MS = 1500;
+
 /**
  * A live take on the reader (Revisely Dev): the microphone streams to the checker's `/live`, and its events become
  * what the page and the bar show (lib/reciteLive/state). The reciter's place turns the page; a page turned by hand
@@ -1170,6 +1173,22 @@ export function useLiveRecitation({
     const last = words.pageRange(page)[1] - 1;
     if (saidUpTo >= last && (before == null || before < last)) turnTo(page + 1, true);
   }, [live, saidUpTo, words, turnTo]);
+
+  // The same once the reciter's place has stayed on the page's last word for LAST_WORD_WAIT_MS: in a noisy room the
+  // checker's `said` often never reaches that word until the next one is begun (its voice detector stays on), so the page
+  // waited for the next ayah (Majd, Nov 26 2026, in a revision session: "homie it didn't work"). On the lab's golden
+  // takes with background babble, `said` reached the page's last word before the place moved on at 40 of 218 page ends;
+  // at 168 of the rest the place sat on that word, 3 s at the median.
+  const cursorNow = state.cursor;
+  useEffect(() => {
+    if (!live || cursorNow == null || !words || endWord.current != null) return;
+    const page = pageRef.current;
+    if (page >= 604 || cursorPage.current !== page || cursorNow !== words.pageRange(page)[1] - 1) return;
+    const timer = setTimeout(() => {
+      if (pageRef.current === page) turnTo(page + 1, true);
+    }, LAST_WORD_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [live, cursorNow, words, turnTo]);
 
   // A spot test stops by itself once the checker has decided its last word (reciting on would add "Added after the
   // end" marks).

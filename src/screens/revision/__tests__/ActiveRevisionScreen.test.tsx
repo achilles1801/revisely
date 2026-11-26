@@ -993,6 +993,38 @@ describe('ActiveRevisionScreen — Recite (Revisely Dev)', () => {
     expect(mockPager.scrolled).toEqual([380]);
   });
 
+  it('[RECITE-30] a noisy room: `said` stops one word short; after 1.5 s on the page’s last word the next page shows and the page left is marked', async () => {
+    await live();
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    await flush();
+    await flush();
+    await event({ type: 'ready', take: 't1', protocol: 6 });
+    await event({ type: 'locked', w: A23, s: 27, a: 23 });
+    const last379 = words.pageRange(379)[1] - 1;
+    // Majd's order (Nov 26 2026): the place reaches the page's last word, `said` stays on the word before it.
+    await event({ type: 'said', upTo: last379 - 1 });
+    await event({ type: 'at', w: last379 });
+    expect(mockPager.scrolled).toEqual([]);
+    await act(() => new Promise((r) => setTimeout(r, 1700)));
+    expect(mockPager.scrolled).toEqual([380]);
+    expect(pagesSheet().props.done.has(379)).toBe(true);
+  });
+
+  it('[RECITE-30] the place only passing the last word (on to the next ayah at once) turns as before, once', async () => {
+    await live();
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    await flush();
+    await flush();
+    await event({ type: 'ready', take: 't1', protocol: 6 });
+    await event({ type: 'locked', w: A23, s: 27, a: 23 });
+    const last379 = words.pageRange(379)[1] - 1;
+    await event({ type: 'at', w: last379 });
+    await event({ type: 'at', w: last379 + 1 });
+    expect(mockPager.scrolled).toEqual([380]);
+    await act(() => new Promise((r) => setTimeout(r, 1700)));
+    expect(mockPager.scrolled).toEqual([380]);
+  });
+
   it('[RECITE-30] the last ayah said on the session’s last page: nothing turns', async () => {
     await live([379]);
     fireEvent.press(screen.getByTestId('recite-mic'));
