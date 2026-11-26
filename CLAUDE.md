@@ -82,7 +82,7 @@ every session must follow goes here. `scripts/__tests__/handbook.test.js` checks
 - **Hand off before your context fills, and name sessions by topic and number** (Majd, Nov 14 2026).
   - Check your context with `mcp__ccd_session_mgmt__get_usage` (session "self") at milestones and before big
     reads. Auto-compaction starts at about 97% and keeps you going, but it loses detail.
-  - At about 93–95% (Majd, Nov 16 2026: "80% is too short to swap sessions, i was thinking closer to 95%"), write a
+  - Past 90% (Majd, Nov 26 2026: "hand off past 90% context btw for all sessions"), write a
     full hand-off doc in `~/Documents/revisely-handoffs/<topic>-<n>.md`, before auto-compaction at about 97%:
     - the goal and scope;
     - where things stand;
