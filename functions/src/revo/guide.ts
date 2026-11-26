@@ -419,7 +419,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- “Recite the mistakes again” and "Recite your N mistakes here" are gone: never offer them. To work on a mistake, recite the passage again.',
       '- A take needs at least one ayah recited (or about a mushaf line of a very long one). Less isn’t kept.',
       // The main guide's line on a take in a session goes with the release's re-record of its replies.
-      '- In a session, going on to the next page while reciting marks the page they finished revised, as a swipe does (✓ or “Pages” takes it back); a jump to a mark’s page marks nothing. Once a page’s last ayah is said, the session’s next page shows and waits for them, even when it isn’t the next page of the Qur’an (on a session’s last page, its end card).',
+      '- In a session, turning the page while reciting marks the page left revised, as a swipe does (✓ or “Pages” takes it back); a jump to a mark’s page marks nothing. Once a page’s last ayah is said, the session’s next page shows and waits (on its last page, the end card).',
       '- The bar writes each word once they’ve said it, in the order said: a repeat or going back shows again, and nothing ahead of their voice.',
       '- “Test me” here is one spot test: a random verse, the page hidden but for it. How far, where from and “Show progress” are in Settings → Mushaf and Recite → Spot tests; it finishes a surah ending near. It ends with “Hasbuk”, or “Stopped early”.',
       '- Settings → Mushaf and Recite → “Keep my recitations as test data” (on by default) keeps each take and its result for Revisely’s tests; software checks them, nobody listens. Every account that recites has it. Settings → Testing → “Premium” turns Premium off to see Mark mistakes locked.',
