@@ -213,7 +213,7 @@ export default {
         }
       ],
       // Revisely Dev only: its widget reads its own App Group and opens revisely-dev:// links, and the native modules
-      // in modules-dev/ (Recite on the phone, Revo's mic) are linked into its builds alone.
+      // in modules-dev/ (Recite on the phone, Revo's mic, the account picture) are linked into its builds alone.
       ...(DEV
         ? [
             "./plugins/withDevVariant",
@@ -225,6 +225,14 @@ export default {
               {
                 microphonePermission: MIC_TEXT,
                 speechRecognitionPermission: "Revisely turns what you say into text when you speak a question to Revo. Nothing is saved unless you send it."
+              }
+            ],
+            [
+              // The account picture (Settings → Account): choose a photo or take one. Images only, never video.
+              "./modules-dev/expo-image-picker/app.plugin.js",
+              {
+                photosPermission: "Revisely uses your photos when you choose a picture for your account. Only you see it.",
+                cameraPermission: "Revisely uses the camera when you take a picture for your account. Only you see it."
               }
             ]
           ]
