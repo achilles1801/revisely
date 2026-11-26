@@ -56,7 +56,7 @@ import { ThemeColors } from '../../theme/v2';
 import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
 import { catchUpDayOf, duePagesOf, insightsPagesOn } from '../../lib/carryOver';
 import { revisablePages } from '../../lib/memorizedAyahs';
-import { creditedOnDay, doneOnDay, sessionCredit } from '../../lib/aheadCredit';
+import { creditedOnDay, doneOnDay, sessionCredit, takeBackCredit } from '../../lib/aheadCredit';
 import { aheadDayLabel, nextRevisionDayPlan, revisionDayPlan, startsCycle, type RevisionDayPlan } from '../../lib/aheadPlan';
 import { describePageRange, describePassage, surahName, surahsOfPages } from '../../lib/passages';
 import {
@@ -461,6 +461,17 @@ function ActiveRevisionScreenBody() {
       );
       // A new round takes back only its own credit: the day keeps its own revision of the page (AHEAD-3).
       if (todaysLog) await updateLog(round ? removeRoundPages(todaysLog, pageDays, unrevised) : removeRevisedPages(todaysLog, unrevised));
+      // A page another session holds for the day it is shown on (revised ahead for it the night before, AHEAD-2): its
+      // credit to that day is taken back there, and that session keeps its revision (AHEAD-6), as in the day's review
+      // (SESS-4). Before, unchecking it changed nothing: the credit stayed, and the page came back checked.
+      const byDay = new Map<string, number[]>();
+      for (const p of unrevised) {
+        const day = pageDays.get(p) ?? revisionDay;
+        byDay.set(day, [...(byDay.get(day) ?? []), p]);
+      }
+      for (const [day, list] of byDay) {
+        for (const changed of takeBackCredit(logsRef.current, day, list, todaysLog?.id ?? revisionDay)) await updateLog(changed);
+      }
       unrevised.forEach((p) => silentlySavedRef.current.delete(p));
     }
   }, [user, assignment, sessionDay, completedPages, pages, localRatings, pageDays, updatePages, addLog, updateLog, heldAsRevised, round]);
