@@ -69,11 +69,11 @@ export const SCREEN_MASKS = {
     android: [{ x: 800, y: 348, w: 205, h: 53, why: 'prayer countdown' }],
   }),
   '08-home-kathmandu': merge(revoButton),
-  // 11-surah-names: Home done after a session, alone and under today's menu and Jump to, in light
+  // 11-surah-names: Home done after a session, alone and under Jump to, in light
   // and dark: 02-home-done's layout. The flow sets no position (subflows/location.yaml), so Home has
   // no prayer line, whatever ran before it in its job.
   ...Object.fromEntries(
-    ['11-home', '11-today-menu', '11-jump-juz', '11-jump-surah']
+    ['11-home', '11-jump-juz', '11-jump-surah']
       .flatMap((n) => [n, `${n}-dark`])
       .map((n) => [n, merge(revoButton, sessionMinutes(1272, 1081))]),
   ),

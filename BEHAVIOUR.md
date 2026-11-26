@@ -403,6 +403,10 @@ current basic sounds". October 2026's version was removed for the voices it offe
 - **HOME-2.** (Revisely Dev) One quiet row under Today, "Today's journal", opens today's journal (Majd, Nov 23 2026: it is
   "a rly big piece of this app and it's almost hidden", "but i wanna avoid clutter on the home page"). It shows today's
   first note, one still waiting to be sent included, or "Add a note" when there is none.
+- **HOME-3.** Where today starts on Home's Today post ends with "Change", which opens Jump to directly (Majd, Nov 25
+  2026: "yes jump to should be option 3 the 'change' one"). There is no menu: Edit schedule is in Settings → Revision
+  (SET-1). Once today is done the word goes, as the › did, and a tap on the line still opens Jump to. (Before: a › that
+  opened a menu of Jump to… and Edit schedule, under today's exact pages.)
 
 ## Sheets and updates
 
@@ -1704,11 +1708,11 @@ shows up once and they must go through it and complete it … just the main stuf
   numbers when it comes to revising or memorizing ... it should just be the page"). One page is "Maryam, 5th page" (its
   first "1st page", its last "last page"; a surah of a page or less, its name alone). A run is "Maryam, 3rd to 5th page",
   "Maryam, first 3 pages", "Maryam, last 3 pages", and at a juz's edge "Juz 2, first 5 pages". Across surahs it is the
-  names, "Maryam to Ta-Ha"; only the › sheet's header gives the page at each end. Part of a page reads "Maryam, 3rd page ·
+  names, "Maryam to Ta-Ha". Part of a page reads "Maryam, 3rd page ·
   start" (or middle, or end). A page holding two surahs counts for both, and alone is named by the one it opens with, else
   the one that fills more of it. A place to start is the surah or juz the page opens, else its page: "Starts at Al-Mujadila", "Tomorrow starts at
   Juz 2", "Continue at Al-Hashr, 3rd page". Amounts are fine ("20 pages"). The mushaf's page numbers stay a quiet detail
-  (the › sheet's "… · pp. 542–561"), inside the reader and the session, and where the user chooses by page (Jump to's Page
+  inside the reader and the session, and where the user chooses by page (Jump to's Page
   tab, From and To). Ayah numbers stay only where a verse is cited or played: a held verse, search results, Audio Options
   and "Play from", and for now the Memorized sheet's picker, which is being rebuilt.
 - **NAME-2.** A place to start, a weak spot or a page chosen by number also shows how its page begins: its first words as

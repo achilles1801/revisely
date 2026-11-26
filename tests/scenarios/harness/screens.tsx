@@ -304,12 +304,11 @@ export class Home {
   }
 
   /**
-   * Jump to…: the Today menu's action, then a row of the sheet (`rowTestID`, e.g.
+   * Jump to: today's line ("Change", HOME-3), then a row of the sheet (`rowTestID`, e.g.
    * "jump-juz-28"), then "Start today at …".
    */
   async jumpTo(rowTestID: string): Promise<void> {
     await this.tap('today-summary');
-    await this.tap('sheet-action-jump');
     await this.app.until(() => this.app.screen.queryByTestId('jump-go') != null, 'the Jump to… sheet');
     await this.tap(rowTestID);
     await this.tap('jump-go');

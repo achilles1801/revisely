@@ -33,8 +33,8 @@ export const HELP_TITLES_AR: Readonly<Partial<Record<HelpScreen, ArabicHelpText>
 export const HELP_TOPICS_AR: Readonly<Record<string, ArabicHelpText>> = {
   'home.today': {
     title: 'اليوم',
-    text: 'كل يوم يأتي بقدر محدد من صفحاتك المحفوظة، في دورة تتكرر. اضغط على موضع بداية اليوم لتختار {{الانتقال إلى…}} أو {{تعديل الجدول}}.',
-    from: '65947c2588ee33d7',
+    text: 'كل يوم يأتي بقدر محدد من صفحاتك المحفوظة، في دورة تتكرر. اضغط {{تغيير}} بعد موضع بداية اليوم لتبدأ مراجعة اليوم من موضع آخر.',
+    from: '1ea8ee7b59509bb5',
   },
   'home.missed': {
     title: 'الأيام الفائتة',

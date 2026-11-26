@@ -1,5 +1,5 @@
 // Today's two lines (option E): the examples are the mocks' own.
-import { juzSpan, NBHY, NBSP, rangesText, runsInOrder, todayLines } from '../todayLines';
+import { juzSpan, NBHY, NBSP, runsInOrder, todayLines } from '../todayLines';
 
 const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 /** No-break spaces and hyphens as plain ones, to read the expectations. */
@@ -106,16 +106,6 @@ describe('Today’s lines (E: "Starts at")', () => {
     expect(t.detail).toEqual({ kind: 'text', text: `20${NBSP}pages · to At${NBHY}Tahrim · Juz${NBSP}28` });
   });
 
-  it('the › sheet’s header: the surahs and juz first, in order, then the pages as a quiet detail', () => {
-    expect(plain(rangesText(range(542, 561)))).toBe('Al-Mujadila to At-Tahrim · Juz 28 · pp. 542–561');
-    expect(plain(rangesText([...range(595, 604), ...range(1, 10)]))).toBe(
-      'Ash-Shams to An-Nas, then Al-Fatihah to Al-Baqarah, 9th page · pp. 595–604, 1–10',
-    );
-    expect(plain(rangesText([5]))).toBe('Al-Baqarah, 4th page · Juz 1 · p. 5');
-    expect(plain(rangesText(range(522, 541)))).toBe('Adh-Dhariyat, 3rd page to Al-Hadid · Juz 27 · pp. 522–541');
-    expect(rangesText([])).toBe('');
-  });
-
   it('VoiceOver reads both lines in words ("page 542", "to"); in progress, how many are done', () => {
     expect(todayLines('not_started', range(542, 561), new Set()).label).toBe(
       'Starts at Al-Mujadila. 20 pages · to At-Tahrim · Juz 28',
@@ -156,13 +146,7 @@ describe('Today’s lines with a partly memorized page (MEM-4)', () => {
     expect(lines('not_started', range(560, 563), new Set(), 0, 0, alMulk).detail).toBe('4 pages · to Al-Mulk · Juz 28–29');
   });
 
-  it('the › sheet’s header names only the memorized ayahs', () => {
-    expect(plain(rangesText([562, 563], alMulk))).toBe('Al-Mulk, first 2 pages · Juz 29 · pp. 562–563');
-    expect(plain(rangesText([603, 604, 1], partial))).toBe('Al-Kafirun to Al-Masad and An-Nas, then Al-Fatihah · pp. 603–604, 1');
-  });
-
   it('with no partly memorized page among them, the lines are exactly as before', () => {
     expect(todayLines('not_started', range(542, 561), new Set(), 0, 0, partial)).toEqual(todayLines('not_started', range(542, 561), new Set()));
-    expect(rangesText(range(595, 604))).toBe(rangesText(range(595, 604), new Map()));
   });
 });

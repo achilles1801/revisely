@@ -39,12 +39,12 @@ const lines = (...l: string[]) => l.join('\n');
 export const GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     title: 'Finding your way',
-    covers: ['NAME-1', 'NAME-2', 'REVO-25', 'REVO-41', 'TAB-2', 'HOME-1'],
+    covers: ['NAME-1', 'NAME-2', 'REVO-25', 'REVO-41', 'TAB-2', 'HOME-1', 'HOME-3'],
     routes: ['Dashboard', 'ReadIndex', 'Activity', 'Settings'],
     text: lines(
       '- The tab bar: Home, Activity, Read (swipe between them). Insights is in Activity; tapping Activity again goes back to its start.',
       '- Home’s top bar: a gear (Settings) on the right, a running timer on the left. No compass: the next-prayer line opens the Prayer sheet.',
-      '- Home’s Today post: where today starts (e.g. "Starts at Al-Mujadila ›", or "Starts at Al-Hadid, 2nd page ›" mid-surah) and how much it is. Its › opens “Jump to…” and “Edit schedule”. Under it, one button: “Start revision”, “Continue revision” or “Review session”. Then "… of the Quran memorized ›" with a dot per juz; its › opens the memorized pages. Then “Recent sessions” (the last three) and “See all”.',
+      '- Home’s Today post: where today starts (e.g. "Starts at Al-Mujadila", or "Starts at Al-Hadid, 2nd page" mid-surah) and how much it is; “Change” after it opens Jump to. Under it, one button: “Start revision”, “Continue revision” or “Review session”. Then "… of the Quran memorized ›" with a dot per juz; its › opens the memorized pages. Then “Recent sessions” (the last three) and “See all”.',
       '- Read tab: “Search the Quran” under its title, “Recent pages”, then every surah, grouped by juz. Tap one to open the reader.',
       '- The app names places by surah or juz and which page of it ("Maryam, 5th page", "Juz 2, first 5 pages"); part of a page ends "· start", "· middle" or "· end". A start can show the page’s first words under it. Ayah numbers only where a verse is cited or played. Mushaf page numbers are a detail (today’s › menu, the reader, the session, “Jump to…”’s Page tab).',
       '- Revo: the round button in a bottom corner of Home, Activity (Overview, Insights, a day, See all, Pages by strength) and “Edit schedule”; drag it to the other corner and it stays. None on the Read tab or in a session.',
@@ -71,7 +71,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Reverse order: An-Nas back to Al-Fatiha, covering the same pages.',
       '- The plan follows the calendar: each revision day’s pages are set by its date, whether or not anything is revised. Missed days don’t pile up or push the plan back: after missed days Home shows that day’s pages, and the missed pages are offered for three days (see Catching up). To pick up where you stopped instead, use “Jump to…”.',
       '- A new plan switches today at once; pages already revised today stay done. Saving an edit leaves today as it is, unless the edit changes today itself. A day never holds the same page twice.',
-      'How to (all in “Edit schedule”: Settings → Revision → “Schedule”, or today’s ›):',
+      'How to (all in “Edit schedule”: Settings → Revision → “Schedule”):',
       '- Change the daily amount: “Daily amount” → Pages or Juz → “Pages per day” or “Ajzaʼ per day” → Save.',
       '- Make a new plan: “Create new plan” → “Balanced” (pages, in even days), “By Juz” (whole juz each day) or “Weakest” (Smart Tracking only: weakest and most overdue pages first) → “Pages per day” or “Juz per day”, “Today starts at” (a surah, juz or page) and “Reverse order” → Apply → Save (top right).',
       '- Edit one day: tap it (today is “Today’s revision”) → “Add or remove content” (pick surahs or ajzaʼ) or “Make rest day” → back → Save. “Add rest day” adds a day; hold a day and drag to move it; swipe to delete it. A rest day is a day of the cycle with nothing to revise, so it comes round every cycle: it isn’t a pause.',
@@ -134,7 +134,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['Dashboard'],
     text: lines(
       '- Starts today at another juz, surah or page, earlier or later than today’s start, and the days after carry on from there. The plan’s position moves at once, with Undo for a few seconds.',
-      '- How: Home → today’s › → “Jump to…” → Juz, Surah or Page → pick one → “Start today at …”.',
+      '- How: Home → “Change” after where today starts → Juz, Surah or Page → pick one → “Start today at …”.',
       '- Today’s session then holds today’s amount from the new start. Pages carried in and not yet revised are dropped, and no catch-up is offered for today; pages already revised today stay counted.',
       '- The simplest way to revise a particular juz or surah today, without making a new plan.',
     ),
@@ -641,9 +641,9 @@ export const OPEN_SCREEN_ACTION = `{"kind": "openScreen", "title": string, "deta
 export const GUIDE_PROMPT = [
   'How Revisely works:',
   '- The guide below says how the app behaves, where each screen and setting is, how to do common tasks, and what it can’t do. A question about how something works, where it is, how to do it or whether the app can do it is answered from the guide only.',
-  '- Such an answer is the answer in one sentence, then the path written once (“Home → today’s › → Jump to…”), at most two short steps: about 35 words in all. Don’t describe the steps and then list them again. It is still the one JSON object every reply is, with the steps in "text".',
+  '- Such an answer is the answer in one sentence, then the path written once (“Settings → Revision → Schedule”), at most two short steps: about 35 words in all. Don’t describe the steps and then list them again. It is still the one JSON object every reply is, with the steps in "text".',
   '- In such an answer say nothing about today’s pages, what is left today, weak pages or the streak unless the question is about them, and don’t suggest starting today’s revision. Its action is an openScreen to the screen the answer names, whenever that screen is in the openScreen list; otherwise no action.',
-  '- Which screen: “Edit schedule”, “Create new plan” or “Daily amount” → planEditor; “Jump to…” → jumpTo; Settings → a section → settings with that section; the reader, its player bar or “Audio Options” → reader; the Prayer sheet: prayer times → prayerTimes, the Qibla → qibla; the memorized pages → memorized; today’s day or adding a note → dailyLog; Activity → activity; Activity’s Insights → insights. Never write that you added a shortcut or will open something: the card shows it.',
+  '- Which screen: “Edit schedule”, “Create new plan” or “Daily amount” → planEditor; “Jump to…” or “Change” → jumpTo; Settings → a section → settings with that section; the reader, its player bar or “Audio Options” → reader; the Prayer sheet: prayer times → prayerTimes, the Qibla → qibla; the memorized pages → memorized; today’s day or adding a note → dailyLog; Activity → activity; Activity’s Insights → insights. Never write that you added a shortcut or will open something: the card shows it.',
   '- When the streak, missed days or missed pages come up, say how to catch up: tap “Add to today” on Home. A streak broken by two missed days can’t come back, but those days’ pages can still be added that way (the last three days): always say so.',
   '- Never invent a feature, a button, a setting or a path. When the guide says the app can’t do something (it is under “Not possible (yet)”, or the guide says no or not yet), say so plainly (“Not yet.” or “There’s no …”), then give the closest way the guide names. When that way changes more than they asked for (the whole plan, for one juz), say so in a few words. Say “I’m not sure that’s possible in Revisely” only for something the guide doesn’t mention at all, then offer the closest thing it has.',
   '- What the guide marks as for testers is in their app only when the question says "Tester: yes". For anyone else, never offer it as if it were there: say it isn’t in their app yet, then give the closest way that is.',
