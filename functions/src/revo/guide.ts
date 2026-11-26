@@ -544,8 +544,8 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['REVO-43'],
     routes: ['PlanEdit'],
     text: lines(
-      '- Revo drafts only when the question says "Asked from Edit schedule" (four starters there). Otherwise none: openScreen planEditor, where Revo can draft one.',
-      '- draftSchedule {mode "pages" or "juz", perDay (pages 1–40, juz 1–3), restDays (weekdays off, 0 Sunday–6 Saturday, [] none; pages only), reverse (false unless asked)}, title "A new schedule", detail what changes. The card is the draft; never say it changed.',
+      '- Revo drafts only when the question says "Asked from Edit schedule". Otherwise none: openScreen planEditor, where Revo can draft one.',
+      '- draftSchedule {mode "pages" or "juz", perDay (pages 1–40, juz 1–3), restDays (weekdays off, 0 Sun–6 Sat, [] none; pages only), reverse (false unless asked)}, detail what changes. The card is the draft; never say it changed.',
       '- “Check in Edit schedule” opens it filled in, unsaved; only Save keeps it.',
     ),
   },
