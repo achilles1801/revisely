@@ -72,6 +72,7 @@ import { followCues, washOf, washReach } from '../../../src/lib/reciteLive/wash'
 import { followBox, hiddenInkPlan } from '../../../src/components/reciteLive/HiddenInkLayer';
 import { hiddenTakeInfo, keepRecited, revealedOnHide } from '../../../src/lib/reciteLive/hideSwitch';
 import { pageLines } from '../../../src/lib/recite/pageLines';
+import { markerCorners } from '../../../src/lib/recite/markerOutline';
 import { CAP_S, chainView, endsAyah, nextLinkStart, ROLL_FROM_S, ROLL_NOW_S, rolloverDue } from '../../../src/lib/reciteLive/chain';
 
 const words = quranWords();
@@ -1527,9 +1528,17 @@ describe('[RECITE-20] a hidden page is drawn empty: faint rules where words are 
         for (const l of lines) {
           l.markers.forEach(([a, b], k) => {
             const [top, bottom] = l.markerRows[k];
-            // Every marker whole: open in its rows, and no cover reaches into it.
+            // Every marker whole: open in its rows, and no cover reaches into its round outline. In its rows a cover reaches
+            // into the opening only in a corner beside the outline (Majd, Nov 25 2026: "pieces of letters"; lib/recite/markerOutline).
             expect(openOn(l.line, 'marker').some((m) => m.x0 <= a && m.x1 >= b && m.y0 <= top && m.y1 >= bottom)).toBe(true);
-            for (const c of coversOn(l.line)) expect(Math.min(c.x1, b) - Math.max(c.x0, a) <= 0 || Math.min(c.y1, bottom) - Math.max(c.y0, top) <= 0).toBe(true);
+            const corners = markerCorners({ x0: a - 1, x1: b + 1, y0: top, y1: bottom }).map((x) => x.rect);
+            const EPS = 1e-9;
+            for (const c of coversOn(l.line)) {
+              const into = Math.min(c.x1, b) - Math.max(c.x0, a) > EPS && Math.min(c.y1, bottom) - Math.max(c.y0, top) > EPS;
+              if (!into) continue;
+              const inCorner = corners.some((r) => c.x0 >= r.x0 - EPS && c.x1 <= r.x1 + EPS && c.y0 >= r.y0 - EPS && c.y1 <= r.y1 + EPS);
+              expect({ marker: [page, l.line, k], cover: c, inCorner }).toEqual({ marker: [page, l.line, k], cover: c, inCorner: true });
+            }
             // Over and under it, each half with its side's word (page 379's ۲٤ showed a sajdah's overline): the right half
             // covered while the word before it (right to left) is hidden, the left half while the word after is.
             const mid = (a + b) / 2;
