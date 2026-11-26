@@ -8,7 +8,7 @@ import type { ReactElement } from 'react';
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
 import { markPreviewTester } from '../harness/admin';
-import { getServerDoc, setServerDoc } from '../harness/serverDocs';
+import { getServerDoc, listServerDocs, setServerDoc } from '../harness/serverDocs';
 import { Home } from '../harness/screens';
 import { Phone, type Booted, type OpenApp } from '../harness/phone';
 import { plainText } from '../../../src/lib/passages';
@@ -71,11 +71,20 @@ const tap = async (app: OpenApp, testID: string) => {
 /** What the model says next for this account (functions/src/emulator.ts). */
 const modelSays = (uid: string, reply: object) => setServerDoc(`emulator/anthropic/accounts/${uid}`, { reply: { text: JSON.stringify(reply), stopReason: 'end_turn' } });
 
-it('[REVO-43] Revo from Edit schedule: the schedule and four starters; its draft is a card, then Edit schedule filled in and not saved until Save', async () => {
+/** The reply schema each request to the model carried, oldest first (its hash). */
+async function schemasAsked(uid: string): Promise<string[]> {
+  const docs = (await listServerDocs(`emulator/anthropic/accounts/${uid}/requests`)) as unknown as { at: number; outputSchemaSha256: string }[];
+  return docs.sort((a, b) => a.at - b.at).map((r) => r.outputSchemaSha256);
+}
+
+/** The store app's reply schema, the one every answer before the draft was given with (replySchema.test.ts). */
+const STORE_SCHEMA = 'ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e';
+
+/** 108 pages, 10 a day (every page comes round every 11 days), on Wednesday 25 Nov; Revo opened from Edit schedule. */
+async function openFromEditSchedule(): Promise<{ app: OpenApp; uid: string }> {
   setZone(ZONES.amman);
   setNow('2026-11-25 10:00');
   const phone = new Phone('phone');
-  // 108 pages, 10 a day: every page comes round every 11 days.
   let app = await newAccount(phone, { memorized: pagesRange(1, 108), user: { dailyPageCapacity: 10 } });
   const uid = app.uid;
   await app.untilSynced();
@@ -91,10 +100,22 @@ it('[REVO-43] Revo from Edit schedule: the schedule and four starters; its draft
     nav.current.navigate('Home', { screen: 'PlanEdit' });
   });
   await app.until(() => app.screen.queryByTestId('plan-edit') != null, 'Edit schedule');
-
-  // Opened here: the schedule in Edit schedule's words, and the four starters.
   await tap(app, 'revo-button');
   await app.until(() => app.screen.queryByTestId('revo-greeting') != null, 'Revo’s first line');
+  return { app, uid };
+}
+
+/** The draft card's rows, as a screen reader reads them. */
+function draftRows(app: OpenApp): string[] {
+  const rows = app.screen.getByTestId('revo-draft-rows');
+  const labels: string[] = rows.findAll((n: any) => n.props?.accessible === true && typeof n.props.accessibilityLabel === 'string').map((n: any) => n.props.accessibilityLabel);
+  return [...new Set(labels)];
+}
+
+it('[REVO-43] Revo from Edit schedule: the schedule and four starters; its draft is a card, then Edit schedule filled in and not saved until Save', async () => {
+  const { app, uid } = await openFromEditSchedule();
+
+  // Opened here: the schedule in Edit schedule's words, and the four starters.
   const greeting = plainText(String(app.screen.getByTestId('revo-greeting').props.children));
   expect(greeting).toContain('Your schedule is 10 pages a day: every page comes round every 11 days.');
   for (const chip of ['Make it lighter', 'Finish a round sooner', 'Rest one day a week', 'Start a new plan']) {
@@ -106,7 +127,7 @@ it('[REVO-43] Revo from Edit schedule: the schedule and four starters; its draft
     text: 'Then 6 pages a day with Fridays off fits.',
     chart: null,
     textAfter: null,
-    action: { kind: 'draftSchedule', title: 'A new schedule', detail: '6 pages a day with Fridays off', mode: 'pages', perDay: 6, restDays: [5] },
+    action: { kind: 'draftSchedule', title: 'A new schedule', detail: '6 pages a day with Fridays off', mode: 'pages', perDay: 6, restDays: [5], reverse: false },
     remember: [],
     title: 'A lighter schedule',
     chips: [],
@@ -114,9 +135,9 @@ it('[REVO-43] Revo from Edit schedule: the schedule and four starters; its draft
   await tap(app, 'revo-chip-Make it lighter');
   await app.until(() => app.screen.queryByTestId('revo-plan') != null, 'the draft’s card');
   // What changes, worked out on the phone: 108 pages at 6 a day is 18 days, 6 a week around Friday: 3 weeks, 21 days.
-  const rows = app.screen.getByTestId('revo-draft-rows');
-  const labels = [...new Set(rows.findAll((n: any) => n.props?.accessible === true && typeof n.props.accessibilityLabel === 'string').map((n: any) => n.props.accessibilityLabel))];
-  expect(labels).toEqual(['A day: 10 pages, then 6 pages', 'A round: Every 11 days, then Every 21 days', 'Rest days: None, then Friday']);
+  expect(draftRows(app)).toEqual(['A day: 10 pages, then 6 pages', 'A round: Every 11 days, then Every 21 days', 'Rest days: None, then Friday']);
+  // Asked with Revisely Dev's schema, the one with the draft in it.
+  expect((await schemasAsked(uid)).map((h) => h === STORE_SCHEMA)).toEqual([false]);
   // Nothing is saved by the answer.
   expect((await getServerDoc(`users/${uid}`))?.customPlan ?? null).toBeNull();
 
@@ -136,5 +157,48 @@ it('[REVO-43] Revo from Edit schedule: the schedule and four starters; its draft
   expect(days).toHaveLength(21);
   // The rest days are the Fridays: today, the day it's saved, is a Wednesday, so days 2, 9 and 16.
   expect(days.map((d: number[], i: number) => (d.length === 0 ? i : -1)).filter((i: number) => i >= 0)).toEqual([2, 9, 16]);
+  await app.close();
+});
+
+it('[REVO-43] a draft with no rest day and the usual order (the schema asks for both): Revo’s card and Edit schedule, 18 days', async () => {
+  const { app, uid } = await openFromEditSchedule();
+  // Every field of a draft is required (functions/src/revo/replySchema.ts): none is restDays [], the usual order reverse false.
+  await modelSays(uid, {
+    text: '6 pages a day fits.',
+    chart: null,
+    textAfter: null,
+    action: { kind: 'draftSchedule', title: 'A new schedule', detail: '6 pages a day', mode: 'pages', perDay: 6, restDays: [], reverse: false },
+    remember: [],
+    title: 'A lighter schedule',
+    chips: [],
+  });
+  await tap(app, 'revo-chip-Make it lighter');
+  await app.until(() => app.screen.queryByTestId('revo-plan') != null, 'the draft’s card');
+  expect(draftRows(app)).toEqual(['A day: 10 pages, then 6 pages', 'A round: Every 11 days, then Every 18 days', 'Rest days: None, then None']);
+  await tap(app, 'revo-plan-do');
+  await app.until(() => app.screen.queryByTestId('plan-revo-draft') != null, 'the draft in Edit schedule');
+  expect(app.screen.getAllByText('Every page comes round every 18 days').length).toBeGreaterThan(0);
+  await app.close();
+});
+
+it('[REVO-43] the API refuses Revisely Dev’s schema (Nov 26 2026): Revo asks again with the store app’s and answers, with no draft', async () => {
+  const { app, uid } = await openFromEditSchedule();
+  // As the API answered every question from Revisely Dev once the draft was in its schema: a 400, "Schema is too
+  // complex for compilation", before the model ran. Revo said "Revo couldn’t answer that. Try again." (Majd's phone).
+  await setServerDoc(`emulator/anthropic/accounts/${uid}`, { refuseSchemaWith: 'draftSchedule' });
+  await modelSays(uid, { text: 'Fewer pages a day makes it lighter: 6 a day brings each page round every 18 days.', chart: null, textAfter: null, action: null, remember: [], title: 'A lighter schedule', chips: [] });
+  await tap(app, 'revo-chip-Make it lighter');
+  await app.until(
+    () => app.screen.queryByText('Fewer pages a day makes it lighter: 6 a day brings each page round every 18 days.') != null || app.screen.queryByText(/Revo couldn’t answer that/) != null,
+    'Revo’s answer',
+  );
+  expect(app.screen.queryByText(/Revo couldn’t answer that/)).toBeNull();
+  expect(app.screen.getByText('Fewer pages a day makes it lighter: 6 a day brings each page round every 18 days.')).toBeTruthy();
+  // Dev's schema first, refused; then the store's, answered.
+  const asked = await schemasAsked(uid);
+  expect(asked).toHaveLength(2);
+  expect(asked[0]).not.toBe(STORE_SCHEMA);
+  expect(asked[1]).toBe(STORE_SCHEMA);
+  expect(app.screen.queryByTestId('revo-plan')).toBeNull();
   await app.close();
 });
