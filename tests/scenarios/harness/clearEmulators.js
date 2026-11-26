@@ -4,12 +4,12 @@
 // the second run found the first's data: the day's Revo spend (coachLedgerDay) put Revo to rest
 // halfway through REVO-26 (#328's run 42586241564). So every run after the first starts here.
 //
-// Storage too (Nov 26 2026). Each account's files are under its own new uid, but the emulator lists
-// a prefix by going through every file it holds, so the first run's files (a backup and seeded
-// recordings per test scenario loaded) slowed every listing in the second. loadTestScenario took
-// 39–128 s there against 3–13 s in the first run; past the app's 70 s for a callable, REVO-26 hung
-// until its 15 minutes ran out (runs 45782607100 and 45770868685). Files that load no test scenario
-// ran at the same speed in both runs.
+// Storage too (Nov 26 2026), so the second run starts as the first does. That did NOT end what it was
+// added for: loading a test scenario is still slower in the second run (30–91 s against 3–14 s in run
+// 45794919902, after this change; 39–128 s before it), and grows within the first run too, so what
+// builds up isn't the emulators' data. Past the app's 70 s for a callable REVO-26 can hang until its
+// 15 minutes run out (runs 45782607100, 45770868685). Files that load no test scenario run at the same
+// speed in both runs. Cause not found yet.
 //   node tests/scenarios/harness/clearEmulators.js   (inside emulators.sh exec, which sets the hosts)
 const PROJECT = 'demo-revisely';
 
