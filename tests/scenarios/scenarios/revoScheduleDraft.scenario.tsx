@@ -83,8 +83,9 @@ async function lastAsked(uid: string): Promise<{ outputSchemaSha256: string; que
 
 /** The reply schema each request to the model carried, oldest first (its hash). */
 async function schemasAsked(uid: string): Promise<string[]> {
-  const docs = (await listServerDocs(`emulator/anthropic/accounts/${uid}/requests`)) as unknown as { at: number; outputSchemaSha256: string }[];
-  return docs.sort((a, b) => a.at - b.at).map((r) => r.outputSchemaSha256);
+  const docs = (await listServerDocs(`emulator/anthropic/accounts/${uid}/requests`)) as unknown as { at: number; kind: string; outputSchemaSha256: string }[];
+  // Revo's answers only: in Revisely Dev a question is first checked for whether it's about the Qur'an (REVO-44), with its own schema.
+  return docs.filter((r) => r.kind === 'revo-ask').sort((a, b) => a.at - b.at).map((r) => r.outputSchemaSha256);
 }
 
 /** The store app's reply schema, the one every answer before the draft was given with (replySchema.test.ts). */
