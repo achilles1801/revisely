@@ -31,6 +31,11 @@ classic default), and a fresh install starts in light.
   share sheet can open straight after. The tab bar (`navigation/TabBar`) is flat and icon-only,
   with a small accent dot under the current tab that follows a swipe (below); `ActionBar` takes
   its place for a screen's own actions. No Threads/Meta names, logos or icons, no likes or reposts.
+- A mark inside a ring, a disc or a badge (a check, a glyph) is centred by its box: the box is square and centres its
+  child, the ring is drawn behind it (absolute), and the icon is never absolute itself. An icon is text: given
+  `absoluteFill` its glyph sits at the box's top start, cut by the ring (the Calendar's day card, Nov 26 2026).
+  `jest/rings.ts` (`offCentreMarks`) checks a rendered ring; `components/__tests__/ringMarks.test.tsx` checks the shared
+  ones and that no `<Ionicons>` in `src/` is placed absolutely.
 - Shared pieces live in `src/components/v2/`; Home's feed in `src/components/home/feed/`. Every sheet
   is `v2/Sheet` (handle, centred title, optional Cancel/Save, optional foot bar, and `pinned`: a sheet's own
   main action kept on screen under its scrolling content; the backdrop is its sibling) and every menu `v2/ActionSheet`; segmented controls are `v2/PillTabs`. Sheets with their

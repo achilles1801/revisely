@@ -18,6 +18,7 @@ jest.mock('expo-haptics', () => ({
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 
 import { DesignProvider } from '../DesignContext';
+import { boxedMarks, offCentreMarks } from '../../../jest/rings';
 import { ThemeProvider } from '../../context/ThemeContext';
 import { RoundButton } from '../../components/reader/RoundButton';
 import { PagesSheet } from '../../components/revision/PagesSheet';
@@ -127,6 +128,10 @@ describe('the session and reader in the new design', () => {
     );
     await act(async () => {});
     expect(screen.getByLabelText('Unmark all')).toBeTruthy();
+    // Each page's check sits in the centre of its circle (jest/rings.ts).
+    const { Ionicons } = require('@expo/vector-icons');
+    expect(boxedMarks(screen.UNSAFE_root as never, Ionicons)).toBe(3);
+    expect(offCentreMarks(screen.UNSAFE_root as never, Ionicons)).toEqual([]);
   });
 
   it('no help buttons: Keep daily amount says what it does under its label', async () => {

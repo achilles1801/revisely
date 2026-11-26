@@ -13,7 +13,14 @@ import { describePassage, pageRunEnds, spokenText } from '../../lib/passages';
 import type { StripCell, Strength } from '../../lib/activityDayParts';
 import { formatNumber, t } from '../../i18n';
 
-/** The Revised mark: a ring filled to the share revised; a check when done. */
+/**
+ * The Revised mark: a ring filled to the share revised; a check in its centre when done (about half the ring,
+ * inside the stroke at every size).
+ *
+ * The ring is drawn behind (absolute) and the check is the box's one child, centred by it. An icon is text: given
+ * `absoluteFill` it fills the ring's box and its glyph sits at the box's top start, cut by the ring (Majd's Calendar
+ * day card, Nov 26 2026). `ringChildrenCentred` (jest/rings.ts) checks every ring and disc for it.
+ */
 export function ProgressRing({ fraction, done, size = 40 }: { fraction: number; done: boolean; size?: number }) {
   const { palette } = useTheme();
   const stroke = 3;
@@ -21,8 +28,12 @@ export function ProgressRing({ fraction, done, size = 40 }: { fraction: number; 
   const c = 2 * Math.PI * r;
   const f = Math.max(0, Math.min(1, fraction));
   return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel={t('activity.marks.percentRevised', { n: Math.round(f * 100) })}>
-      <Svg width={size} height={size}>
+    <View
+      style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}
+      accessibilityLabel={done ? t('activity.marks.revisedDone') : t('activity.marks.percentRevised', { n: Math.round(f * 100) })}
+      testID="progress-ring"
+    >
+      <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
         <Circle cx={size / 2} cy={size / 2} r={r} stroke={palette.track} strokeWidth={stroke} fill="none" />
         <Circle
           cx={size / 2}
@@ -36,7 +47,7 @@ export function ProgressRing({ fraction, done, size = 40 }: { fraction: number; 
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
       </Svg>
-      {done && <Ionicons name="checkmark" size={18} color={palette.primary} style={StyleSheet.absoluteFill} />}
+      {done ? <Ionicons name="checkmark" size={Math.round(size * 0.45)} color={palette.primary} testID="progress-ring-check" /> : null}
     </View>
   );
 }
