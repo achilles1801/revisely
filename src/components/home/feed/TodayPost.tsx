@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
@@ -7,7 +7,6 @@ import { aheadLine, NBSP, todayLines, type TodayStatus, type PartialPages } from
 import type { UserPage } from '../../../types';
 import { typeV2 } from '../../../theme/v2';
 import { ProgressRing } from '../../activity/DayParts';
-import { ActionSheet, SheetAction } from '../../v2/ActionSheet';
 import { FirstWords } from '../../v2/FirstWords';
 import { Mark } from '../../v2/Mark';
 import { JuzDots } from '../../v2/JuzDots';
@@ -61,10 +60,10 @@ function Chevron({ color }: { color: string }) {
 
 /**
  * Today on Home, in one post (lib/todayLines): where today starts and how much
- * it is, with a › that opens Jump to… and Edit schedule (the exact pages in the
- * sheet's header); the one action (start, continue, review); then how much of
- * the Quran is memorized (its › opens the memorized pages to edit), with a dot
- * per juz. No ⋯: those are the menus.
+ * it is, with "Change", which opens Jump to (HOME-3; Edit schedule is in
+ * Settings → Revision); the one action (start, continue, review); then how much
+ * of the Quran is memorized (its › opens the memorized pages to edit), with a
+ * dot per juz. No ⋯ and no menu.
  */
 export function TodayPost({
   name,
@@ -80,7 +79,6 @@ export function TodayPost({
   streakGrace,
   memorized,
   onPrimary,
-  onEditSchedule,
   onMemorization,
   onJump,
   catchUp,
@@ -110,10 +108,9 @@ export function TodayPost({
   /** How much is memorized (memorizedText): the line and the juz dots. */
   memorized: { body: string; fraction: number; juz: number[] };
   onPrimary: () => void;
-  onEditSchedule: () => void;
   /** Opens the memorized pages, ready to edit. */
   onMemorization: () => void;
-  /** Where today starts (Jump to…). */
+  /** Where today starts: "Change" (and a tap on the line) opens Jump to. */
   onJump: () => void;
   /** The catch-up offer for pages missed on earlier days (catchUpLine), or none. */
   catchUp: { title: string; label: string } | null;
@@ -126,7 +123,6 @@ export function TodayPost({
   help?: React.ReactNode;
 }) {
   const { palette } = useTheme();
-  const [menuOpen, setMenuOpen] = useState(false);
   const lines = todayLines(status, pages, done, carried, carriedLeft, partial, carriedInsights);
   const grace = streakGrace ?? null;
   // In grace the streak that can come back shows dimmed, with a ring for the missed pages (SESS-6).
@@ -135,17 +131,6 @@ export function TodayPost({
     : streak > 0
       ? t('home.today.streak', { days: streak })
       : t('common.today');
-
-  const actions: SheetAction[] = [
-    {
-      key: 'jump',
-      label: t('home.today.jump'),
-      subtitle: t('home.today.jumpSubtitle'),
-      icon: 'locate-outline',
-      onPress: onJump,
-    },
-    { key: 'schedule', label: t('home.today.editSchedule'), icon: 'calendar-outline', onPress: onEditSchedule },
-  ];
 
   // Two lines, each at most two lines tall: where today starts (ink), then how
   // much it is (grey), or how far it has got (a thin bar and "6 of 20").
@@ -160,9 +145,13 @@ export function TodayPost({
         <Text style={[typeV2.name, styles.shrink, { color: palette.text }]} {...fit} testID="today-title">
           {lines.title.text}
           {lines.title.chevron ? (
+            // "Change", held to the line's last word so it never starts a line alone (HOME-3).
             <>
               {NBSP}
-              <Chevron color={palette.secondary} />
+              {NBSP}
+              <Text style={{ color: palette.accentText }} testID="today-change">
+                {t('home.today.change')}
+              </Text>
             </>
           ) : null}
         </Text>
@@ -274,30 +263,18 @@ export function TodayPost({
         {lines.empty ? (
           <View testID="today-summary">{summary}</View>
         ) : (
-          // Done, it shows no ›, but a tap still opens Jump to… and Edit schedule.
+          // Done, it shows no "Change", but a tap still opens Jump to (HOME-3).
           <Tap
-            onPress={() => setMenuOpen(true)}
+            onPress={onJump}
             accessibilityRole="button"
             accessibilityLabel={lines.label}
-            accessibilityHint={t('home.today.summaryHint')}
+            accessibilityHint={t('home.today.changeHint')}
             testID="today-summary"
           >
             {summary}
           </Tap>
         )}
       </ThreadRow>
-
-      <ActionSheet
-        visible={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        title={t('common.today')}
-        message={lines.ranges}
-        // A header line, like the title and the rows (1.4): at the largest
-        // sizes a surah name would otherwise split mid-word on a small phone.
-        messageMaxScale={HEADER_MAX_SCALE}
-        actions={actions}
-        testID="today-menu"
-      />
     </View>
   );
 }

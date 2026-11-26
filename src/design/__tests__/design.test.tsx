@@ -689,7 +689,6 @@ describe('Home in the new design (a feed)', () => {
       streak: 7,
       memorized: { body: '27.5% of the Quran memorized', fraction: 166 / 604, juz: Array(30).fill(0.27) },
       onPrimary: jest.fn(),
-      onEditSchedule: jest.fn(),
       onMemorization: jest.fn(),
       onJump: jest.fn(),
       catchUp: null,
@@ -805,33 +804,24 @@ describe('Home in the new design (a feed)', () => {
     expect(props.onCarryOver).toHaveBeenCalled();
   });
 
-  it('today’s › opens a menu of exactly two, Jump to… and Edit schedule, under the exact pages; it runs once the sheet has gone', async () => {
+  it('[HOME-3] “Change” after where today starts opens Jump to directly: no menu, no Edit schedule here', async () => {
     const props = post();
     await act(async () => {});
+    // In the title, after the words, in the accent; held to the last word (two no-break spaces).
+    const change = screen.getByTestId('today-change');
+    expect(change).toHaveTextContent('Change');
+    expect(screen.getByTestId('today-title')).toHaveTextContent(`Continue at Juz${NBSP}27${NBSP}${NBSP}Change`, {
+      exact: false,
+    });
     fireEvent.press(screen.getByTestId('today-summary'));
-    const menu = screen.getByTestId('today-menu');
-    // The exact ranges in the header, surahs first and the pages a quiet detail; it grows no further than the rows (1.4).
-    expect(
-      within(menu).getByText('Qaf, last page to Adh-Dhariyat, 3rd page · Juz 26–27 · pp. 520–522', {
-        normalizer: plainText,
-      }).props.maxFontSizeMultiplier,
-    ).toBe(1.4);
-    expect(within(menu).getByText('Jump to…')).toBeTruthy();
-    expect(within(menu).getByText('Start today at another juz, surah or page')).toBeTruthy();
-    expect(within(menu).getByText('Edit schedule')).toBeTruthy();
-    for (const gone of [
-      'Edit memorized pages',
-      'Memorized pages',
-      'Behind? Move the plan back a day',
-      'Go back a day',
-    ]) {
-      expect(within(menu).queryByText(gone)).toBeNull();
+    expect(props.onJump).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('today-menu')).toBeNull();
+    for (const gone of ['Jump to…', 'Edit schedule', 'Start today at another juz, surah or page']) {
+      expect(screen.queryByText(gone)).toBeNull();
     }
-    fireEvent.press(within(menu).getByText('Edit schedule'));
-    expect(props.onEditSchedule).not.toHaveBeenCalled();
   });
 
-  it('not started: "Starts at <surah> ›" over how much and to where; the › is held to the words and grows with the text', async () => {
+  it('not started: "Starts at <surah>  Change" over how much and to where; the line grows with the text', async () => {
     post({ status: 'not_started', pages: Array.from({ length: 20 }, (_, i) => 542 + i), done: new Set() });
     await act(async () => {});
     const title = screen.getByTestId('today-title');
@@ -855,16 +845,17 @@ describe('Home in the new design (a feed)', () => {
     expect(screen.getByTestId('today-detail')).toHaveTextContent(`20${NBSP}pages · 4 from yesterday first`);
   });
 
-  it('done: a dot, "Done · N pages" with no ›, then the surahs and juz; still opens the menu', async () => {
+  it('[HOME-3] done: a dot, "Done · N pages" with no “Change”, then the surahs and juz; a tap still opens Jump to', async () => {
     const pages = Array.from({ length: 20 }, (_, i) => 522 + i);
-    post({ status: 'completed', pages, done: new Set(pages) });
+    const props = post({ status: 'completed', pages, done: new Set(pages) });
     await act(async () => {});
     expect(screen.getByTestId('today-done-dot', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId('today-title')).toHaveTextContent(`Done · 20${NBSP}pages`);
     expect(screen.getByTestId('today-detail')).toHaveTextContent(held(`Adh-Dhariyat → Al-Hadid · Juz${NBSP}27`));
     expect(screen.getByTestId('today-cta')).toHaveTextContent('Review session');
+    expect(screen.queryByTestId('today-change')).toBeNull();
     fireEvent.press(screen.getByTestId('today-summary'));
-    expect(screen.getByTestId('today-menu')).toBeTruthy();
+    expect(props.onJump).toHaveBeenCalledTimes(1);
   });
 
   it('VoiceOver: today’s pages are one button that says what it opens; the Memorized line says it edits', async () => {
@@ -873,19 +864,19 @@ describe('Home in the new design (a feed)', () => {
     const summary = screen.getByTestId('today-summary');
     expect(summary.props.accessibilityRole).toBe('button');
     expect(summary.props.accessibilityLabel).toBe('Continue at Juz 27. 2 of 3 pages done');
-    expect(summary.props.accessibilityHint).toBe('Jump to another start, or edit the schedule');
+    expect(summary.props.accessibilityHint).toBe('Opens Jump to, to start today somewhere else');
     expect(screen.getByTestId('today-memorized').props.accessibilityLabel).toBe(
       '27.5% of the Quran memorized. Edit memorized pages',
     );
   });
 
-  it('nothing to revise yet: today’s line isn’t a button and has no ›', async () => {
+  it('nothing to revise yet: today’s line isn’t a button and has no “Change”', async () => {
     const props = post({ pages: [], done: new Set(), status: 'not_started' });
     await act(async () => {});
     const summary = screen.getByTestId('today-summary');
     expect(summary.props.accessibilityRole).toBeUndefined();
+    expect(screen.queryByTestId('today-change')).toBeNull();
     fireEvent.press(summary);
-    expect(screen.queryByTestId('today-menu')).toBeNull();
     expect(props.onJump).not.toHaveBeenCalled();
   });
 

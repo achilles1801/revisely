@@ -53,8 +53,8 @@ classic default), and a fresh install starts in light.
   bounce, so it never followed the finger.
 - The owner's rules from testing (Oct 26 2026):
   - **Minimal.** Home is one Today post (pages, juz, surahs, the action, how much is memorized); no
-    second card restating it, and no ⋯ (Nov 2026): today's pages carry a › that opens exactly two
-    actions, "Jump to…" (`lib/jump`, `home/JumpSheet`) and "Edit schedule"; the memorized line,
+    second card restating it, and no ⋯ (Nov 2026): where today starts ends with "Change", which opens Jump to
+    (`lib/jump`, `home/JumpSheet`) directly (HOME-3, Nov 25 2026; Edit schedule is in Settings → Revision); the memorized line,
     "17.9% of the Quran memorized ›" (one decimal, of 604 pages; always shown, no setting; it wraps,
     never truncates), opens the memorized pages ready to edit. The old "Behind? / back a day" (Home
     and the plan editor's "Running behind?") is gone: Jump to covers it. Under the memorized line,

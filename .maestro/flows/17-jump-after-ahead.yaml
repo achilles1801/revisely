@@ -2,9 +2,10 @@
 # (Majd's TestFlight report, Nov 9 2026: after the jump Home took no taps, only the swipe to Read).
 # A preview update had downloaded while the Today menu was up: "A new update is ready" opened by
 # itself over it, iOS refused it, and its invisible host stayed over Home. One sheet at a time now:
-# the offer waits until Jump to has gone. Tuesday is pages 1, 582–590, Wednesday 591–600
+# the offer waits until Jump to has gone. Today's line opens Jump to itself now (HOME-3), so the
+# update downloads while Jump to is up. Tuesday is pages 1, 582–590, Wednesday 591–600
 # (subflows/onboard.yaml).
-# Rules (BEHAVIOUR.md): SHEET-1, UPD-1, JUMP-1
+# Rules (BEHAVIOUR.md): SHEET-1, UPD-1, JUMP-1, HOME-3
 appId: com.revisionbuddy.app
 ---
 - runFlow:
@@ -46,18 +47,18 @@ appId: com.revisionbuddy.app
       text: "Done · 13.pages"
     timeout: 10000
 
-# The Today menu, and an update downloads while it is up (src/lib/e2e/updates.ts).
+# Jump to, straight from today's line (HOME-3), and an update downloads while it is up (src/lib/e2e/updates.ts).
 - tapOn:
     id: today-summary
 - extendedWaitUntil:
     visible:
-      id: today-menu
+      id: jump-juz-list
     timeout: 10000
 - openLink:
     link: revisely://e2e/update-ready
     optional: true
 - runFlow: ../subflows/open-link-prompt.yaml
-# SHEET-1, UPD-1: not over the menu (its own delay is 1.2 s).
+# SHEET-1, UPD-1: not over Jump to (its own delay is 1.2 s).
 - extendedWaitUntil:
     visible:
       id: update-ready-sheet
@@ -66,14 +67,9 @@ appId: com.revisionbuddy.app
 - assertNotVisible:
     id: update-ready-sheet
 - assertVisible:
-    id: today-menu
+    id: jump-juz-list
 
 # JUMP-1: Jump to Juz 1 (after Juz 30 in the cycle).
-- tapOn: "Jump to….*"
-- extendedWaitUntil:
-    visible:
-      id: jump-juz-list
-    timeout: 10000
 - tapOn:
     id: jump-juz-1
 - tapOn:

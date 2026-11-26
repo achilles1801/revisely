@@ -5,14 +5,12 @@ export const home: NonNullable<ArStrings['home']> = {
   today: {
     memorized: '{{percent}} من القرآن محفوظ',
     streak: 'اليوم · الأيام المتتالية: {{days}}',
-    jump: 'الانتقال إلى…',
-    jumpSubtitle: 'ابدأ مراجعة اليوم من جزء أو سورة أو صفحة أخرى',
-    editSchedule: 'تعديل الجدول',
+    change: 'تغيير',
     adding: 'جارٍ الإضافة…',
     addToToday: 'إضافة إلى اليوم',
     addToTodayLabel: '{{line}}. إضافة إلى اليوم',
     editMemorizedLabel: '{{line}}. تعديل الصفحات المحفوظة',
-    summaryHint: 'الانتقال إلى بداية أخرى أو تعديل الجدول',
+    changeHint: 'يفتح «الانتقال إلى» لتبدأ مراجعة اليوم من موضع آخر',
   },
   jump: {
     title: 'الانتقال إلى',

@@ -588,7 +588,6 @@ export default function DashboardScreen() {
           streakGrace={streakNow?.grace ?? null}
           memorized={memorized}
           onPrimary={handleCtaPress}
-          onEditSchedule={() => navigation.navigate('PlanEdit')}
           onMemorization={() => navigation.navigate('Memorization', { edit: true })}
           onJump={() => setJumpOpen(true)}
           catchUp={catchUpLine(leftovers, partial)}
