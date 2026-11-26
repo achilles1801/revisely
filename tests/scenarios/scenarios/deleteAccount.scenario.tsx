@@ -10,6 +10,7 @@ import { newAccount, pagesRange } from '../harness/account';
 import { markOnServer, watchFunction } from '../harness/admin';
 import { trackingListeners, type ListenerTracker } from '../harness/listeners';
 import { getServerDoc, listServerDocs } from '../harness/serverDocs';
+import { listObjects, putObject } from '../harness/storageObjects';
 import { Phone, PASSWORD, type OpenApp } from '../harness/phone';
 
 const DELETE_LIMIT_MS = 30_000;
@@ -105,6 +106,20 @@ async function accountWithListeners(): Promise<{ phone: Phone; app: OpenApp; uid
   );
   return { phone, app, uid, listeners };
 }
+
+it('[ACCOUNT-1] [RECITE-26] deleting the account deletes the takes it kept to help improve mistake detection, and no one else’s', async () => {
+  const { app, uid } = await accountWithListeners();
+  // What the checker keeps for a take: its audio and its result, under recite-tests/<uid>/.
+  await putObject(`recite-tests/${uid}/20261110-100000-a1b2c3.wav`, new Uint8Array([1, 2, 3]), 'audio/wav');
+  await putObject(`recite-tests/${uid}/20261110-100000-a1b2c3.json`, '{}', 'application/json');
+  await putObject('recite-tests/someone-else/20261110-100000-d4e5f6.wav', new Uint8Array([4]), 'audio/wav');
+
+  await app.act(() => (app.auth.deleteAccount as () => Promise<void>)());
+  await app.until(() => app.auth.firebaseUser == null, 'the phone to be signed out');
+  expect(await listObjects(`recite-tests/${uid}/`)).toEqual([]);
+  expect(await listObjects('recite-tests/someone-else/')).toEqual(['recite-tests/someone-else/20261110-100000-d4e5f6.wav']);
+  await app.close();
+});
 
 it('[ACCOUNT-3] nothing on the phone listens to the account while the server deletes it', async () => {
   const { app, uid, listeners } = await accountWithListeners();

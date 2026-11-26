@@ -1,6 +1,6 @@
 // A take checked on the phone never opens the checker's socket, so what the server would have noted of it is sent here,
-// after the take (recite-contract.md draft 15): one health line, and on Revisely Dev, with "Keep my recitations as test
-// data" on, the take's audio and result for the lab. Best effort and never in the reciter's way: a failure is logged and
+// after the take (recite-contract.md draft 15): one health line, and with "Help improve mistake detection" on (RECITE-26),
+// the take's audio and result for the lab. Best effort and never in the reciter's way: a failure is logged and
 // nothing is retried, and a service without these routes answers 404, which means there is nothing to send.
 
 import { File, Paths } from 'expo-file-system';

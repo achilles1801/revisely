@@ -1,5 +1,5 @@
 // What a take checked on the phone leaves with the server (recite-contract.md draft 15), as plain data: its health line
-// (`POST /line`, numbers only) and, on Revisely Dev with "Keep my recitations as test data" on, its result for the lab
+// (`POST /line`, numbers only) and, with "Help improve mistake detection" on (RECITE-26), its result for the lab
 // (`POST /keep`). lib/onDevice/takeReport sends them.
 
 import type { StartFrame } from './feed';

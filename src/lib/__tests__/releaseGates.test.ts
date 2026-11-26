@@ -49,6 +49,42 @@ describe('the Account page’s new look: one switch (ACCOUNT-4 to ACCOUNT-7)', (
   });
 });
 
+describe('Help improve mistake detection (RECITE-26): the store app’s through one switch of its own', () => {
+  const variant = require('../variant') as typeof import('../variant');
+  const { TRAINING_TAKES_RELEASED, TRAINING_STORE_DEFAULT, setTrainingTakesReleasedForTests, trainingTakesOffered } =
+    require('../release/trainingTakes') as typeof import('../release/trainingTakes');
+  const { keepsTakes, trainingSwitchOn, RECITE_CHECK_DEFAULTS } =
+    require('../reciteCheck/settings') as typeof import('../reciteCheck/settings');
+  afterEach(() => {
+    setTrainingTakesReleasedForTests(undefined);
+    jest.restoreAllMocks();
+  });
+
+  it('[RECITE-26] off: Revisely Dev offers it and keeps takes (on by default); the store app neither shows nor asks', () => {
+    setTrainingTakesReleasedForTests(false);
+    jest.spyOn(variant, 'isDevVariant').mockReturnValue(true);
+    expect(trainingTakesOffered()).toBe(true);
+    expect(keepsTakes(RECITE_CHECK_DEFAULTS)).toBe(true);
+    jest.spyOn(variant, 'isDevVariant').mockReturnValue(false);
+    expect(trainingTakesOffered()).toBe(false);
+    expect(keepsTakes({ keep: true, keepSet: true })).toBe(false);
+  });
+
+  it('[RECITE-26] on: the store app offers it; a keep the phone saved without the user choosing reads as the store default', () => {
+    setTrainingTakesReleasedForTests(true);
+    jest.spyOn(variant, 'isDevVariant').mockReturnValue(false);
+    expect(trainingTakesOffered()).toBe(true);
+    expect(trainingSwitchOn({ keep: true, keepSet: false })).toBe(TRAINING_STORE_DEFAULT);
+    expect(keepsTakes({ keep: true, keepSet: true })).toBe(true);
+    expect(keepsTakes({ keep: false, keepSet: true })).toBe(false);
+  });
+
+  it('ships off until Majd opens it, and starts off in the store app until he says otherwise (Nov 26 2026)', () => {
+    expect(TRAINING_TAKES_RELEASED).toBe(false);
+    expect(TRAINING_STORE_DEFAULT).toBe(false);
+  });
+});
+
 describe('Home, version 3: one switch (HOME-4, HOME-5)', () => {
   const { homeV3Enabled, HOME_V3_RELEASED, setHomeV3ForTests } =
     require('../release/homeV3') as typeof import('../release/homeV3');

@@ -183,8 +183,10 @@ until its part is set up.
       An answer from `/health` lets takes back.
   - The model's licence (Quran Muaalem License 1.0, 2.1) asks for its AI notice, English and Arabic, before the
     first use and reachable afterwards: the sheet shows it first, and Settings → About has it.
-  - "Keep as test data" (on by default; in the sheet and Settings → Testing) keeps each recording and its result
-    in `recite-tests/<uid>/` in the dev bucket (closed to clients). The lab copies them with `fetch_takes.py`.
+  - "Help improve mistake detection" (RECITE-26; was "Keep as test data"; on by default here; Settings → Mushaf and
+    Recite) keeps each recording and its result in `recite-tests/<uid>/` in the dev bucket (closed to clients,
+    `storage.rules`; deleting the account deletes them). The lab copies them with `fetch_takes.py`. The store app gets
+    the switch with `lib/release/trainingTakes`: see "Training recordings in production" below.
     Sessions may replay them through software to debug and improve Recite (Majd, Nov 26 2026: "yes all sessions can
     look at any recordings it wants to help debug and fix issues and enhance things"), and they may be used to train
     the model (Majd, Nov 26 2026: "yes it's fine to train the model on it"), like the /record takes.
@@ -408,6 +410,44 @@ until its part is set up.
     a word with a mistake (its highlight shows as it is). Grey, not amber: amber is a slip. The summary says "3 words
     peeked" and lists each ayah's peeked words in a row (a tap shows it on the page). Peeks never count in the score
     (the checker counts them as `helped`). The verse Test me shows to start from isn't a peek.
+
+### Training recordings in production (RECITE-26; designed Nov 26 2026, nothing deployed)
+
+Majd, Nov 26 2026: "once we get a lot of users and use their recordings to better train our model and we truly cross that
+final bar then we can charge". The store app's "Help improve mistake detection" is built and switched off
+(`lib/release/trainingTakes`: `TRAINING_TAKES_RELEASED`, and `TRAINING_STORE_DEFAULT` for where it starts).
+
+**Where the takes live.** The same as Revisely Dev's, so the lab's tools work on both: production's default bucket
+(`revision-buddy-3a398.firebasestorage.app`), `recite-tests/<uid>/<take>.wav` (16 kHz mono PCM) and `<take>.json` (the
+events, every dismissal and Put back, and the final result). Late labels (`/dismiss`, `/undismiss`) and on-device takes
+(`/keep`) go to the same checker. Each name is written once (`ifGenerationMatch=0`).
+- **Who writes:** production's checker (`recite-check`, `recite-check-pair`) with its own service account, given
+  `roles/storage.objectCreator` on that bucket only. It keeps a take only when the app asks (`keep` in the start frame,
+  `keepsTakes`) and its `BUCKET` names the bucket. Today production's `BUCKET` is empty, so it keeps nothing.
+- **Who reads:** nobody through the client SDKs (`storage.rules`, `match /recite-tests/**`, tested in
+  `tests/firestore-rules/keptTakesStorage.test.ts`). The lab reads with admin access (`fetch_takes.py`).
+- **Deleting:** Delete account deletes `recite-tests/<uid>/` (`deleteUserAccount`, ACCOUNT-1). Turning the switch off
+  stops new takes and leaves what is kept (whether off should also delete is Majd's call).
+- **Retention:** a bucket lifecycle rule on the `recite-tests/` prefix deletes takes older than the period Majd picks.
+  Nothing sets one today, on dev or production.
+
+**Cost, measured on dev's 111 kept takes (Nov 26 2026):** a take averages 1.7 MB of WAV (mean 54 s, median 27 s) and 9 KB
+of JSON, so 1,000 takes are about 1.7 GB. The bucket's no-cost limits (a `firebasestorage.app` bucket on Blaze, in a US
+region) are 5 GB stored, 5,000 uploads and 50,000 reads a month, and 100 GB downloaded. That 5 GB is shared with the
+recording backup. With nothing else in it, about 2,900 takes fit. Past it, standard storage is about $0.02–0.026 per GB a
+month, so about $0.035–0.045 a month per 1,000 takes kept, adding up as takes accumulate (100,000 takes: about $3.50–4.50
+a month). Uploads are 2–3 a take: free up to about 2,000 takes a month, then about $0.015 per 1,000 takes. Keeping the
+ADPCM the phone already sends (4:1) instead of WAV would cut storage about four times (a checker change).
+
+**The production pieces, for the release owner (in order):**
+1. `firebase deploy --only storage` to production (the closed `recite-tests` rule; keep the rules already live).
+2. `firebase deploy --only functions:deleteUserAccount` to production (deletes `recite-tests/<uid>/`).
+3. revisely-internal: set `BUCKET=revision-buddy-3a398.firebasestorage.app` on production's `recite-check` and
+   `recite-check-pair`, and give their service account `roles/storage.objectCreator` on that bucket.
+4. The lifecycle rule on `recite-tests/` (the period Majd picks).
+5. Majd: the privacy policy, App Store Connect's App Privacy (Audio Data's purposes) and Play's Data safety (see the PR).
+6. The release PR: `TRAINING_TAKES_RELEASED = true`, `TRAINING_STORE_DEFAULT` as Majd decides, RECITE-26 loses "(Revisely
+   Dev)", and its line moves from Revo's Dev guide to the main guide.
 
 ## Native code for Revisely Dev only: `modules-dev/` (Recite on the phone, Nov 23 2026)
 

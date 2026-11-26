@@ -147,6 +147,9 @@ export const deleteUserAccount = onCall(
     await getStorage().bucket().deleteFiles({ prefix: `recordings/${uid}/` });
     // The account's picture and anything else under its own folder (storage.rules: users/<uid>/profile/).
     await getStorage().bucket().deleteFiles({ prefix: `users/${uid}/` });
+    // The takes "Help improve mistake detection" kept (RECITE-26): the checker writes them under recite-tests/<uid>/ of
+    // this same default bucket (its BUCKET), out of every client's reach (storage.rules).
+    await getStorage().bucket().deleteFiles({ prefix: `recite-tests/${uid}/` });
 
     await deleteSubcollection('pages');
     await deleteSubcollection('sessions');

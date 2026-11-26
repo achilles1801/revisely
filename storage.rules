@@ -63,6 +63,13 @@ service firebase.storage {
       allow read, write: if false;
     }
 
+    // Takes kept by "Help improve mistake detection" (BEHAVIOUR.md RECITE-26): the checker writes them with its own
+    // account, deleteUserAccount removes an account's, and the lab reads them with admin access. No client, the owner's
+    // own phone included, reads, lists or writes them.
+    match /recite-tests/{allPaths=**} {
+      allow read, write: if false;
+    }
+
     // Deny all other access
     match /{allPaths=**} {
       allow read, write: if false;
