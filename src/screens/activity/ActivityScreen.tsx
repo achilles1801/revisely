@@ -39,6 +39,9 @@ import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { Tap } from '../../components/v2/Tap';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { t } from '../../i18n';
+import { RamadanActivity } from '../../components/ramadan';
+import { useRamadanDecor } from '../../components/ramadan/quiet';
+import { useRamadanMonth } from '../../components/ramadan/useRamadanMonth';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Activity'>;
 
@@ -65,6 +68,10 @@ export default function ActivityScreen() {
   // Insights' buttons (the weak pages first tomorrow, with its toast; the reader; Settings), shared with a section's page.
   const { props: insightsActions, toast: carryToast } = useInsightsActions(tabFootprint);
   const oneTab = activityOneTabEnabled();
+  // The Ramadan theme (THEME-5): lanterns and falling light, five lanterns and more light in the last ten nights.
+  const ramadan = useRamadanDecor();
+  const ramadanMonth = useRamadanMonth();
+  const lastTen = ramadanMonth?.phase.kind === 'during' && ramadanMonth.phase.lastTen;
   const { readings, journal, recordings, loading, loadError, load } = useActivitySources();
   // Pull to refresh reads everything again (ACT-27): the readings and notes, and Overview's and Insights'
   // items (they were left out, so a pull never changed Coverage). The spinner always ends (usePullToRefresh).
@@ -116,6 +123,7 @@ export default function ActivityScreen() {
 
   return (
     <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+      {ramadan ? <RamadanActivity lastTen={lastTen} /> : null}
       <TopBar
         title={t('activity.screen.title')}
         right={
@@ -167,6 +175,8 @@ export default function ActivityScreen() {
               onOpenSection={(section) => navigation.navigate('ActivitySection', { section })}
               // This week's "Month ›" (Majd's T1): the full calendar on its own page.
               onOpenMonth={() => navigation.navigate('ActivityMonth')}
+              // The Ramadan row's own page (THEME-6).
+              onOpenRamadan={() => navigation.navigate('ActivityRamadan')}
             />
           ) : (
             <View style={v2.graph}>

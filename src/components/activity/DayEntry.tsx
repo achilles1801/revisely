@@ -8,7 +8,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tap } from '../v2/Tap';
 import { ProgressRing } from './DayParts';
 import { useTheme } from '../../context/ThemeContext';
-import { typeV2 } from '../../theme/v2';
+import { ramadanV2, typeV2 } from '../../theme/v2';
+import { Crescent } from '../ramadan/art';
 import { forwardIcon } from '../../i18n/direction';
 import { formatNumber, t } from '../../i18n';
 
@@ -51,6 +52,7 @@ export function DayEntry({
   showNote = true,
   ring,
   extras = [],
+  hijri,
 }: {
   /** "Wednesday 28 October". */
   date: string;
@@ -64,12 +66,14 @@ export function DayEntry({
   /** C2's form (the one Activity tab): the revision as a ring, the other kinds in one grey line; no note, no Add a note. */
   ring?: DayEntryRing | null;
   extras?: DayEntryExtra[];
+  /** The Ramadan theme (THEME-6): the day's Hijri date in Ramadan or Eid, "12 Ramadan", beside the date. */
+  hijri?: string | null;
 }) {
-  const { palette } = useTheme();
+  const { palette, isDark } = useTheme();
   const shownNote = showNote ? note : null;
   const spoken = [date, ...lines.map((l) => `${l.label}, ${l.value}${l.tail ? `, ${l.tail}` : ''}`), ...(shownNote ? [`${t('activity.calendar.note')}, ${shownNote}`] : [])].join('. ');
   if (ring !== undefined) {
-    const said = [date, ring ? `${ring.figure} ${t('activity.oneTab.revised')}${ring.detail ? `, ${ring.detail}` : ''}` : null, ...extras.map((e) => e.text)]
+    const said = [hijri ? `${date}, ${hijri}` : date, ring ? `${ring.figure} ${t('activity.oneTab.revised')}${ring.detail ? `, ${ring.detail}` : ''}` : null, ...extras.map((e) => e.text)]
       .filter(Boolean)
       .join('. ');
     const mark = (key: DayEntryExtra['key']) =>
@@ -82,9 +86,21 @@ export function DayEntry({
       <View style={styles.entry} testID="calendar-preview">
         <Tap onPress={onOpen} accessibilityRole="button" accessibilityLabel={said || date} accessibilityHint={t('activity.calendar.openTheDay')} style={styles.open} testID="preview-open">
           <View style={styles.head}>
-            <Text style={[styles.date, { color: palette.text }]} numberOfLines={2} maxFontSizeMultiplier={MAX_SCALE} testID="preview-date">
-              {date}
-            </Text>
+            <View style={styles.dateRow}>
+              <Text style={[styles.date, { color: palette.text }]} numberOfLines={2} maxFontSizeMultiplier={MAX_SCALE} testID="preview-date">
+                {date}
+              </Text>
+              {hijri ? (
+                <View style={styles.hijri} testID="preview-hijri">
+                  <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                    <Crescent size={12} tokens={ramadanV2(isDark, palette.accent)} />
+                  </View>
+                  <Text style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE}>
+                    {hijri}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
             <Ionicons name={forwardIcon()} size={18} color={palette.secondary} />
           </View>
           {ring ? (
@@ -193,6 +209,8 @@ const styles = StyleSheet.create({
   open: { paddingHorizontal: 16, paddingBottom: 2 },
   head: { minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   date: { flexShrink: 1, fontSize: 17, lineHeight: 22, fontWeight: '600' },
+  dateRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 8, flexShrink: 1 },
+  hijri: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   line: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 4 },
   label: { width: 92 },
   value: { flex: 1, minWidth: 0 },
