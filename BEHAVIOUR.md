@@ -1638,10 +1638,14 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   evenly over the other days, so a plan saved today keeps those weekdays off (a missed day that Keep daily amount carries
   can still land on one, as in any plan).
   "Check in Edit schedule" opens Edit schedule filled in, marked "Revo's schedule, not saved yet": only Save keeps it,
-  and Back leaves the schedule as it was (with Discard changes?, as any edit). Not now hides the card. The store app
-  never gets such a card, and its questions go with exactly the reply format they went with before the draft. Drafting
-  never costs an answer: if the model's service refuses Revisely Dev's reply format (it did, Nov 26 2026: every Dev
-  question came back "Revo couldn't answer that"), Revo asks again with the store app's and answers, with no draft.
+  and Back leaves the schedule as it was (with Discard changes?, as any edit). Not now hides the card. Revo drafts only
+  when opened from Edit schedule: a change or a new plan asked there (each starter too) is answered with the card. Those
+  questions go with a reply format that has the draft and, of the charts, only a day's pages, the weeks and the juz map,
+  one the model's service compiles (Nov 26 2026: with the draft beside every chart it refused every question from
+  Revisely Dev as too big, so Revo answered in words only and never showed the card). Every other question, and the
+  store app's, goes with exactly the reply format it went with before the draft, and never shows a draft. Drafting never
+  costs an answer: if the model's service refuses the schedule's format, Revo asks again with the store app's and
+  answers, with no draft.
 
 ## Memorizing
 

@@ -69,6 +69,11 @@ export interface RevoContext {
    */
   app?: 'dev';
   /**
+   * 'schedule' when Revo was opened from Edit schedule in Revisely Dev (REVO-43, from Nov 26 2026): the question then
+   * goes with the schedule schema, which has the drafted schedule (replySchema.ts). Kept only with `app: 'dev'`.
+   */
+  place?: 'schedule';
+  /**
    * 'ar' when the app is in Arabic (Revisely Dev's language picker, from Nov 22 2026): the answer is asked for in Arabic
    * (prompt.ts ARABIC_SYSTEM, a system block of its own). English requests never carry it.
    */

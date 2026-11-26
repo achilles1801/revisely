@@ -82,6 +82,11 @@ export interface RevoContext {
   /** 'dev' from Revisely Dev (lib/variant): the server then adds the Dev guide to the question. Never from the store app. */
   app?: 'dev';
   /**
+   * 'schedule' when Revo was opened from Edit schedule (REVO-43, Revisely Dev, with `app`): the server then asks with the
+   * reply format that has the drafted schedule. A server from before Nov 26 2026 refuses it; the dev backend deploys first.
+   */
+  place?: 'schedule';
+  /**
    * 'ar' when the app is in Arabic (Revisely Dev's language picker, src/i18n/choice): the server asks for the answer in
    * Arabic. Never sent in English, so those requests are as before.
    */

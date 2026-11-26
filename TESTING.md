@@ -99,6 +99,17 @@ cd functions && npm run build && ANTHROPIC_API_KEY=… node scripts/record-anthr
 The key is read from the environment and sent only to api.anthropic.com; response headers are not
 kept. The 529 stays as Anthropic documents it (an overload can't be produced on demand).
 
+**Reply schemas.** The API also refuses a reply schema whose compiled grammar is too big, a limit it
+doesn't publish (Nov 26 2026: Revisely Dev's, with the drafted schedule, on every question, so Revo
+never showed the card). The emulator answers each schema as the real API did
+(`test-recordings/anthropic/compiled-schemas.json`) and treats one never checked as malformed, and the
+Cloud Functions tests fail while a schema Revo sends isn't recorded as compiled. After changing
+`functions/src/revo/replySchema.ts` (about a cent a schema):
+
+```bash
+cd functions && npm run build && ANTHROPIC_API_KEY=… node scripts/check-revo-schemas.js
+```
+
 ## Adding a test
 
 1. **A rule a user would state** ("a note written before Fajr belongs to yesterday"): add it to

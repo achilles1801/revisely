@@ -71,6 +71,16 @@ const tap = async (app: OpenApp, testID: string) => {
 /** What the model says next for this account (functions/src/emulator.ts). */
 const modelSays = (uid: string, reply: object) => setServerDoc(`emulator/anthropic/accounts/${uid}`, { reply: { text: JSON.stringify(reply), stopReason: 'end_turn' } });
 
+/** The real model's reply, word for word (functions/scripts/revo-draft-samples.js). */
+const modelSent = (uid: string, text: string) => setServerDoc(`emulator/anthropic/accounts/${uid}`, { reply: { text, stopReason: 'end_turn' } });
+
+/** The last request to the model: its schema's hash and the question as the model read it. */
+async function lastAsked(uid: string): Promise<{ outputSchemaSha256: string; question: string }> {
+  const docs = (await listServerDocs(`emulator/anthropic/accounts/${uid}/requests`)) as unknown as { at: number; outputSchemaSha256: string; messages: { content: string }[] }[];
+  const last = docs.sort((a, b) => a.at - b.at).at(-1)!;
+  return { outputSchemaSha256: last.outputSchemaSha256, question: last.messages.at(-1)!.content };
+}
+
 /** The reply schema each request to the model carried, oldest first (its hash). */
 async function schemasAsked(uid: string): Promise<string[]> {
   const docs = (await listServerDocs(`emulator/anthropic/accounts/${uid}/requests`)) as unknown as { at: number; outputSchemaSha256: string }[];
@@ -136,7 +146,7 @@ it('[REVO-43] Revo from Edit schedule: the schedule and four starters; its draft
   await app.until(() => app.screen.queryByTestId('revo-plan') != null, 'the draft’s card');
   // What changes, worked out on the phone: 108 pages at 6 a day is 18 days, 6 a week around Friday: 3 weeks, 21 days.
   expect(draftRows(app)).toEqual(['A day: 10 pages, then 6 pages', 'A round: Every 11 days, then Every 21 days', 'Rest days: None, then Friday']);
-  // Asked with Revisely Dev's schema, the one with the draft in it.
+  // Asked with the schedule's format, the one with the draft in it.
   expect((await schemasAsked(uid)).map((h) => h === STORE_SCHEMA)).toEqual([false]);
   // Nothing is saved by the answer.
   expect((await getServerDoc(`users/${uid}`))?.customPlan ?? null).toBeNull();
@@ -181,7 +191,7 @@ it('[REVO-43] a draft with no rest day and the usual order (the schema asks for 
   await app.close();
 });
 
-it('[REVO-43] the API refuses Revisely Dev’s schema (Nov 26 2026): Revo asks again with the store app’s and answers, with no draft', async () => {
+it('[REVO-43] the API refuses the schedule’s format (as it refused Dev’s, Nov 26 2026): Revo asks again with the store app’s and answers, with no draft', async () => {
   const { app, uid } = await openFromEditSchedule();
   // As the API answered every question from Revisely Dev once the draft was in its schema: a 400, "Schema is too
   // complex for compilation", before the model ran. Revo said "Revo couldn’t answer that. Try again." (Majd's phone).
@@ -194,11 +204,85 @@ it('[REVO-43] the API refuses Revisely Dev’s schema (Nov 26 2026): Revo asks a
   );
   expect(app.screen.queryByText(/Revo couldn’t answer that/)).toBeNull();
   expect(app.screen.getByText('Fewer pages a day makes it lighter: 6 a day brings each page round every 18 days.')).toBeTruthy();
-  // Dev's schema first, refused; then the store's, answered.
+  // The schedule's format first, refused; then the store's, answered.
   const asked = await schemasAsked(uid);
   expect(asked).toHaveLength(2);
   expect(asked[0]).not.toBe(STORE_SCHEMA);
   expect(asked[1]).toBe(STORE_SCHEMA);
+  expect(app.screen.queryByTestId('revo-plan')).toBeNull();
+  await app.close();
+});
+
+it('[REVO-43] a request typed to Revo on Edit schedule goes with a reply format the model’s service compiles: the real answer is the draft card, then Edit schedule filled in', async () => {
+  // Majd's Revisely Dev, Nov 26 2026: Revo answered in words only, never the card. The API refused Dev's reply format as
+  // too big to compile (a 400, before the model ran) and Revo asked again with the store app's, which has no draft. The
+  // emulator answers a format as the real API did (functions/test-recordings/anthropic/compiled-schemas.json).
+  const { app, uid } = await openFromEditSchedule();
+  // The real model's answer to this question, asked from Edit schedule with this format (revo-draft-samples.js, Nov 26).
+  await modelSent(
+    uid,
+    '{"text":"Here\'s a lighter plan: 6 pages a day, with Friday as a rest day. It\'s slower, so a full cycle takes longer, but each day stays doable.","chart":null,"textAfter":"Check it in Edit schedule, then Save if it suits you.","action":{"kind":"draftSchedule","title":"6 pages a day, Fridays off","detail":"Lowers the daily amount from 10 to 6 pages, with Friday as a rest day","mode":"pages","perDay":6,"restDays":[5],"reverse":false},"remember":["Can only do about 6 pages a day; Fridays are busy"],"title":"Lighter plan, Fridays off","chips":["Why does a rest day come round?","What if I miss a day?"]}',
+  );
+  await app.until(() => app.screen.queryByTestId('revo-input') != null, 'Revo’s composer');
+  await app.act(async () => {
+    app.mods.rtl.fireEvent.changeText(app.screen.getByTestId('revo-input'), 'I can only do 6 pages, and Fridays are busy');
+  });
+  await tap(app, 'revo-send');
+  await app.until(() => app.screen.queryByTestId('revo-plan') != null || app.screen.queryByText(/Here’s a lighter plan|Here's a lighter plan/) != null, 'Revo’s answer');
+
+  // Asked once, with the schedule's format (one the real API compiled), and told it was asked from Edit schedule.
+  const asked = await schemasAsked(uid);
+  expect(asked).toHaveLength(1);
+  expect(asked[0]).not.toBe(STORE_SCHEMA);
+  expect((await lastAsked(uid)).question).toContain('Asked from Edit schedule:');
+
+  // The card, as the board has it: "A new schedule", what changes, and the rows worked out on the phone.
+  await app.until(() => app.screen.queryByTestId('revo-plan') != null, 'the draft’s card');
+  expect(app.screen.getByText('A new schedule')).toBeTruthy();
+  expect(app.screen.getByText('Lowers the daily amount from 10 to 6 pages, with Friday as a rest day')).toBeTruthy();
+  expect(draftRows(app)).toEqual(['A day: 10 pages, then 6 pages', 'A round: Every 11 days, then Every 21 days', 'Rest days: None, then Friday']);
+
+  // Its button: Edit schedule filled in, not saved.
+  await tap(app, 'revo-plan-do');
+  await app.until(() => app.screen.queryByTestId('plan-revo-draft') != null, 'the draft in Edit schedule');
+  expect(app.screen.getAllByText('6 pages a day').length).toBeGreaterThan(0);
+  expect(app.screen.getAllByText('Every page comes round every 21 days').length).toBeGreaterThan(0);
+  expect((await getServerDoc(`users/${uid}`))?.customPlan ?? null).toBeNull();
+  await app.close();
+});
+
+it('[REVO-43] Revo opened anywhere but Edit schedule asks with the store app’s format and never shows a draft', async () => {
+  setZone(ZONES.amman);
+  setNow('2026-11-25 10:00');
+  const phone = new Phone('phone');
+  let app = await newAccount(phone, { memorized: pagesRange(1, 108), user: { dailyPageCapacity: 10 } });
+  const uid = app.uid;
+  await app.untilSynced();
+  await app.close();
+  await markPreviewTester(uid);
+  await setServerDoc(`coachSettings/${uid}`, { revoOn: true });
+  app = await phone.open(stack);
+  await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
+  await new Home(app).ready();
+  // From Home: even a reply with a draft in it shows none (the server keeps drafts for Edit schedule's questions).
+  await modelSays(uid, {
+    text: '6 pages a day fits.',
+    chart: null,
+    textAfter: null,
+    action: { kind: 'draftSchedule', title: 'A new schedule', detail: '6 pages a day', mode: 'pages', perDay: 6, restDays: [], reverse: false },
+    remember: [],
+    title: 'A lighter schedule',
+    chips: [],
+  });
+  await tap(app, 'revo-button');
+  await app.until(() => app.screen.queryByTestId('revo-input') != null, 'Revo’s composer');
+  await app.act(async () => {
+    app.mods.rtl.fireEvent.changeText(app.screen.getByTestId('revo-input'), 'Make it lighter');
+  });
+  await tap(app, 'revo-send');
+  await app.until(() => app.screen.queryByText('6 pages a day fits.') != null, 'Revo’s answer');
+  expect(await schemasAsked(uid)).toEqual([STORE_SCHEMA]);
+  expect((await lastAsked(uid)).question).not.toContain('Asked from Edit schedule');
   expect(app.screen.queryByTestId('revo-plan')).toBeNull();
   await app.close();
 });
