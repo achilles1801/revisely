@@ -21,7 +21,8 @@ classic default), and a fresh install starts in light.
   16pt gutter; each row has an avatar-size mark (40 top-level, 36 reply, 28 nested; `v2/Mark`),
   a name (15/600), metadata (13) and a ⋯ menu, and rows of one thread are joined by a 2pt line
   (`v2/ThreadRow`, ported from the Layl app's ThreadCard). No cards, no glass, no gradient but
-  Home's glow and the accent's progress fill: the primary button is a solid pill
+  Home's glow, the accent's progress fill, Premium's mark and ring (`premium`) and the badges' materials (`BADGE_MATERIALS`,
+  Settings → Account; Majd approved them on Nov 26 2026): the primary button is a solid pill
   (`v2/PillButton`). Every menu is `v2/ActionSheet` (handle, 18/600 title, icon rows, red
   destructive rows, a Cancel bar); its action runs after the sheet has gone. The one exception is
   the held verse's menu (`verse/VerseMenu`, Oct 27 2026): a small card beside the verse

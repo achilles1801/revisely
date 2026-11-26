@@ -387,9 +387,9 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['ATHAN-1', 'ATHAN-2', 'ATHAN-3', 'ATHAN-4'],
     routes: ['Settings', 'PrayerNotifications', 'AthanVoice'],
     text: lines(
-      '- On iPhone, a prayer’s notification can play the athan: Settings → Prayer → “Prayer notifications” → a prayer that is on → “Sound” → “Athan”, then “Voice” to choose it for that prayer. The same sheet opens from the prayer times on Home: tap a prayer’s name there. Settings → Prayer → “Athan voice” chooses one voice for every prayer set to the athan. Fajr uses the voice’s own Fajr athan when it has one; a voice with Fajr in its name is used for Fajr only.',
+      '- On iPhone, a prayer’s notification can play the athan: Settings → Prayer → “Prayer notifications” → a prayer that is on → “Sound” → “Athan”, then “Voice” to choose it for that prayer. Tapping a prayer’s name in Home’s prayer times opens it too. Settings → Prayer → “Athan voice” chooses one voice for every prayer set to the athan. Fajr uses the voice’s Fajr athan if it has one; a voice named for Fajr is for Fajr only.',
       '- An iPhone notification can play only the first 30 seconds of an athan. A reminder before the prayer keeps the standard tone. Silent mode and Focus still apply.',
-      '- A voice downloads when chosen (the play button listens to it first); until it has, that prayer plays the standard tone. Android doesn’t have the athan yet.',
+      '- A voice downloads when chosen (play listens first); until then, the standard tone. Android doesn’t have the athan yet.',
       '- To hear the whole athan, tap the prayer’s notification within 15 minutes of it: the app opens and plays that voice’s whole athan from the start, with “Stop”. It needs a connection, and it stops if the app is left.',
     ),
   },
@@ -412,9 +412,9 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['SESS-8', 'LANG-2', 'RECITE-7', 'RECITE-26', 'RECITE-27', 'RECITE-28', 'RECITE-29', 'RECITE-30', 'SET-5', 'ONBOARD-5'],
     routes: ['Settings'],
     text: lines(
-      '- Settings → Testing → “Preview onboarding”: the first setup’s screens on a blank account. It saves nothing.',
-      '- Settings → Mushaf and Recite → “Mistakes to mark”: “Mistakes”, or “Strict (Beta)”, which also marks tajweed in violet: ghunnah, ikhfa, qalqalah, idgham (with and without ghunnah), iqlab, a natural madd dropped, “Madd munfasil” at 4 or 5 counts, a lazim madd held short, and “Madd ʿarid” once it’s set to a length. It doesn’t check “Madd muttasil”, munfasil at 2 counts or ikhfa of meem yet, so never say it checks every tajweed rule. It’s Beta: it can miss a slip or note a correct word, and notes never count in the score. The store app marks mistakes only.',
-      '- Two tiers of marks (Majd, Nov 22 2026). Mistakes: a wrong or skipped word, a hesitation (“Hesitated here”, on the word they didn’t know; one after the end stays “Extra word”), a wrong haraka and a wrong letter, each named for what it is on its card (“Wrong word”, “Wrong haraka”, “Wrong letter”, “Wrong shadda”), in the summary’s line (for example "1 wrong haraka, 1 wrong letter") and counted in the score; a wrong haraka or letter is a mistake like a wrong word, never a “slip”. Tajweed notes (Strict) are Beta: “(Beta)” after a note’s name, in the summary’s line and in Insights, and never counted. “Not clear” is neither: never a mistake, never counted. The colours are as before: red for words, amber for harakat and letters and Not clear, violet for tajweed.',
+      '- Settings → Testing → “Preview onboarding”: the first setup’s screens on a blank account, saving nothing.',
+      '- Settings → Mushaf and Recite → “Mistakes to mark”: “Mistakes”, or “Strict (Beta)”, which also marks tajweed in violet: ghunnah, ikhfa, qalqalah, idgham (with and without ghunnah), iqlab, a natural madd dropped, “Madd munfasil” at 4 or 5 counts, a lazim madd held short, and “Madd ʿarid” once it’s set to a length. It doesn’t check “Madd muttasil”, munfasil at 2 counts or ikhfa of meem yet, so never say it checks every tajweed rule. It’s Beta: it can miss a slip or note a correct word; notes never count. The store app marks mistakes only.',
+      '- Two tiers of marks. Mistakes: a wrong or skipped word, a hesitation (“Hesitated here”, on the word they didn’t know; one after the end stays “Extra word”), a wrong haraka and a wrong letter, each named for what it is on its card (“Wrong word”, “Wrong haraka”, “Wrong letter”, “Wrong shadda”), in the summary’s line and counted in the score; a wrong haraka or letter is a mistake like a wrong word, never a “slip”. Tajweed notes (Strict) are Beta: “(Beta)” after a note’s name, in the summary’s line and in Insights, and never counted. “Not clear” is neither: never a mistake, never counted. Colours: red for words, amber for harakat and letters and Not clear, violet for tajweed.',
       // The main guide's two lines on this go with the release's re-record of its replies.
       '- “Recite the mistakes again” and "Recite your N mistakes here" are gone: never offer them. To work on a mistake, recite the passage again.',
       '- A take needs at least one ayah recited (or about a mushaf line of a very long one). Less isn’t kept.',
@@ -422,11 +422,11 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- In a session, going on to the next page while reciting marks the page they finished revised, as a swipe does (✓ or “Pages” takes it back); a jump to a mark’s page marks nothing. Once a page’s last ayah is said, the next page shows and waits for them.',
       '- The bar writes each word once they’ve said it, in the order said: a repeat or going back shows again, and nothing ahead of their voice.',
       '- “Test me” here is one spot test: a random verse, the page hidden but for it. How far, where from and “Show progress” are in Settings → Mushaf and Recite → Spot tests; it finishes a surah ending near. It ends with “Hasbuk”, or “Stopped early”.',
-      '- Settings → Mushaf and Recite → “Keep my recitations as test data” (on unless turned off) keeps each take and its result for Revisely’s tests; software checks them, nobody listens. Any account that recites has it, tester or not. Settings → Testing → “Premium” turns Premium off to see Mark mistakes locked.',
-      '- Settings → About → “Licences” shows, in full, the licence of the model Revisely’s recitation checking is built on (the Quran Muaalem License); it opens without a connection.',
-      '- Settings → Testing → “Mistake detection model” says which model the checker runs for Recite, Mistakes and Strict (for example v7), read from the checker when Settings opens; a tap asks again.',
-      '- Settings → Appearance → “Language”: “Phone’s language”, English or العربية (Arabic, right to left). Revisely restarts to change it (“Restart”, or “Not now” for the next launch). In Arabic, Revo answers in Arabic too. The Arabic is still being written: what isn’t translated yet shows in English. The store app is English only for now. In Arabic the mushaf still turns like a printed one: page 1 on the right, the next page from the left.',
-      '- Rating Revisely: Settings → Help and support → “Rate Revisely” opens the store’s review page. After a day’s revision with a streak of 7 days or more, the end card may show “Enjoying Revisely? Rate it”: at most 3 times ever, four months apart, never in an account’s first week, never again once tapped or dismissed. Rating is optional and nothing is given for it.',
+      '- Settings → Mushaf and Recite → “Keep my recitations as test data” (on by default) keeps each take and its result for Revisely’s tests; software checks them, nobody listens. Every account that recites has it. Settings → Testing → “Premium” turns Premium off to see Mark mistakes locked.',
+      '- Settings → About → “Licences” shows the recitation model’s licence (the Quran Muaalem License) in full, offline too.',
+      '- Settings → Testing → “Mistake detection model” says which model the checker runs (for example v7); a tap asks again.',
+      '- Settings → Appearance → “Language”: “Phone’s language”, English or العربية (Arabic). It restarts Revisely (“Restart”, or “Not now”). In Arabic, Revo answers in Arabic too. Untranslated text shows in English. The store app is English only for now. In Arabic the mushaf turns as a printed one does.',
+      '- Rating Revisely: Settings → Help and support → “Rate Revisely” opens the store’s review page. After a day’s revision with a streak of 7 days or more, the end card may show “Enjoying Revisely? Rate it”: at most 3 times ever, four months apart, never in an account’s first week, never again once tapped or dismissed. Rating is optional; nothing is given for it.',
     ),
   },
   {
@@ -546,6 +546,16 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- From “Edit schedule”, Revo opens on the schedule with four starters.',
       '- Never say you changed it: send draftSchedule {mode "pages" or "juz", perDay (pages 1–40, juz 1–3), restDays (weekdays off, 0 Sunday to 6 Saturday; pages only), reverse}, title "A new schedule", detail what changes.',
       '- “Check in Edit schedule” opens it filled in, not saved: only Save keeps it. Lighter is fewer pages a day, sooner more.',
+    ),
+  },
+  {
+    // The Account page's new look (Majd approved the boards, Nov 26 2026): Revisely Dev until released.
+    title: 'Account and badges',
+    covers: ['ACCOUNT-4', 'ACCOUNT-5', 'ACCOUNT-6', 'ACCOUNT-7', 'ACCOUNT-8'],
+    routes: ['Dashboard', 'Settings'],
+    text: lines(
+      '- Settings → your name: picture (photo or initial; tap to change) in Premium’s ring, latest badge, pages revised (each revision counts), longest streak, time in Revisely. Home’s picture opens it. “Name and email” has “Delete account”.',
+      '- Badges by pages revised, two a tier: Bronze 10/50, Silver 100/250, Gold 500/1K, Platinum 2.5K/5K, Diamond 10K/25K, Emerald 50K/100K. The bar opens “Badges”. A new one shows once (end card or Account).',
     ),
   },
 ];

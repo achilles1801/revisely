@@ -99,6 +99,16 @@ import { releaseSync } from '../../lib/offline/sync';
 import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { premiumErrorText, setDevPremium, usePremium } from '../../lib/premium';
 import { earlyAccessLine, useEarlyAccess } from '../../lib/earlyAccess';
+import { accountDesignEnabled } from '../../lib/release/accountDesign';
+import { useAccountJourney } from '../../lib/accountJourney';
+import { useBadgeMoment } from '../../lib/badgeSeen';
+import { badgeName, latestMilestone, type Milestone } from '../../lib/badges';
+import { AccountHeader } from '../../components/account/AccountHeader';
+import { BadgesSheet } from '../../components/account/BadgesSheet';
+import { ProfilePicture } from '../../components/account/ProfilePicture';
+import { BadgeMark } from '../../components/account/BadgeMark';
+import { GoogleGIcon } from '../../components/GoogleGIcon';
+import { canPickPhoto, googlePhotoOf, pickPhoto, removePhoto, restoreGooglePhoto, setPhoto, useAccountPhoto } from '../../lib/accountPicture';
 import { checkLevel, maddChecked, setReciteCheckSettings, strictOffered, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { TEST_LENGTHS, type TestLength } from '../../lib/reciteLive/testLength';
 import { getJuzForPage } from '../../lib/quranData';
@@ -106,7 +116,8 @@ import { getRevisionDateForUser } from '../../lib/fajrBoundary';
 import { revisablePages } from '../../lib/memorizedAyahs';
 import { scheduleSummary } from '../../lib/scheduleSummary';
 import { ReciteCheckNotice } from '../../components/reciteCheck/ReciteCheckNotice';
-import { currentLanguage, dayMonth, t, formatNumber } from '../../i18n';
+import { currentLanguage, dayMonth, t, formatDate, formatNumber } from '../../i18n';
+import { dateToLocalISODay } from '../../lib/schedulePlans';
 import {
   chooseLanguage,
   languageChoice,
@@ -470,6 +481,20 @@ export default function SettingsScreen() {
   const notificationsRefused = refusalShown && notifyPermission?.status === 'denied';
   const [refusedSheet, setRefusedSheet] = useState(false);
 
+  // The Account page's new look (lib/release/accountDesign; Revisely Dev until released): the picture in Premium's ring,
+  // pages revised, the longest streak and badges (ACCOUNT-4 to ACCOUNT-6), Name and email, no early-access words.
+  const accountV2 = accountDesignEnabled();
+  // Hooks run before the loading return below, so the page is read from the route here.
+  const accountShown = route.params?.page === 'account' || (route.params?.section != null && pageOfSection(route.params.section, prayerEnabled) === 'account');
+  const journey = useAccountJourney({ enabled: accountV2, streak: accountShown });
+  const latestBadge = journey ? latestMilestone(journey.pagesRevised) : undefined;
+  const badgeMoment = useBadgeMoment(accountV2 && accountShown ? user?.id : null, latestBadge);
+  const [badgesOpen, setBadgesOpen] = useState(false);
+  // The picture (ACCOUNT-8): its photo now, and the menu a tap on it opens.
+  const photoUrl = useAccountPhoto(firebaseUser);
+  const [pictureMenu, setPictureMenu] = useState(false);
+  const [pictureBusy, setPictureBusy] = useState(false);
+
   if (!localUser) {
     return (
       <TopSafeAreaView style={styles.container}>
@@ -668,6 +693,62 @@ export default function SettingsScreen() {
     off: t('settings.appearance.ramadanChoice.off'),
   };
   // Your account at the top of the first level (it opens the Account page) and of the Account page.
+  const hasPremium = reciteCheck && premium.has;
+  const googlePhoto = googlePhotoOf(firebaseUser);
+  const changePicture = (run: () => Promise<void>) => {
+    setPictureBusy(true);
+    run()
+      .catch((err) => {
+        logger.warn('Account picture could not be changed', err);
+        Alert.alert(t('account.picture.failed'), t('account.picture.failedBody'));
+      })
+      .finally(() => setPictureBusy(false));
+  };
+  const pictureActions = [
+    ...(canPickPhoto()
+      ? [
+          { key: 'choose', label: t('account.picture.choose'), icon: 'images-outline' as const, onPress: () => changePicture(async () => { const a = await pickPhoto('library'); if (a) await setPhoto(a); }) },
+          { key: 'take', label: t('account.picture.take'), icon: 'camera-outline' as const, onPress: () => changePicture(async () => { const a = await pickPhoto('camera'); if (a) await setPhoto(a); }) },
+        ]
+      : []),
+    ...(googlePhoto && googlePhoto !== photoUrl
+      ? [{ key: 'google', label: t('account.picture.google'), icon: 'logo-google' as const, onPress: () => changePicture(restoreGooglePhoto) }]
+      : []),
+    ...(photoUrl ? [{ key: 'remove', label: t('account.picture.remove'), icon: 'trash-outline' as const, destructive: true, onPress: () => changePicture(removePhoto) }] : []),
+  ];
+  const createdDay = localUser.createdAt ? new Date(localUser.createdAt) : null;
+  const sinceMonth =
+    createdDay && !Number.isNaN(createdDay.getTime()) && dateToLocalISODay(createdDay) !== dateToLocalISODay(new Date())
+      ? formatDate(createdDay, { month: 'long', year: 'numeric' })
+      : null;
+  const providerId = firebaseUser?.providerData?.[0]?.providerId;
+  const signInProvider: 'google' | 'apple' | 'password' = providerId === 'google.com' ? 'google' : providerId === 'apple.com' ? 'apple' : 'password';
+  const accountWhoV2 = [localUser.name?.trim(), hasPremium ? t('account.premium') : null, latestBadge ? badgeName(latestBadge) : null]
+    .filter(Boolean)
+    .join(', '); // i18n-ignore (a list for VoiceOver)
+  const accountRowV2 = (
+    <View style={[v2.profileRow, { borderBottomColor: palette.separator }]}>
+      <ProfilePicture size={40} photoUrl={photoUrl} initial={avatarInitial(localUser.name, firebaseUser?.email)} premium={hasPremium} testID="settings-account-picture" />
+      <View style={{ flex: 1, minWidth: 0, marginLeft: layoutV2.markGap }}>
+        <View style={v2.nameLine}>
+          {localUser.name?.trim() ? (
+            <Text style={[typeV2.name, { color: theme.textPrimary, flexShrink: 1 }]} numberOfLines={1}>
+              {localUser.name.trim()}
+            </Text>
+          ) : null}
+          {latestBadge ? (
+            <View style={{ marginStart: 5 }} testID="settings-account-badge">
+              <BadgeMark milestone={latestBadge} size={16} number={false} />
+            </View>
+          ) : null}
+        </View>
+        <Text style={[typeV2.meta, { color: theme.textSecondary }]} numberOfLines={1} testID="settings-account-revised">
+          {journey ? t('account.pagesRevised', { count: journey.pagesRevised, n: formatNumber(journey.pagesRevised) }) : ' '}
+        </Text>
+      </View>
+      <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
+    </View>
+  );
   const premiumLine = reciteCheck && premium.has ? (earlyAccessOn ? t('settings.root.premiumEarly') : t('settings.root.premium')) : null;
   const accountWho = [localUser.name?.trim(), firebaseUser?.email, premiumLine].filter(Boolean).join(', '); // i18n-ignore (a list for VoiceOver)
   const accountHeader = (opens: boolean) => (
@@ -710,10 +791,10 @@ export default function SettingsScreen() {
               <Tap
                 onPress={() => openPage('account')}
                 accessibilityRole="button"
-                accessibilityLabel={t('settings.root.accountLabel', { who: accountWho })}
+                accessibilityLabel={t('settings.root.accountLabel', { who: accountV2 ? accountWhoV2 : accountWho })}
                 testID="settings-account"
               >
-                {accountHeader(true)}
+                {accountV2 ? accountRowV2 : accountHeader(true)}
               </Tap>
             ) : null}
             <Section>
@@ -750,7 +831,86 @@ export default function SettingsScreen() {
             )}
           </>
         ) : null}
-        {page === 'account' && firebaseUser ? (
+        {page === 'account' && firebaseUser && accountV2 ? (
+          <>
+            <AccountHeader
+              name={localUser.name?.trim() || t('settings.account.notSet')}
+              initial={avatarInitial(localUser.name, firebaseUser?.email)}
+              photoUrl={photoUrl}
+              premium={hasPremium}
+              since={sinceMonth}
+              pictureBusy={pictureBusy}
+              onPicture={pictureActions.length > 0 ? () => setPictureMenu(true) : undefined}
+              journey={journey}
+              timeInApp={appSeconds != null ? formatDuration(appSeconds) : '—'}
+              moment={badgeMoment}
+              onBadges={() => setBadgesOpen(true)}
+            />
+            <Section>
+              <Row
+                icon="person-outline"
+                label={t('settings.sections.accountDetails')}
+                value={localUser.name ?? t('settings.account.notSet')}
+                onPress={() => openPage('accountDetails')}
+                testID="settings-account-details"
+              />
+            </Section>
+            <Section>
+              <Row icon="log-out-outline" label={t('common.signOut')} onPress={handleSignOut} testID="settings-sign-out" />
+            </Section>
+            <ActionSheet
+              visible={pictureMenu}
+              onClose={() => setPictureMenu(false)}
+              title={t('account.picture.title')}
+              actions={pictureActions}
+              testID="account-picture-menu"
+            />
+            <BadgesSheet
+              visible={badgesOpen}
+              onClose={() => setBadgesOpen(false)}
+              pagesRevised={journey?.pagesRevised ?? 0}
+              reachedOn={journey?.reachedOn ?? NO_MILESTONE_DAYS}
+            />
+          </>
+        ) : null}
+        {page === 'accountDetails' && firebaseUser ? (
+          <>
+            <Section>
+              <Row
+                icon="person-outline"
+                label={t('account.details.name')}
+                value={localUser.name ?? t('settings.account.notSet')}
+                onPress={() => {
+                  setTempName(localUser.name ?? '');
+                  setShowNameModal(true);
+                }}
+                testID="settings-name"
+              />
+              <View style={v2.iconRow} testID="settings-email">
+                {signInProvider === 'google' ? (
+                  <View style={v2.providerIcon}>
+                    <GoogleGIcon size={20} />
+                  </View>
+                ) : (
+                  <SettingIcon name={signInProvider === 'apple' ? 'logo-apple' : 'mail-outline'} />
+                )}
+                <View style={v2.iconRowText}>
+                  <Text style={[typeV2.body, { color: palette.text }]} numberOfLines={1} ellipsizeMode="middle">
+                    {firebaseUser.email}
+                  </Text>
+                  <Text style={[typeV2.meta, { color: palette.secondary }]}>
+                    {t('account.details.signedInWith', { provider: t(`account.details.${signInProvider}`) })}
+                  </Text>
+                </View>
+              </View>
+            </Section>
+            {/* Delete account: findable, as the stores ask, but quiet, at the foot of the page (ACCOUNT-4). */}
+            <Tap onPress={handleDeleteAccount} accessibilityRole="button" style={v2.quietDelete} testID="settings-delete-account">
+              <Text style={[typeV2.meta, { color: palette.secondary, textAlign: 'center' }]}>{t('settings.account.deleteAccount')}</Text>
+            </Tap>
+          </>
+        ) : null}
+        {page === 'account' && firebaseUser && !accountV2 ? (
           <>
             {accountHeader(false)}
             <Section>
@@ -1770,6 +1930,8 @@ function TextSheetV2({
 // Styles
 // ---------------------------------------------------------------------------
 
+const NO_MILESTONE_DAYS: ReadonlyMap<Milestone, string> = new Map();
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -1803,6 +1965,9 @@ const v2 = StyleSheet.create({
   // A row without an icon lines up with the labels of those with one.
   indent: { marginLeft: 40 },
   // Your account: the first row of the first level, and the head of the Account page.
+  nameLine: { flexDirection: 'row', alignItems: 'center' },
+  providerIcon: { width: 24, marginRight: 8, alignItems: 'center' },
+  quietDelete: { alignSelf: 'center', marginTop: 96, marginBottom: 24, paddingVertical: 12, paddingHorizontal: 16 },
   profileRow: {
     flexDirection: 'row',
     alignItems: 'center',

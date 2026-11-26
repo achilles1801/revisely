@@ -68,6 +68,8 @@ function Chevron({ color }: { color: string }) {
 export function TodayPost({
   name,
   initial,
+  picture,
+  onPicture,
   status,
   pages,
   done,
@@ -90,6 +92,10 @@ export function TodayPost({
 }: {
   name: string;
   initial: string;
+  /** The account's picture in the mark's place (ACCOUNT-7, the Account page's new look), with the latest badge. */
+  picture?: React.ReactNode;
+  /** A tap on the picture: Account. */
+  onPicture?: () => void;
   status: TodayStatus;
   /** Today's pages, in the session's order. */
   pages: number[];
@@ -181,7 +187,15 @@ export function TodayPost({
   return (
     <View testID="today-thread">
       <ThreadRow
-        mark={<Mark label={initial} />}
+        mark={
+          picture ? (
+            <Tap onPress={onPicture} accessibilityRole="button" accessibilityLabel={t('home.today.openAccount')} testID="today-picture">
+              {picture}
+            </Tap>
+          ) : (
+            <Mark label={initial} />
+          )
+        }
         name={name || t('common.today')}
         meta={name ? meta : undefined}
         figure={

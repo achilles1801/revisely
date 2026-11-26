@@ -8,6 +8,8 @@ import { t } from '../i18n';
 
 export const SETTINGS_PAGES = [
   'account',
+  // The Account page's new look: Name and email, with Delete account at its foot (lib/release/accountDesign).
+  'accountDetails',
   'revision',
   'reminders',
   'prayer',

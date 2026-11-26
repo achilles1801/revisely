@@ -1,4 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { accountDesignEnabled } from '../../lib/release/accountDesign';
+import { useAccountJourney } from '../../lib/accountJourney';
+import { latestMilestone } from '../../lib/badges';
+import { useBadgeMoment } from '../../lib/badgeSeen';
 import {
   AccessibilityInfo,
   AppState,
@@ -591,6 +595,12 @@ function ActiveRevisionScreenBody() {
   // the session saved at once. A jump there, or a page already done, marks
   // nothing (so coming back to it later doesn't celebrate again).
   const [celebrate, setCelebrate] = useState(0);
+  // A badge this session wins (ACCOUNT-6; the Account page's new look): kept from the moment it is won, shown on the end
+  // card, and marked seen once the end card has come into view (it is drawn before the session reaches it).
+  const accountV2 = accountDesignEnabled();
+  const journey = useAccountJourney({ enabled: accountV2 });
+  const latestBadge = accountV2 && journey ? latestMilestone(journey.pagesRevised) : undefined;
+  const badgeMoment = useBadgeMoment(accountV2 ? user?.id : null, latestBadge, celebrate > 0);
   const handleReachEnd = useCallback(
     (lastPage: number, bySwipe: boolean) => {
       // The header names the page just left, not where the session would resume.
@@ -972,6 +982,7 @@ function ActiveRevisionScreenBody() {
           onTapPoint={recite.pager.onTapPoint}
           endCard={
             <SessionEndCard
+              newBadge={badgeMoment}
               total={lastSectionPages.length}
               done={lastSectionPages.filter((p) => completedPages.has(p)).length}
               celebrate={celebrate}

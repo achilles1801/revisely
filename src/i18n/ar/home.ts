@@ -6,6 +6,7 @@ export const home: NonNullable<ArStrings['home']> = {
     memorized: '{{percent}} من القرآن محفوظ',
     streak: 'اليوم · الأيام المتتالية: {{days}}',
     change: 'تغيير',
+    openAccount: 'حسابك',
     adding: 'جارٍ الإضافة…',
     addToToday: 'إضافة إلى اليوم',
     addToTodayLabel: '{{line}}. إضافة إلى اليوم',

@@ -140,6 +140,8 @@ export const deleteUserAccount = onCall(
 
     // The default bucket (from FIREBASE_CONFIG). The slash keeps it to this account.
     await getStorage().bucket().deleteFiles({ prefix: `recordings/${uid}/` });
+    // The account's picture and anything else under its own folder (storage.rules: users/<uid>/profile/).
+    await getStorage().bucket().deleteFiles({ prefix: `users/${uid}/` });
 
     await deleteSubcollection('pages');
     await deleteSubcollection('sessions');

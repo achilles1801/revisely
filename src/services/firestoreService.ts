@@ -1248,6 +1248,37 @@ export async function getActivityItemsBetween(
   };
 }
 
+/**
+ * The account's revision items from before `day` (pages revised all along, lib/accountJourney): the ones older than the
+ * history Home reads (lib/activityHistory's HISTORY_DAYS). Usually none.
+ */
+export async function getRevisionItemsBefore(
+  day: string,
+  userId?: string,
+): Promise<
+  { id: string; day: string; countsFor: string; pages: number[]; assigned: number[]; occurredAt: number | null }[]
+> {
+  const uid = userId || getCurrentUserId();
+  const snap = await getDocs(query(collection(db, 'users', uid, 'revisions'), where('day', '<', day)));
+  return snap.docs.map((d) => {
+    const x = d.data();
+    const occurred =
+      x.occurredAt && typeof x.occurredAt.toMillis === 'function'
+        ? x.occurredAt.toMillis()
+        : typeof x.occurredAt === 'number'
+          ? x.occurredAt
+          : null;
+    return {
+      id: d.id,
+      day: x.day,
+      countsFor: x.countsFor,
+      pages: x.pages ?? [],
+      assigned: x.assigned ?? [],
+      occurredAt: occurred,
+    };
+  });
+}
+
 /** Every memorization item of the account, with its ayahs when added by the ayah (deleting one, ACT-7). */
 export async function getMemorizationItems(
   userId: string,

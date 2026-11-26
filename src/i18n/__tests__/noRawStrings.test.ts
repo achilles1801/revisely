@@ -17,6 +17,7 @@ const SRC = path.resolve(__dirname, '../..');
  */
 const EXTRACTED: string[] = [
   'components/*',
+  'components/account',
   'components/activity',
   'components/coach',
   'components/help',

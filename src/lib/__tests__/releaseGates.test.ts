@@ -36,6 +36,19 @@ describe('the journal’s new look: one switch (ACT-33, ACT-34, HOME-2)', () => 
   });
 });
 
+describe('the Account page’s new look: one switch (ACCOUNT-4 to ACCOUNT-7)', () => {
+  const { accountDesignEnabled, ACCOUNT_DESIGN_RELEASED, setAccountDesignReleasedForTests } =
+    require('../release/accountDesign') as typeof import('../release/accountDesign');
+  afterEach(() => setAccountDesignReleasedForTests(undefined));
+
+  it('[ACCOUNT-4] is Revisely Dev’s until released, then everyone’s', () => {
+    expect(ACCOUNT_DESIGN_RELEASED).toBe(false);
+    expect(accountDesignEnabled()).toBe(false);
+    setAccountDesignReleasedForTests(true);
+    expect(accountDesignEnabled()).toBe(true);
+  });
+});
+
 describe('everyone’s from the November 2026 release', () => {
   it.each(APP_STORE)('[ACT-2] [ACT-3] the Activity blocks, for %o', (user) => {
     expect(activityBlocksEnabled(user)).toBe(true);

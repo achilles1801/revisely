@@ -5,6 +5,8 @@ export const home = {
     streak: 'Today · {{days}}-day streak',
     /** After where today starts (HOME-3): opens Jump to. */
     change: 'Change',
+    /** Home's picture (ACCOUNT-7): opens Account. */
+    openAccount: 'Your account',
     adding: 'Adding…',
     addToToday: 'Add to today',
     /** VoiceOver: the catch-up line, then the button. */
