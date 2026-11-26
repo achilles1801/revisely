@@ -288,6 +288,19 @@ export function duePagesOf(pages: readonly number[], user: User, day: string, me
   return pages.filter((p) => carried.has(p) && !insights.has(p));
 }
 
+/**
+ * The pages from Insights among `pages` (a day's pages in a session) that are extra there (ACT-24): put in front of
+ * the day, not its own, nor a catch-up page. None on a day with no pages of its own (an off day): there they are what
+ * finishes it.
+ */
+export function insightsExtrasOf(pages: readonly number[], user: User, day: string, memorizedPages: UserPage[]): number[] {
+  const insights = insightsPagesOn(user, day);
+  if (insights.size === 0) return [];
+  const own = new Set(ownPagesOf(pages, user, day, memorizedPages));
+  if (own.size === 0) return [];
+  return pages.filter((p) => insights.has(p) && !own.has(p));
+}
+
 /** The day a carried page is credited to, when it came from an earlier day; null otherwise. */
 export function catchUpDayOf(user: User, day: string, page: number): string | null {
   const carry = carryOverOn(user, day);

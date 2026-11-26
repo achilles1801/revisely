@@ -52,6 +52,12 @@ export interface RevisionDayPlan {
    * before it (AHEAD-3: Majd, Nov 9 2026, the cycle restarts). Absent otherwise.
    */
   round?: true;
+  /**
+   * Pages of this day, and of days passed over before it, that the session has already revised as pages from Insights
+   * (`covers`): day → pages. They count for that day now (AHEAD-3), so the plan leaves them out and a day they fill is
+   * passed over. Absent when none.
+   */
+  covered?: Record<string, number[]>;
 }
 
 /**
@@ -73,17 +79,31 @@ export function nextRevisionDayPlan(
   after: string,
   taken: ReadonlySet<number>,
   logs: readonly RevisionLog[] = [],
+  /**
+   * Pages the session has revised as pages from Insights (ACT-24), put in front of an earlier day that isn't
+   * theirs. They aren't the schedule coming round: each is done for the first later day that has it (`covered`).
+   */
+  covers: ReadonlySet<number> = new Set(),
 ): RevisionDayPlan | null {
   const memorized = revisablePages(pages);
   const index = creditIndex(logs);
+  const left = new Set(covers);
+  const covered: Record<string, number[]> = {};
   for (let delta = 1; delta <= MAX_DAYS_AHEAD; delta++) {
     const day = addDays(after, delta);
     const scheduled = getPagesForDay(user, parseDay(day), memorized);
     if (scheduled.length === 0) continue;
     const credited = index.get(day);
-    const remaining = credited ? scheduled.filter((p) => !credited.has(p)) : scheduled;
+    let remaining = credited ? scheduled.filter((p) => !credited.has(p)) : scheduled;
+    const here = remaining.filter((p) => left.has(p));
+    if (here.length > 0) {
+      covered[day] = here;
+      for (const p of here) left.delete(p);
+      remaining = remaining.filter((p) => !here.includes(p));
+    }
     if (remaining.length === 0) continue;
-    return remaining.some((p) => taken.has(p)) ? { day, pages: remaining, round: true } : { day, pages: remaining };
+    const plan: RevisionDayPlan = { day, pages: remaining, ...(Object.keys(covered).length > 0 ? { covered } : {}) };
+    return remaining.some((p) => taken.has(p) && !covers.has(p)) ? { ...plan, round: true } : plan;
   }
   return null;
 }

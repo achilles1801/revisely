@@ -170,7 +170,13 @@ How the tests are made: `tests/scenarios/README.md`.
   on the day they were revised (AHEAD-6). A day that repeats pages the session already holds (the
   cycle has come round) starts a new round: the session holds that day alone, its pages unchecked, and
   today keeps its own revision of them (unchecking one in the round takes back only its credit to that
-  day). One revision counts for one day. Activity and Insights show those pages on the day they were
+  day). One revision counts for one day. Pages the session holds as pages from Insights (ACT-24), put in front of a
+  day that has pages of its own, are not the cycle coming round: those it has revised count for the later day that
+  has them as its own instead of the day they were put in front of, so that day needs only the rest, and is passed
+  over (AHEAD-4) when they were all it had. (On the session's own day they also stay in its record, which is where
+  the revision is kept.) (Majd's Dev account, Nov 26 2026: Juz 29 from Insights went first on Thursday, revised
+  ahead; Keep going then opened Friday's own Juz 29 pages unchecked as a new round, and revising them again
+  credited the same pages to Thursday and Friday.) Activity and Insights show those pages on the day they were
   revised (DAY-9, AHEAD-6): the day's own pages stay done there, each later day it counted for is
   named ("Ahead for Monday 9 November: …"), and Coverage counts them. Home's line goes on the same
   way, "Next cycle starts at Al-Fatihah ›" for a day that begins the plan again, and a day a week or

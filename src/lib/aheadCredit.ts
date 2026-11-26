@@ -126,6 +126,21 @@ export function mergeAhead(
   return out;
 }
 
+/** `ahead` with `uncredit`'s pages taken off their days (a day left empty dropped). Unchanged without it. */
+export function withoutCredit(
+  ahead: Record<string, number[]>,
+  uncredit: Record<string, number[]> | undefined,
+): Record<string, number[]> {
+  if (!uncredit) return ahead;
+  const out: Record<string, number[]> = {};
+  for (const [day, pages] of Object.entries(ahead)) {
+    const remove = new Set(uncredit[day] ?? []);
+    const kept = pages.filter((p) => !remove.has(p));
+    if (kept.length > 0) out[day] = kept;
+  }
+  return out;
+}
+
 /**
  * `ahead` kept to the pages revised here: credit for a later day exists only
  * for a page the session has revised (checked), so a stale or partial map can

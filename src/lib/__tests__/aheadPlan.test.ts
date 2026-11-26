@@ -87,6 +87,33 @@ describe('nextRevisionDayPlan', () => {
     expect(nextRevisionDayPlan(baseUser, pages, '2026-01-03', new Set([1, 2]), done)).toEqual({ day: '2026-01-04', pages: [3] });
   });
 
+  // Majd's Dev account, Nov 26 2026: pages from Insights revised as extras of an earlier day aren't the cycle coming round.
+  it('pages the session revised from Insights count for the first later day that has them: passed over, no round', () => {
+    // Jan 2's own pages (4–6) were revised as extras of Jan 1 (from Insights): Jan 2 is passed over, on to Jan 3.
+    expect(nextRevisionDayPlan(baseUser, pages, '2026-01-01', new Set([4, 5, 6, 1, 2, 3]), [], new Set([4, 5, 6]))).toEqual({
+      day: '2026-01-03',
+      pages: [7, 8, 9],
+      covered: { '2026-01-02': [4, 5, 6] },
+    });
+    // Two of them: Jan 2 opens on the rest, with no round.
+    expect(nextRevisionDayPlan(baseUser, pages, '2026-01-01', new Set([4, 5, 1, 2, 3]), [], new Set([4, 5]))).toEqual({
+      day: '2026-01-02',
+      pages: [6],
+      covered: { '2026-01-02': [4, 5] },
+    });
+  });
+
+  it('a page from Insights counts for one later day only, and the cycle still comes round for the rest', () => {
+    // Day pages 1–3 again on Jan 4: page 1, revised as an extra, counts for Jan 4; 2 and 3 repeat taken pages, a round.
+    const taken = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(nextRevisionDayPlan(baseUser, pages, '2026-01-03', taken, [], new Set([1]))).toEqual({
+      day: '2026-01-04',
+      pages: [2, 3],
+      covered: { '2026-01-04': [1] },
+      round: true,
+    });
+  });
+
   it('passes over a day already done ahead', () => {
     const logs = [log('2026-01-01', [1, 2, 3], { '2026-01-02': [4, 5, 6] })];
     expect(nextRevisionDayPlan(baseUser, pages, '2026-01-01', new Set([1, 2, 3]), logs)).toEqual({
