@@ -442,6 +442,10 @@ current basic sounds". October 2026's version was removed for the voices it offe
   a sheet (the user, an update, Revo's "Open Jump to"), the screen under it takes taps again once the
   sheets have gone. (Nov 9 2026: "A new update is ready" opened by itself over the Today menu; iOS
   refused it, and Home took no taps, only the swipe to Read, until the app restarted.)
+- **SHEET-2.** With the keyboard up, a sheet with a text field fits above the keyboard and under the status bar, so
+  its header (Cancel, Add, Save) stays on screen and takes taps; its content shrinks instead, and a long note scrolls
+  inside its field. (Nov 26 2026: in the Note sheet, a long note put Cancel and Add under the clock, where no tap
+  reached them.)
 - **UPD-1.** "A new update is ready" opens by itself once an update has downloaded, on a tab's main
   screen, 1.2 s after nothing is going on: never during a session, a recording, a recitation or a
   timer, nor while another sheet is open (it waits until that one has gone, then the delay again).

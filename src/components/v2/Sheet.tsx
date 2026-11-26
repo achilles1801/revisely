@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Animated,
   Easing,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -61,6 +62,38 @@ export const DISMISS_DISTANCE = 120;
 /** A downward fling this fast (pt/s) closes it, however short. */
 export const DISMISS_VELOCITY = 800;
 const SPRING_BACK = { damping: 22, stiffness: 320, mass: 0.8 };
+
+/** With the keyboard up, the room kept between the sheet's top and the status bar (pt). */
+export const KEYBOARD_TOP_GAP = 8;
+
+/**
+ * The tallest a sheet may be: 90% of the window, and with the keyboard up, what is left above the keyboard
+ * under the status bar (SHEET-2). The keyboard's lift (KeyboardAvoidingView) used to push a tall sheet's
+ * header, Cancel and Add, under the status bar, where no tap reached them (the Note sheet with a long note,
+ * Nov 26 2026). Its content shrinks instead: a text field scrolls inside itself.
+ */
+export function sheetMaxHeight(windowHeight: number, keyboardHeight: number, topInset: number): number {
+  const most = windowHeight * 0.9;
+  if (keyboardHeight <= 0) return most;
+  return Math.max(0, Math.min(most, windowHeight - keyboardHeight - topInset - KEYBOARD_TOP_GAP));
+}
+
+/** How tall the keyboard is while it is up over a sheet with a text field (`on`); 0 otherwise. */
+function useKeyboardHeight(on: boolean): number {
+  const [height, setHeight] = useState(0);
+  useEffect(() => {
+    if (!on) return;
+    const ios = Platform.OS === 'ios';
+    const subs = [
+      Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', (e) => setHeight(e?.endCoordinates?.height ?? 0)),
+      // The predictive bar coming or going moves the keyboard's top while it stays up.
+      ...(ios ? [Keyboard.addListener('keyboardWillChangeFrame', (e) => e?.endCoordinates?.height && setHeight(e.endCoordinates.height))] : []),
+      Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setHeight(0)),
+    ];
+    return () => subs.forEach((s) => s.remove());
+  }, [on]);
+  return on ? height : 0;
+}
 
 /** Whether a drag of the handle or header that ended here closes the sheet. */
 export function shouldDismiss(translationY: number, velocityY: number, sheetHeight: number): boolean {
@@ -143,6 +176,7 @@ export function Sheet({
   const insets = useSafeAreaInsets();
   const ramadanLights = useRamadanDecor();
   const { height } = useWindowDimensions();
+  const keyboardHeight = useKeyboardHeight(keyboard);
   // Shown only once it has its turn: no other sheet up or still going.
   const nested = useInsideModal();
   const { turn, release } = useModalTurn(visible, nested);
@@ -273,7 +307,7 @@ export function Sheet({
             {
               backgroundColor: palette.sheet,
               paddingBottom: Math.max(insets.bottom, layoutV2.gutter),
-              maxHeight: height * 0.9,
+              maxHeight: sheetMaxHeight(height, keyboardHeight, insets.top),
               transform: [{ translateY }],
             },
           ]}
@@ -350,7 +384,8 @@ export function Sheet({
               <ModalNest>{children}</ModalNest>
             </ScrollView>
           ) : (
-            <View style={contentStyle}>
+            // Shrinks when the sheet is at its tallest (a text field then scrolls inside itself, SHEET-2).
+            <View style={[styles.content, contentStyle]}>
               <ModalNest>{children}</ModalNest>
             </View>
           )}
@@ -487,6 +522,7 @@ const styles = StyleSheet.create({
   message: { marginTop: 4 },
   strong: { fontWeight: '600' },
   scroll: { flexGrow: 0 },
+  content: { flexShrink: 1 },
   footer: { borderRadius: radiusV2.cancel, paddingVertical: 15, marginTop: 12, alignItems: 'center' },
   footerText: { fontSize: 16 },
 });

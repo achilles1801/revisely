@@ -583,6 +583,7 @@ export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'ONBOARD-2': 'server: the server repairs a sign-up stopped half way; nothing to do',
   'LANG-1': 'layout: the layout follows the app’s language, not the phone’s; nothing for Revo to explain',
   'SHEET-1': 'layout: one sheet at a time, so the screen under them always takes taps again; nothing for Revo to explain',
+  'SHEET-2': 'layout: a sheet with the keyboard up fits under the status bar, so its Cancel and Add stay on screen; nothing for Revo to explain',
   'TAB-1': 'layout: a sideways swipe never presses the row under the finger; nothing for Revo to explain',
   'ACT-32': 'layout: how the calendar’s preview words a day’s Revised figure; nothing for Revo to explain',
   'RECITE-25': 'layout: nothing a take shows covers the page; its bar, a shown take’s card and its Undo sit under it; nothing for Revo to explain',
