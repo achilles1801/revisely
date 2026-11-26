@@ -2444,7 +2444,10 @@ describe('long takes (Nov 20 2026): Stop always ends in a summary, and the take 
   const { memoryRecords, resetMemoryForTests } = jest.requireActual('../../../lib/reciteMemory/store');
   const { setStopBudgetForTests, setLiveBatchForTests } = jest.requireActual('../../../components/reciteLive/useLiveRecitation');
   const captured = jest.requireMock('@sentry/react-native').captureMessage as jest.Mock;
+  /** When this test began: takes started before it are an earlier test's (see `taken`). */
+  let began = 0;
   beforeEach(() => {
+    began = Date.now();
     resetMemoryForTests();
     captured.mockClear();
   });
@@ -2455,11 +2458,13 @@ describe('long takes (Nov 20 2026): Stop always ends in a summary, and the take 
   // Each waits for Recite's memory to write the take (800 ms to settle), on a loaded runner too.
   jest.setTimeout(20_000);
   const wrong = { id: `${UTIYAT}:word:sound`, w: UTIYAT, ayah: [27, 23], kind: 'word', heard: 'وَأُوهِيَتْ', sure: 'clear' };
-  // This test's take: the newest. (An earlier test's reader, cleaned up mid-take, keeps its take too, RECITE-12, and
-  // that write may land after this test's reset.)
+  // This test's take: the newest one started since the test began. An earlier test's take can still be written after
+  // this test's reset: a reader cleaned up mid-take keeps its take (RECITE-12), and a recording saved after its reader
+  // has gone joins the take's record 800 ms later (useRememberTake's SETTLE_MS). The Test me take with a peek did that
+  // and landed in RECITE-27's "nothing kept" on a loaded runner (PR #1003's Fast checks, Nov 26 2026).
   const taken = () =>
     (memoryRecords('u1') as { kind: string; createdAt: number; unfinished?: boolean; mistakes: number; recordingId: string | null; to: number }[])
-      .filter((r) => r.kind === 'take')
+      .filter((r) => r.kind === 'take' && r.createdAt >= began)
       .sort((a, b) => b.createdAt - a.createdAt)[0];
   /** A take that reached An-Naml 23's seventh word, with one wrong word. */
   async function reciteSome() {
