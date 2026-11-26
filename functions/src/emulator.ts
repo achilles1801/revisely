@@ -19,7 +19,9 @@
  *   off at max_tokens, a chart on a page the model wasn't given); its `refuseSchemaWith` (a string)
  *   answers a request whose reply schema contains it with the API's 400 for a schema too complex to
  *   compile (Revisely Dev's draft, Nov 26 2026). Per account, so tests running side
- *   by side on one emulator don't change each other's answers.
+ *   by side on one emulator don't change each other's answers. A reply schema is answered as the real API
+ *   answered it (test-recordings/anthropic/compiled-schemas.json, made by scripts/check-revo-schemas.js): a schema
+ *   it refused gets its 400, and one never checked is a malformed request.
  * - **The clock.** Scenarios and E2E flows run at a test time; a phone's clock and the server's
  *   agree, so a request may carry `X-Revisely-Test-Now` (ms) and the handler's clock follows it.
  */
@@ -76,14 +78,33 @@ export interface Recording {
   body: unknown;
 }
 
+/** A reply schema's hash, as recordings and compiled-schemas.json name it: of the request's whole `output_config`. */
+export function schemaSha256(outputConfig: unknown): string {
+  return createHash('sha256').update(JSON.stringify(outputConfig)).digest('hex');
+}
+
 export function shortRequest(request: MessagesRequest): RecordedRequest {
   return {
     model: request.model,
     max_tokens: request.max_tokens,
     thinking: (request as { thinking?: unknown }).thinking ?? null,
     systemSha256: createHash('sha256').update(request.system.map((s) => s.text).join('\n')).digest('hex'),
-    outputSchemaSha256: request.output_config ? createHash('sha256').update(JSON.stringify(request.output_config)).digest('hex') : null,
+    outputSchemaSha256: request.output_config ? schemaSha256(request.output_config) : null,
   };
+}
+
+/** What the real API did with a reply schema (functions/scripts/check-revo-schemas.js), by its hash. */
+export interface CompiledSchema {
+  name: string;
+  model: string;
+  checkedAt: string;
+  compiled: boolean;
+  /** The API's own words when it refused it. */
+  error?: string;
+}
+
+export function compiledSchemas(): Record<string, CompiledSchema> {
+  return (JSON.parse(readFileSync(join(RECORDINGS, 'compiled-schemas.json'), 'utf8')) as { schemas: Record<string, CompiledSchema> }).schemas;
 }
 
 /** Where the request differs from the one the recording was made with. */
@@ -132,6 +153,11 @@ export function recordedAnthropic(db: Firestore, uid: string | undefined): Fetch
     if (request && (!Array.isArray(request.messages) || request.messages.length === 0 || request.messages[0].role !== 'user')) {
       problems.push('messages must start with a user turn');
     }
+    // A reply schema the real API was never seen to compile (it has an unpublished limit on the grammar's size).
+    const schema = request?.output_config ? compiledSchemas()[schemaSha256(request.output_config)] : undefined;
+    if (request?.output_config && !schema) {
+      problems.push(`reply schema ${schemaSha256(request.output_config).slice(0, 12)} was never checked against the API: run functions/scripts/check-revo-schemas.js`);
+    }
     const settings = await account.get();
     const mode = String(settings.get('mode') ?? 'recorded');
     const given = settings.get('reply') as { text?: unknown; stopReason?: unknown } | undefined;
@@ -154,6 +180,10 @@ export function recordedAnthropic(db: Firestore, uid: string | undefined): Fetch
     if (problems.length > 0) {
       // As Anthropic answers a malformed request: a 400, which our code treats as no answer.
       return respond({ status: 400, body: { type: 'error', error: { type: 'invalid_request_error', message: problems.join('; ') } } });
+    }
+    if (schema && !schema.compiled) {
+      // As the real API answered this schema (compiled-schemas.json): a 400 before the model ran, so nothing billed.
+      return respond({ status: 400, body: { type: 'error', error: { type: 'invalid_request_error', message: schema.error ?? 'The compiled grammar is too large.' } } });
     }
     if (typeof refuseSchemaWith === 'string' && request?.output_config && JSON.stringify(request.output_config).includes(refuseSchemaWith)) {
       // As the API answered every question from Revisely Dev on Nov 26 2026, before the model ran (so nothing billed): a

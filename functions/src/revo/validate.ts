@@ -189,7 +189,8 @@ export function validateContext(v: unknown): RevoContext {
   // Gaps, ACT-28). `recitation` likewise, for an account that recites.
   // `language` ('ar') comes from apps in Arabic (Revisely Dev's picker), from Nov 22 2026: the answer is asked for in it.
   // `ramadan` comes from Revisely Dev only (with `app: 'dev'`), during Ramadan, from Nov 26 2026 (THEME-8).
-  keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'patterns', 'passages', 'pageNames', 'recitation', 'app', 'gaps', 'language', 'ramadan', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
+  // `place` ('schedule') comes from Revisely Dev's Revo opened from Edit schedule, from Nov 26 2026 (REVO-43).
+  keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'patterns', 'passages', 'pageNames', 'recitation', 'app', 'place', 'gaps', 'language', 'ramadan', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
   if (c.ramadan !== undefined && c.app !== 'dev') fail('context.ramadan');
   if (c.app !== undefined && c.app !== 'dev') fail('context.app');
   if (c.language !== undefined && c.language !== 'ar') fail('context.language');
@@ -290,6 +291,8 @@ export function validateContext(v: unknown): RevoContext {
     ...(pageNames ? { pageNames } : {}),
     ...(recitation ? { recitation } : {}),
     ...(c.app === 'dev' ? { app: 'dev' as const } : {}),
+    // REVO-43: Revo opened from Edit schedule, in Revisely Dev only.
+    ...(c.app === 'dev' && c.place === 'schedule' ? { place: 'schedule' as const } : {}),
     ...(c.language === 'ar' ? { language: 'ar' as const } : {}),
     ...(c.gaps !== undefined ? { gaps: validateGaps(c.gaps, 'context.gaps') } : {}),
     ...(c.ramadan !== undefined ? { ramadan: validateRamadan(c.ramadan, 'context.ramadan') } : {}),

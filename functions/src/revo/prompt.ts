@@ -10,7 +10,7 @@ import { attachedText } from './attachText';
 import { DEV_GUIDE_SYSTEM, GUIDE_PROMPT, OPEN_SCREEN_ACTION } from './guide';
 import { RECITATION_SYSTEM, recitationText } from './recitation';
 import { gapsText } from './gaps';
-import { REVO_DEV_OUTPUT_CONFIG, REVO_OUTPUT_CONFIG } from './replySchema';
+import { REVO_OUTPUT_CONFIG, REVO_SCHEDULE_OUTPUT_CONFIG } from './replySchema';
 import { RevoAttachment, RevoContext, RevoPattern, RevoRamadan, StoredMessage } from './types';
 
 export { REVO_MODEL };
@@ -202,6 +202,10 @@ export function contextText(day: string, context: RevoContext, memory: readonly 
   const pagesNote = (pages: readonly number[]) => (pages.length === 1 ? `page ${pages[0]}` : `pages ${pagesSaid(pages)}`);
   const part = (words: string | undefined, pages: readonly number[]) => (words ? `${words} (${pagesNote(pages)})` : pagesNote(pages));
   const lines: string[] = [`It is ${weekdayOf(day)}${context.localTime ? `, ${context.localTime}` : ''}, their revision day.`];
+  // REVO-43: Revo opened from Edit schedule (Revisely Dev), where it can draft a schedule.
+  if (context.place === 'schedule') {
+    lines.push('Asked from Edit schedule: a change or a new plan they ask for (each starter too) is a draftSchedule (lighter is fewer pages a day, sooner more; rest days only when asked), its text what it changes, with no steps to do it by hand.');
+  }
 
   if (t.plannedPages === 0) {
     lines.push('Today: nothing is planned.');
@@ -347,7 +351,7 @@ export const ARABIC_SYSTEM = [
  * Every Revo request: the cached system prompt, the conversation, and structured output, so the
  * reply is the one JSON object the app reads (revo/replySchema.ts; reply.ts still checks it).
  */
-function request(messages: MessagesRequest['messages'], blocks: { dev?: boolean; recitation?: boolean; arabic?: boolean } = {}): MessagesRequest {
+function request(messages: MessagesRequest['messages'], blocks: { dev?: boolean; schedule?: boolean; recitation?: boolean; arabic?: boolean } = {}): MessagesRequest {
   const system: MessagesRequest['system'] = [{ type: 'text', text: REVO_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }];
   // Only from Revisely Dev (the context's `app`): the Dev guide, what only Revisely Dev has (guide.ts). Store requests
   // never carry it, so they (their cache, and the recorded replies) stay exactly as they were.
@@ -362,18 +366,19 @@ function request(messages: MessagesRequest['messages'], blocks: { dev?: boolean;
     thinking: REVO_THINKING,
     system,
     messages,
-    // Revisely Dev's schema has the drafted schedule (REVO-43); the store's stays as it was (replySchema.ts).
-    output_config: blocks.dev ? REVO_DEV_OUTPUT_CONFIG : REVO_OUTPUT_CONFIG,
+    // Asked from Edit schedule in Revisely Dev: the schema with the drafted schedule (REVO-43). Every other question the
+    // store's, as it was: with the draft and every chart the API refuses it (replySchema.ts).
+    output_config: blocks.schedule ? REVO_SCHEDULE_OUTPUT_CONFIG : REVO_OUTPUT_CONFIG,
   };
 }
 
 /**
- * A Revisely Dev question asked again with the store app's schema, for when the API refuses Dev's (a 400: Nov 26
- * 2026, "Schema is too complex for compilation"). Its answer can't carry a draft. Null for a request that has the
- * store's already.
+ * A schedule question asked again with the store app's schema, for when the API refuses the schedule's (a 400: Nov 26
+ * 2026, "The compiled grammar is too large…" for Revisely Dev's schema then). Its answer can't carry a draft. Null for a
+ * request that has the store's already.
  */
 export function withStoreSchema(request: MessagesRequest): MessagesRequest | null {
-  return request.output_config === REVO_DEV_OUTPUT_CONFIG ? { ...request, output_config: REVO_OUTPUT_CONFIG } : null;
+  return request.output_config === REVO_SCHEDULE_OUTPUT_CONFIG ? { ...request, output_config: REVO_OUTPUT_CONFIG } : null;
 }
 
 /** Whether a request carries the user's recitation: the context's summary, or a take attached now or earlier in the chat. */
@@ -413,6 +418,7 @@ export function buildAskRequest(input: AskInput): MessagesRequest {
   const opening = input.chat?.kind === 'review' ? `Day in review (${weekdayOf(input.chat.day)}).` : '(Earlier in this chat.)';
   return request(alternate(turns, opening), {
     dev: input.context.app === 'dev',
+    schedule: input.context.app === 'dev' && input.context.place === 'schedule',
     recitation: carriesRecitation(input.context, input.attached, input.history.slice(-REVO_HISTORY)),
     arabic: input.context.language === 'ar',
   });

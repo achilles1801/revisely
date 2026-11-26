@@ -4,7 +4,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { buildCoachRequest } from '../coach/prompt';
 import { buildAskRequest, buildReviewRequest } from '../revo/prompt';
-import { driftOf, inTestEmulator, kindOf, Recording, shortRequest, testNow } from '../emulator';
+import { compiledSchemas, driftOf, inTestEmulator, kindOf, Recording, schemaSha256, shortRequest, testNow } from '../emulator';
 import type { RevoContext } from '../revo/types';
 
 const recording = (name: string): Recording =>
@@ -76,6 +76,18 @@ describe('the recorded replies', () => {
   // so the tests run on what Anthropic answers to the request we really send.
   it.each(Object.keys(requests) as (keyof typeof requests)[])('%s was recorded with the request the functions send now', (name) => {
     expect(driftOf(shortRequest(requests[name]), recording(name).request)).toEqual([]);
+  });
+
+  // [REVO-43] The API refuses a schema whose compiled grammar is too big, a limit it doesn't publish (Nov 26 2026:
+  // Revisely Dev's, with the draft, refused on every question). Every schema Revo sends was compiled by the real API
+  // (functions/scripts/check-revo-schemas.js); the emulator answers the rest as malformed.
+  it('[REVO-43] every reply schema Revo sends is one the real API compiled', () => {
+    const dev = buildAskRequest({ day: '2026-11-03', question: 'Make it lighter', context: { ...context, app: 'dev', place: 'schedule' }, attached: [], memory: [], history: [], chat: null });
+    const schemas = compiledSchemas();
+    for (const request of [requests['revo-ask'], requests['revo-review'], dev]) {
+      const sha = schemaSha256(request.output_config);
+      expect({ sha, compiled: schemas[sha]?.compiled ?? 'never checked' }).toEqual({ sha, compiled: true });
+    }
   });
 
   it.each(Object.keys(requests) as (keyof typeof requests)[])('%s is a Messages API reply with text and usage', (name) => {

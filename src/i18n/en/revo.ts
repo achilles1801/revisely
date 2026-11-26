@@ -54,6 +54,8 @@ export const revo = {
     added: 'Added to tomorrow’s revision',
     /** A drafted schedule's button (REVO-43): it opens Edit schedule filled in, not saved. */
     draftSchedule: 'Check in Edit schedule',
+    /** A drafted schedule's card title (REVO-43), as the board has it, whatever title Revo wrote. */
+    newSchedule: 'A new schedule',
     aDay: 'A day',
     aRound: 'A round',
     rest: 'Rest days',

@@ -1,0 +1,24 @@
+{
+  "how": "functions/scripts/check-revo-schemas.js: a two-letter question to the real API with each reply schema, max_tokens 16",
+  "schemas": {
+    "ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e": {
+      "name": "every question but the schedule's",
+      "model": "claude-sonnet-5-5",
+      "checkedAt": "2026-11-26T08:25:46.440Z",
+      "compiled": true
+    },
+    "92170616e6499a469616b58daad4001a35f49d1b413ff7884d54778f6e3c20b7": {
+      "name": "Revisely Dev (#1026: the draft, every field required)",
+      "model": "claude-sonnet-5-5",
+      "checkedAt": "2026-11-26T08:10:14.308Z",
+      "compiled": false,
+      "error": "The compiled grammar is too large, which would cause performance issues. Simplify your tool schemas or reduce the number of strict tools."
+    },
+    "31df6350f6027c8932108cf68350f3d0ff854cf1e37426bd3385d4eb64f07079": {
+      "name": "Edit schedule in Revisely Dev",
+      "model": "claude-sonnet-5-5",
+      "checkedAt": "2026-11-26T08:25:50.118Z",
+      "compiled": true
+    }
+  }
+}

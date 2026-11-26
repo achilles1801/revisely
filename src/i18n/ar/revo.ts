@@ -50,6 +50,7 @@ export const revo: NonNullable<ArStrings['revo']> = {
     startRevision: 'بدء المراجعة',
     added: 'أُضيفت إلى مراجعة الغد',
     draftSchedule: 'راجِعه في تعديل الجدول',
+    newSchedule: 'جدول جديد',
     aDay: 'في اليوم',
     aRound: 'الدورة',
     rest: 'أيام الراحة',

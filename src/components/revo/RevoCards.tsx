@@ -150,7 +150,8 @@ export function PlanCard({
       <View style={styles.planHead}>
         <Ionicons name={ACTION_ICON[action.kind]} size={22} color={palette.text} />
         <Text style={[styles.planTitle, { color: palette.text }]} maxFontSizeMultiplier={1.3}>
-          {action.title}
+          {/* A drafted schedule is always "A new schedule" (REVO-43, the board); its detail says what changes. */}
+          {action.kind === 'draftSchedule' ? t('revo.card.newSchedule') : action.title}
         </Text>
       </View>
       {action.detail ? (

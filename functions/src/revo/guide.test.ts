@@ -228,6 +228,17 @@ describe('the Dev guide goes only with questions from Revisely Dev', () => {
     expect(ask(context({ app: 'dev' })).system.map((s) => s.text)).not.toContain(ARABIC_SYSTEM);
   });
 
+  it('[REVO-43] the server keeps place "schedule" only from Revisely Dev, and the question then says it was asked from Edit schedule', () => {
+    const plain = JSON.parse(JSON.stringify(context())) as Record<string, unknown>;
+    expect(validateContext({ ...plain, app: 'dev', place: 'schedule' }).place).toBe('schedule');
+    // From the store app, or a place it doesn't know: no place, and the question goes as before.
+    expect(validateContext({ ...plain, place: 'schedule' }).place).toBeUndefined();
+    expect(validateContext({ ...plain, app: 'dev', place: 'home' }).place).toBeUndefined();
+    const said = (c: RevoContext) => ask(c).messages.at(-1)!.content;
+    expect(said(context({ app: 'dev', place: 'schedule' }))).toContain('Asked from Edit schedule: a change or a new plan they ask for (each starter too) is a draftSchedule');
+    expect(said(context({ app: 'dev' }))).not.toContain('Edit schedule');
+  });
+
   it('the server takes language "ar" and nothing else there', () => {
     const plain = JSON.parse(JSON.stringify(context())) as Record<string, unknown>;
     expect(validateContext({ ...plain, language: 'ar' }).language).toBe('ar');

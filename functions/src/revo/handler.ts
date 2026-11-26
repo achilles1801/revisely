@@ -298,7 +298,7 @@ async function metered(
     await deps.store.settleSpend(month, reserved, 0, NO_USAGE, today);
     const code = err instanceof CoachCallError ? err.status : null;
     const detail = err instanceof CoachCallError ? err.detail : undefined;
-    // Revisely Dev's schema refused (Nov 26 2026: every Dev question failed so once the draft was in it). A refused
+    // The schedule's schema refused (Nov 26 2026: with the draft beside every chart, every Dev question was). A refused
     // request costs nothing; once more with the store's schema, which answers without a draft.
     const retry = fallback !== null && code === 400;
     deps.log({ event: 'failed', code: code == null ? 'network' : String(code), ...(detail ? { detail } : {}), ...(retry ? { retry: 'store-schema' } : {}) });
@@ -431,8 +431,9 @@ export async function handleRevoAsk(auth: { uid: string } | undefined, data: unk
   }
 
   const allowed = new Set([...contextPages(context), ...attached.flatMap(attachmentPages), ...history.flatMap((m) => attachmentsOf(m).flatMap(attachmentPages))]);
-  // A drafted schedule only for Revisely Dev, which can show it (REVO-43), and only with Dev's schema.
-  const parts = parseReply(result.reply.text, allowed, { firstTurn: !chat, smartTracking, drafts: context.app === 'dev' && !result.fellBack });
+  // A drafted schedule only for Revo opened from Edit schedule in Revisely Dev, which can show it (REVO-43), and only with
+  // the schedule schema (not when the store's answered instead).
+  const parts = parseReply(result.reply.text, allowed, { firstTurn: !chat, smartTracking, drafts: context.app === 'dev' && context.place === 'schedule' && !result.fellBack });
   if (!parts) {
     await deps.store.releaseQuestion(uid, day);
     deps.log({ event: 'failed', code: 'no-text' });

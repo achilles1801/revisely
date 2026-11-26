@@ -157,7 +157,8 @@ export function RevoChat({
         chatId,
         day,
         question,
-        context: ctx,
+        // REVO-43: opened from Edit schedule (Revisely Dev), where Revo can draft a schedule.
+        context: place?.kind === 'schedule' && ctx.app === 'dev' ? { ...ctx, place: 'schedule' } : ctx,
         attach: sent.length === 1 ? sent[0] : null,
         ...(sent.length > 1 ? { attachments: sent } : {}),
       });
