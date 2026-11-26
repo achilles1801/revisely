@@ -171,11 +171,13 @@ passed 06 once in the smoke set, and broke 06 on develop for everyone.
 - **The scenario harness, its Jest config or `scripts/emulators.sh`:** the scenario suite twice. The
   second run starts from empty Firestore, Auth and Storage emulators (`harness/clearEmulators.js`), as
   the first does: it had found the first run's data, and the day's Revo spend put Revo to rest halfway
-  through REVO-26 (#328's run 42586241564). Loading a test scenario is still several times
-  slower in the second run (30–91 s against 3–14 s, run 45794919902) and grows within the first, with
-  the emulators' data emptied (Storage too since Nov 26 2026), so it isn't the data; cause not found
-  yet. Past the app's 70 s for a callable, REVO-26 can hang for its 15 minutes (runs 45782607100,
-  45770868685). Within one run, files still share the emulators, so a
+  through REVO-26 (#328's run 42586241564). Emptying can't reset one thing: the Firestore emulator's
+  `listCollections` goes through every document it has ever held, deleted ones too, so it slows as a run
+  goes on (0.7 ms a call new, 14 ms after one run of a shard, 34 ms after two) and stays slow after
+  emptying. Code the scenarios run mustn't call it once per document: the tester backup did, about 1,400
+  times a test scenario load, so a load took 30–128 s late in a run and REVO-26 hung past the app's 70 s
+  (runs 45782607100, 45770868685). It reads an account with one query since Nov 26 2026
+  (`documentsUnder` in `functions/src/testerResetAdmin.ts`, checked by its emulator test). Within one run, files still share the emulators, so a
   test sets up every document it reads that other accounts share (the month's coach ledger: COACH-4
   and REVO-37 each take a month no other test uses and clear its ledger first).
 

@@ -59,8 +59,10 @@ export function encode(v: unknown): unknown {
   return out;
 }
 
+type BackupDoc = { path: string; data: unknown };
+
 /** Every document under ref, depth first, including those under documents that exist only as parents. */
-async function walk(ref: DocRef, docs: { path: string; data: unknown }[]): Promise<void> {
+async function walk(ref: DocRef, docs: BackupDoc[]): Promise<void> {
   for (const col of await ref.listCollections()) {
     for (const d of await col.listDocuments()) {
       const snap = await d.get();
@@ -68,6 +70,65 @@ async function walk(ref: DocRef, docs: { path: string; data: unknown }[]): Promi
       await walk(d, docs);
     }
   }
+}
+
+/** The tree walked a document at a time, as the backup read it before documentsUnder (the emulator test compares). */
+export async function walkDocuments(ref: DocRef): Promise<BackupDoc[]> {
+  const docs: BackupDoc[] = [];
+  await walk(ref, docs);
+  return docs;
+}
+
+/** The pieces of @google-cloud/firestore 7 (firebase-admin's) that query all of a document's descendants. */
+type QueryLike = {
+  limit(n: number): QueryLike;
+  startAfter(snap: unknown): QueryLike;
+  get(): Promise<{ docs: { ref: DocRef; data(): unknown }[] }>;
+};
+type QueryCtor = new (firestore: Firestore, options: unknown) => QueryLike;
+type OptionsCtor = { forKindlessAllDescendants?: (parent: unknown, id: string, requireConsistency?: boolean) => unknown };
+
+/**
+ * A query for every document under ref, at any depth, under documents that exist only as parents too: what
+ * firebase-admin's recursiveDelete reads to find what it deletes (deleteHistory below). @google-cloud/firestore 7
+ * doesn't make it public, so its pieces come from the SDK's own objects (a query's prototype and options), the
+ * same copy `db` is. Null when they aren't there (another version): the backup walks the tree then, and the
+ * emulator test fails, so the change is noticed.
+ */
+function allDescendantsQuery(db: Firestore, ref: DocRef): QueryLike | null {
+  const col = db.collection(ref.parent.id) as unknown as { _queryOptions?: { constructor?: OptionsCtor } };
+  const Options = col._queryOptions?.constructor;
+  const Query = Object.getPrototypeOf(Object.getPrototypeOf(col))?.constructor as QueryCtor | undefined;
+  const path = (ref as unknown as { _resourcePath?: unknown })._resourcePath;
+  if (typeof Options?.forKindlessAllDescendants !== 'function' || typeof Query !== 'function' || !path) return null;
+  if (typeof (Query.prototype as Partial<QueryLike>).startAfter !== 'function') return null;
+  return new Query(db, Options.forKindlessAllDescendants(path, ref.parent.id, true));
+}
+
+/**
+ * Every document under ref (not ref itself), at any depth, including those under documents that exist only as
+ * parents: one query, in pages. It walked the tree before, a document at a time with listCollections on each:
+ * about 2,800 calls for an account of 1,400 documents. The emulator's listCollections goes through every document
+ * it has ever held, deleted ones too (35 ms a call after 112,000 documents, and still after emptying it), so a
+ * test scenario's load took 30–90 s late in the scenario suite and REVO-26 hung past the app's 70 s
+ * (Nov 26 2026). `via` says which way it read them (the emulator test checks it's the query).
+ */
+export async function documentsUnder(db: Firestore, ref: DocRef): Promise<{ docs: BackupDoc[]; via: 'query' | 'walk' }> {
+  const query = allDescendantsQuery(db, ref);
+  const docs: BackupDoc[] = [];
+  if (!query) {
+    await walk(ref, docs);
+    return { docs, via: 'walk' };
+  }
+  const PAGE = 500;
+  let last: unknown = null;
+  for (;;) {
+    const page = await (last ? query.startAfter(last) : query).limit(PAGE).get();
+    for (const d of page.docs) docs.push({ path: d.ref.path, data: encode(d.data()) });
+    if (page.docs.length < PAGE) break;
+    last = page.docs[page.docs.length - 1];
+  }
+  return { docs, via: 'query' };
 }
 
 export function adminResetStore(db: Firestore, bucket: BucketLike): ResetStore {
@@ -106,7 +167,7 @@ export function adminResetStore(db: Firestore, bucket: BucketLike): ResetStore {
       const docs: { path: string; data: unknown }[] = [];
       const userSnap = await ref.get();
       if (userSnap.exists) docs.push({ path: ref.path, data: encode(userSnap.data()) });
-      await walk(ref, docs);
+      docs.push(...(await documentsUnder(db, ref)).docs);
       const body = JSON.stringify({ uid, exportedAt: stampIso, reason: 'tester reset (resetMyData or loadTestScenario)', docs });
       await bucket.file(`${dir}/firestore.json`).save(body, { contentType: 'application/json', resumable: false, preconditionOpts: CREATE_ONLY });
 
