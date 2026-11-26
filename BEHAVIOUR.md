@@ -871,7 +871,9 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   reach it until the next word is begun; Majd, Nov 26 2026, "homie it didn't work"), the next page shows at once and the take waits there for the reciter, whether or not
   they have begun it; it doesn't wait for a word of the next page (Majd, Nov 25 2026: "when i finish reciting the last
   verse it should automatically take me to the next page and wait for me to begin if i didn't already"). Once per page.
-  Never past a session's last page, and never in a stretch with an end of its own (Test me), which stops there instead.
+  On a session's last page the next thing is its end card: it shows, and the page is marked as a swipe onto it would
+  mark it (Majd's take, Nov 26 2026, was on a session's last page). Never in a stretch with an end of its own (Test me),
+  which stops there instead.
 - **RECITE-31.** The first amber mark explains itself, once (Majd, Nov 25 2026, from a friend's "Whats does yellow
   mean?"). The first time a take shows an amber mark (a wrong haraka or letter, or Not clear) on an account on this phone,
   the bar's line says what amber is, with an amber dot, in place of the words for 6 seconds or until that take ends

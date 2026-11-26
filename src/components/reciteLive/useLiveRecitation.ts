@@ -229,6 +229,7 @@ export function useLiveRecitation({
   currentPage,
   onShowPage,
   onRecitedPast,
+  onEndOfPages,
   recordingDay = null,
   onRecordingSaved,
   connect = defaultConnect,
@@ -243,6 +244,8 @@ export function useLiveRecitation({
    * checker first found the reciter, or to a page shown by hand, isn't one.
    */
   onRecitedPast?: (from: number, to: number) => void;
+  /** The last ayah of `page` said, and the screen holds no next page (a session's last page): RECITE-30's end. */
+  onEndOfPages?: (page: number) => void;
   /** The revision day a take's audio belongs to (null: nothing is kept). */
   recordingDay?: string | null;
   /** A take's audio was saved (its record notes it). */
@@ -351,6 +354,8 @@ export function useLiveRecitation({
   onShowPageRef.current = onShowPage;
   const onRecitedPastRef = useRef(onRecitedPast);
   onRecitedPastRef.current = onRecitedPast;
+  const onEndOfPagesRef = useRef(onEndOfPages);
+  onEndOfPagesRef.current = onEndOfPages;
   const [owner] = useState(() => `recite-live-${Math.random().toString(36).slice(2)}`);
   const recordingRef = useRef<TakeRecording | null>(null);
   const [recording, setRecording] = useState(false);
@@ -1143,14 +1148,16 @@ export function useLiveRecitation({
   const live = state.status === 'listening';
   /** The page of the reciter's place as last shown (null before the checker has found them, or after a page turned by hand). */
   const cursorPage = useRef<number | null>(null);
-  const turnTo = useCallback((page: number, recitedPast: boolean) => {
+  const turnTo = useCallback((page: number, recitedPast: boolean, pageDone = false) => {
     const from = pageRef.current;
     turningTo.current = page;
-    // A page the screen doesn't hold (past a session's last page) isn't turned to: nothing to wait for.
+    // A page the screen doesn't hold (past a session's last page) isn't turned to: nothing to wait for. The page's last
+    // ayah said there is the end of what the screen holds (a session's end card).
     const shown = onShowPageRef.current(page);
     turnTrail('jump', { from, to: page, recitedPast, shown: shown !== false });
     if (shown === false) {
       turningTo.current = null;
+      if (pageDone) onEndOfPagesRef.current?.(from);
       return;
     }
     if (recitedPast && page > from) onRecitedPastRef.current?.(from, page);
@@ -1184,7 +1191,7 @@ export function useLiveRecitation({
       turnTrail('said', { page, said: saidUpTo, last, before, cursor: state.cursor, cursorPage: cursorPage.current });
     }
     if (cursorPage.current !== page || page >= 604) return;
-    if (saidUpTo >= last && (before == null || before < last)) turnTo(page + 1, true);
+    if (saidUpTo >= last && (before == null || before < last)) turnTo(page + 1, true, true);
   }, [live, saidUpTo, words, turnTo]);
 
   // The same once the reciter's place has stayed on the page's last word for LAST_WORD_WAIT_MS: in a noisy room the
@@ -1198,7 +1205,7 @@ export function useLiveRecitation({
     const page = pageRef.current;
     if (page >= 604 || cursorPage.current !== page || cursorNow !== words.pageRange(page)[1] - 1) return;
     const timer = setTimeout(() => {
-      if (pageRef.current === page) turnTo(page + 1, true);
+      if (pageRef.current === page) turnTo(page + 1, true, true);
     }, LAST_WORD_WAIT_MS);
     return () => clearTimeout(timer);
   }, [live, cursorNow, words, turnTo]);

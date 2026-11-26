@@ -31,6 +31,7 @@ interface Box {
 
 interface PagerHandle {
   scrollToPage: (page: number) => boolean;
+  scrollToEnd: () => boolean;
 }
 
 interface PagerState {
@@ -52,6 +53,14 @@ export const MushafPager = forwardRef<PagerHandle, PagerProps>(function MushafPa
       if (!state.props?.pages.includes(page)) return false;
       state.current = page;
       state.props.onPageChange?.(page, state.props.pages.indexOf(page));
+      return true;
+    },
+    // The end card, as MushafPager reports it: onReachEnd, not as a swipe.
+    scrollToEnd: () => {
+      const props = state.props;
+      const last = props?.pages[props.pages.length - 1];
+      if (!props?.endCard || last == null) return false;
+      props.onReachEnd?.(last, false);
       return true;
     },
   }));
