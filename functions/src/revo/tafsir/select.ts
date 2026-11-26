@@ -5,8 +5,9 @@
  * ayat a free question is about). From those, al-Sa'di in full (short, and it covers every ayah), and from each of
  * the other three the pieces most likely to answer, up to `PER_BOOK`. The focus comes from keyword search (BM25) over
  * Ibn Kathir's English: its best pieces say which ayat the question is about, and the Arabic books' pieces are taken
- * from the passages on those ayat, in the book's order (a passage opens with the meaning). An English line on every
- * piece (Anthropic's Contextual Retrieval) would rank the Arabic pieces themselves; it waits on Majd's yes (~$4). Measured: about 8,500–11,000 tokens a question
+ * from the passages on those ayat, in the book's order (a passage opens with the meaning). Where the copy has an
+ * English line on every piece (Anthropic's Contextual Retrieval, scripts/tafsir/lines-batch.js), the pieces whose line
+ * matches the question best come first. Measured: about 8,500–11,000 tokens a question
  * (count_tokens, seven pages), against 27,000–29,000 for the whole page.
  */
 import { TafsirSourceBook } from './books';
@@ -30,6 +31,8 @@ export interface Piece {
   passage: TafsirPassage;
   /** [start, end) into the passage's text. */
   range: [number, number];
+  /** Which piece of the passage (its English line, when the copy has them). */
+  index: number;
 }
 
 /** The pieces for one book, in reading order. */
@@ -87,7 +90,7 @@ export function passagesFor(pages: readonly TafsirPage[], scope: Scope): TafsirP
   return out.sort((a, b) => ayahKey(a.from) - ayahKey(b.from));
 }
 
-const piecesOf = (p: TafsirPassage): Piece[] => p.pieces.map((range) => ({ passage: p, range }));
+const piecesOf = (p: TafsirPassage): Piece[] => p.pieces.map((range, index) => ({ passage: p, range, index }));
 const pieceText = (x: Piece) => x.passage.text.slice(x.range[0], x.range[1]);
 
 /** Up to `limit` pieces from these passages, taking each passage's opening pieces first, in turn. */
@@ -135,7 +138,19 @@ export function selectPieces(pages: readonly TafsirPage[], scope: Scope, questio
   for (const book of ['ibnKathir', 'tabari', 'qurtubi'] as const) {
     const all = of(book);
     const near = focus ? all.filter((p) => overlaps(p, focus)) : [];
-    const chosen = openings(near.length ? near : all, PER_BOOK).sort(inReadingOrder);
+    const opening = openings(near.length ? near : all, PER_BOOK);
+    // With English lines (Contextual Retrieval), the pieces whose line matches the question best, then the openings.
+    const lined = all.flatMap(piecesOf).filter((x) => x.passage.lines?.[x.index]);
+    const lineScores = bm25(q, lined.map((x) => words(x.passage.lines![x.index])));
+    const matched = lined
+      .map((x, i) => ({ x, s: lineScores[i] }))
+      .filter((r) => r.s > 0)
+      .sort((a, b) => b.s - a.s)
+      .slice(0, PER_BOOK)
+      .map((r) => r.x);
+    const chosen = [...matched, ...opening.filter((x) => !matched.some((m) => m.passage === x.passage && m.index === x.index))]
+      .slice(0, PER_BOOK)
+      .sort(inReadingOrder);
     if (chosen.length) out.push({ book, pieces: chosen });
   }
   if (english) {

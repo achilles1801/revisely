@@ -1663,7 +1663,8 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   turned off), the reader shows a small R at the foot of the page while reading, on the other side of the page number,
   in the room kept under the page, so it never covers it; not with the controls up, nor while a take runs. A tap opens
   Revo about that page: its chip ("An-Naml, 3rd page"), a line that it answers only from the tafsir, and three
-  starters. A held ayah's menu starts with "Ask Revo" ("About this ayah, from the tafsir"), which opens Revo about
+  starters; the first, "What's happening here?", is answered ahead for every page, so it comes at once and isn't
+  counted as a question. A held ayah's menu starts with "Ask Revo" ("About this ayah, from the tafsir"), which opens Revo about
   that ayah. Their questions are answered from the tafsir (REVO-44). Never in a revision session. Turned off, neither
   shows. Settings → Revo AI's footer says in one line that answers about the Qur'an come only from the four tafsirs.
 

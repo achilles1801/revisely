@@ -13,7 +13,8 @@ import { CallLedger, MONTHLY_CAP_USD, ledgerOf } from '../coach/handler';
 import { costUsd, worstCaseCostUsd } from '../coach/pricing';
 import { LOCATE_MAX_TOKENS, LOCATE_MODEL, buildLocateRequest, parseLocate } from './tafsir/locate';
 import { PageLoader } from './tafsir/pages';
-import { parseTafsirReply } from './tafsir/reply';
+import { TafsirAnswer, parseTafsirReply } from './tafsir/reply';
+import { AHEAD_QUESTION, aheadPageOf } from './tafsir/ahead';
 import { TAFSIR_MAX_TOKENS, TafsirTurn, buildTafsirRequest } from './tafsir/request';
 import { loadScopePages, placeOf, scopeOfLocated, spanOf, validateQuranScope } from './tafsir/scope';
 import { selectPieces } from './tafsir/select';
@@ -173,6 +174,8 @@ export interface RevoDeps {
   call: (request: MessagesRequest) => Promise<CoachReply>;
   /** Revo's copy of the tafsirs, a page at a time (tafsir/pages.ts). Without it, no answers from the tafsir. */
   tafsirPages?: PageLoader;
+  /** "What's happening here?" answered ahead for a page (scripts/tafsir/answers-batch.js), or null. */
+  tafsirAhead?: (page: number) => Promise<TafsirAnswer | null>;
   now: () => Date;
   log: RevoLog;
 }
@@ -423,6 +426,14 @@ function turnsOf(history: readonly StoredMessage[]): TafsirTurn[] {
  * questions, and the answer keeps the books' words it rests on.
  */
 async function answerFromTafsir(deps: RevoDeps, a: TafsirAsk): Promise<RevoAskResult> {
+  // The mushaf's first starter on a whole page: answered ahead, at once, and free (no model call, not counted).
+  const aheadPage = !a.chat && a.question === AHEAD_QUESTION ? aheadPageOf(a.scope) : null;
+  const ahead = aheadPage && deps.tafsirAhead ? await deps.tafsirAhead(aheadPage).catch(() => null) : null;
+  if (ahead) {
+    deps.log({ event: 'answer', cached: true, attach: 'tafsir-ahead' });
+    const used = a.usage && a.usage.day === a.day ? a.usage.count : 0;
+    return saveTafsirTurn(deps, a, ahead, Math.max(0, REVO_DAILY_QUESTIONS - used));
+  }
   const reserved = await deps.store.reserveQuestion(a.uid, a.day, REVO_DAILY_QUESTIONS);
   if (!reserved.ok) {
     if (reserved.reason === 'behind') throw new RevoError('invalid-argument', MESSAGES.behind, { reason: 'clock' });
@@ -449,7 +460,11 @@ async function answerFromTafsir(deps: RevoDeps, a: TafsirAsk): Promise<RevoAskRe
       : new RevoError('resource-exhausted', MESSAGES.resting(deps.now()), { reason: 'resting' });
   }
   const answer = parseTafsirReply(result.reply.content, documents) ?? { text: MESSAGES.notInBooks, sources: [] };
+  return saveTafsirTurn(deps, a, answer, Math.max(0, REVO_DAILY_QUESTIONS - reserved.count));
+}
 
+/** Keeps the question and the answer in the conversation (a new one, or the one it was asked in). */
+async function saveTafsirTurn(deps: RevoDeps, a: TafsirAsk, answer: TafsirAnswer, remainingToday: number): Promise<RevoAskResult> {
   const atReply = Math.max(deps.now().getTime(), a.atAsk + 1);
   const id = a.chat?.id ?? deps.store.newId();
   const title = a.chat?.title ?? a.question.slice(0, 60).trimEnd();
@@ -467,7 +482,7 @@ async function answerFromTafsir(deps: RevoDeps, a: TafsirAsk): Promise<RevoAskRe
     title: saved.title,
     question: publicMessage(q),
     reply: publicMessage(r),
-    remainingToday: Math.max(0, REVO_DAILY_QUESTIONS - reserved.count),
+    remainingToday,
     cached: false,
   };
 }

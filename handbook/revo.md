@@ -172,3 +172,9 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
     offering the next page's tafsir (`context.today.nextPages[0]`) and puts "What does the tafsir say?" first among the
     starters; that starter sends the page's `quran`. A one-line summary of each page from the tafsir, written ahead in a
     batch, would let the greeting say the meaning itself; it waits on Majd's yes for the spend (~$7 with the chips).
+  - **The spend Majd OK'd** (Nov 26 2026, $13; ledger `~/Documents/revisely-revo-mocks/tafsir/spend.md`), each script with
+    a `--max-usd` guard: `scripts/tafsir/lines-batch.js` (an English line on every piece of al-Tabari, Ibn Kathir and
+    al-Qurtubi, Haiku 5.5 Batch, ~$2.40; `collect` writes `lines` into the page files, re-upload them; `select.ts` then
+    ranks those pieces by their lines), `scripts/tafsir/answers-batch.js` ("What's happening here?" for all 604 pages,
+    Sonnet 5.5 Batch, ~$6; served by `tafsir/ahead.ts` from Storage `tafsir/answers/v1/`, free and at once, only for a
+    whole Madani 1405 page) and `scripts/tafsir/eval.js` (60 questions on Sonnet and Haiku, judged; ~$2).

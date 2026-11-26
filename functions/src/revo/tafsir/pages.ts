@@ -17,6 +17,8 @@ export interface TafsirPassage {
   text: string;
   /** About a sentence each: [start, end) into `text`. Revo is given, and cites, these. */
   pieces: [number, number][];
+  /** An English line a piece, saying what it is about (scripts/tafsir/lines-batch.js): al-Tabari, Ibn Kathir, al-Qurtubi. */
+  lines?: string[];
 }
 
 export interface TafsirPage {

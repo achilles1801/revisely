@@ -205,7 +205,7 @@ async function closeRevo(app: OpenApp) {
   await app.until(() => app.screen.queryByTestId('revo-input') == null, 'Revo closed');
 }
 
-it('[REVO-45] [REVO-25] [REVO-44] Revo in the mushaf (Revisely Dev): an R at the page’s foot asks about the page, a held ayah’s menu asks about the ayah, both answered from the tafsir; Settings’ switch takes both away', async () => {
+it('[REVO-45] [REVO-25] [REVO-44] Revo in the mushaf (Revisely Dev): an R at the page’s foot asks about the page (its first starter answered ahead, free), a held ayah’s menu asks about the ayah, both answered from the tafsir; Settings’ switch takes both away', async () => {
   setZone(ZONES.amman);
   setNow('2026-11-26 10:00');
   const phone = new Phone('phone');
@@ -233,6 +233,13 @@ it('[REVO-45] [REVO-25] [REVO-44] Revo in the mushaf (Revisely Dev): an R at the
     await tap(app, 'revo-chip-What’s happening here?');
     await app.until(() => app.screen.queryByTestId('revo-tafsir-sources') != null, 'the answer from the tafsir');
     expect(asks.sent[asks.sent.length - 1]).toMatchObject({ question: 'What’s happening here?', quran: { from: [27, 23], to: [27, 35] } });
+    // The first starter on a whole page is answered ahead (functions/test-recordings/tafsir/answers/p379.json): no
+    // model call, and it isn't counted as one of the day's questions.
+    expect((await modelRequests(uid)).map((r) => r.kind)).toEqual([]);
+    expect((await getServerDoc(`revoUsage/${uid}`))?.count ?? 0).toBe(0);
+    // Another question on the page is answered live from the tafsir, and counted.
+    await ask(app, 'Why did she send a gift instead of answering?');
+    await app.until(() => app.screen.queryAllByTestId('revo-tafsir-sources').length === 2, 'the live answer');
     expect((await modelRequests(uid)).map((r) => r.kind)).toEqual(['revo-tafsir']);
     await closeRevo(app);
 

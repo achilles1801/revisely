@@ -209,3 +209,28 @@ describe('the real page 379 (An-Naml 23–35, test-recordings/tafsir/p379.json)'
     expect(chars).toBeLessThan(16000);
   });
 });
+
+describe('ranking by English lines (Contextual Retrieval)', () => {
+  it("puts the pieces whose line matches the question first, then the passages' openings", () => {
+    const lined: TafsirPage = {
+      ...PAGE,
+      passages: PAGE.passages.map((p) =>
+        p.book === 'tabari' && p.from[1] === 35 ? { ...p, lines: p.pieces.map((_, i) => (i === 4 ? 'Why the queen sent a gift: testing Sulayman' : 'grammar of the verse')) } : p,
+      ),
+    };
+    const tabari = selectPieces([lined], PAGE_SCOPE, 'Why did the queen send a gift?', true).find((b) => b.book === 'tabari')!;
+    expect(tabari.pieces.some((x) => x.passage.from[1] === 35 && x.index === 4)).toBe(true);
+    expect(tabari.pieces).toHaveLength(PER_BOOK);
+  });
+});
+
+describe('answers written ahead', () => {
+  it('are for a whole Madani 1405 page only', () => {
+    const { aheadPageOf, lastAyahOfPage } = require('./ahead');
+    expect(aheadPageOf({ from: [27, 23], to: [27, 35] })).toBe(379);
+    expect(aheadPageOf({ from: [27, 23], to: [27, 34] })).toBeNull();
+    expect(aheadPageOf({ from: [27, 35], to: [27, 35] })).toBeNull();
+    expect(lastAyahOfPage(1)).toBe(1007);
+    expect(aheadPageOf({ from: [112, 1], to: [114, 6] })).toBe(604);
+  });
+});
