@@ -185,7 +185,7 @@ describe('every plan goes on into the next cycle', () => {
     await app.close();
   });
 
-  it('[AHEAD-3] [ACT-24] Plan it put two of Thursday’s pages first tomorrow: Thursday then repeats them, so it starts a new round, and Friday begins the next cycle', async () => {
+  it('[AHEAD-3] [ACT-24] Plan it put two of Thursday’s pages first tomorrow: revised there, they count for Thursday, which opens on the rest, with no new round; Friday begins the next cycle', async () => {
     // Pages a day over 20 pages: Mon 1–5, Tue 6–10, Wed 11–15, Thu 16–20.
     const phone = await account(pagesRange(1, 20), { dailyPageCapacity: 5 });
     const { app, home } = await openHome(phone, `${MON} 21:00`);
@@ -201,11 +201,12 @@ describe('every plan goes on into the next cycle', () => {
     await session.swipeThrough(7);
     await session.keepGoing();
     await session.swipeThrough(5);
-    // Thursday holds 16 and 17 again: revised for Tuesday in this session, so a new round.
+    // Thursday has 16 and 17 as its own: revised from Insights in front of Tuesday in this session, they count for
+    // Thursday now, so it opens on the rest, with no new round (AHEAD-3; it used to reopen 16–20 unchecked, Nov 26 2026).
     await session.keepGoing();
-    expect(session.pages()).toEqual(pagesRange(16, 20));
+    expect(session.pages()).toEqual([18, 19, 20]);
     expect(await session.isChecked()).toBe(false);
-    await session.swipeThrough(5);
+    await session.swipeThrough(3);
     expect(nextLine(app)).toMatch(/^Next cycle · .+ · 5 pages$/);
     await session.keepGoing();
     expect(session.pages()).toEqual(pagesRange(1, 5));
@@ -213,7 +214,8 @@ describe('every plan goes on into the next cycle', () => {
     await session.back();
     await app.untilSynced();
     const ahead = aheadOf(app, MON);
-    expect(ahead[day(1)]).toEqual([6, 7, 8, 9, 10, 16, 17]);
+    // Each page counts for one day: 16 and 17 for Thursday, not Tuesday too.
+    expect(ahead[day(1)]).toEqual(pagesRange(6, 10));
     expect(ahead[day(3)]).toEqual(pagesRange(16, 20));
     expect(ahead[day(4)]).toEqual(pagesRange(1, 5));
     await app.close();

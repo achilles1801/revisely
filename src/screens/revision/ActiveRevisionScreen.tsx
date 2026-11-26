@@ -54,7 +54,7 @@ import type { RevisionLog } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../theme/v2';
 import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algorithm';
-import { catchUpDayOf, duePagesOf, insightsPagesOn } from '../../lib/carryOver';
+import { catchUpDayOf, duePagesOf, insightsExtrasOf, insightsPagesOn } from '../../lib/carryOver';
 import { revisablePages } from '../../lib/memorizedAyahs';
 import { creditedOnDay, doneOnDay, sessionCredit } from '../../lib/aheadCredit';
 import { aheadDayLabel, nextRevisionDayPlan, revisionDayPlan, startsCycle, type RevisionDayPlan } from '../../lib/aheadPlan';
@@ -174,13 +174,6 @@ function ActiveRevisionScreenBody() {
   // (Majd, Nov 5 2026). The session still spans every day it covered: marks,
   // credit and saves go by page, each page's day in pageDays.
   const shownPages = lastSectionPages.length > 0 ? lastSectionPages : NO_PAGES;
-  const keepGoingPlan = useMemo(
-    () =>
-      user && lastSectionDay
-        ? nextRevisionDayPlan(user, pages, lastSectionDay, new Set(sessionPages), logs)
-        : null,
-    [user, pages, lastSectionDay, sessionPages, logs],
-  );
 
   // Today's pages already done: credited to today (revised today, or ahead from an earlier
   // session), or revised in today's sessions for another day: a catch-up page is credited to the
@@ -213,6 +206,20 @@ function ActiveRevisionScreenBody() {
     () => openedAhead?.pages[0] ?? null,
   );
   const [sessionStartTime] = useState(Date.now());
+  // Pages from Insights this session has revised as extras of a day it holds (ACT-24): page → that day. They aren't
+  // the schedule coming round: Keep going counts each for the later day that has it as its own (AHEAD-3).
+  const revisedExtras = useMemo(() => {
+    const out = new Map<number, string>();
+    if (!user) return out;
+    const memorized = revisablePages(pages);
+    for (const s of sections) for (const p of insightsExtrasOf(s.pages, user, s.day, memorized)) out.set(p, s.day);
+    return out;
+  }, [sections, user, pages]);
+  const keepGoingPlan = useMemo(() => {
+    if (!user || !lastSectionDay) return null;
+    const covers = new Set([...revisedExtras.keys()].filter((p) => completedPages.has(p)));
+    return nextRevisionDayPlan(user, pages, lastSectionDay, new Set(sessionPages), logs, covers);
+  }, [user, pages, lastSectionDay, sessionPages, logs, revisedExtras, completedPages]);
   const [saving, setSaving] = useState(false);
 
   const [pagesOpen, setPagesOpen] = useState(false);
@@ -688,6 +695,31 @@ function ActiveRevisionScreenBody() {
   const keepGoing = useCallback(async () => {
     if (!keepGoingPlan) return;
     haptics.selection();
+    // Pages from Insights this session revised as extras count for the later days that have them as their own (AHEAD-3):
+    // what is marked is saved first, then their credit moves there, off the day they were put in front of. The
+    // session's own day keeps them in its record, which is where the revision is kept.
+    const covered = keepGoingPlan.covered;
+    if (covered && user && sessionDay) {
+      await commitPendingPages();
+      const uncredit: Record<string, number[]> = {};
+      for (const list of Object.values(covered)) {
+        for (const p of list) {
+          const from = revisedExtras.get(p);
+          if (from && from !== sessionDay) (uncredit[from] ??= []).push(p);
+        }
+      }
+      await addLog({
+        date: sessionDay,
+        assignedPages: duePagesOf(assignment?.pages ?? [], user, sessionDay, revisablePages(pages)),
+        pagesRevised: [],
+        pagesSkipped: [],
+        weaknessUpdates: [],
+        durationMinutes: 0,
+        ahead: covered,
+        uncredit,
+        checked: heldAsRevised(sessionDay),
+      });
+    }
     if (!keepGoingPlan.round) {
       addSection(keepGoingPlan);
       return;
@@ -701,7 +733,7 @@ function ActiveRevisionScreenBody() {
     setCurrentPageNumber(keepGoingPlan.pages[0]);
     setRound(true);
     setAheadDays([keepGoingPlan]);
-  }, [keepGoingPlan, addSection, haptics, commitPendingPages]);
+  }, [keepGoingPlan, addSection, haptics, commitPendingPages, user, sessionDay, revisedExtras, addLog, assignment, pages, heldAsRevised]);
 
   // Home's "Tomorrow starts at …" (#168) when the user wasn't loaded at mount:
   // the day is added once they are (planned at mount otherwise, above).

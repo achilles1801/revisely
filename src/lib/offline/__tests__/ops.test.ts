@@ -64,6 +64,13 @@ describe('a session change from the outbox', () => {
     expect(s.weaknessUpdates).toHaveLength(1);
   });
 
+  it('[AHEAD-3] uncredit moves a page off a day, merged against what the session has', () => {
+    const existing = mergeSessionAdd(null, add({ pagesRevised: [1, 2, 5, 6], ahead: { '2026-11-03': [5, 6] } }), AT);
+    const moved = mergeSessionAdd(existing, add({ pagesRevised: [], ahead: { '2026-11-04': [6] }, uncredit: { '2026-11-03': [6] } }), AT);
+    expect(moved.ahead).toEqual({ '2026-11-03': [5], '2026-11-04': [6] });
+    expect(moved.pagesRevised).toEqual([1, 2, 5, 6]);
+  });
+
   it('applied twice gives the same session (the app closed before it was crossed off)', () => {
     const once = mergeSessionAdd(null, add(), AT);
     const twice = mergeSessionAdd(once, add(), AT);

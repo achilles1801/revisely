@@ -152,7 +152,7 @@ interface AppContextType extends AppState {
   updatePage: (page: UserPage) => Promise<void>;
   updatePages: (pages: UserPage[], changedPageNumbers?: number[]) => Promise<void>;
   /** `checked`: every page the session holds as revised, catch-up pages included (SESS-7). */
-  addLog: (log: Omit<RevisionLog, 'id'> & { checked?: number[]; assignedExact?: boolean }) => Promise<void>;
+  addLog: (log: Omit<RevisionLog, 'id'> & { checked?: number[]; assignedExact?: boolean; uncredit?: Record<string, number[]> }) => Promise<void>;
   updateLog: (log: RevisionLog & { checked?: number[] }) => Promise<void>;
   deleteLog: (logId: string) => Promise<void>;
   deleteLogs: (logIds: string[]) => Promise<void>;
@@ -1138,7 +1138,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     log.checked ?? [...new Set([...log.pagesRevised, ...Object.values(log.ahead ?? {}).flat()])];
 
   const addLog = useCallback(
-    async (log: Omit<RevisionLog, 'id'> & { checked?: number[]; assignedExact?: boolean }) => {
+    async (log: Omit<RevisionLog, 'id'> & { checked?: number[]; assignedExact?: boolean; uncredit?: Record<string, number[]> }) => {
       setError(null);
       const at = Date.now();
       const existing = viewRef.current?.sessions.find((s) => s.id === log.date);
@@ -1154,6 +1154,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           durationAtLeast: (existing?.durationMinutes ?? 0) + (log.durationMinutes ?? 0),
           durationAdd: log.durationMinutes ?? 0,
           ...(log.ahead ? { ahead: log.ahead } : {}),
+          ...(log.uncredit ? { uncredit: log.uncredit } : {}),
           ...(log.ahead || log.checked ? { checked: checkedOf(log) } : {}),
         },
         at,

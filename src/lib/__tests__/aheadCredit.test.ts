@@ -7,7 +7,7 @@ import {
   removeAheadPages,
 } from '../aheadCredit';
 import { recomputePagesFromLogs } from '../algorithm';
-import { doneOnDay, heldElsewhere, reviewedOn, reviewPagesInOrder, takeBackCredit } from '../aheadCredit';
+import { doneOnDay, heldElsewhere, reviewedOn, reviewPagesInOrder, takeBackCredit, withoutCredit } from '../aheadCredit';
 import { removeRevisedPages } from '../revisionSession';
 import { applySessionEdit, mergeSessionAdd, sessionUpdateData } from '../offline/ops';
 import type { RevisionLog, UserPage } from '../../types';
@@ -349,5 +349,14 @@ describe('a review’s pages held by other sessions (SESS-4; Majd, Nov 26 2026)'
   it('another session of the same day no longer holds the page at all', () => {
     const other = { ...log('2026-11-26', [4, 5], { '2026-11-27': [5] }), id: 'old' };
     expect(takeBackCredit([other, thu], '2026-11-26', [5], thu.id)).toEqual([{ ...other, pagesRevised: [4], ahead: {} }]);
+  });
+});
+
+describe('withoutCredit', () => {
+  it('takes pages off their days, dropping a day left empty; nothing to take off leaves it as it was', () => {
+    const ahead = { '2026-11-26': [562, 563, 332], '2026-11-27': [562] };
+    expect(withoutCredit(ahead, { '2026-11-26': [562, 563] })).toEqual({ '2026-11-26': [332], '2026-11-27': [562] });
+    expect(withoutCredit(ahead, { '2026-11-27': [562] })).toEqual({ '2026-11-26': [562, 563, 332] });
+    expect(withoutCredit(ahead, undefined)).toBe(ahead);
   });
 });

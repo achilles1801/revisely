@@ -320,6 +320,65 @@ describe('the review of a day with a session of its own and pages revised ahead 
   });
 });
 
+describe('pages from Insights that a later day has as its own', () => {
+  // Majd's Dev account, Nov 26 2026: Insights put Juz 29 in front of Thursday; he revised Thursday ahead, then Keep
+  // going opened Friday's own Juz 29 pages unchecked, as if the cycle had come round, and revising them again credited
+  // the same pages to Thursday and Friday.
+  it('[AHEAD-3] [AHEAD-4] [ACT-24] Keep going counts them done for that day: no new round, each page credited to one day', async () => {
+    const { phone } = await account();
+    const { app, home } = await openHome(phone, '2026-11-02 21:00');
+    const mon = await home.startSession();
+    await mon.swipeThrough(5);
+    await mon.back();
+    await app.untilSynced();
+    // Insights → "Revise these first tomorrow": Wednesday's pages go in front of Tuesday's.
+    type Weak = typeof import('../../../src/lib/weakSpotActions');
+    const { carryForTomorrow } = app.mods.require<Weak>('src/lib/weakSpotActions');
+    const user = app.app.user!;
+    await app.act(() => app.app.saveUser({ ...user, carryOver: carryForTomorrow('2026-11-03', WED, user.carryOver) }));
+    await app.untilSynced();
+
+    const tue = await home.openAhead();
+    expect(tue.pages()).toEqual([...WED, ...TUE]);
+    await tue.swipeThrough(10);
+    await tue.keepGoing();
+    // Wednesday's pages were all just revised: Wednesday is passed over, on to Thursday.
+    expect(tue.pages()).toEqual(THU);
+    await tue.back();
+    await app.untilSynced();
+    expect(credit(app)).toEqual([
+      { day: '2026-11-02', revised: pagesRange(1, 15), ahead: { '2026-11-03': TUE, '2026-11-04': WED } },
+    ]);
+    await app.close();
+  });
+
+  it('[AHEAD-3] [ACT-24] a later day they fill only partly opens on the rest', async () => {
+    const { phone } = await account();
+    const { app, home } = await openHome(phone, '2026-11-02 21:00');
+    const mon = await home.startSession();
+    await mon.swipeThrough(5);
+    await mon.back();
+    await app.untilSynced();
+    type Weak = typeof import('../../../src/lib/weakSpotActions');
+    const { carryForTomorrow } = app.mods.require<Weak>('src/lib/weakSpotActions');
+    const user = app.app.user!;
+    await app.act(() => app.app.saveUser({ ...user, carryOver: carryForTomorrow('2026-11-03', [11, 12], user.carryOver) }));
+    await app.untilSynced();
+
+    const tue = await home.openAhead();
+    expect(tue.pages()).toEqual([11, 12, ...TUE]);
+    await tue.swipeThrough(7);
+    await tue.keepGoing();
+    expect(tue.pages()).toEqual([13, 14, 15]);
+    await tue.back();
+    await app.untilSynced();
+    expect(credit(app)).toEqual([
+      { day: '2026-11-02', revised: pagesRange(1, 12), ahead: { '2026-11-03': TUE, '2026-11-04': [11, 12] } },
+    ]);
+    await app.close();
+  });
+});
+
 describe('the review of a day that went ahead', () => {
   it('[SESS-4] [AHEAD-2] [DAY-2] the day’s own pages first, then the pages revised ahead (Fajr on, after midnight)', async () => {
     const { phone } = await account({ fajrBoundaryEnabled: true, locationCoords: CITIES.chicago });
