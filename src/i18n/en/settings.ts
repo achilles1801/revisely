@@ -72,6 +72,7 @@ export const settings = {
   /** Section titles. Revo opens Settings at one by its title (REVO-31). */
   /** Settings' pages (SET-1): each is a row on the first level and its page's title. */
   sections: {
+    accountDetails: 'Name and email',
     account: 'Account',
     revision: 'Revision',
     reminders: 'Reminders',

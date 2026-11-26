@@ -68,6 +68,7 @@ export const settings: NonNullable<ArStrings['settings']> = {
   },
   title: 'الإعدادات',
   sections: {
+    accountDetails: 'الاسم والبريد الإلكتروني',
     account: 'الحساب',
     revision: 'المراجعة',
     reminders: 'التذكيرات',

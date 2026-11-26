@@ -7,6 +7,8 @@ import { useReduceMotion } from '../../design/motion';
 import { typeV2 } from '../../theme/v2';
 import { Confetti } from '../v2/Confetti';
 import { PillButton } from '../v2/PillButton';
+import { NewBadgeRow } from '../account/NewBadgeRow';
+import type { Milestone } from '../../lib/badges';
 import { Tap } from '../v2/Tap';
 import { t } from '../../i18n';
 import { chevron } from '../../i18n/direction';
@@ -33,6 +35,7 @@ export function SessionEndCard({
   onListenBack,
   onRate,
   onDismissRate,
+  newBadge,
 }: {
   total: number;
   done: number;
@@ -54,6 +57,8 @@ export function SessionEndCard({
   onRate?: () => void;
   /** The line's ✕: never ask again on this phone. */
   onDismissRate?: () => void;
+  /** A badge this session won (ACCOUNT-6): one quiet row under the totals, this once. */
+  newBadge?: Milestone | null;
 }) {
   const { palette } = useTheme();
   const reduceMotion = useReduceMotion();
@@ -101,6 +106,7 @@ export function SessionEndCard({
             : t('revision.end.swipeBack')}
         </Text>
       </View>
+      {complete && newBadge ? <NewBadgeRow milestone={newBadge} /> : null}
       {complete && next && onKeepGoing ? (
         <View style={styles.keep}>
           <Text style={[typeV2.meta, styles.center, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>

@@ -9,6 +9,7 @@ import { useModalTurn } from '../v2/modalTurn';
 import { DISMISS_FALLBACK_MS } from '../v2/Sheet';
 import { BarButton } from './ReciteBar';
 import { earlyAccessIntroLine } from '../../lib/earlyAccess';
+import { accountDesignEnabled } from '../../lib/release/accountDesign';
 import { t } from '../../i18n';
 
 /** The real screen the page shows: a take marking mistakes on An-Naml 23 (E2E flow 18's screenshot), light and dark. */
@@ -90,9 +91,13 @@ export function CheckIntroPage({
         <View style={styles.bottom}>
           <PillButton title={t('reciteLive.intro.get')} size="lg" onPress={onGet} busy={getting} testID="check-intro-get" />
           {earlyAccess ? (
-            <Text style={[typeV2.meta, styles.early, { color: palette.text }]} maxFontSizeMultiplier={1.4} testID="check-intro-early">
-              {earlyAccessIntroLine()}
-            </Text>
+            // The Account page's new look drops the early-access words (Majd, Nov 26 2026: no "javadocs in the app");
+            // Get Premium still gives it at once, and Apply for support stays hidden (PREM-1).
+            accountDesignEnabled() ? null : (
+              <Text style={[typeV2.meta, styles.early, { color: palette.text }]} maxFontSizeMultiplier={1.4} testID="check-intro-early">
+                {earlyAccessIntroLine()}
+              </Text>
+            )
           ) : (
           <Tap
             onPress={onSupport}

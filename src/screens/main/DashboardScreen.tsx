@@ -70,6 +70,13 @@ import { ownRevised } from '../../lib/activityItems';
 import { aheadLead, nextRevisionDayPlan } from '../../lib/aheadPlan';
 import type { HistoryItem } from '../../lib/streakFromItems';
 import { handLogsOf, loadActivityHistory, sameHistory, shareActivityHistory, withPendingHandLogs } from '../../lib/activityHistory';
+import { accountDesignEnabled } from '../../lib/release/accountDesign';
+import { useAccountJourney } from '../../lib/accountJourney';
+import { latestMilestone } from '../../lib/badges';
+import { useNewBadge } from '../../lib/badgeSeen';
+import { usePremium } from '../../lib/premium';
+import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
+import { ProfilePicture } from '../../components/account/ProfilePicture';
 import { pendingEntries } from '../../lib/offline/outbox';
 import { todaySnapshot } from '../../lib/todaySnapshot';
 import { JumpSheet } from '../../components/home/JumpSheet';
@@ -234,6 +241,15 @@ export default function DashboardScreen() {
     [user, pages, logs, revisionDay, assignment, counted],
   );
   const todayStatus = { status: snapshot?.status ?? ('not_started' as const) };
+
+  // The account's picture and latest badge on the Today post (ACCOUNT-7; the Account page's new look). Home reads the
+  // history itself, so the journey waits for it. Home is where an account is first read: its badges so far count as
+  // seen there (lib/badgeSeen), so only badges won from now on arrive as new.
+  const accountV2 = accountDesignEnabled();
+  const journey = useAccountJourney({ enabled: accountV2, load: false });
+  const latestBadge = accountV2 && journey ? latestMilestone(journey.pagesRevised) : undefined;
+  useNewBadge(accountV2 ? user?.id : null, latestBadge);
+  const premiumNow = usePremium(user?.id, accountV2 && reciteLiveForAccount(user));
 
   // Done today: the next revision day, which Home's quiet line opens (#168). It goes on past the cycle's
   // end (AHEAD-3): a day that repeats today's pages opens as a new round, and one that begins the plan
@@ -577,6 +593,19 @@ export default function DashboardScreen() {
         <TodayPost
           name={userName}
           initial={avatarInitial(userName, firebaseUser?.email)}
+          picture={
+            accountV2 ? (
+              <ProfilePicture
+                size={premiumNow.has ? 35 : 40}
+                photoUrl={firebaseUser?.photoURL}
+                initial={avatarInitial(userName, firebaseUser?.email)}
+                premium={premiumNow.has}
+                badge={latestBadge ?? null}
+                testID="today-picture-mark"
+              />
+            ) : undefined
+          }
+          onPicture={() => navigation.navigate('Settings', { page: 'account' })}
           status={todayStatus.status}
           pages={assignment.pages}
           partial={partial}

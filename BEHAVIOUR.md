@@ -329,6 +329,26 @@ current basic sounds". October 2026's version was removed for the voices it offe
   it, nothing on the phone (its copy, signing out) keeps the spinner up more than a few seconds. The deletion itself
   doesn't hold the phone up either: the phone stops listening to the account (its user document, pages and sessions)
   while the server deletes it, and listens again if the account is still there.
+- **ACCOUNT-4.** (Revisely Dev, the Account page's new look; Majd approved the boards on Nov 26 2026.) Settings → Account
+  opens on the account's picture (its photo, or the first letter of its name when it has none) in Premium's ring when it
+  has Premium, the name with its latest badge (ACCOUNT-5), a Premium pill, "Revising since <month>" ("since today" on
+  the day it was set up), the bar to the next badge, and three figures: pages revised, the longest streak and time in
+  Revisely. Pages revised counts every revision: each page of each day's revised pages, from a session, revising ahead
+  or the daily log, so a page revised on three days is three (twice in one day is one, as Activity shows it). The
+  longest streak is the longest run of days done by the streak's own rule (SESS-2), never shorter than the streak now.
+  There is no email under the name and no Premium row. Below: "Name and email" (the name, the email with how the
+  account signs in, and Delete account as a quiet link at its foot, still confirmed twice: ACCOUNT-1), then Sign out.
+  Settings' first row shows the picture, the name with its latest badge and "<n> pages revised".
+- **ACCOUNT-5.** (Revisely Dev.) Badges for pages revised: 10, 50, 100, 250, 500, 1,000, 2,500, 5,000, 10,000, 25,000,
+  50,000 and 100,000, two a tier, I then II: Bronze, Silver, Gold, Platinum, Diamond, Emerald, each tier its own shape
+  and material. The bar on Account runs from the latest badge to the next ("13 more for Bronze II"; before the first,
+  "Revise 10 pages for your first badge"), and a tap on it opens Badges: every badge, the day each was won, the rest in
+  grey with how many pages are left.
+- **ACCOUNT-6.** (Revisely Dev.) A badge won is shown as new once on this phone: on the session's end card, as a row
+  under the totals, once the end card comes into view, or else on Account the next time it opens, with a halo on the
+  badge and "New badge · <name>" under the bar. Badges an account had before this phone first read it aren't new.
+- **ACCOUNT-7.** (Revisely Dev.) Home's Today post shows the account's picture in its mark's place, with Premium's ring
+  when it has Premium and the latest badge at its lower corner; a tap on the picture opens Settings → Account.
 - **ACCOUNT-2.** A sign-up or sign-in that fails (an address already registered, a wrong password, Google or Apple
   refused, no connection) leaves the sign-in screen as it was: the same mode, the name, the email and the password
   still typed, with the error under them. A password reset that fails keeps the email. While an attempt runs, it
@@ -1878,7 +1898,9 @@ of this deal. those users can have premium for life".
   script. Early access itself has no end date yet. Marking mistakes' intro says Premium is free for everyone during
   early access, which has no end date yet, will be paid after it, and is kept for life, and its Get Premium gives it at
   once; "Can't afford it? Apply for support" is hidden. Settings' Account page's Premium row says the same (a take's
-  summary doesn't: Majd, Nov 21 2026). A grant once given is never changed or taken away, after early access too; once early access ends, new
+  summary doesn't: Majd, Nov 21 2026). With the Account page's new look (Revisely Dev, ACCOUNT-4; Majd, Nov 26 2026:
+  "feels like theres no need to write "free in early access""), neither the intro nor Settings says it: the intro keeps
+  Get Premium, and Premium shows as the picture's ring and the Premium pill. A grant once given is never changed or taken away, after early access too; once early access ends, new
   accounts don't get it and the intro's Get Premium no longer gives it. The words say early access and for life, never
   trial, a price or a date.
 
