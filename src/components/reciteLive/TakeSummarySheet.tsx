@@ -1,3 +1,4 @@
+import { onNextWord } from '../../lib/reciteLive/markPlace';
 import React from 'react';
 import { AccessibilityInfo, Alert, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -69,13 +70,16 @@ export function findingsLine(marks: Mark[]): string {
   const parts: string[] = [];
   const wrong = n(['word']);
   const skipped = n(['skipped']);
-  const added = n(['added']);
+  // An extra word on the word reached for is a hesitation there; one past the end stays an extra word.
+  const hesitated = marks.filter((m) => onNextWord(m) && !isUnclear(m)).length;
+  const added = n(['added']) - hesitated;
   const harakat = n(['harakat']);
   const letters = n(['letter']);
   const tajweed = n(['tajweed']);
   const unclear = marks.filter(isUnclear).length;
   if (wrong) parts.push(t('reciteLive.summary.wrong', { count: wrong }));
   if (skipped) parts.push(t('reciteLive.summary.skipped', { count: skipped }));
+  if (hesitated) parts.push(t('reciteLive.summary.hesitated', { count: hesitated }));
   if (added) parts.push(t('reciteLive.summary.extra', { count: added }));
   if (harakat) parts.push(t('reciteLive.summary.harakat', { count: harakat }));
   if (letters) parts.push(t('reciteLive.summary.letters', { count: letters }));

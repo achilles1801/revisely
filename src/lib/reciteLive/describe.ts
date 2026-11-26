@@ -1,5 +1,6 @@
 // How a mark is worded on its card and in the summary (pure). Surah first, never a page number (NAME-1).
 
+import { checkerWord, onNextWord } from './markPlace';
 import { ayahKey } from '../ayahKeys';
 import { pageNameOfAyah, surahName } from '../passages';
 import { firstWordsOfAyah } from '../recite/quranWords';
@@ -25,7 +26,9 @@ export function markTitle(mark: Mark): string {
     case 'skipped':
       return t('reciteLive.describe.skippedWord');
     case 'added':
-      // "Extra": the page highlights the word before it (an extra word has no text there).
+      // On the word the reciter was reaching for (lib/reciteLive/markPlace): they hesitated there. Past the end, or at a
+      // surah's end, it stays on the word before it, as an extra word.
+      if (onNextWord(mark)) return t('reciteLive.describe.hesitated');
       return mark.detail === 'trail' ? t('reciteLive.describe.extraAfterEnd') : t('reciteLive.describe.extraWord');
     case 'harakat':
       return mark.detail === 'shadda' ? t('reciteLive.describe.wrongShadda') : t('reciteLive.describe.wrongHaraka');
@@ -128,6 +131,7 @@ function slipSide(text: string): string {
  * A lone haraka is too small to read in a line of text, so harakat are named. Null when the checker didn't say which.
  */
 export function slipLine(mark: Mark): string | null {
+  if (onNextWord(mark)) return t('reciteLive.describe.hesitatedLine');
   if (!mark.slip || (mark.kind !== 'harakat' && mark.kind !== 'letter')) return null;
   const cap = (x: string) => (x.startsWith('\u2068') ? x : x.charAt(0).toUpperCase() + x.slice(1));
   const { expected, heard } = mark.slip;
@@ -188,7 +192,8 @@ function around(words: QuranWords, a: number, b: number, reach: number): [number
  */
 export function expectedPhrase(words: QuranWords, mark: Mark, reach = 2): PhrasePart[] {
   const added = mark.kind === 'added';
-  const [from, to] = added ? around(words, mark.w, mark.w + 1, reach - 1) : around(words, mark.w, mark.w, reach);
+  const at = checkerWord(mark);
+  const [from, to] = added ? around(words, at, at + 1, reach - 1) : around(words, mark.w, mark.w, reach);
   const out: PhrasePart[] = [];
   for (let i = from; i < to; i++) {
     out.push({ text: words.uthmani(i), role: !added && i === mark.w ? 'expected' : 'context' });
@@ -204,7 +209,8 @@ export function recitedPhrase(words: QuranWords, mark: Mark, reach = 2): PhraseP
   if (mark.kind === 'tajweed') return null;
   if (mark.kind !== 'skipped' && !mark.heard) return null;
   const added = mark.kind === 'added';
-  const [from, to] = added ? around(words, mark.w, mark.w + 1, reach - 1) : around(words, mark.w, mark.w, reach);
+  const at = checkerWord(mark);
+  const [from, to] = added ? around(words, at, at + 1, reach - 1) : around(words, mark.w, mark.w, reach);
   const out: PhrasePart[] = [];
   for (let i = from; i < to; i++) {
     if (!added && i === mark.w) {
@@ -212,7 +218,7 @@ export function recitedPhrase(words: QuranWords, mark: Mark, reach = 2): PhraseP
       continue;
     }
     out.push({ text: words.uthmani(i), role: 'context' });
-    if (added && i === mark.w) out.push({ text: mark.heard ?? '', role: 'recited' });
+    if (added && i === at) out.push({ text: mark.heard ?? '', role: 'recited' });
   }
   return out;
 }

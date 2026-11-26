@@ -1,3 +1,4 @@
+import { onNextWord } from '../../lib/reciteLive/markPlace';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import type { Rect } from '../../lib/ayahBounds';
@@ -221,7 +222,7 @@ export function LiveMarkTargets({ page, scale, words, marks }: { page: number; s
             pointerEvents="none"
             accessible
             accessibilityRole="button"
-            accessibilityLabel={t(m.kind === 'added' ? 'reciteLive.markLabelAfter' : 'reciteLive.markLabel', { title: markTitle(m), word: words.uthmani(m.w) })}
+            accessibilityLabel={t(m.kind === 'added' && !onNextWord(m) ? 'reciteLive.markLabelAfter' : 'reciteLive.markLabel', { title: markTitle(m), word: words.uthmani(m.w) })}
             accessibilityHint={t('reciteLive.markHint')}
             testID={`live-mark-${m.kind}`}
             style={[styles.abs, rectStyle(box, scale)]}

@@ -11,6 +11,7 @@
 // winning. "Clear now" on a word is a record of its own (`kind: 'clear'`), and forgetting a record leaves a tombstone
 // (`deleted`) so another phone's next pull drops it too.
 
+import { placeMark } from '../reciteLive/markPlace';
 import type { TajweedRule } from '../reciteCheck/result';
 import type { Mark, MarkDetail, MarkGroup, MarkInto, MarkKind } from '../reciteLive/contract';
 import { WHERE_WHYS, type RunsOn, type WhereWhy } from '../reciteLive/where';
@@ -228,7 +229,8 @@ function markFromStored(raw: unknown): Mark | null {
   if (num(r.t0) != null && num(r.t1) != null) m.t = [r.t0 as number, r.t1 as number];
   const into = intoFromStored(r);
   if (into) m.into = into;
-  return m;
+  // Shown as a take's marks are: an extra word on the word it was reaching for, old records too (lib/reciteLive/markPlace).
+  return placeMark(m);
 }
 
 /** The document for a record (the remote adds `updatedAt`, the server's time). */

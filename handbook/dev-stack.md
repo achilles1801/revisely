@@ -242,7 +242,10 @@ until its part is set up.
     Tarteel's "blurb or splash": RECITE-19; `components/reciteLive/Wash`, `lib/reciteLive/wash`: a pill-shaped core
     whose edge fades out all round in its own colour, a `boxShadow`, reaching a little past the word so a box a few
     units off never shows an edge; pastel colours, checked in design.test), in three colours (`markGroup`, theme/v2 `markWord`…): red for a wrong,
-    skipped or extra word (an extra word on the word before it: "Extra word"), amber for a wrong haraka or letter and
+    skipped or extra word (an extra word on the next word, the one the reciter was reaching for: "Hesitated here"; Majd,
+    Nov 25 2026: "extra word marks ... should be put on the next word not on the word before the stumble because the
+    word before the stumble was said right"; `lib/reciteLive/markPlace`, after the end it stays on the word before it,
+    "Extra word after the end"), amber for a wrong haraka or letter and
     "Not clear", violet for a tajweed note (Strict). A word with several shows its strongest; the mark a card is open
     for is a firmer shade of its own (`…Firm`), no outline. No red ink, dotted lines or + discs. The bar, the card and
     the summary use the same highlights, and a small flat swatch beside the kind's name (never a round mark): the kind
@@ -251,8 +254,8 @@ until its part is set up.
   - **The next word's cover turns red while something else is said** (contract draft 7's `off`; Majd's yes, Nov 15 2026):
     - What shows: in the hidden view only, red over the word's cover (the word-mistake highlight), its text still
       hidden. It's never a mark and never counted.
-    - When it goes: once the word is said (`at` or `said` reach it), the reciter goes back, or a mark lands on it or an
-      Extra word just before it (`off` in `lib/reciteLive/state`).
+    - When it goes: once the word is said (`at` or `said` reach it), the reciter goes back, or a mark lands on it (a
+      hesitation there included: the checker's extra word just before it; `off` in `lib/reciteLive/state`).
     - What the lab measured: right 86% of the times it fires, and never on hesitations or pauses.
     - VoiceOver hears nothing: the mic is on throughout a take.
   - **"Not a mistake" can be undone** (Majd, Nov 15 2026; Tarteel's Removed list): for 5 s an Undo in the take's bar, in the words' place (RECITE-25: never a note over the page),

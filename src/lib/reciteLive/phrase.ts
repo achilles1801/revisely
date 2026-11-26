@@ -17,6 +17,7 @@
 //
 // The pause marks are src/data/quranWaqf.json (scripts/build-quran-waqf.py, from Tanzil's Uthmani text).
 
+import { checkerWord } from './markPlace';
 import type { QuranWords } from '../recite/quranWords';
 import type { Mark } from './contract';
 
@@ -108,7 +109,9 @@ export function clipRange(
   takeEnd: number,
 ): [number, number] | null {
   const own: [number, number] | null = m.t ? [Math.max(0, m.t[0] - 0.6), Math.min(takeEnd, m.t[1] + 0.4)] : null;
-  const r = words.ref(m.w);
+  // Where the checker put it: an extra word plays from the phrase of the word it came after (RECITE-18).
+  const w = checkerWord(m);
+  const r = words.ref(w);
   const [a0, a1] = words.verseRange(r.sura, r.ayah);
   const ayah = span(a0, a1 - 1, timeOf, takeEnd);
   let range: [number, number] | null;
@@ -116,20 +119,20 @@ export function clipRange(
   const recited = ayah ? ayah[1] - ayah[0] - LEAD - TAIL : Infinity;
   if (ayah && (a1 - a0 <= SHORT_WORDS || recited <= SHORT_SECONDS) && ayah[1] - ayah[0] <= MAX_SECONDS) range = ayah;
   else {
-    const [first, last] = phraseOf(words, m.w);
+    const [first, last] = phraseOf(words, w);
     range = span(first, last, timeOf, takeEnd);
     if (range && range[1] - range[0] > MAX_SECONDS) {
-      range = span(Math.max(first, m.w - WORDS_BEFORE), Math.min(last, m.w + WORDS_AFTER), timeOf, takeEnd);
+      range = span(Math.max(first, w - WORDS_BEFORE), Math.min(last, w + WORDS_AFTER), timeOf, takeEnd);
     }
   }
-  if (!range) return own ?? across(m.w, timeOf, takeEnd);
+  if (!range) return own ?? across(w, timeOf, takeEnd);
   // The mistake isn't in it (the reciter started the ayah again: the times are when the cursor first reached each word):
   // around the mark's own second.
   if (own && m.t && (m.t[0] < range[0] || m.t[1] > range[1])) return own;
   // A skipped word the clip would start after (the first of its phrase or ayah): from the last word reached before it,
   // so the jump over it is heard.
-  if (timeOf(m.w) == null) {
-    const [prev] = heardAround(m.w, timeOf);
+  if (timeOf(w) == null) {
+    const [prev] = heardAround(w, timeOf);
     if (prev != null) range = [Math.min(range[0], Math.max(0, prev - AT_LAG - LEAD)), range[1]];
   }
   // Still longer than MAX_SECONDS (a slow take, or words the cursor never reached in between): the mark's own second
@@ -137,7 +140,7 @@ export function clipRange(
   // always the whole MAX_SECONDS and always holds the mistake).
   if (range[1] - range[0] > MAX_SECONDS) {
     if (own) return own;
-    const at = momentOf(m.w, timeOf) ?? range[0];
+    const at = momentOf(w, timeOf) ?? range[0];
     const start = Math.min(Math.max(range[0], at - MAX_SECONDS / 2), range[1] - MAX_SECONDS);
     return [start, start + MAX_SECONDS];
   }

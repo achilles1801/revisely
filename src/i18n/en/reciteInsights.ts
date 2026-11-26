@@ -48,8 +48,9 @@ export const reciteInsights = {
   wrong_other: '{{count}} wrong',
   skipped_one: '{{count}} skipped',
   skipped_other: '{{count}} skipped',
-  extra_one: '{{count}} extra',
-  extra_other: '{{count}} extra',
+  // An extra word, shown on the word the reciter was reaching for: a hesitation (Majd, Nov 25 2026).
+  extra_one: '{{count}} hesitation',
+  extra_other: '{{count}} hesitations',
   harakat_one: '{{count}} harakat',
   harakat_other: '{{count}} harakat',
   letters_one: '{{count}} letter',

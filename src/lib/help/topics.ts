@@ -267,7 +267,7 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'color-palette-outline',
         title: 'The highlights',
         text:
-          'Red: a word skipped, wrong or extra. Amber: a wrong haraka or letter, a mistake too, or {{Not clear}} (never counted). ' +
+          'Red: a word skipped, wrong or hesitated at. Amber: a wrong haraka or letter, a mistake too, or {{Not clear}} (never counted). ' +
           'Violet: tajweed, with {{Strict (Beta)}}.',
         covers: ['RECITE-2', 'RECITE-3'],
         when: 'liveRecite',
