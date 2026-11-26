@@ -1,4 +1,4 @@
-// E2E builds only: the journal's new look (ACT-33, ACT-34, HOME-2), which is Revisely Dev's until it ships.
+// E2E builds only: the journal's new look (ACT-33, ACT-34), which is Revisely Dev's until it ships.
 //
 //   revisely://e2e/journal-design?on=1
 

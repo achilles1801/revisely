@@ -111,6 +111,9 @@ export const lib = {
     days_other: '{{count}} days',
     missed: 'Missed {{when}} · Revise {{what}}',
     left: 'Left {{when}} · Revise {{what}}',
+    /** The quiet line under Home's button (HOME-5): "Missed yesterday · Juz 28", then "Add to today". */
+    missedQuiet: 'Missed {{when}} · {{what}}',
+    leftQuiet: 'Left {{when}} · {{what}}',
     pages_one: '{{count}} page',
     pages_other: '{{count}} pages',
     juz: 'Juz {{n}}',

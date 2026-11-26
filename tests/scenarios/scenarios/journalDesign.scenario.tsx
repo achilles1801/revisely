@@ -1,9 +1,9 @@
-// The journal's new look in Revisely Dev (BEHAVIOUR.md ACT-33, ACT-34, HOME-2; Majd's picks, Nov 23 2026). Revised elsewhere picks
-// from a search and the thirty juz, the day under Overview's calendar is one entry, and one quiet row on Home opens today's journal.
+// The journal's new look in Revisely Dev (BEHAVIOUR.md ACT-33, ACT-34; Majd's picks, Nov 23 2026). Revised elsewhere picks
+// from a search and the thirty juz, and the day under Overview's calendar is one entry. (Home's row went on Nov 26: HOME-4.)
 
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
-import { ActivityDayView, DailyLog, Home, homeStack } from '../harness/screens';
+import { ActivityDayView, Home, homeStack } from '../harness/screens';
 import { OpenApp, Phone } from '../harness/phone';
 import { AddToDay, goBack } from '../harness/addToDay';
 
@@ -114,22 +114,6 @@ describe('the journal’s new look', () => {
     await add.choose('revised');
     await app.idle(400);
     expect(app.screen.getByTestId('juz-cell-1').props.accessibilityState.disabled).toBe(true);
-    await app.close();
-  });
-
-  it('[HOME-2] one quiet row under Today opens today’s journal and shows its note', async () => {
-    const { app, home } = await open();
-    await app.until(() => app.screen.queryByTestId('today-journal') != null, 'the row');
-    expect(text(app, 'today-journal-detail')).toBe('Add a note');
-    await press(app, 'today-journal');
-    await app.until(() => app.screen.queryByTestId('activity-day-v2') != null, 'today’s journal');
-    const log = new DailyLog(app);
-    await log.open(TUESDAY);
-    await log.add('Kept mixing up the two endings');
-    await app.untilSynced();
-    await goBack(app);
-    await home.ready();
-    await app.until(() => text(app, 'today-journal-detail') === 'Kept mixing up the two endings', 'the note on Home');
     await app.close();
   });
 });

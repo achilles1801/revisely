@@ -20,6 +20,7 @@ export function KahfPost({
   state,
   eve = false,
   saving = false,
+  quietRead = false,
   onRead,
   onMarkRead,
   onDismiss,
@@ -28,6 +29,8 @@ export function KahfPost({
   /** Thursday evening, after maghrib: Friday has begun but the revision day is still Thursday's. */
   eve?: boolean;
   saving?: boolean;
+  /** HOME-5 (Revisely Dev): Read is an outline like "Mark as read", so Home's one solid button is the Today post's. */
+  quietRead?: boolean;
   onRead: () => void;
   onMarkRead: (minutes: number) => void;
   onDismiss: () => void;
@@ -58,7 +61,13 @@ export function KahfPost({
             <PillButton title={t('home.kahf.open')} variant="outline" onPress={onRead} accessibilityLabel={t('home.kahf.openLabel')} />
           ) : (
             <>
-              <PillButton title={t('home.kahf.read')} onPress={onRead} accessibilityLabel={t('home.kahf.readLabel')} testID="kahf-read" />
+              <PillButton
+                title={t('home.kahf.read')}
+                variant={quietRead ? 'outline' : 'solid'}
+                onPress={onRead}
+                accessibilityLabel={t('home.kahf.readLabel')}
+                testID="kahf-read"
+              />
               <PillButton
                 title={saving ? t('common.saving') : t('home.kahf.markRead')}
                 variant="outline"

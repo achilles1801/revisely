@@ -186,6 +186,10 @@ How the tests are made: `tests/scenarios/README.md`.
   day with no session, and "Missed 3 days · Revise …" when several days come to more than one (the
   pages named by their surahs, NAME-1). Earlier days are not offered.
   A page revised at any point in those days is never offered, whichever day the schedule had it on.
+  In Revisely Dev (HOME-5) the line sits under today's button instead, grey and without "Revise", and ends in
+  "Add to today" in the accent colour, which adds them: "Missed yesterday · Juz 28  Add to today" (Majd, Nov 26
+  2026: the button "looks so off compared to everything else and completely knocks off the "start revision"
+  button").
 - **CARRY-2.** Keep daily amount (`shift`, the default): today keeps its size. The leftovers come
   first, and the rest of the plan slides back by as many pages. With as many leftovers as today holds or
   more, today is the leftovers alone, all of them, and the whole of today's plan moves on a day: revising
@@ -426,14 +430,21 @@ current basic sounds". October 2026's version was removed for the voices it offe
   qibla is next to it on the sheet if users wanna use it and it also makes the home page way cleaner"). The Prayer sheet
   (Times | Qibla) opens from the next-prayer line on Home; the Qibla also opens from Settings → Prayer → Qibla and from
   the Qibla widget, on the sheet's Qibla.
-- **HOME-2.** (Revisely Dev) One quiet row under Today, "Today's journal", opens today's journal (Majd, Nov 23 2026: it is
-  "a rly big piece of this app and it's almost hidden", "but i wanna avoid clutter on the home page"). It shows today's
-  first note, one still waiting to be sent included, or "Add a note" when there is none.
 - **HOME-3.** Where today starts on Home's Today post ends with "Change", which opens Jump to directly (Majd, Nov 25
   2026: "yes jump to should be option 3 the 'change' one"). There is no menu: Edit schedule is in Settings → Revision
   (SET-1). Once today is done the word goes, as the › did, and a tap on the line still opens Jump to. Today's page numbers,
   which only that menu showed ("pp. 542–551"), are gone from Home (Majd, Nov 26 2026: "yeah drop them"). (Before: a › that
   opened a menu of Jump to… and Edit schedule, under today's exact pages.)
+- **HOME-4.** (Revisely Dev) Home is today: the next prayer, the Today post and, on Fridays, Al-Kahf. There is no
+  "Today's journal" row and no "Recent sessions" (Majd, Nov 26 2026: "the todays journal honestly looks terrible on the
+  home screen", and Recent sessions "literally takes up half the screen when its not even the main thing going on").
+  Every past session is in Activity, a tap or two away: on its day's page, and in All activity's list and its search.
+  Once today is done, "Review session" still opens today's session. (Before: a "Today's journal" row under Today, from
+  Nov 23 2026, and the last three sessions with "See all".)
+- **HOME-5.** (Revisely Dev) Home has one solid button, the Today post's ("Start revision", "Continue revision",
+  "Mark memorized pages"; "Review session" is an outline). Al-Kahf's "Read" is an outline like "Mark as read", and the
+  catch-up's "Add to today" is the accent words ending a grey line under the Today post's button (CARRY-1), never a
+  button of its own. A tap anywhere on that line adds the pages.
 
 ## Sheets and updates
 

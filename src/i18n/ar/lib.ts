@@ -132,6 +132,8 @@ export const lib: NonNullable<ArStrings['lib']> = {
     days_other: '{{count}} يوم',
     missed: 'فاتتك مراجعة {{when}} · راجع {{what}}',
     left: 'بقي من مراجعة {{when}} · راجع {{what}}',
+    missedQuiet: 'فاتتك مراجعة {{when}} · {{what}}',
+    leftQuiet: 'بقي من مراجعة {{when}} · {{what}}',
     pages_zero: 'لا توجد صفحات',
     pages_one: 'صفحة واحدة',
     pages_two: 'صفحتان',

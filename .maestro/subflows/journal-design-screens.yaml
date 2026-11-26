@@ -1,12 +1,14 @@
-# The journal's new look (ACT-33, ACT-34, HOME-2), one pass in the theme on show, from Home. The seeded account has Juz 1–6,
-# 21–28 and 30 memorized.
+# The journal's new look (ACT-33, ACT-34) and Home, version 3 (HOME-4), one pass in the theme on show, from Home. The
+# seeded account has Juz 1–6, 21–28 and 30 memorized.
 #   env THEME: light or dark
 appId: com.revisionbuddy.app
 ---
 - extendedWaitUntil:
     visible:
-      id: today-journal
+      id: today-post
     timeout: 15000
+- assertNotVisible:
+    id: home-recent
 - runFlow:
     file: shot.yaml
     env:
