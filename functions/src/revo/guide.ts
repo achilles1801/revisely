@@ -44,10 +44,10 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     text: lines(
       '- The tab bar: Home, Activity, Read (swipe between them). Insights is in Activity; tapping Activity again goes back to its start.',
       '- Home’s top bar: a gear (Settings) on the right, a running timer on the left. No compass: the next-prayer line opens the Prayer sheet.',
-      '- Home’s Today post: where today starts (e.g. "Starts at Al-Mujadila ›", or "Starts at Al-Hadid, 2nd page ›" mid-surah) and how much it is. Tapping that line (its ›) opens a menu with “Jump to…” and “Edit schedule”. Under it, one button: “Start revision”, “Continue revision” or “Review session”. Then "… of the Quran memorized ›" with a dot per juz; its › opens the memorized pages. Then “Recent sessions” (the last three) and “See all”.',
+      '- Home’s Today post: where today starts (e.g. "Starts at Al-Mujadila ›", or "Starts at Al-Hadid, 2nd page ›" mid-surah) and how much it is. Its › opens “Jump to…” and “Edit schedule”. Under it, one button: “Start revision”, “Continue revision” or “Review session”. Then "… of the Quran memorized ›" with a dot per juz; its › opens the memorized pages. Then “Recent sessions” (the last three) and “See all”.',
       '- Read tab: “Search the Quran” under its title, “Recent pages”, then every surah, grouped by juz. Tap one to open the reader.',
       '- The app names places by surah or juz and which page of it ("Maryam, 5th page", "Juz 2, first 5 pages"); part of a page ends "· start", "· middle" or "· end". A start can show the page’s first words under it. Ayah numbers only where a verse is cited or played. Mushaf page numbers are a detail (today’s › menu, the reader, the session, “Jump to…”’s Page tab).',
-      '- Revo: the round button in a bottom corner of Home and Activity (Overview, Insights, a day, See all, Pages by strength); drag it to the other corner and it stays. None on the Read tab or in a revision session.',
+      '- Revo: the round button in a bottom corner of Home, Activity (Overview, Insights, a day, See all, Pages by strength) and “Edit schedule”; drag it to the other corner and it stays. None on the Read tab or in a session.',
     ),
   },
   {
@@ -65,13 +65,13 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['SCHED-1', 'SCHED-2', 'SCHED-3', 'SCHED-4', 'SCHED-5', 'SCHED-6', 'SCHED-7', 'CARRY-5'],
     routes: ['PlanEdit', 'PlanDayEdit'],
     text: lines(
-      '- The plan goes round the memorized pages in a cycle, a set amount each revision day, then starts again. Each memorized page comes round once a cycle.',
+      '- The plan goes round the memorized pages in a cycle, a set amount each revision day. Each memorized page comes round once a cycle.',
       '- Automatic (the default): a number of pages a day in mushaf order, or a number of juz a day (each day is the memorized pages of its juz). Set by “Daily amount”.',
       '- A custom plan: days built or edited by hand (or made with “Create new plan”); it loops from the day it was saved. New memorized pages don’t join it by themselves.',
       '- Reverse order: An-Nas back to Al-Fatiha, covering the same pages.',
       '- The plan follows the calendar: each revision day’s pages are set by its date, whether or not anything is revised. Missed days don’t pile up or push the plan back: after missed days Home shows that day’s pages, and the missed pages are offered for three days (see Catching up). To pick up where you stopped instead, use “Jump to…”.',
       '- A new plan switches today at once; pages already revised today stay done. Saving an edit leaves today as it is, unless the edit changes today itself. A day never holds the same page twice.',
-      'How to (all from Home → today’s › → “Edit schedule”):',
+      'How to (all in “Edit schedule”: Settings → Revision → “Schedule”, or today’s ›):',
       '- Change the daily amount: “Daily amount” → Pages or Juz → “Pages per day” or “Ajzaʼ per day” → Save.',
       '- Make a new plan: “Create new plan” → “Balanced” (pages, in even days), “By Juz” (whole juz each day) or “Weakest” (Smart Tracking only: weakest and most overdue pages first) → “Pages per day” or “Juz per day”, “Today starts at” (a surah, juz or page) and “Reverse order” → Apply → Save (top right).',
       '- Edit one day: tap it (today is “Today’s revision”) → “Add or remove content” (pick surahs or ajzaʼ) or “Make rest day” → back → Save. “Add rest day” adds a day; hold a day and drag to move it; swipe to delete it. A rest day is a day of the cycle with nothing to revise, so it comes round every cycle: it isn’t a pause.',
@@ -270,7 +270,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['Settings'],
     text: lines(
       '- Settings is a short list: your name (display name, “Premium”, “Time in app”, “Sign out”, “Delete account”), then a row per page.',
-      '- Revision: “Smart Tracking”, “Keep daily amount”, “Start day at fajr”, “Memorized pages”, “Activity”. Reminders: “Revision reminders” (8:00 AM, after Asr, an hour before the day ends, until today is done; times can’t be set), “Prayer notifications”, “Friday Al-Kahf reminder”.',
+      '- Revision: “Schedule”, “Smart Tracking”, “Keep daily amount”, “Start day at fajr”, “Memorized pages”, “Activity”. Reminders: “Revision reminders” (8:00 AM, after Asr, an hour before the day ends, until today is done; times can’t be set), “Prayer notifications”, “Friday Al-Kahf reminder”.',
       '- Mushaf and Recite: “Mushaf”, and Recite’s settings. Revo AI: its switch, “What Revo can do” (its short introduction, also played before Revo is first on; Skip ends it), “Memory”, “Delete conversations”.',
       '- Downloads and storage: “Offline mushaf”, “Download over mobile data”, “Recordings”, “Back up recordings”, “Back up over mobile data”, and “Speech model” (iPhone). Appearance: “Theme”, “Accent” (Indigo, Crimson, Jade).',
       '- Help and support: “Help buttons”, “Share Revisely”, “Send feedback”, “Report a problem” (with “Add a screenshot”), “Contact support”. About: “What’s new”, “Privacy Policy”, “Terms of Service”. Testing (testers only): “Reset my data”, “Load test scenario”.',

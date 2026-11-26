@@ -9,11 +9,11 @@ import { RevoMoment } from '../whatsNew/RevoMoment';
 import { auth } from '../../lib/firebase';
 import { logger } from '../../lib/logger';
 import { navigationRef, navigateToActivityDay } from '../../navigation/navigationRef';
-import { useTabBarHeight } from '../../navigation/TabBar';
+import { useBottomGap, useTabBarHeight } from '../../navigation/TabBar';
 import { MINI_PLAYER_GAP, MINI_PLAYER_HEIGHT } from '../player/MiniPlayer';
 import { useMiniPlayer } from '../../lib/nowPlaying';
 import { refreshRevoRelease } from '../../lib/revo/release';
-import { REVO_BUTTON_ROUTES, useRevoAvailable } from '../../lib/revo/availability';
+import { REVO_BUTTON_NO_TAB_BAR, REVO_BUTTON_ROUTES, useRevoAvailable } from '../../lib/revo/availability';
 import { useRevoButtonSide } from '../../lib/revo/buttonSide';
 import { revoBackend } from '../../lib/revo/backend';
 import { dayHadActivity } from '../../lib/revo/context';
@@ -115,6 +115,7 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
   const route = useRouteName();
   const keyboard = useKeyboardUp();
   const tabBar = useTabBarHeight();
+  const bottomGap = useBottomGap();
   const { visible: miniPlayer } = useMiniPlayer();
   const { day, build, sources } = useRevoContext();
 
@@ -411,7 +412,11 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
     return () => setRevoButtonRoute(false);
   }, [buttonRoute]);
   const buttonShown = available && buttonRoute && !open && !keyboard;
-  const bottom = tabBar + (miniPlayer ? MINI_PLAYER_HEIGHT + MINI_PLAYER_GAP : 0) + REVO_BUTTON_GAP;
+  // Above the tab bar and the mini player; on Edit schedule, which has neither, just above the bottom edge.
+  const bottom =
+    route != null && REVO_BUTTON_NO_TAB_BAR.has(route)
+      ? bottomGap + REVO_BUTTON_GAP
+      : tabBar + (miniPlayer ? MINI_PLAYER_HEIGHT + MINI_PLAYER_GAP : 0) + REVO_BUTTON_GAP;
 
   return (
     <>

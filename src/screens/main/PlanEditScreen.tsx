@@ -35,8 +35,9 @@ import {
   PlanDirection,
   planStats,
   removeDay,
-  liveCustomPlanDays,
 } from '../../lib/planBuilder';
+import { liveScheduleDays, scheduleAmount } from '../../lib/scheduleSummary';
+import { useRevoFootprint } from '../../lib/revo/presence';
 import { pageCountLabel, summarizeDay } from '../../lib/planDisplay';
 import { CustomPlan, SavedPlan, User } from '../../types';
 import { GroupedRow, GroupedSection } from '../../components/plan/Grouped';
@@ -123,26 +124,12 @@ export default function PlanEditScreen() {
     [memorizedPages],
   );
 
-  const isJuzMode = !!user && user.scheduleMode === 'juz' && (user.dailyJuzCount ?? 0) > 0;
-
   // What's live right now, rotated so index 0 is today (the editor re-anchors
-  // the cycle to today on save).
-  const initialState = useMemo(() => {
-    if (user?.customPlan && user.customPlan.days.length > 0) {
-      // With a carry-over shift, the days as they are now scheduled ("Add to plan" reads the same).
-      return {
-        days: liveCustomPlanDays(user, memorizedPages, revisionDate),
-        direction: user.customPlan.direction as PlanDirection,
-      };
-    }
-    if (isJuzMode && user) {
-      return { days: buildJuzCycleDays(user, memorizedPages, revisionDate), direction: 'forward' as PlanDirection };
-    }
-    return {
-      days: user ? buildDefaultPlanDays(user, memorizedPages, 'forward', revisionDate) : [],
-      direction: 'forward' as PlanDirection,
-    };
-  }, [user, memorizedPages, isJuzMode, revisionDate]);
+  // the cycle to today on save). Settings → Revision's Schedule row reads the same days (lib/scheduleSummary).
+  const initialState = useMemo(
+    () => (user ? liveScheduleDays(user, memorizedPages, revisionDate) : { days: [], direction: 'forward' as PlanDirection }),
+    [user, memorizedPages, revisionDate],
+  );
 
   const [days, setDays] = useState<number[][]>(initialState.days);
   const [direction, setDirection] = useState<PlanDirection>(initialState.direction);
@@ -160,6 +147,8 @@ export default function PlanEditScreen() {
   // switches today to it, even where its first day matches today's.
   const [newPlan, setNewPlan] = useState(false);
   const insets = useSafeAreaInsets();
+  // Revo's button sits in a bottom corner here (REVO-25): the list's end scrolls clear of it.
+  const revoFootprint = useRevoFootprint();
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollOffset = useScrollOffset(scrollRef);
   const contentHeight = useSharedValue(0);
@@ -469,14 +458,10 @@ export default function PlanEditScreen() {
       ? t('common.juzCount', { count: user.dailyJuzCount ?? 1 })
       : pageCountLabel(user.dailyPageCapacity);
 
-  const perDay =
-    stats.minPerDay === stats.maxPerDay
-      ? pageCountLabel(stats.maxPerDay)
-      : t('plan.builder.pagesRange', { min: stats.minPerDay, max: stats.maxPerDay });
   const daysFooter = isLongCycle ? t('plan.edit.longCycle', { n: days.length }) : t('plan.edit.dayFooter');
 
   // The header (SCHED-7): how much a day, then how often each page comes round; a named plan's name above.
-  const amount = !user.customPlan && !isDirty && user.scheduleMode === 'juz' ? quotaSummary : perDay;
+  const amount = scheduleAmount(user, days, isDirty);
   const heroTitle = !hasMemorized
     ? t('plan.edit.nothingToSchedule')
     : days.length === 0
@@ -518,7 +503,7 @@ export default function PlanEditScreen() {
       <Animated.ScrollView
         ref={scrollRef}
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContentV2}
+        contentContainerStyle={[styles.scrollContentV2, revoFootprint > 0 ? { paddingBottom: spacing.huge + insets.bottom + revoFootprint } : null]}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!dragging}
         scrollEventThrottle={16}

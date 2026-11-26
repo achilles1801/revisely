@@ -12,7 +12,12 @@ jest.mock('@expo/vector-icons', () => {
   const Icon = ({ name }: { name: string }) => require('react').createElement(Text, null, `[${name}]`);
   return { Ionicons: Icon, MaterialCommunityIcons: Icon, Feather: Icon };
 });
-jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
+// Reanimated's own mock has no useFrameCallback (Edit schedule's day list scrolls near an edge with one): a frame
+// callback that never runs, as the unit tests stand it in.
+jest.mock('react-native-reanimated', () => ({
+  ...require('react-native-reanimated/mock'),
+  useFrameCallback: () => ({ setActive: () => undefined, isActive: false, callbackId: -1 }),
+}));
 jest.mock('react-native/Libraries/AppState/AppState', () => require('./appState'));
 
 // Our Cloud Functions: the app's calls go to the functions emulator (harness/functions).

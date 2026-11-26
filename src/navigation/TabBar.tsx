@@ -32,7 +32,8 @@ const TAB_LABELS: Record<string, () => string> = {
 const BAR_HEIGHT = 52;
 const BAR_PADDING = 12;
 
-function useBottomGap() {
+/** The room under the bottom edge's chrome: the home indicator's, or 14 without one. */
+export function useBottomGap() {
   const insets = useSafeAreaInsets();
   return insets.bottom > 0 ? insets.bottom : 14;
 }

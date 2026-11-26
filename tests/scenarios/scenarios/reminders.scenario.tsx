@@ -344,7 +344,8 @@ it('[SET-1] Settings opens on its first level, a row per page with what it is se
     for (const id of ['settings-account', 'settings-page-revision', 'settings-page-storage', 'settings-page-appearance', 'settings-page-help', 'settings-page-about']) {
       expect(app.screen.getByTestId(id)).toBeTruthy();
     }
-    expect(app.screen.getByTestId('settings-page-revision').props.accessibilityLabel).toBe('Revision, Smart Tracking off');
+    // Revision says the schedule's amount (Edit schedule's own words, Nov 25 2026); Smart Tracking only with nothing to schedule.
+    expect(app.screen.getByTestId('settings-page-revision').props.accessibilityLabel).toMatch(/^Revision, \d+ pages? a day$/);
     // No page's own rows on the first level.
     expect(app.screen.queryByTestId('settings-notifications')).toBeNull();
     expect(app.screen.queryByTestId('settings-delete-account')).toBeNull();

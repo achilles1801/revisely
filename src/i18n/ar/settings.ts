@@ -177,6 +177,7 @@ export const settings: NonNullable<ArStrings['settings']> = {
     qibla: 'القبلة',
   },
   revision: {
+    schedule: 'الجدول',
     smartTracking: 'التتبّع الذكي',
     smartTrackingOff: 'فعّله لتقيّم الصفحات من قائمة الجلسة وترى إحصاءات تخصّك.',
     speechModel: 'نموذج الكلام',

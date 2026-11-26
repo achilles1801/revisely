@@ -352,13 +352,16 @@ current basic sounds". October 2026's version was removed for the voices it offe
 
 - **SET-1.** Settings opens on a short first level (Majd, Nov 22 2026, the Settings audit's option B: "i feel like
   option B is way better and cleaner let's do that"): your account at the top (name, email, and Premium when the account
-  has it), then a row per page with what it is set to (Revision "Smart Tracking on", Reminders "On · 3 prayers", Prayer
+  has it), then a row per page with what it is set to (Revision the schedule's amount, "10 pages a day", or "Smart
+  Tracking on" with nothing memorized, Reminders "On · 3 prayers", Prayer
   its method and city, Mushaf and Recite the mushaf, Revo AI, Downloads and storage how much is on the phone,
   Appearance "Light · Indigo"), then Help and support, About and, for testers, Testing, and the version. Each row opens
   its own page with that group's rows and nothing else:
   - Account: Display name, Premium, Time in app, Sign out and Delete account;
-  - Revision: Smart Tracking, Keep daily amount, Start day at fajr (always here, with prayer times or without),
-    Memorized pages and Activity;
+  - Revision: Schedule first (Majd, Nov 25 2026: "as for the edit schedule i guess the most intuitive is to just put it
+    in settings"), saying what Edit schedule's header says ("10 pages a day", "Every page comes round every 11 days";
+    SCHED-7) and opening it, then Smart Tracking, Keep daily amount, Start day at fajr (always here, with prayer times or
+    without), Memorized pages and Activity;
   - Reminders: Revision reminders (the revision reminders' switch, REMIND-1), Prayer notifications and the Friday
     Al-Kahf reminder;
   - Prayer (with prayer times): Prayer times, Calculation, Qibla and Next prayer on Home;
@@ -1416,12 +1419,14 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
 
 - **REVO-25.** Revo's button is a 44pt disc (the smallest touch target, with room around it to tap), in a bottom corner
   (REVO-41), 14 above the tab bar and the mini player. It shows on Home, Activity (Overview and Insights), a day in Activity, See
-  all and Pages by strength, and nowhere else. There is no Revo on the Read tab (its list or the reader) or in a
+  all, Pages by strength and Edit schedule, and nowhere else. On Edit schedule, which has no tab bar, it sits 14 above
+  the bottom edge (Majd, Nov 25 2026, of Revo's button there: "yes the revo there is nice"); opened there, it starts as
+  from Home. There is no Revo on the Read tab (its list or the reader) or in a
   revision session, and their help sheets offer no "Ask Revo" (Majd, Nov 8 2026: "no revo in the revision
-  sessions. there should also be no revo in the mushaf tab at all"); none in an editor or Settings either. The one way
-  to Revo from the reader or a session is a finished take's summary (Majd, Nov 25 2026: "the reader stays free of Revo"):
-  its row "Ask Revo about this take" closes the summary and opens Revo with the take attached, only for an account with
-  Revo on, and never while the take still runs. The
+  sessions. there should also be no revo in the mushaf tab at all"); none in another editor or Settings either. The one
+  way to Revo from the reader or a session is a finished take's summary (Majd, Nov 25 2026: "the reader stays free of
+  Revo"): its row "Ask Revo about this take" closes the summary and opens Revo with the take attached, only for an
+  account with Revo on, and never while the take still runs. The
   screens it shows on end their lists with room for it (`useRevoFootprint`), so their last row scrolls clear of it;
   other screens leave none.
 
