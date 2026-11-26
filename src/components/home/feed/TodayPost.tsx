@@ -87,6 +87,7 @@ export function TodayPost({
   onCarryOver,
   carrying,
   quietCatchUp = false,
+  separator = true,
   ahead,
   onAhead,
   help,
@@ -128,6 +129,8 @@ export function TodayPost({
    * (catchUpLine's quiet form); else the line, then "Add to today" as a button, above it (CARRY-1).
    */
   quietCatchUp?: boolean;
+  /** The hairline under the post: only when something follows it (HOME-6: with nothing under it, Home's ground runs on). */
+  separator?: boolean;
   /** Done today: the next revision day, for the quiet line that opens it (revise ahead). */
   ahead?: { lead: string; first: number } | null;
   onAhead?: () => void;
@@ -219,6 +222,8 @@ export function TodayPost({
           ) : undefined
         }
         headerMaxScale={HEADER_MAX_SCALE}
+        separator={separator}
+        separatorTestID="today-post-separator"
         testID="today-post"
         footer={
           <>

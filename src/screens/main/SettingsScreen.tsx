@@ -130,6 +130,7 @@ import {
 import { LANGUAGE_NAMES } from '../../i18n/language';
 import { isDevVariant } from '../../lib/variant';
 import { RAMADAN_CHOICES, ramadanThemeOffered, setRamadanChoice, useRamadanChoice, useRamadanTheme, type RamadanChoice } from '../../lib/ramadanTheme';
+import { HOME_BACKGROUNDS, homeBackgroundOffered, setHomeBackground, useHomeBackground } from '../../lib/homeBackground';
 import { RAMADAN_TESTS, ramadanDates, ramadanTestLabel, ramadanWindow, setRamadanTest, useRamadanTest } from '../../lib/ramadanDates';
 import { localDay } from '../../lib/fajrBoundary';
 import { WithCrescent } from '../../components/ramadan/WithCrescent';
@@ -323,6 +324,9 @@ export default function SettingsScreen() {
   const [licences, setLicences] = useState(false);
   // Revisely Dev: Settings → Appearance → Language (src/i18n/choice.ts).
   const [languageSheet, setLanguageSheet] = useState(false);
+  // Home's background (HOME-6, with Home v3): Glow, Two glows, Glow and an ayah; kept on this phone.
+  const homeBackground = useHomeBackground();
+  const [homeBackgroundSheet, setHomeBackgroundSheet] = useState(false);
   const [chosenLanguage, setChosenLanguage] = useState<LanguageChoice>(languageChoice);
   const pickLanguage = (next: LanguageChoice) => {
     setChosenLanguage(next);
@@ -1516,6 +1520,15 @@ export default function SettingsScreen() {
                 }
               />
             ) : null}
+            {homeBackgroundOffered() ? (
+              <Row
+                icon="image-outline"
+                label={t('settings.appearance.homeBackground')}
+                value={t(`settings.appearance.homeBackgroundChoice.${homeBackground}`)}
+                onPress={() => setHomeBackgroundSheet(true)}
+                testID="settings-home-background"
+              />
+            ) : null}
           </Section>
         ) : null}
         {page === 'help' ? (
@@ -1735,6 +1748,19 @@ export default function SettingsScreen() {
           })),
         ]}
         testID="language-sheet"
+      />
+      <ActionSheet
+        visible={homeBackgroundSheet}
+        onClose={() => setHomeBackgroundSheet(false)}
+        title={t('settings.appearance.homeBackground')}
+        actions={HOME_BACKGROUNDS.map((choice) => ({
+          key: choice,
+          label: t(`settings.appearance.homeBackgroundChoice.${choice}`),
+          subtitle: t(`settings.appearance.homeBackgroundSub.${choice}`),
+          selected: homeBackground === choice,
+          onPress: () => void setHomeBackground(choice),
+        }))}
+        testID="home-background-sheet"
       />
       <ActionSheet
         visible={checkLevelSheet && strictOffered()}

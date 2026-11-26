@@ -48,6 +48,9 @@ import { RecentSection } from '../../components/activity/ActivityItemRow';
 import { useHomeV3 } from '../../lib/release/homeV3';
 import { RunningTimerChip } from '../../components/timer/RunningTimerChip';
 import { HeroGlow } from '../../components/v2/HeroGlow';
+import { HomeGround } from '../../components/home/HomeGround';
+import { HomeAyah } from '../../components/home/feed/HomeAyah';
+import { useHomeBackground } from '../../lib/homeBackground';
 import { RamadanHome, WithCrescent } from '../../components/ramadan';
 import { RamadanIntro } from '../../components/ramadan/RamadanIntro';
 import { useRamadanTheme } from '../../lib/ramadanTheme';
@@ -104,7 +107,7 @@ export default function DashboardScreen() {
   // The greeting grows like the icons beside it (1.4), but always keeps 12pt
   // from them: on an iPhone SE's narrower bar that is about 1.05.
   // (React Native ignores a cap under 1, so 1 is the floor.)
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const salamRoom = screenWidth - 2 * layoutV2.gutter - 2 * TOP_BAR_SIDE - 2 * 12;
   const salamScale = Math.max(1, Math.min(1.4, salamRoom / SALAM_INK_WIDTH));
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -119,7 +122,10 @@ export default function DashboardScreen() {
 
   const homePrefs = useHomePrefs();
   // Room for the tab bar (and the mini player) and for Revo's button.
-  const tabFootprint = useTabBarFootprint() + useRevoFootprint();
+  const tabBar = useTabBarFootprint();
+  const tabFootprint = tabBar + useRevoFootprint();
+  // Home's ground with Home v3 (HOME-6): Glow, Two glows, or Glow and an ayah (the default), kept on this phone.
+  const background = useHomeBackground();
   const [carrying, setCarrying] = useState(false);
   // "Jump to…": the sheet, and the toast after a jump (with what to put back).
   const [jumpOpen, setJumpOpen] = useState(false);
@@ -447,6 +453,11 @@ export default function DashboardScreen() {
     }
   };
 
+  // Today's ayah: its page in the mushaf, in the Read tab, as Al-Kahf opens.
+  const openAyah = (page: number) => {
+    navigation.getParent()?.navigate('Read', { screen: 'QuranReader', params: { pageNumber: page }, initial: false });
+  };
+
   const openKahf = () => {
     navigation.getParent()?.navigate('Read', {
       screen: 'QuranReader',
@@ -563,8 +574,9 @@ export default function DashboardScreen() {
 
   return (
     <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
-      <HeroGlow />
-      {ramadan ? <RamadanHome /> : null}
+      {homeV3 ? <HomeGround background={background} ramadan={ramadan} bottom={tabBar} /> : <HeroGlow />}
+      {/* With Home v3 the light falls the whole way down to the tab bar, as the ground does (HOME-6). */}
+      {ramadan ? <RamadanHome fall={homeV3 ? screenHeight - tabBar : undefined} /> : null}
       {/* The theme's one card, the first time it shows on this phone (THEME-7). */}
       {ramadan ? <RamadanIntro /> : null}
       <TopBar
@@ -583,7 +595,7 @@ export default function DashboardScreen() {
       <ScrollView
         ref={scrollRef}
         style={styles.scrollView}
-        contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad }}
+        contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad, flexGrow: homeV3 ? 1 : undefined }}
         refreshControl={
           // Transparent: an opaque pull area cut Home's glow off in a hard line.
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.secondary} style={{ backgroundColor: 'transparent' }} />
@@ -629,6 +641,8 @@ export default function DashboardScreen() {
           onCarryOver={handleCarryOver}
           carrying={carrying}
           quietCatchUp={homeV3}
+          // Home v3: the hairline only when a post follows (Al-Kahf); with nothing under Today, the ground runs on.
+          separator={!homeV3 || showKahfCard}
           ahead={aheadNext ? { lead: aheadNext.lead, first: aheadNext.plan.pages[0] } : null}
           onAhead={() =>
             aheadNext &&
@@ -670,6 +684,14 @@ export default function DashboardScreen() {
             ))}
           </RecentSection>
         )}
+        {homeV3 && background === 'ayah' ? (
+          // Today's ayah (HOME-7): after the posts, pushed to the foot of the screen when there is room, so it never
+          // sits over them.
+          <>
+            <View style={styles.grow} />
+            <HomeAyah day={revisionDay} onOpen={openAyah} />
+          </>
+        ) : null}
       </ScrollView>
       {editModal}
       <UpdateReadySheet />
@@ -717,6 +739,8 @@ const makeStyles = (theme: ThemeColors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: 'transparent' },
     scrollView: { flex: 1 },
+    // Takes the room left under the posts, so today's ayah sits at the foot of the screen (HOME-7).
+    grow: { flexGrow: 1 },
     loadingContainer: {
       flex: 1,
       justifyContent: 'center',

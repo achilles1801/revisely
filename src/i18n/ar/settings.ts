@@ -265,6 +265,17 @@ export const settings: NonNullable<ArStrings['settings']> = {
       on: 'تشغيل',
       off: 'إيقاف',
     },
+    homeBackground: 'خلفية الرئيسية',
+    homeBackgroundChoice: {
+      glow: 'توهّج',
+      glows: 'توهّجان',
+      ayah: 'توهّج وآية',
+    },
+    homeBackgroundSub: {
+      glow: 'يمتد التوهّج حتى شريط التبويب',
+      glows: 'ويرتفع توهّج أخفّ من شريط التبويب',
+      ayah: 'وآية في أسفل الرئيسية، كل يوم آية',
+    },
   },
   language: {
     row: 'اللغة',

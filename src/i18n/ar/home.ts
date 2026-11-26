@@ -54,6 +54,12 @@ export const home: NonNullable<ArStrings['home']> = {
     edit: 'تعديل الجلسة',
     delete: 'حذف الجلسة',
   },
+  ayah: {
+    place: '{{surah}} ({{sura}}:{{ayah}})',
+    withSaheeh: '{{place}} · ⁨Saheeh International⁩',
+    label: 'آية اليوم، {{place}}',
+    hint: 'يفتح صفحتها في المصحف',
+  },
   screen: {
     loadFailed: 'تعذّر تحميل بياناتك',
     saveFailed: 'تعذّر الحفظ',

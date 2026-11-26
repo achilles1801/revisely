@@ -34,6 +34,7 @@ export function ThreadRow({
   lineAbove,
   lineBelow,
   separator = true,
+  separatorTestID,
   onPress,
   accessibilityLabel,
   children,
@@ -61,6 +62,8 @@ export function ThreadRow({
   lineAbove?: boolean;
   lineBelow?: boolean;
   separator?: boolean;
+  /** The hairline's own testID, where a test looks for it (Home's Today post, HOME-6). */
+  separatorTestID?: string;
   /** The whole row opens something (its inner buttons still work). */
   onPress?: () => void;
   accessibilityLabel?: string;
@@ -190,7 +193,9 @@ export function ThreadRow({
           {body}
         </View>
       )}
-      {separator ? <View style={{ height: layoutV2.hairline, backgroundColor: palette.separator }} /> : null}
+      {separator ? (
+        <View style={{ height: layoutV2.hairline, backgroundColor: palette.separator }} testID={separatorTestID} />
+      ) : null}
     </View>
   );
 }

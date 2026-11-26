@@ -446,6 +446,21 @@ current basic sounds". October 2026's version was removed for the voices it offe
   "Mark memorized pages"; "Review session" is an outline). Al-Kahf's "Read" is an outline like "Mark as read", and the
   catch-up's "Add to today" is the accent words ending a grey line under the Today post's button (CARRY-1), never a
   button of its own. A tap anywhere on that line adds the pages.
+- **HOME-6.** (Revisely Dev) Home's background runs from the top to the tab bar as one piece, with no edge and no plain
+  block under the posts (Majd, Nov 26 2026: "connect it to the top in a way with the rest of the theme/gradient so that it
+  doesn't just look like one huge empty black rectangle", then "build a, b, and c and just have them as appearance options
+  in settings but make C the default"). Settings → Appearance → Home background, kept on this phone: "Glow" (the top's
+  glow carried down as a faint wash that eases out at the tab bar), "Two glows" (that, and a softer glow rising from the
+  tab bar: the string lights' amber with the Ramadan theme, else the accent's) and "Glow and an ayah" (Glow, with today's
+  ayah, HOME-7), the default. With the Ramadan theme the falling light falls the whole way down. The hairline under the
+  Today post shows only when a post follows it (Al-Kahf). Grey text reads at 4.5:1 or more anywhere on the wash.
+- **HOME-7.** (Revisely Dev) "Glow and an ayah" shows one ayah at the foot of Home: one a day from a short list chosen for
+  people who revise (the Qur'an and its remembrance, patience, ease, du'a; whole ayahs, none cut), in order, the same all
+  day (the revision day) and the next the day after. The Arabic in the mushaf's script, then in English Saheeh
+  International once that surah is on the phone (word for word; a verse with a footnote shows the Arabic alone), then
+  where it is, "Al-Qamar (54:17)". It sits under the posts, pushed to the foot of the screen when there is room and after
+  them when there isn't, so it never covers them, at any text size, in either direction. A tap opens its page in the
+  mushaf.
 
 ## Sheets and updates
 
