@@ -1646,6 +1646,16 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   store app's, goes with exactly the reply format it went with before the draft, and never shows a draft. Drafting never
   costs an answer: if the model's service refuses the schedule's format, Revo asks again with the store app's and
   answers, with no draft.
+- **REVO-44.** (Revisely Dev) A question about the Qur'an (what an ayah means, what happens in a passage, who someone in
+  it is, or why) is answered only from Tafsir al-Tabari, Tafsir Ibn Kathir, Tafsir al-Qurtubi and Tafsir al-Sa'di (Majd,
+  Nov 26 2026: "all answers MUST stem from those tafseer books"). Asked from the mushaf, it is about the page or the
+  held ayah (REVO-45); asked anywhere else in Revo, the ayat it is about are found first, and a question that isn't
+  about the Qur'an is answered as before. The answer comes first, then "From the tafsir": up to three books, one quote
+  each, as the book has it (the Arabic with Revo's English for it, labelled "Revo's translation", or Ibn Kathir's own
+  English words), with the ayat its passage is about; a tap shows the passage around the words, them in the page's
+  grey highlight. Every quote is the books' own text: a long answer that cites none is never shown. When the books
+  don't answer it, Revo says so in a sentence or two, and it gives no rulings. A follow-up in that conversation is
+  answered from the same ayat. Each counts as one of the day's questions (REVO-22).
 
 ## Memorizing
 

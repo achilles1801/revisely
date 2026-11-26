@@ -6,6 +6,8 @@ import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import {
   AUDIENCE,
   BuildError,
@@ -30,6 +32,7 @@ import { callCoach } from './coach/call';
 import { adminRevoStore, deleteRevoData } from './revo/admin';
 import { RevoError, handleClear, handleDayInReview, handleRevoAsk, handleSetOptions } from './revo/handler';
 import { inTestEmulator, recordedAnthropic, testNow } from './emulator';
+import { asTafsirPage, cachedLoader } from './revo/tafsir/pages';
 import { AdminError, TOTALS_AUDIENCE, consoleOrigins, handleAdminMetrics, handleAdminRevo, handleMetricsTotals, metricsFor, requireAdmin } from './metrics/admin';
 import type { Metrics } from './metrics/aggregate';
 import {
@@ -352,9 +355,23 @@ export const setCoachOptIn = onCall({ enforceAppCheck: true, maxInstances: 2 }, 
  * questions an account a revision day, the Ask coach's monthly cap and key, and a daily share of
  * the month. See functions/src/revo/.
  */
+/**
+ * Revo's copy of the tafsirs (revo/tafsir/pages.ts): the default bucket's tafsir/v1/p<page>.json, kept by the instance.
+ * In the test emulator, the pages in test-recordings/tafsir (page 379) stand in for Storage.
+ */
+const tafsirPages = cachedLoader(async (page) => {
+  if (inTestEmulator()) {
+    const file = join(__dirname, '..', 'test-recordings', 'tafsir', `p${page}.json`);
+    return asTafsirPage(JSON.parse(readFileSync(file, 'utf8')), page);
+  }
+  const [bytes] = await getStorage().bucket().file(`tafsir/v1/p${page}.json`).download();
+  return asTafsirPage(JSON.parse(bytes.toString('utf8')), page);
+});
+
 function revoDeps(caller: CallerRequest) {
   return {
     store: adminRevoStore(adminDb),
+    tafsirPages,
     call: (request: Parameters<typeof callCoach>[0]) =>
       callCoach(request, { apiKey: ANTHROPIC_COACH_KEY.value(), fetch: anthropicFor(caller.auth?.uid) }),
     now: clockOf(caller.rawRequest),

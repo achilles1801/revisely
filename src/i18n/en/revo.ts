@@ -414,4 +414,20 @@ export const revo = {
     monthPages_other: '{{month}} · {{count}} pages',
     nothingMemorizedIn: 'Nothing memorized in {{month}}',
   },
+  /** Answers from the tafsir (Revisely Dev, REVO-44): the books' words under an answer. */
+  tafsir: {
+    fromTheTafsir: 'From the tafsir',
+    book: {
+      tabari: 'Al-Tabari',
+      ibnKathir: 'Ibn Kathir',
+      ibnKathirEn: 'Ibn Kathir',
+      qurtubi: 'Al-Qurtubi',
+      saadi: 'Al-Sa’di',
+    },
+    translationNote: 'Revo’s translation · Tap for the passage',
+    englishNote: 'Ibn Kathir in English (abridged) · Tap for the passage',
+    showPassage: 'Shows the passage around these words',
+    hidePassage: 'Hides the passage',
+    textFrom: 'Text from the Quranic Universal Library (Tarteel)',
+  },
 } as const;

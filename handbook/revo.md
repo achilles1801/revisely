@@ -153,3 +153,10 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
     structured output (Citations can't be combined with it), the rules and al-Sa'di cached. `reply.ts` maps each
     citation back to the book's own text, harakat and all; an answer with no source is shown only when short (the
     books don't say). A question asked elsewhere in Revo first goes to Haiku 5.5 (`locate.ts`) for its ayat.
+  - **The answer** (`handleRevoAsk` → `answerFromTafsir`, REVO-44): in Revisely Dev, a question with `quran` (the app's
+    ayat: the mushaf's page or a held ayah), in a chat that has one, or that the Haiku step places, is answered from the
+    tafsir and counts in the 20 a day; the reply keeps `sources` (each the book's words, the passage around them, Revo's
+    sentence) and the chat its `quran`, so follow-ups use the same ayat. The app draws them under the answer
+    (`components/revo/TafsirSources`: "From the tafsir", a tap shows the passage). The emulator answers the two new
+    requests from `revo-locate.json` and `revo-tafsir.json` (hand-written in the documented shape, citations computed
+    against page 379, until Majd OKs recording them); `replies.<kind>` on an account sets one kind's reply.

@@ -16,12 +16,13 @@
  *   `mode` picks a failure instead: `rejected` (a recorded 401), `overloaded` (a 529 every attempt)
  *   or `network` (the connection fails every attempt); its `reply` (`{ text, stopReason? }`) puts
  *   that text in the recorded reply, for a test of how our code reads a given answer (a reply cut
- *   off at max_tokens, a chart on a page the model wasn't given); its `refuseSchemaWith` (a string)
- *   answers a request whose reply schema contains it with the API's 400 for a schema too complex to
- *   compile (Revisely Dev's draft, Nov 26 2026). Per account, so tests running side
- *   by side on one emulator don't change each other's answers. A reply schema is answered as the real API
- *   answered it (test-recordings/anthropic/compiled-schemas.json, made by scripts/check-revo-schemas.js): a schema
- *   it refused gets its 400, and one never checked is a malformed request.
+  *   off at max_tokens, a chart on a page the model wasn't given), or its `content` (text blocks with citations) an
+  *   answer from the tafsir; `replies.<kind>` (`revo-locate`, `revo-tafsir`, …) does the same for one kind of request
+  *   only; its `refuseSchemaWith` (a string) answers a request whose reply schema contains it with the API's 400 for a
+  *   schema too complex to compile (Revisely Dev's draft, Nov 26 2026). Per account, so tests running side
+  *   by side on one emulator don't change each other's answers. A reply schema is answered as the real API
+  *   answered it (test-recordings/anthropic/compiled-schemas.json, made by scripts/check-revo-schemas.js): a schema
+  *   it refused gets its 400, and one never checked is a malformed request.
  * - **The clock.** Scenarios and E2E flows run at a test time; a phone's clock and the server's
  *   agree, so a request may carry `X-Revisely-Test-Now` (ms) and the handler's clock follows it.
  */
@@ -29,7 +30,7 @@ import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import type { Firestore } from 'firebase-admin/firestore';
-import { ANTHROPIC_URL, ANTHROPIC_VERSION, MessagesRequest } from './coach/call';
+import { ANTHROPIC_URL, ANTHROPIC_VERSION, BlocksRequest, MessagesRequest } from './coach/call';
 
 type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -49,13 +50,15 @@ export function testNow(headers: Record<string, string | string[] | undefined> |
 }
 
 /** What a request is for: the recording that answers it. */
-export type RecordingKind = 'revo-ask' | 'revo-review' | 'coach';
+export type RecordingKind = 'revo-ask' | 'revo-review' | 'revo-tafsir' | 'revo-locate' | 'coach';
 
 export const REVIEW_INSTRUCTION = 'Write the day in review for this revision day.';
 
-export function kindOf(request: MessagesRequest): RecordingKind {
+export function kindOf(request: MessagesRequest | BlocksRequest): RecordingKind {
   const system = request.system.map((s) => s.text).join('\n');
+  if (system.startsWith("You find where in the Qur'an")) return 'revo-locate';
   if (!system.startsWith('You are Revo')) return 'coach';
+  if (system.includes('from four books of tafsir only')) return 'revo-tafsir';
   const last = request.messages[request.messages.length - 1];
   return last?.role === 'user' && typeof last.content === 'string' && last.content.endsWith(REVIEW_INSTRUCTION) ? 'revo-review' : 'revo-ask';
 }
@@ -86,7 +89,7 @@ export function schemaSha256(outputConfig: unknown): string {
   return createHash('sha256').update(JSON.stringify(outputConfig)).digest('hex');
 }
 
-export function shortRequest(request: MessagesRequest): RecordedRequest {
+export function shortRequest(request: MessagesRequest | BlocksRequest): RecordedRequest {
   return {
     model: request.model,
     max_tokens: request.max_tokens,
@@ -147,9 +150,9 @@ export function recordedAnthropic(db: Firestore, uid: string | undefined): Fetch
     if (!headers['x-api-key']) problems.push('no x-api-key');
     if (headers['anthropic-version'] !== ANTHROPIC_VERSION) problems.push(`anthropic-version ${headers['anthropic-version']}`);
     if (init.method !== 'POST') problems.push(`method ${init.method}`);
-    let request: MessagesRequest | null = null;
+    let request: BlocksRequest | null = null;
     try {
-      request = JSON.parse(String(init.body)) as MessagesRequest;
+      request = JSON.parse(String(init.body)) as BlocksRequest;
     } catch {
       problems.push('body is not JSON');
     }
@@ -166,9 +169,11 @@ export function recordedAnthropic(db: Firestore, uid: string | undefined): Fetch
     }
     const settings = await account.get();
     const mode = String(settings.get('mode') ?? 'recorded');
-    const given = settings.get('reply') as { text?: unknown; stopReason?: unknown } | undefined;
     const refuseSchemaWith = settings.get('refuseSchemaWith');
     const kind = request ? kindOf(request) : null;
+    // `replies.<kind>` is for that kind of request only (a free question asks two: where it is, then the answer).
+    const perKind = (settings.get('replies') as Record<string, unknown> | undefined)?.[kind ?? ''];
+    const given = (perKind ?? settings.get('reply')) as { text?: unknown; content?: unknown; stopReason?: unknown } | undefined;
     const answer = kind ? recording(kind) : null;
     const drift = request && answer ? driftOf(shortRequest(request), answer.request) : [];
     await account.collection('requests').add({
@@ -199,6 +204,10 @@ export function recordedAnthropic(db: Firestore, uid: string | undefined): Fetch
     if (mode === 'network') throw new TypeError('fetch failed');
     if (mode === 'overloaded') return respond(recording('error-529'));
     if (mode === 'rejected') return respond(recording('error-401'));
+    if (given && Array.isArray(given.content) && kind === 'revo-tafsir') {
+      // A cited answer from the tafsir the test wrote (text blocks with their citations).
+      return respond({ status: 200, body: { ...(answer!.body as Record<string, unknown>), content: given.content, stop_reason: 'end_turn' } });
+    }
     if (given && typeof given.text === 'string') {
       // The recorded reply with the test's text in it (usage and the rest as recorded).
       const body: Record<string, unknown> = {

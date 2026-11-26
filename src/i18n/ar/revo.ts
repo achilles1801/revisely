@@ -452,4 +452,20 @@ export const revo: NonNullable<ArStrings['revo']> = {
     monthPages_other: '{{month}} · {{count}} صفحة',
     nothingMemorizedIn: 'لا حفظ في {{month}}',
   },
+  /** إجابات من التفسير (Revisely Dev، REVO-44). */
+  tafsir: {
+    fromTheTafsir: 'من التفسير',
+    book: {
+      tabari: 'الطبري',
+      ibnKathir: 'ابن كثير',
+      ibnKathirEn: 'ابن كثير',
+      qurtubi: 'القرطبي',
+      saadi: 'السعدي',
+    },
+    translationNote: 'ترجمة ⁨Revo⁩ · اضغط لعرض النص',
+    englishNote: 'ابن كثير بالإنجليزية (مختصر) · اضغط لعرض النص',
+    showPassage: 'يعرض النص حول هذه الكلمات',
+    hidePassage: 'يخفي النص',
+    textFrom: 'النص من المكتبة القرآنية الشاملة (ترتيل)',
+  },
 };

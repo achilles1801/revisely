@@ -15,5 +15,5 @@ export const REVO_ON = 'revoOn';
 export function revoSettingsOf(get: (field: string) => unknown): RevoSettings {
   const on = get(REVO_ON);
   const optIn = on === true || (on === undefined && get('optIn') === true);
-  return { optIn, memoryOn: get('memoryOn') !== false };
+  return { optIn, memoryOn: get('memoryOn') !== false, mushafOn: get('mushafOn') !== false };
 }

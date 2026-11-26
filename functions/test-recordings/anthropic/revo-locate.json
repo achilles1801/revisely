@@ -1,0 +1,31 @@
+{
+  "recordedAt": "2026-11-26T00:00:00Z",
+  "how": "Hand-written in the shape the Messages API documents for structured outputs,; the answer for a question that is not about the Qur'an. Not yet recorded from the real API: that waits on Majd's OK for the spend (Nov 26 2026). Re-record with scripts/record-anthropic.js.",
+  "request": {
+    "model": "claude-haiku-5-5",
+    "max_tokens": 200,
+    "thinking": {
+      "type": "disabled"
+    },
+    "systemSha256": "c4e45fe3481ed6403d670adf61793d34430bb35bc3da73ac06dbddba742b3ec4",
+    "outputSchemaSha256": "685c4ff5473466b261c2db1c8ddbaf696aba07bc341f598ae61860f520856abe"
+  },
+  "status": 200,
+  "body": {
+    "model": "claude-haiku-5-5",
+    "id": "msg_standin_locate",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"about_quran\":false,\"ayat\":[]}"
+      }
+    ],
+    "stop_reason": "end_turn",
+    "usage": {
+      "input_tokens": 212,
+      "output_tokens": 12
+    }
+  }
+}

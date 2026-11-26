@@ -2,6 +2,7 @@
  * Revo's shapes, as the app and the server exchange and store them (the app's side is
  * src/lib/revo/types.ts; both follow the same contract).
  */
+import type { TafsirSource } from './tafsir/reply';
 
 export const REVO_TOTALS = [
   'memorizedPages',
@@ -425,6 +426,16 @@ export interface RevoMessage {
   attach?: { kind: RevoAttachment['kind']; label: string };
   /** Every attachment's chip, when there were several (apps after Nov 7 2026 show them all; older ones show `attach`). */
   attachments?: { kind: RevoAttachment['kind']; label: string }[];
+  /** An answer from the tafsir (Revisely Dev): the books' words it rests on, at most three. */
+  sources?: TafsirSource[];
+  /** The ayat a question about the Qur'an was about (the page in the mushaf, a held ayah, or the ones Revo found). */
+  quran?: QuranScope;
+}
+
+/** Ayat from `from` to `to` (each [surah, ayah]), which may cross into the next surah (a page can). */
+export interface QuranScope {
+  from: [number, number];
+  to: [number, number];
 }
 
 /** A message as stored: the returned fields, the owner, and on a user message the attachments themselves. */
@@ -445,6 +456,8 @@ export interface RevoChat {
   updatedAt: number;
   turns: number;
   meta?: string;
+  /** A conversation about the Qur'an: its follow-ups are answered from the tafsir on the same ayat. */
+  quran?: QuranScope;
 }
 
 export interface RevoMemoryItem {
@@ -460,6 +473,8 @@ export interface RevoMemoryItem {
 export interface RevoSettings {
   optIn: boolean;
   memoryOn: boolean;
+  /** Revo at the foot of the mushaf's pages (Revisely Dev); on unless turned off (left out: on). */
+  mushafOn?: boolean;
 }
 
 /** What Revo's reply holds once checked (reply.ts). */

@@ -25,6 +25,7 @@ import { ChartCard, PlanCard } from './RevoCards';
 import { knownAction } from '../../lib/revo/screens';
 import { refreshRevoRelease } from '../../lib/revo/release';
 import { RevoComposer } from './RevoComposer';
+import { TafsirSources } from './TafsirSources';
 import { Chips, FeedbackRow, LimitCard, ReviewRow, RevoHeader, RevoText, Typing, UserBubble } from './RevoParts';
 import { t } from '../../i18n';
 
@@ -266,6 +267,7 @@ export function RevoChat({
                 />
               ) : null}
               {m.textAfter ? <RevoText text={m.textAfter} /> : null}
+              {m.sources?.length ? <TafsirSources sources={m.sources} /> : null}
               {knownAction(m.action) ? (
                 <PlanCard
                   action={m.action}
