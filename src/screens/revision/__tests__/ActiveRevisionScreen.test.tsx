@@ -102,7 +102,11 @@ jest.mock('../../../lib/recite/quranWords', () => {
   const fixture = () => require('../../../lib/recite/__fixtures__/quranWords').quranWords();
   return { ...actual, loadQuranWords: async () => fixture(), getQuranWords: () => null };
 });
-const mockLive: { start?: Record<string, unknown>; onEvent?: (e: import('../../../lib/reciteLive/contract').LiveEvent) => void } = {};
+const mockLive: {
+  start?: Record<string, unknown>;
+  onEvent?: (e: import('../../../lib/reciteLive/contract').LiveEvent) => void;
+  sent: Record<string, unknown>[];
+} = { sent: [] };
 jest.mock('../../../lib/reciteCheck/service', () => ({
   ...jest.requireActual('../../../lib/reciteCheck/service'),
   warmUpReciteCheck: jest.fn(),
@@ -112,7 +116,7 @@ jest.mock('../../../lib/reciteLive/socket', () => ({
   socketFeed: () => (start: Record<string, unknown>, handlers: { onEvent: (e: unknown) => void }) => {
     mockLive.start = start;
     mockLive.onEvent = handlers.onEvent as never;
-    return { sendAudio: () => undefined, send: () => undefined, close: jest.fn(), audioClip: () => new Int16Array(0) };
+    return { sendAudio: () => undefined, send: (f: Record<string, unknown>) => void mockLive.sent.push(f), close: jest.fn(), audioClip: () => new Int16Array(0) };
   },
 }));
 jest.mock('../../../lib/premium', () => ({
@@ -259,6 +263,7 @@ beforeEach(() => {
   mockPager.scrolled = [];
   mockRecite.dev = false;
   mockLive.start = undefined;
+  mockLive.sent = [];
   mockLive.onEvent = undefined;
   mockRecorder = null;
   mockRecordings = [];
@@ -1028,6 +1033,24 @@ describe('ActiveRevisionScreen — Recite (Revisely Dev)', () => {
     expect(mockPager.scrolled).toEqual([380]);
     await act(() => new Promise((r) => setTimeout(r, 1700)));
     expect(mockPager.scrolled).toEqual([380]);
+  });
+
+  it('[RECITE-30] a session whose pages jump: the last ayah said shows the session’s next page, the checker looks there, and the page left is marked', async () => {
+    // A memorizer's pages jump from one surah to another: Majd's session went from 341 to 562 (J6, Nov 26 2026), and the
+    // turn to 342, a page it doesn't hold, never came.
+    await live([379, 382]);
+    fireEvent.press(screen.getByTestId('recite-mic'));
+    await flush();
+    await flush();
+    await event({ type: 'ready', take: 't1', protocol: 6 });
+    await event({ type: 'locked', w: A23, s: 27, a: 23 });
+    const last379 = words.pageRange(379)[1] - 1;
+    await event({ type: 'at', w: last379 });
+    await event({ type: 'said', upTo: last379 });
+    expect(mockPager.scrolled).toEqual([382]);
+    expect(pagesSheet().props.done.has(379)).toBe(true);
+    // Page 382 doesn't follow on: the checker is sent to find the reciter on it, as after a page turned by hand.
+    expect(mockLive.sent).toContainEqual(expect.objectContaining({ type: 'seek', w: words.pageRange(382)[0] }));
   });
 
   it('[RECITE-30] the last ayah said on the session’s last page: the end card shows, the page marked as a swipe onto it would', async () => {

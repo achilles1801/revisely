@@ -322,6 +322,12 @@ function ActiveRevisionScreenBody() {
     showPage: (page: number) => pagerRef.current?.scrollToPage(page) ?? false,
     onRecitedPast: (from: number, to: number) => recitedPastRef.current(from, to),
     onEndOfPages: (page: number) => endOfPagesRef.current(page),
+    // The session's next page, not the Qur'an's: a memorizer's pages jump from one surah to another (J6: Majd's session
+    // went from 341, Al-Hajj's end, to 562, and the take turned to 342, which it doesn't hold, so nothing turned).
+    nextPage: (page: number) => {
+      const at = shownPages.indexOf(page);
+      return at >= 0 && at + 1 < shownPages.length ? shownPages[at + 1] : null;
+    },
     openElsewhere,
     day: sessionDay,
     focused: isScreenFocused,
