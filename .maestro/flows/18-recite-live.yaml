@@ -304,14 +304,32 @@ appId: com.revisionbuddy.app
     id: recite-mode-test
 - extendedWaitUntil:
     visible:
-      id: test-me-juz-19
+      id: test-me-settings
+    timeout: 15000
+# Where from is a setting (RECITE-8): Juz 19, through the sheet's quiet Test settings; Back brings the sheet back.
+- tapOn:
+    id: test-me-settings
+- scrollUntilVisible:
+    element:
+      id: settings-test-where
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: settings-test-where
+- tapOn:
+    text: Juz 19
+- tapOn:
+    id: back
+- extendedWaitUntil:
+    visible:
+      id: test-me-start
     timeout: 15000
 - runFlow:
     file: ../subflows/shot.yaml
     env:
       NAME: rl08a-test-me-where
 - tapOn:
-    id: test-me-juz-19
+    id: test-me-start
 - extendedWaitUntil:
     visible:
       id: recite-eye-group

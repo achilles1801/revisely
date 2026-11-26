@@ -47,8 +47,10 @@ const mockUser: any = {
   fajrBoundaryEnabled: false,
 };
 const mockSaveUser = jest.fn(async () => undefined);
+// The account's pages (none unless a test memorizes some).
+let mockPages: { pageNumber: number; status: string }[] = [];
 jest.mock('../../../context/AppContext', () => ({
-  useApp: () => ({ user: mockUser, saveUser: mockSaveUser, resetOnboarding: jest.fn() }),
+  useApp: () => ({ user: mockUser, pages: mockPages, saveUser: mockSaveUser, resetOnboarding: jest.fn() }),
 }));
 const mockDeleteAccount = jest.fn(async () => undefined);
 jest.mock('../../../context/AuthContext', () => ({
@@ -418,6 +420,26 @@ describe("Settings: the checker's model (Revisely Dev's testers)", () => {
     delete mockUser.previewTester;
     await renderV2('testing');
     expect(screen.queryByTestId('settings-checker-model')).toBeNull();
+  });
+});
+
+describe('[RECITE-8] Spot tests: their choices on Mushaf and Recite', () => {
+  afterEach(() => {
+    mockDev = false;
+    mockPages = [];
+  });
+
+  it('how far (1 page at first), where from (everything, or a memorized juz) and Show progress (on at first)', async () => {
+    mockDev = true;
+    mockPages = Array.from({ length: 20 }, (_, i) => ({ pageNumber: 582 + i, status: 'memorized' }));
+    await renderV2('mushaf');
+    expect(screen.getByText('Spot tests')).toBeTruthy();
+    expect(screen.getByLabelText('1, selected')).toBeTruthy();
+    expect(screen.getByTestId('settings-test-where').props.accessibilityLabel).toBe('Where from, Everything you’ve memorized');
+    expect(screen.getByTestId('settings-test-progress').props.value).toBe(true);
+    fireEvent.press(screen.getByTestId('settings-test-where'));
+    await act(async () => {});
+    expect(screen.getByText('Juz 30')).toBeTruthy();
   });
 });
 

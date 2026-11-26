@@ -421,7 +421,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       // The main guide's line on a take in a session goes with the release's re-record of its replies.
       '- In a session, going on to the next page while reciting marks the page they finished revised, as a swipe does (✓ or “Pages” takes it back); a jump to a mark’s page marks nothing. Once a page’s last ayah is said, the next page shows and waits for them.',
       '- The bar writes each word once they’ve said it, in the order said: a repeat or going back shows again, and nothing ahead of their voice.',
-      '- “Test me” here is one spot test, not five places: a random verse, the page hidden but for it. They choose how far (½, 1, 2 or 3 pages) and carry on; it ends with “Hasbuk”, or is kept as “Stopped early”.',
+      '- “Test me” here is one spot test: a random verse, the page hidden but for it. How far, where from and “Show progress” are in Settings → Mushaf and Recite → Spot tests; it finishes a surah ending near. It ends with “Hasbuk”, or “Stopped early”.',
       '- Settings → Mushaf and Recite → “Keep my recitations as test data” (on unless turned off) keeps each take and its result for Revisely’s tests; software checks them, nobody listens. Any account that recites has it, tester or not. Settings → Testing → “Premium” turns Premium off to see Mark mistakes locked.',
       '- Settings → About → “Licences” shows, in full, the licence of the model Revisely’s recitation checking is built on (the Quran Muaalem License); it opens without a connection.',
       '- Settings → Testing → “Mistake detection model” says which model the checker runs for Recite, Mistakes and Strict (for example v7), read from the checker when Settings opens; a tap asks again.',

@@ -21,6 +21,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { getReadPalette } from '../../theme/readPalette';
 import { spacing } from '../../theme/spacing';
 import { CAPSULE_HEIGHT } from '../reader/PlayerCapsule';
+import { READER_HEADER_HEIGHT } from '../reader/ReaderFrame';
 import { UndoToast } from '../revision/UndoToast';
 import { isATake } from '../../lib/reciteLive/takeEnough';
 import { toAyahRef } from '../../lib/verses';
@@ -79,7 +80,9 @@ import { say, undoMs, useScreenReaderOn } from './a11y';
 import { navigateToActivityDay } from '../../navigation/navigationRef';
 import { markTitle } from '../../lib/reciteLive/describe';
 import { TakeSpan } from '../../lib/reciteLive/span';
-import { pickTest, type SpotTest, testFinished, testJuz, testLengthLabel } from '../../lib/reciteLive/testMe';
+import { pickTest, type SpotTest, testFinished, testJuz, testLengthLabel, testProgress } from '../../lib/reciteLive/testMe';
+import { reachedWord } from '../../lib/reciteLive/takeEnough';
+import { TestProgressLine } from './TestProgressLine';
 import { memorizedAyahs } from '../../lib/memorizedAyahs';
 import { HasbukNote } from './HasbukNote';
 import { TestMeScopeSheet } from './TestMeSheets';
@@ -167,6 +170,8 @@ export interface ReciteLayerOptions {
   onInto: (target: AyahRef) => void;
   /** Test me (places anywhere in what's memorized) in the held mic's menu: the reader's, not a session's. */
   testMe?: boolean;
+  /** Test me's "Test settings": Settings → Mushaf and Recite over this screen, Back coming back to it (RECITE-8). */
+  openTestSettings?: () => void;
   /** A past take to show on its page (Activity's Show on the page), and the screen told when showing it ends. */
   showTake?: string | null;
   onShowTakeEnd?: () => void;
@@ -196,6 +201,7 @@ export function useReciteLayer({
   dismissHint,
   onInto,
   testMe = true,
+  openTestSettings,
   showTake = null,
   onShowTakeEnd,
 }: ReciteLayerOptions) {
@@ -344,6 +350,15 @@ export function useReciteLayer({
   const [testPick, setTestPick] = useState(false);
   const memorized = useMemo(() => (liveOn ? memorizedAyahs(pages ?? []) : []), [liveOn, pages]);
   const testableJuz = useMemo(() => (liveOn && qw ? testJuz(memorized, qw) : []), [liveOn, qw, memorized]);
+  // Where a test comes from (Settings → Mushaf and Recite → Spot tests): that juz while it has somewhere to start.
+  const testFrom = reciteSettings.testJuz != null && testableJuz.some((j) => j.juz === reciteSettings.testJuz) ? reciteSettings.testJuz : null;
+  // Test me's sheet comes back after its Test settings, when the reader is in front again.
+  const reopenTest = useRef(false);
+  useEffect(() => {
+    if (!focused || !reopenTest.current) return;
+    reopenTest.current = false;
+    setTestPick(true);
+  }, [focused]);
   // The word under the cursor, once it has been there about as long as it takes to say (revealDelay: its letters at the
   // reciter's pace, 0.7–2.5 s) while the take listens: a hidden page shows it then (Majd, Nov 22 2026: "under one second
   // max"), and a held madd isn't shown before its end.
@@ -1001,6 +1016,12 @@ export function useReciteLayer({
     : baseStatus;
 
   const busy = liveStatus === 'connecting' || liveStatus === 'listening' || liveStatus === 'checking';
+  // A test's progress line (RECITE-8): the lines recited from memory out of the test's, while it runs (on unless off in
+  // Settings → Mushaf and Recite → Spot tests).
+  const testLine =
+    test && test.finished == null && qw && reciteSettings.testProgress && busy
+      ? testProgress(qw, test.spot, reachedWord(furthestWord(live.state), Object.values(live.state.marks)))
+      : null;
 
   return {
     /** The live check is on for this account and print (Revisely Dev). */
@@ -1152,13 +1173,23 @@ export function useReciteLayer({
         />
         <TestMeScopeSheet
           visible={testPick}
-          juz={testableJuz}
           pages={reciteSettings.testPages}
-          onPages={(testPages) => setReciteCheckSettings(user?.id, { testPages })}
-          onStart={startTest}
+          juz={testFrom}
+          onStart={() => startTest(testFrom)}
+          onSettings={() => {
+            // Settings over the reader; Back brings this sheet back (RECITE-8).
+            setTestPick(false);
+            reopenTest.current = true;
+            openTestSettings?.();
+          }}
           onClose={() => setTestPick(false)}
         />
-        <HasbukNote trigger={hasbuk} bottom={insets.bottom + spacing.sm + CAPSULE_HEIGHT + spacing.sm} />
+        {testLine != null ? <TestProgressLine progress={testLine} top={insets.top + (chromeShown ? READER_HEADER_HEIGHT : 0)} /> : null}
+        <HasbukNote
+          trigger={hasbuk}
+          top={insets.top + (chromeShown ? READER_HEADER_HEIGHT : 0)}
+          bottom={insets.bottom + spacing.sm + CAPSULE_HEIGHT + spacing.sm}
+        />
         {qw ? (
           <MarkCard
             marks={cardMarks}

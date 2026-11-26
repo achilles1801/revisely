@@ -105,6 +105,8 @@ export type HomeStackParamList = {
 
 export type ReadStackParamList = {
   ReadIndex: undefined;
+  /** Settings over the reader (Test me's "Test settings", RECITE-8): Back comes back to the reader. */
+  Settings: HomeStackParamList['Settings'];
   /** `highlight`: a verse found by search, highlighted on its page until the page is turned; with
    *  `last`, the verses from it to `last` (a match that runs on into the next ayah). `recite`: a voice
    *  search's one result (Revisely Dev's live check): a take starts there as the reader opens. */
@@ -211,6 +213,7 @@ function ReadStackNavigator() {
       <ReadStack.Screen name="ReadIndex" component={ReadIndexScreen} />
       <ReadStack.Screen name="QuranReader" component={QuranReaderScreen} />
       <ReadStack.Screen name="QuranSearch" component={QuranSearchScreen} />
+      <ReadStack.Screen name="Settings" component={SettingsScreen} />
     </ReadStack.Navigator>
   );
 }

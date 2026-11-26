@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useState, useEffect } from 'react';
+import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -100,6 +100,9 @@ import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { premiumErrorText, setDevPremium, usePremium } from '../../lib/premium';
 import { earlyAccessLine, useEarlyAccess } from '../../lib/earlyAccess';
 import { checkLevel, maddChecked, setReciteCheckSettings, strictOffered, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
+import { TEST_LENGTHS, type TestLength } from '../../lib/reciteLive/testLength';
+import { getJuzForPage } from '../../lib/quranData';
+import { revisablePages } from '../../lib/memorizedAyahs';
 import { ReciteCheckNotice } from '../../components/reciteCheck/ReciteCheckNotice';
 import { currentLanguage, t, formatNumber } from '../../i18n';
 import {
@@ -261,7 +264,7 @@ function AthanVoiceRow({ onPress }: { onPress: () => void }) {
 export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProp<HomeStackParamList, 'Settings'>>();
-  const { user, saveUser, resetOnboarding, pendingChanges = 0 } = useApp();
+  const { user, pages, saveUser, resetOnboarding, pendingChanges = 0 } = useApp();
   const help = useHelpButtons();
   const { firebaseUser, signOutUser, deleteAccount } = useAuth();
   const { theme, palette, themeMode, setThemeMode } = useTheme();
@@ -287,6 +290,9 @@ export default function SettingsScreen() {
   const reciteCheck = reciteLiveForAccount(user);
   const reciteCheckSettings = useReciteCheckSettings(reciteCheck ? user?.id : null);
   const [checkLevelSheet, setCheckLevelSheet] = useState(false);
+  // Spot tests' Where from: everything memorized, or one juz of it.
+  const [testWhereSheet, setTestWhereSheet] = useState(false);
+  const memorizedJuz = useMemo(() => [...new Set(revisablePages(pages ?? []).map((p) => getJuzForPage(p.pageNumber)))].sort((a, b) => a - b), [pages]);
   // About → Licences (SET-5): the recitation model's licence in full, once the model runs on the phone.
   const [licences, setLicences] = useState(false);
   // Revisely Dev: Settings → Appearance → Language (src/i18n/choice.ts).
@@ -986,6 +992,44 @@ export default function SettingsScreen() {
             ) : null}
           </Section>
         ) : null}
+        {page === 'mushaf' && reciteCheck ? (
+          // Spot tests (RECITE-8; Majd, Nov 25 2026: "test choices should be in settings but there should be a way to reach
+          // that settings page from the test me sheet but subtle"): how far, where from, and the progress line.
+          <Section title={t('settings.recite.spotTests')}>
+            <Row
+              label={t('settings.recite.testHowFar')}
+              rightSlot={
+                <PillTabs
+                  compact
+                  hug
+                  tone="ink"
+                  options={TEST_LENGTHS.map((n) => ({ value: String(n), label: n === 0.5 ? '½' : String(n) }))}
+                  value={String(reciteCheckSettings.testPages)}
+                  onChange={(v) => setReciteCheckSettings(user?.id, { testPages: Number(v) as TestLength })}
+                />
+              }
+              testID="settings-test-pages"
+            />
+            <Row
+              label={t('settings.recite.testWhere')}
+              value={reciteCheckSettings.testJuz == null ? t('reciteLive.test.everything') : t('common.juzN', { n: reciteCheckSettings.testJuz })}
+              onPress={() => setTestWhereSheet(true)}
+              testID="settings-test-where"
+            />
+            <Row
+              label={t('settings.recite.testProgress')}
+              subtitle={t('settings.recite.testProgressSub')}
+              rightSlot={
+                <SettingSwitch
+                  value={reciteCheckSettings.testProgress}
+                  onValueChange={(testProgress) => setReciteCheckSettings(user?.id, { testProgress })}
+                  accessibilityLabel={t('settings.recite.testProgress')}
+                  testID="settings-test-progress"
+                />
+              }
+            />
+          </Section>
+        ) : null}
         {page === 'revo' ? (
           <>
             {revoShown && (
@@ -1474,6 +1518,26 @@ export default function SettingsScreen() {
           },
         ]}
         testID="check-level-sheet"
+      />
+      <ActionSheet
+        visible={testWhereSheet}
+        onClose={() => setTestWhereSheet(false)}
+        title={t('settings.recite.testWhere')}
+        actions={[
+          {
+            key: 'all',
+            label: t('reciteLive.test.everything'),
+            selected: reciteCheckSettings.testJuz == null,
+            onPress: () => setReciteCheckSettings(user?.id, { testJuz: null }),
+          },
+          ...memorizedJuz.map((juz) => ({
+            key: `juz-${juz}`,
+            label: t('common.juzN', { n: juz }),
+            selected: reciteCheckSettings.testJuz === juz,
+            onPress: () => setReciteCheckSettings(user?.id, { testJuz: juz }),
+          })),
+        ]}
+        testID="test-where-sheet"
       />
       <ActionSheet
         visible={deleteSpeechOpen}

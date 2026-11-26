@@ -644,13 +644,24 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   always recite one verse or give them one verse and then the person starts from that one verse and continues"; "there
   should only be one spot test at a time"). It gives one verse at random in what the account has memorized, or in one juz
   of it, never a surah's last. The hidden page shows that verse, and the reciter recites it or carries on straight after
-  it. How far is chosen in the same sheet: half a page, 1, 2 or 3 pages (1 at first, then the last one chosen, kept on the
-  phone). The take runs to the end of the ayah about that far on, across a surah's end, through memorized ayahs only (and
-  only in the juz picked), and stops by itself there; a start with room for the whole length is taken when there is one.
-  Reaching the end says Hasbuk (حسبك): a small note above the bar for about 2 seconds that takes no touches, with a little
-  confetti, or none with Reduce Motion. Stopped before the end, it is still kept, marked stopped early; under one ayah it
-  isn't a take (RECITE-27). The take's record says it was a test, its length and whether it finished (`spotTest`). Tajweed
-  notes and Not clear count as in any take. Its result in the bar opens the take's summary, with Test me again.
+  it. Its choices live in Settings → Mushaf and Recite → Spot tests: how far (half a page, 1, 2 or 3 pages; 1 at first),
+  where from (everything memorized, or a juz of it, when it has somewhere to start) and Show progress (on at first). Test
+  me's sheet says what the test will be ("1 page · Everything you've memorized"), with Start and a quiet "Test settings"
+  that opens that page over the reader; Back comes back to the sheet (Majd, Nov 25 2026: "test choices should be in
+  settings but there should be a way to reach that settings page from the test me sheet but subtle and swiping back
+  takes u back to that page u were just on"). How far counts what is recited from memory: lines of ayat (15 a page; a
+  surah's name and basmala are no line) from the first word after the verse shown. The test ends at the end of the ayah
+  that count is reached in, and a surah's end wins within a third of the length either side, to the line above (3 lines
+  for half a page): near the end it finishes the surah, just past it it doesn't start the next (Majd, Nov 25 2026:
+  "should always finish the surah if i'm at the end of it already, we need to do proper math"; of this rule, "yes to
+  both"). Memorized ayahs only, only in the juz picked; a start with room for the whole length is taken when there is
+  one. While it runs, a line under the header fills from the right with the lines recited (Majd: "the last option with
+  the bar on the top but it should fill right to left"), unless Show progress is off. Reaching the end says Hasbuk
+  (حسبك): the page fades and the word fills the middle, in the accent, with confetti, for about 2½ seconds, taking no
+  touches (Majd: "option B the word for hasbuk"); with Reduce Motion it only fades. Stopped before the end, it is still
+  kept, marked stopped early; under one ayah it isn't a take (RECITE-27). The take's record says it was a test, its
+  length and whether it finished (`spotTest`). Tajweed notes and Not clear count as in any take. Its result in the bar
+  opens the take's summary, with Test me again.
 - **RECITE-9.** A revision session has the reader's mic, with the same takes, marks, hidden view, cards and summary;
   Test me stays in the reader. When the reciter goes on past a page to the session's next one (their place moves on to
   it, or the page's last ayah is said, RECITE-30), the take marks the page left revised, as a swipe off it does (SESS-1),

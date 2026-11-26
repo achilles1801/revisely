@@ -242,6 +242,8 @@ export default function QuranReaderScreen() {
     onInto: setIntoTarget,
     showTake: route.params.showTake ?? null,
     onShowTakeEnd: () => (navigation as { setParams?: (p: Record<string, unknown>) => void }).setParams?.({ showTake: undefined }),
+    // Settings over the reader (the Read stack has it), so Back comes back here (RECITE-8).
+    openTestSettings: () => (navigation as { push?: (name: string, params?: object) => void }).push?.('Settings', { page: 'mushaf' }),
   });
 
   // Previous / next go when the capsule is crowded (a recording, a timer) on
