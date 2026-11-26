@@ -58,6 +58,10 @@ describe('the Ramadan theme’s colours', () => {
     expect(contrast(t.mote, p.bg)).toBeGreaterThanOrEqual(2.5);
     expect(t.bulbs[1]).toBe(p.doneText);
   });
+
+  it('takes the default accent’s bulb for an accent it doesn’t know (a stand-in palette)', () => {
+    expect(ramadanV2(false, '#000000' as never).bulbs[1]).toBe(paletteV2(false, 'indigo').doneText);
+  });
 });
 
 describe('the falling light', () => {
