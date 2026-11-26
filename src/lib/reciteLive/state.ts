@@ -16,6 +16,7 @@ import {
   MarkKind,
 } from './contract';
 import type { QuranWords } from '../recite/quranWords';
+import { checkerWord, placeMark } from './markPlace';
 
 /**
  * idle: not started. connecting: waiting for the checker to be ready. listening: reciting.
@@ -198,9 +199,17 @@ export function liveStopping(state: LiveState): LiveState {
   return state.status === 'listening' || state.status === 'connecting' ? { ...state, status: 'checking', off: null } : state;
 }
 
-export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
-  const off = offAfter(state.off, e);
+/** The event with its marks as shown: an extra word on the word it was reaching for (lib/reciteLive/markPlace). */
+function placed(e: LiveEvent): LiveEvent {
+  if (e.type === 'mark') return { ...e, mark: placeMark(e.mark) };
+  if (e.type === 'done') return { ...e, result: { ...e.result, marks: e.result.marks.map((m) => placeMark(m)) } };
+  return e;
+}
+
+export function applyEvent(state: LiveState, raw: LiveEvent): LiveState {
+  const off = offAfter(state.off, raw);
   if (off !== state.off) state = { ...state, off };
+  const e = placed(raw);
   switch (e.type) {
     case 'ready': {
       const protocol = e.protocol ?? 5;
@@ -274,10 +283,11 @@ export function applyEvent(state: LiveState, e: LiveEvent): LiveState {
       // shown, and counts as it did, unless the final answer judged that word itself (its mark there replaces it).
       // A checker from protocol 8 (contract draft 10) keeps them in its final answer itself, and counts them: its marks are
       // the take's.
-      const judged = new Set(Object.values(marks).map((m) => m.w));
+      // By the checker's own places (an extra word on the word it came after), as it judged them.
+      const judged = new Set(Object.values(marks).map((m) => checkerWord(m)));
       const kept = { mistakes: 0, unclear: 0, tajweed: 0 };
       for (const m of finalKeepsLive(state) ? [] : Object.values(state.marks)) {
-        if (marks[m.id] || judged.has(m.w) || state.dismissed.includes(m.id) || beforeStart(m, start)) continue;
+        if (marks[m.id] || judged.has(checkerWord(m)) || state.dismissed.includes(m.id) || beforeStart(m, start)) continue;
         marks[m.id] = m;
         if (isUnclear(m)) kept.unclear++;
         else if (countsAsMistake(m)) kept.mistakes++;
@@ -409,7 +419,7 @@ export function marksInOrder(state: LiveState): Mark[] {
   return Object.values(state.marks).sort((a, b) => a.w - b.w || KIND_ORDER[a.kind] - KIND_ORDER[b.kind]);
 }
 
-/** The marks on one page (an added word belongs where the word before it is). */
+/** The marks on one page (an extra word is on the word it was reaching for: lib/reciteLive/markPlace). */
 export function marksOnPage(state: LiveState, words: QuranWords, page: number): Mark[] {
   const [from, to] = words.pageRange(page);
   return marksInOrder(state).filter((m) => m.w >= from && m.w < to);

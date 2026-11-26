@@ -10,7 +10,7 @@ export const reciteLive = {
     // The riwaya it checks (Recite due diligence, row 6): Hafs ʿan ʿĀṣim, the only one the model knows.
     note: 'For recitation in Hafs ʿan ʿĀṣim. Part of Premium; following along stays free. It’s AI and can make mistakes.',
   },
-  /** A mark on the page, for VoiceOver: "Wrong word, وَأُوهِيَتْ". An extra word is on the word before it. */
+  /** A mark on the page, for VoiceOver: "Wrong word, وَأُوهِيَتْ". An extra word past the end is on the word before it ("after"). */
   markLabel: '{{title}}, {{word}}',
   markLabelAfter: '{{title}}, after {{word}}',
   markHint: 'Shows what you said',
@@ -99,6 +99,8 @@ export const reciteLive = {
     skipped_other: '{{count}} skipped',
     extra_one: '{{count}} extra',
     extra_other: '{{count}} extra',
+    hesitated_one: '{{count}} hesitation',
+    hesitated_other: '{{count}} hesitations',
     harakat_one: '{{count}} wrong haraka',
     harakat_other: '{{count}} wrong harakat',
     letters_one: '{{count}} wrong letter',
@@ -202,6 +204,9 @@ export const reciteLive = {
     skippedWord: 'Skipped word',
     extraAfterEnd: 'Extra word after the end',
     extraWord: 'Extra word',
+    /** An extra word, shown on the word the reciter was reaching for (Majd, Nov 25 2026). */
+    hesitated: 'Hesitated here',
+    hesitatedLine: 'Something else was said before this word.',
     /** A wrong haraka or letter is a mistake like a wrong word (Majd, Nov 22 2026). */
     wrongShadda: 'Wrong shadda',
     wrongHaraka: 'Wrong haraka',

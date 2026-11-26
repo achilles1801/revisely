@@ -590,7 +590,13 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
 - **RECITE-2.** With Mark mistakes, a take marks two tiers (Majd, Nov 22 2026: "saying a wrong haraka or letter IS a
   word mistake"). Mistakes: a word said wrong, skipped or added, a wrong haraka and a wrong letter, each named for what
   it is ("Wrong word", "Wrong haraka", "Wrong letter") and counted as a mistake, on its card, in the bar, in the
-  summary's line ("1 wrong haraka, 1 wrong letter") and in the score, never called a slip. With Strict, tajweed notes,
+  summary's line ("1 wrong haraka, 1 wrong letter") and in the score, never called a slip. A word added before a word
+  the reciter didn't know shows on that next word, the one they were reaching for, as "Hesitated here" ("Something else
+  was said before this word."; "1 hesitation" in the summary): on the page, in the bar, on its card, in the summary, in
+  Recite's memory and Insights, past takes too, and counted as a mistake as before (Majd, Nov 25 2026: "extra word marks
+  which is essentially when the user doesn't know what the next word is should be put on the next word not on the word
+  before the stumble because the word before the stumble was said right"). One said after the end, or at a surah's end,
+  stays an extra word on the word before it. What Not a mistake sends back is the checker's own mark. With Strict, tajweed notes,
   labelled Beta wherever they show (Strict in Settings, a note's title, the summary's line, Insights) and never
   counted. There is no level that marks words without harakat and letters: Settings' levels are Mistakes and Strict
   (Beta). Strict marks ghunnah, ikhfa, qalqalah, idgham (with and without ghunnah), iqlab, a natural madd dropped, madd

@@ -1,3 +1,4 @@
+import { onNextWord } from '../../lib/reciteLive/markPlace';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import type { Rect } from '../../lib/ayahBounds';
@@ -88,7 +89,7 @@ export function RememberedTargets({ page, scale, words, memories }: { page: numb
             pointerEvents="none"
             accessible
             accessibilityRole="button"
-            accessibilityLabel={t(mark.kind === 'added' ? 'reciteMemory.pastLabelAfter' : 'reciteMemory.pastLabel', { title: markTitle(mark), word: words.uthmani(m.w) })}
+            accessibilityLabel={t(mark.kind === 'added' && !onNextWord(mark) ? 'reciteMemory.pastLabelAfter' : 'reciteMemory.pastLabel', { title: markTitle(mark), word: words.uthmani(m.w) })}
             accessibilityHint={t('reciteMemory.pastHint')}
             testID={`past-mark-${m.group}`}
             style={[styles.abs, rectStyle(markBox(words, mark), scale)]}
