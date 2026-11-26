@@ -29,6 +29,7 @@ const mockApp: any = {};
 jest.mock('../../context/AppContext', () => ({ useApp: () => mockApp }));
 
 import { EditSessionModal } from '../EditSessionModal';
+import { MushafPager } from '../MushafPager';
 import { WeaknessModal } from '../WeaknessRating';
 import { ProgressBar } from '../ProgressBar';
 import { strengthTone } from '../insights/strength';
@@ -128,8 +129,45 @@ describe('editing a session in the new design', () => {
     fireEvent.press(screen.getByLabelText('Unmark current page'));
     expect(screen.queryByTestId('round-button-active')).toBeNull();
     fireEvent.press(screen.getByLabelText('Close and save'));
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [], pagesSkipped: [1, 2] }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [], pagesSkipped: [1, 2] }), []);
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('[SESS-4] pages another session holds start checked, stay out of this log, and come back unchecked as released', async () => {
+    const onSave = jest.fn();
+    // Page 1 is this log's own; 2 and 3 were revised ahead for its day in an earlier session; 4 is a catch-up page
+    // it credits to an earlier day (SESS-7).
+    const today = { ...log, pagesRevised: [1], pagesSkipped: [], ahead: { '2026-10-19': [4] } } as RevisionLog;
+    render(
+      v2(
+        <EditSessionModal
+          visible
+          onClose={jest.fn()}
+          log={today}
+          quranData={getQuranData()}
+          sessionPages={[1, 2, 3, 4]}
+          held={[2, 3]}
+          onSave={onSave}
+          onDelete={jest.fn()}
+        />,
+      ),
+    );
+    await act(async () => {});
+    const pager = screen.UNSAFE_getByType(MushafPager);
+    for (const page of [1, 2, 3, 4]) {
+      await act(async () => pager.props.onPageChange(page));
+      expect(screen.getByLabelText('Unmark current page')).toBeTruthy();
+    }
+    // Page 3 unchecked, page 4 unchecked; page 2 left as it was.
+    await act(async () => pager.props.onPageChange(3));
+    fireEvent.press(screen.getByLabelText('Unmark current page'));
+    await act(async () => pager.props.onPageChange(4));
+    fireEvent.press(screen.getByLabelText('Unmark current page'));
+    fireEvent.press(screen.getByLabelText('Close and save'));
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ pagesRevised: [1], pagesSkipped: [3, 4], ahead: {} }),
+      [3],
+    );
   });
 
   it('its menu is the new design’s menu', async () => {

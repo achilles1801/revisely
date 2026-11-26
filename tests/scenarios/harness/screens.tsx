@@ -377,6 +377,61 @@ export class Home {
   }
 }
 
+/** A day's review (Home's Review session, components/EditSessionModal) once open: its ✓ per page, and Close and save. */
+export class Review {
+  constructor(private readonly app: OpenApp) {}
+
+  /** The page on screen. */
+  current(): number | null {
+    return pagerState().current;
+  }
+
+  /** Whether the ✓ shows the page on screen as revised (its label then offers to unmark it). */
+  isChecked(): boolean {
+    return this.app.screen.queryByLabelText('Unmark current page') != null;
+  }
+
+  /** Each page's ✓, in the review's order: page → checked. */
+  async checks(): Promise<Record<number, boolean>> {
+    const out: Record<number, boolean> = {};
+    for (const page of pagerState().props?.pages ?? []) {
+      await this.goTo(page);
+      out[page] = this.isChecked();
+    }
+    return out;
+  }
+
+  /** Turns to `page`, as a swipe would. */
+  async goTo(page: number): Promise<void> {
+    const state = pagerState();
+    if (!state.props?.pages.includes(page)) throw new Error(`the review doesn't hold page ${page}`);
+    await this.app.act(async () => {
+      state.current = page;
+      state.props?.onPageChange?.(page, state.props.pages.indexOf(page));
+    });
+  }
+
+  /** The ✓: marks or unmarks the page on screen. */
+  async toggle(): Promise<void> {
+    const { fireEvent } = this.app.mods.rtl;
+    const before = this.isChecked();
+    const el = this.app.screen.getByLabelText(before ? 'Unmark current page' : 'Mark current page as revised');
+    await this.app.act(async () => {
+      fireEvent.press(el);
+    });
+    await this.app.until(() => this.isChecked() !== before, 'the ✓ to change');
+  }
+
+  /** ✕: closes the review, saving it. */
+  async close(): Promise<void> {
+    const { fireEvent } = this.app.mods.rtl;
+    await this.app.act(async () => {
+      fireEvent.press(this.app.screen.getByLabelText('Close and save'));
+    });
+    await this.app.until(() => this.app.screen.queryByTestId('edit-session') == null, 'the review to close');
+  }
+}
+
 /** The revision session on screen, driven as a finger would. */
 export class Session {
   constructor(private readonly app: OpenApp) {}

@@ -68,6 +68,9 @@ export async function applyEntry(uid: string, entry: OutboxEntry): Promise<void>
           pagesSkipped: s.pagesSkipped,
           durationMinutes: s.durationMinutes,
           weaknessUpdates: s.weaknessUpdates,
+          // The credit for other days, when the edit changes it (SESS-4, SESS-7, AHEAD-3): left out, a page unchecked
+          // in a review or a session kept its credit on the server, and came back once the phone heard from it.
+          ...(op.ahead !== undefined ? { ahead: s.ahead ?? {} } : {}),
         }),
         uid,
       );

@@ -129,8 +129,15 @@ How the tests are made: `tests/scenarios/README.md`.
 - **SESS-4.** Home's "Done · N pages" counts the pages done that day, its own and the ones revised
   ahead in its sessions, and Review session opens exactly those (#199): the day's own pages first,
   in the day's order, then the pages revised ahead, the earliest later day first (Nov 5 2026).
-  A day done only by pages revised ahead (no session of its own) still opens its review with those
-  pages checked; saving it makes that day's session.
+  Every page in it starts checked, wherever it was revised: in the day's own session, ahead in an earlier
+  session (AHEAD-2), or caught up in the day's session for a missed day (SESS-7). Unchecking one (its ✓) takes
+  back its credit to the day: Home no longer counts it Done, and the session that revised it keeps the revision
+  (AHEAD-6). Checking it again before closing keeps it. A page revised in another session is never copied into
+  the day's own session, so it is never revised twice or saved as skipped. A day done only by pages revised
+  ahead (no session of its own) opens its review the same way; closing it with nothing unchecked saves nothing.
+  (Majd, Nov 26 2026: "seems the default rn is they're all unchecked and checking/unchecking isn't rly doing
+  anything": the ✓ read only the day's own session, so pages revised ahead the night before showed unchecked and
+  toggling them changed nothing.)
 - **SESS-5.** On the juz plan, a session whose pages revised for its own day are whole juz (one, or
   several in a row) is named by the juz, "Juz 29" or "Juz 28–29", wherever sessions are listed (Home,
   Activity); pages credited ahead to another day don't count toward it. Any other session, a juz
