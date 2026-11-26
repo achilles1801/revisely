@@ -84,6 +84,17 @@ export const SCREEN_MASKS = {
   ),
   // All activity: the session's row, its minutes.
   ...Object.fromEntries(['11-see-all', '11-see-all-dark'].map((n) => [n, sessionMinutes(777, 640)])),
+  // 23-journal-design: Home v3 (HOME-4), light and dark. The flow's account is in Chicago, so the next prayer's line
+  // sits under the top bar, as on 04-home-done.
+  ...Object.fromEntries(
+    ['23-home-light', '23-home-dark'].map((n) => [
+      n,
+      merge(revoButton, {
+        ios: [{ x: 880, y: 360, w: 242, h: 60, why: 'prayer countdown' }],
+        android: [{ x: 800, y: 279, w: 205, h: 53, why: 'prayer countdown' }],
+      }),
+    ]),
+  ),
 };
 
 // Screens left without a baseline on purpose: being redesigned now. Their captures are
