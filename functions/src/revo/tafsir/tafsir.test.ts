@@ -109,7 +109,8 @@ describe('the request', () => {
     expect(docs).toHaveLength(5);
     expect(docs.every((d) => (d.citations as { enabled: boolean }).enabled)).toBe(true);
     expect(request.output_config?.format).toBeUndefined();
-    expect(request.thinking).toEqual({ type: 'between_tools' });
+    expect(request.model).toBe('claude-haiku-5-5');
+    expect(request.thinking).toEqual({ type: 'disabled' });
     expect(request.output_config).toEqual({ effort: 'low' });
     // The rules and al-Sa'di are cached; the question comes last.
     expect(request.system[0].cache_control).toEqual({ type: 'ephemeral' });

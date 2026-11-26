@@ -152,14 +152,18 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
     (each quote comes back as exact words and their place, guaranteed real; quoted words cost no output tokens), no
     structured output (Citations can't be combined with it), the rules and al-Sa'di cached. `reply.ts` maps each
     citation back to the book's own text, harakat and all; an answer with no source is shown only when short (the
-    books don't say). A question asked elsewhere in Revo first goes to Haiku 5.5 (`locate.ts`) for its ayat.
+    books don't say). A question asked elsewhere in Revo first goes to Haiku 5.5 (`locate.ts`) for its ayat. The answer
+    is Haiku 5.5's too (`TAFSIR_MODEL`; Majd, Nov 26 2026: "haiku", from the 60-question test: the same passes as Sonnet
+    5.5 at about a twentieth of the cost), thinking off (Haiku refuses `between_tools`). The answers written ahead stay
+    Sonnet 5.5's (already paid for).
   - **The answer** (`handleRevoAsk` → `answerFromTafsir`, REVO-44): in Revisely Dev, a question with `quran` (the app's
     ayat: the mushaf's page or a held ayah), in a chat that has one, or that the Haiku step places, is answered from the
     tafsir and counts in the 20 a day; the reply keeps `sources` (each the book's words, the passage around them, Revo's
     sentence) and the chat its `quran`, so follow-ups use the same ayat. The app draws them under the answer
     (`components/revo/TafsirSources`: "From the tafsir", a tap shows the passage). The emulator answers the two new
-    requests from `revo-locate.json` and `revo-tafsir.json` (hand-written in the documented shape, citations computed
-    against page 379, until Majd OKs recording them); `replies.<kind>` on an account sets one kind's reply.
+    requests from `revo-locate.json` and `revo-tafsir.json` (real replies, `scripts/tafsir/record-replies.js`; record
+    them again when the request's model, thinking or system prompt changes); `replies.<kind>` on an account sets one
+    kind's reply.
   - **In the mushaf** (REVO-45; Majd, Nov 26 2026, reversing REVO-25's "no revo in the mushaf tab at all" for Dev):
     `RevoHost` sets `useRevoInMushaf()` (Dev, Revo on, `mushafOn` not false). The reader then puts a 30pt R
     (44pt to tap) in `ReaderFrame`'s `quietEnd`, the quiet footer's empty end slot beside the page number, in the room

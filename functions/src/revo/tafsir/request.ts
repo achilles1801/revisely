@@ -9,16 +9,22 @@
  * reads the rules and al-Sa'di from the cache.
  */
 import type { BlocksRequest } from '../../coach/call';
-import { REVO_MODEL } from '../../coach/pricing';
+import { COACH_MODEL } from '../../coach/pricing';
 import { BOOK_TITLES, TafsirSourceBook } from './books';
 import { BookPieces } from './select';
 import { PlainText, plainArabic } from './text';
 import { TafsirPassage } from './pages';
 
 /**
- * Room for the answer (about 80 words) and up to three sentences, one per book; the quoted words cost nothing. Sonnet
- * 5.5 still thinks with `between_tools` when it reads documents (823 thinking tokens in the first real recording, which
- * was cut off at 1,200), so the request also asks for low effort and leaves room.
+ * Haiku 5.5 answers (Majd, Nov 26 2026: "haiku", from the 60-question test: the same 31 of 60 passes as Sonnet 5.5, at
+ * $0.0009 an answer against $0.0164, 2.6 s against 4.2 s; scripts/tafsir/eval.js). Haiku 5.5 refuses `between_tools`,
+ * so thinking is off; the request is otherwise the one the test measured.
+ */
+export const TAFSIR_MODEL = COACH_MODEL;
+
+/**
+ * Room for the answer (about 80 words) and up to three sentences, one per book; the quoted words cost nothing. The
+ * median answer in the test was 474 tokens; the room keeps a long one from being cut off.
  */
 export const TAFSIR_MAX_TOKENS = 2000;
 
@@ -112,9 +118,9 @@ export function buildTafsirRequest(input: TafsirRequestInput): { request: Blocks
   blocks.push({ type: 'text', text: lines.join('\n') });
   return {
     request: {
-      model: REVO_MODEL,
+      model: TAFSIR_MODEL,
       max_tokens: TAFSIR_MAX_TOKENS,
-      thinking: { type: 'between_tools' },
+      thinking: { type: 'disabled' },
       output_config: { effort: 'low' },
       system: [{ type: 'text', text: TAFSIR_SYSTEM, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: blocks }],

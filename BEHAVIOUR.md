@@ -1656,7 +1656,8 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   English words), with the ayat its passage is about; a tap shows the passage around the words, them in the page's
   grey highlight. Every quote is the books' own text: a long answer that cites none is never shown. When the books
   don't answer it, Revo says so in a sentence or two, and it gives no rulings. A follow-up in that conversation is
-  answered from the same ayat. Each counts as one of the day's questions (REVO-22).
+  answered from the same ayat. Each counts as one of the day's questions (REVO-22). The answers come from
+  claude-haiku-5-5 (Majd's pick, Nov 26 2026), not Revo's own model (REVO-6).
 
 - **REVO-45.** (Revisely Dev) Revo in the mushaf (Majd, Nov 26 2026: "revo can be confirable such that in shows up in
   the mushaf itself (without blocking any text)"). With Revo on and Settings → Revo AI → "In the mushaf" on (on unless
