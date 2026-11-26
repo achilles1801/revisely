@@ -97,6 +97,7 @@ it('[ACT-35] Activity is one tab: this week and the day, then the sections as ro
   await tap(app, 'calendar-month-link');
   await app.until(() => shows(app, 'activity-month') && shows(app, 'calendar-month'), 'the month page');
   expect(text(app, 'calendar-month-title')).toBe('November 2026');
-  expect(text(app, 'preview-ring-figure')).toBe('5 of 5 revised');
+  // The page reads its own items: today's ring once they're in.
+  await app.until(() => text(app, 'preview-ring-figure') === '5 of 5 revised', 'today’s ring on the month page');
   await app.close();
 });
