@@ -867,10 +867,15 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   says. A word the checker takes back comes off the line. Without those
   frames, or outside Revisely Dev, the bar is RECITE-28's.
 - **RECITE-30.** (Revisely Dev) Once the page's last ayah is said (the checker's `said` reaches its last word, the
-  reciter's place on that page), the next page shows at once and the take waits there for the reciter, whether or not
+  reciter's place on that page, or the place has stayed on that last word for 1.5 s: in a noisy room `said` often doesn't
+  reach it until the next word is begun; Majd, Nov 26 2026, "homie it didn't work"), the next page shows at once and the take waits there for the reciter, whether or not
   they have begun it; it doesn't wait for a word of the next page (Majd, Nov 25 2026: "when i finish reciting the last
   verse it should automatically take me to the next page and wait for me to begin if i didn't already"). Once per page.
-  Never past a session's last page, and never in a stretch with an end of its own (Test me), which stops there instead.
+  The next page is the screen's: in a session, the session's next page, which need not follow on in the Qur'an (a
+  memorizer's pages jump from one surah to another: Majd's session of Nov 26 2026 went from 341, Al-Hajj's end, to 562,
+  and nothing turned). One that doesn't follow on waits as after a page turned by hand: the checker looks for the reciter
+  on it. On a session's last page the next thing is its end card: it shows, and the page is marked as a swipe onto it
+  would mark it. Never in a stretch with an end of its own (Test me), which stops there instead.
 - **RECITE-31.** The first amber mark explains itself, once (Majd, Nov 25 2026, from a friend's "Whats does yellow
   mean?"). The first time a take shows an amber mark (a wrong haraka or letter, or Not clear) on an account on this phone,
   the bar's line says what amber is, with an amber dot, in place of the words for 6 seconds or until that take ends

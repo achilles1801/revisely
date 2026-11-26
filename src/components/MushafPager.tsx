@@ -138,6 +138,8 @@ export interface MushafPagerHandle {
    *  pages in between were skipped, not read. False if the page isn't in
    *  `pages`. */
   scrollToPage: (pageNumber: number) => boolean;
+  /** Go to the end card, as if swiped onto it (onReachEnd fires, not as a swipe). False without one. */
+  scrollToEnd: () => boolean;
 }
 
 interface PageItemProps {
@@ -536,8 +538,16 @@ export const MushafPager = forwardRef<MushafPagerHandle, MushafPagerProps>(funct
         }
         return true;
       },
+      scrollToEnd: () => {
+        if (endCard == null || pages.length === 0) return false;
+        draggedRef.current = false;
+        dragStartsRef.current = [];
+        hasAutoScrolledRef.current = true;
+        scrollToIndex(pages.length);
+        return true;
+      },
     }),
-    [pages, onPageChange, scrollToIndex],
+    [pages, onPageChange, scrollToIndex, endCard],
   );
 
   const hasEnd = endCard != null;

@@ -214,6 +214,9 @@ function turnTrail(step: string, data: Record<string, unknown>): void {
   Sentry.addBreadcrumb({ category: 'recite', message: `page turn: ${step}`, data });
 }
 
+/** How long the reciter's place stays on a page's last word before the next page shows anyway (RECITE-30). */
+export const LAST_WORD_WAIT_MS = 1500;
+
 /**
  * A live take on the reader (Revisely Dev): the microphone streams to the checker's `/live`, and its events become
  * what the page and the bar show (lib/reciteLive/state). The reciter's place turns the page; a page turned by hand
@@ -226,6 +229,8 @@ export function useLiveRecitation({
   currentPage,
   onShowPage,
   onRecitedPast,
+  onEndOfPages,
+  nextPage,
   recordingDay = null,
   onRecordingSaved,
   connect = defaultConnect,
@@ -240,6 +245,13 @@ export function useLiveRecitation({
    * checker first found the reciter, or to a page shown by hand, isn't one.
    */
   onRecitedPast?: (from: number, to: number) => void;
+  /** The last ayah of `page` said, and the screen holds no next page (a session's last page): RECITE-30's end. */
+  onEndOfPages?: (page: number) => void;
+  /**
+   * The page the screen shows after `page` (null: its pages end there). By default the Qur'an's next. A session's next
+   * page need not follow on: a memorizer's pages jump from one surah to another (Majd's run …, 340, 341, then 562).
+   */
+  nextPage?: (page: number) => number | null;
   /** The revision day a take's audio belongs to (null: nothing is kept). */
   recordingDay?: string | null;
   /** A take's audio was saved (its record notes it). */
@@ -348,6 +360,10 @@ export function useLiveRecitation({
   onShowPageRef.current = onShowPage;
   const onRecitedPastRef = useRef(onRecitedPast);
   onRecitedPastRef.current = onRecitedPast;
+  const onEndOfPagesRef = useRef(onEndOfPages);
+  onEndOfPagesRef.current = onEndOfPages;
+  const nextPageRef = useRef(nextPage);
+  nextPageRef.current = nextPage;
   const [owner] = useState(() => `recite-live-${Math.random().toString(36).slice(2)}`);
   const recordingRef = useRef<TakeRecording | null>(null);
   const [recording, setRecording] = useState(false);
@@ -1143,7 +1159,7 @@ export function useLiveRecitation({
   const turnTo = useCallback((page: number, recitedPast: boolean) => {
     const from = pageRef.current;
     turningTo.current = page;
-    // A page the screen doesn't hold (past a session's last page) isn't turned to: nothing to wait for.
+    // A page the screen doesn't hold (past a session's pages: the reciter read on where it doesn't go) isn't turned to.
     const shown = onShowPageRef.current(page);
     turnTrail('jump', { from, to: page, recitedPast, shown: shown !== false });
     if (shown === false) {
@@ -1152,6 +1168,32 @@ export function useLiveRecitation({
     }
     if (recitedPast && page > from) onRecitedPastRef.current?.(from, page);
   }, []);
+  /**
+   * `page`'s last ayah said: the screen's next page shows and waits for the reciter (RECITE-30), and `page` counts as
+   * recited past. One that follows on in the Qur'an is the take's own turn: the checker reads on into it. One that doesn't
+   * shows as a page turned by hand would, and the checker looks for the reciter on it: a session's next page after a
+   * jump (J6: Majd's session went 341 then 562, so the turn to 342, a page it doesn't hold, never came). No next page: the
+   * end of what the screen holds (a session's end card).
+   */
+  const turnPast = useCallback(
+    (page: number) => {
+      const next = nextPageRef.current ? nextPageRef.current(page) : page < 604 ? page + 1 : null;
+      if (next == null) {
+        turnTrail('end', { page });
+        onEndOfPagesRef.current?.(page);
+        return;
+      }
+      if (next === page + 1) {
+        turnTo(next, true);
+        return;
+      }
+      // Not the take's own turn (turningTo stays unset): the page-change effect below sends the checker to look there.
+      const shown = onShowPageRef.current(next);
+      turnTrail('jump', { from: page, to: next, recitedPast: true, shown: shown !== false });
+      if (shown !== false) onRecitedPastRef.current?.(page, next);
+    },
+    [turnTo],
+  );
   useEffect(() => {
     if (!live || state.cursor == null || !words) {
       if (!live) cursorPage.current = null;
@@ -1163,7 +1205,7 @@ export function useLiveRecitation({
     if (page !== pageRef.current) turnTo(page, was === pageRef.current);
   }, [live, state.cursor, words, turnTo]);
 
-  // The page's last ayah said: the page turns to the next one and waits for the reciter (RECITE-30; Majd, Nov 25 2026:
+  // The page's last ayah said: the screen's next page shows and waits for the reciter (turnPast, RECITE-30; Majd, Nov 25 2026:
   // "when i finish reciting the last verse it should automatically take me to the next page and wait for me to begin if
   // i didn't already"). Once, as `said` reaches that last word with the reciter's place on the page. A stretch with an
   // end of its own (a spot test) stops there instead.
@@ -1180,9 +1222,25 @@ export function useLiveRecitation({
     if (saidUpTo >= last - 1) {
       turnTrail('said', { page, said: saidUpTo, last, before, cursor: state.cursor, cursorPage: cursorPage.current });
     }
-    if (cursorPage.current !== page || page >= 604) return;
-    if (saidUpTo >= last && (before == null || before < last)) turnTo(page + 1, true);
-  }, [live, saidUpTo, words, turnTo]);
+    if (cursorPage.current !== page) return;
+    if (saidUpTo >= last && (before == null || before < last)) turnPast(page);
+  }, [live, saidUpTo, words, turnPast]);
+
+  // The same once the reciter's place has stayed on the page's last word for LAST_WORD_WAIT_MS: in a noisy room the
+  // checker's `said` often never reaches that word until the next one is begun (its voice detector stays on), so the page
+  // waited for the next ayah (Majd, Nov 26 2026, in a revision session: "homie it didn't work"). On the lab's golden
+  // takes with background babble, `said` reached the page's last word before the place moved on at 40 of 218 page ends;
+  // at 168 of the rest the place sat on that word, 3 s at the median.
+  const cursorNow = state.cursor;
+  useEffect(() => {
+    if (!live || cursorNow == null || !words || endWord.current != null) return;
+    const page = pageRef.current;
+    if (cursorPage.current !== page || cursorNow !== words.pageRange(page)[1] - 1) return;
+    const timer = setTimeout(() => {
+      if (pageRef.current === page) turnPast(page);
+    }, LAST_WORD_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [live, cursorNow, words, turnPast]);
 
   // A spot test stops by itself once the checker has decided its last word (reciting on would add "Added after the
   // end" marks).

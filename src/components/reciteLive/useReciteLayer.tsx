@@ -157,6 +157,10 @@ export interface ReciteLayerOptions {
   showPage: (page: number) => boolean;
   /** The take turned the page because the reciter went on past it (useLiveRecitation's onRecitedPast; a session credits it). */
   onRecitedPast?: (from: number, to: number) => void;
+  /** The last ayah said on the last page the screen holds (useLiveRecitation's onEndOfPages; a session's end card). */
+  onEndOfPages?: (page: number) => void;
+  /** The page the screen shows after `page` (useLiveRecitation's nextPage; a session's next page, which need not follow on). */
+  nextPage?: (page: number) => number | null;
   /** A place the pager doesn't hold (a similar ayah, a past take, a test's place): the reader opens there. */
   openElsewhere?: (place: ElsewherePlace) => void;
   /** The revision day: a take's recording and its record in Recite's memory are the day's. */
@@ -197,6 +201,8 @@ export function useReciteLayer({
   currentPage,
   showPage,
   onRecitedPast,
+  onEndOfPages,
+  nextPage,
   openElsewhere,
   day,
   focused,
@@ -277,6 +283,8 @@ export function useReciteLayer({
     currentPage,
     onShowPage: showPage,
     onRecitedPast,
+    onEndOfPages,
+    nextPage,
     recordingDay: day,
     onRecordingSaved: (saved) => noteTakeRecording.current(saved),
   });
