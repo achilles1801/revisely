@@ -90,12 +90,12 @@ async function schemasAsked(uid: string): Promise<string[]> {
 /** The store app's reply schema, the one every answer before the draft was given with (replySchema.test.ts). */
 const STORE_SCHEMA = 'ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e';
 
-/** 108 pages, 10 a day (every page comes round every 11 days), on Wednesday 25 Nov; Revo opened from Edit schedule. */
-async function openFromEditSchedule(): Promise<{ app: OpenApp; uid: string }> {
+/** 108 pages (or these), 10 a day (every page comes round every 11 days), on Wednesday 25 Nov; Revo opened from Edit schedule. */
+async function openFromEditSchedule(memorized: number[] = pagesRange(1, 108)): Promise<{ app: OpenApp; uid: string }> {
   setZone(ZONES.amman);
   setNow('2026-11-25 10:00');
   const phone = new Phone('phone');
-  let app = await newAccount(phone, { memorized: pagesRange(1, 108), user: { dailyPageCapacity: 10 } });
+  let app = await newAccount(phone, { memorized, user: { dailyPageCapacity: 10 } });
   const uid = app.uid;
   await app.untilSynced();
   await app.close();
@@ -284,5 +284,48 @@ it('[REVO-43] Revo opened anywhere but Edit schedule asks with the store app’s
   expect(await schemasAsked(uid)).toEqual([STORE_SCHEMA]);
   expect((await lastAsked(uid)).question).not.toContain('Asked from Edit schedule');
   expect(app.screen.queryByTestId('revo-plan')).toBeNull();
+  await app.close();
+});
+
+it('[REVO-43] the draft’s daily amount: Daily amount shows it, not saved; Save keeps it with the days, and Edit schedule agrees after', async () => {
+  // Majd, Nov 26 2026, of a draft whose header said "7–8 pages a day" over a Daily amount of "10 pages": "update the daily
+  // amount row if it decides to change the amount because it can be confusing to the user if the two disagree".
+  // 110 pages, 8 a day with Fridays off: 14 days of pages fit in three weeks of 6, so 110 pages over 18 days, 6 or 7 a day.
+  const { app, uid } = await openFromEditSchedule(pagesRange(1, 110));
+  await modelSays(uid, {
+    text: '8 pages a day with Fridays off fits.',
+    chart: null,
+    textAfter: null,
+    action: { kind: 'draftSchedule', title: 'A new schedule', detail: '8 pages a day with Fridays off', mode: 'pages', perDay: 8, restDays: [5], reverse: false },
+    remember: [],
+    title: 'A lighter schedule',
+    chips: [],
+  });
+  await tap(app, 'revo-chip-Make it lighter');
+  await tap(app, 'revo-plan-do');
+  await app.until(() => app.screen.queryByTestId('plan-revo-draft') != null, 'the draft in Edit schedule');
+
+  // The header and Daily amount say the same, the amount marked as Revo's draft; nothing is saved yet.
+  expect(app.screen.getAllByText('6–7 pages a day').length).toBeGreaterThan(0);
+  expect(app.screen.getByTestId('plan-quota').props.accessibilityLabel).toBe('Daily amount, 6–7 pages, Revo’s draft, not saved yet');
+  expect((await getServerDoc(`users/${uid}`))?.dailyPageCapacity).toBe(10);
+
+  // Save keeps the amount with the days: the most on a day, 7.
+  await tap(app, 'plan-save');
+  await app.untilSynced();
+  await app.until(() => app.screen.queryByTestId('plan-revo-draft') == null, 'the draft saved');
+  const saved = await getServerDoc(`users/${uid}`);
+  expect(saved?.dailyPageCapacity).toBe(7);
+  expect(saved?.scheduleMode ?? 'pages').toBe('pages');
+  expect(app.app.user?.customPlan?.days).toHaveLength(21);
+
+  // Opened again, Edit schedule's header and Daily amount still agree.
+  const nav = app.mods.require<{ navigation: { current: any } }>('./navRef').navigation;
+  await app.act(async () => {
+    nav.current.navigate('Home', { screen: 'PlanEdit' });
+  });
+  await app.until(() => app.screen.queryByTestId('plan-edit') != null, 'Edit schedule');
+  expect(app.screen.getAllByText('6–7 pages a day').length).toBeGreaterThan(0);
+  expect(app.mods.rtl.within(app.screen.getByTestId('plan-quota')).getByText('6–7 pages')).toBeTruthy();
   await app.close();
 });

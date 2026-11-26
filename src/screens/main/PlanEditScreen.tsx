@@ -38,7 +38,8 @@ import {
 } from '../../lib/planBuilder';
 import { liveScheduleDays, scheduleAmount } from '../../lib/scheduleSummary';
 import { useRevoFootprint } from '../../lib/revo/presence';
-import { draftScheduleDays, validDraft } from '../../lib/revo/scheduleDraft';
+import { draftScheduleDays, validDraft, type ScheduleDraft } from '../../lib/revo/scheduleDraft';
+import { isDevVariant } from '../../lib/variant';
 import { pageCountLabel, summarizeDay } from '../../lib/planDisplay';
 import { CustomPlan, SavedPlan, User } from '../../types';
 import { GroupedRow, GroupedSection } from '../../components/plan/Grouped';
@@ -239,15 +240,14 @@ export default function PlanEditScreen() {
   // ---- Save ------------------------------------------------------------------
   // Today switches to the new schedule at once: pages already revised today
   // stay on it (done), then the new day's pages (lib/planChange).
-  const saveSchedule = async (customPlan: CustomPlan | null, isNewPlan: boolean) => {
+  const saveSchedule = async (customPlan: CustomPlan | null, isNewPlan: boolean, amount: Partial<User> = {}) => {
     if (!user) return;
     setSaving(true);
     try {
-      const next: User = userWithNewSchedule(
-        user,
-        { customPlan },
-        { revisionDate, memorized: memorizedPages, logs, newPlan: isNewPlan },
-      );
+      const next: User = {
+        ...userWithNewSchedule(user, { customPlan }, { revisionDate, memorized: memorizedPages, logs, newPlan: isNewPlan }),
+        ...amount,
+      };
       await saveUser(next);
       haptics.success();
       leave();
@@ -265,7 +265,14 @@ export default function PlanEditScreen() {
     // that anchor so saving an edit doesn't silently undo it.
     const liveStart = user.customPlan?.cycleStartDate;
     if (!newPlan && liveStart && liveStart > plan.cycleStartDate) plan.cycleStartDate = liveStart;
-    saveSchedule(plan, newPlan);
+    // REVO-43: Revo's draft saves its daily amount with its days, so Daily amount, Home and Revo agree afterwards: pages a
+    // day as the most on any of its days (a round with rest days spreads them, "7–8 pages"), or its juz a day.
+    const amount: Partial<User> = !revoDraft
+      ? {}
+      : revoDraft.mode === 'juz'
+        ? { scheduleMode: 'juz', dailyJuzCount: revoDraft.perDay }
+        : { scheduleMode: 'pages', dailyPageCapacity: Math.max(1, planStats(days).maxPerDay) };
+    saveSchedule(plan, newPlan, amount);
   };
 
   // ---- Day actions -------------------------------------------------------------
@@ -316,22 +323,30 @@ export default function PlanEditScreen() {
   }, []);
   const applyBuiltPlan = useCallback((next: number[][], dir: PlanDirection) => startPlan(next, dir), [startPlan]);
 
-  // A schedule Revo drafted (REVO-43): its days, not saved. Only Save keeps them; Back leaves the schedule as it was.
-  const [revoDraft, setRevoDraft] = useState(false);
+  // A schedule Revo drafted (REVO-43): its days and its daily amount, not saved. Only Save keeps them; Back leaves the
+  // schedule and the amount as they were.
+  const [revoDraft, setRevoDraft] = useState<ScheduleDraft | null>(null);
+  const openDraft = useCallback(
+    (draft: ScheduleDraft) => {
+      if (!user) return false;
+      const built = draftScheduleDays(user, memorizedPages, revisionDate, draft);
+      if (built.days.length === 0) return false;
+      startPlan(built.days, built.direction);
+      setRevoDraft(draft);
+      return true;
+    },
+    [user, memorizedPages, revisionDate, startPlan],
+  );
   useEffect(() => {
     const draft = route.params?.draft;
     if (!draft || !user) return;
     navigation.setParams({ draft: undefined });
-    if (!validDraft(draft)) return;
-    const built = draftScheduleDays(user, memorizedPages, revisionDate, draft);
-    if (built.days.length === 0) return;
-    startPlan(built.days, built.direction);
-    setRevoDraft(true);
-  }, [route.params?.draft, user, memorizedPages, revisionDate, navigation, startPlan]);
+    if (validDraft(draft)) openDraft(draft);
+  }, [route.params?.draft, user, navigation, openDraft]);
   // Saved (or put back as it was): no longer a draft. Only on the change, so the open that fills it in keeps it.
   const wasDirty = useRef(isDirty);
   useEffect(() => {
-    if (wasDirty.current && !isDirty) setRevoDraft(false);
+    if (wasDirty.current && !isDirty) setRevoDraft(null);
     wasDirty.current = isDirty;
   }, [isDirty]);
 
@@ -402,14 +417,26 @@ export default function PlanEditScreen() {
   // ---- Automatic schedule / quota ---------------------------------------------------
   const presentQuota = () => {
     if (!user) return;
-    setTempMode(user.scheduleMode ?? 'pages');
-    setTempCapacity(user.dailyPageCapacity);
-    setTempJuzCount(user.dailyJuzCount ?? 1);
+    // Revo's draft open (REVO-43): the sheet starts from its amount, and changes the draft, not the setting.
+    const draft = revoDraft && isDirty ? revoDraft : null;
+    setTempMode(draft?.mode ?? user.scheduleMode ?? 'pages');
+    setTempCapacity(draft?.mode === 'pages' ? Math.max(1, planStats(days).maxPerDay) : user.dailyPageCapacity);
+    setTempJuzCount(draft?.mode === 'juz' ? draft.perDay : (user.dailyJuzCount ?? 1));
     quotaSheetRef.current?.present();
   };
 
   const handleSaveQuota = useCallback(async () => {
     if (!user || saving) return;
+    // Revo's draft open (REVO-43): the amount is part of the draft. Its days are built again with it (its rest days and
+    // order kept, rest days on pages only), and nothing is saved until Save.
+    if (revoDraft && isDirty) {
+      const perDay = tempMode === 'juz' ? tempJuzCount : tempCapacity;
+      const next: ScheduleDraft = { mode: tempMode, perDay, reverse: revoDraft.reverse, ...(tempMode === 'pages' && revoDraft.restDays ? { restDays: revoDraft.restDays } : {}) };
+      openDraft(next);
+      quotaSheetRef.current?.dismiss();
+      haptics.selection();
+      return;
+    }
     const updatedUser = {
       ...user,
       dailyPageCapacity: tempCapacity,
@@ -436,7 +463,7 @@ export default function PlanEditScreen() {
     } finally {
       setSaving(false);
     }
-  }, [user, saving, tempCapacity, tempMode, tempJuzCount, saveUser, isDirty, memorizedPages, direction, haptics]);
+  }, [user, saving, tempCapacity, tempMode, tempJuzCount, saveUser, isDirty, memorizedPages, direction, haptics, revoDraft, openDraft]);
 
   const handleUseAutomatic = () => {
     if (!user || saving) return;
@@ -477,6 +504,7 @@ export default function PlanEditScreen() {
     user.scheduleMode === 'juz'
       ? t('common.juzCount', { count: user.dailyJuzCount ?? 1 })
       : pageCountLabel(user.dailyPageCapacity);
+  const draftOpen = revoDraft != null && isDirty;
 
   const daysFooter = isLongCycle ? t('plan.edit.longCycle', { n: days.length }) : t('plan.edit.dayFooter');
 
@@ -542,7 +570,7 @@ export default function PlanEditScreen() {
           {hasMemorized && days.length > 0 ? (
             <Text style={[typeV2.body, styles.heroLineV2, { color: palette.secondary }]}>{repeats}</Text>
           ) : null}
-          {revoDraft && isDirty ? (
+          {draftOpen ? (
             <View style={[styles.revoDraftV2, { backgroundColor: palette.accentSubtle }]} testID="plan-revo-draft" accessibilityLiveRegion="polite">
               <Ionicons name="sparkles-outline" size={18} color={palette.accentText} />
               <Text style={[typeV2.meta, styles.revoDraftTextV2, { color: palette.accentText }]}>{t('plan.edit.revoDraft')}</Text>
@@ -566,7 +594,11 @@ export default function PlanEditScreen() {
             <GroupedRow
               title={t('plan.edit.dailyAmount')}
               icon="speedometer-outline"
-              value={quotaSummary}
+              // REVO-43 (Revisely Dev): with Revo's draft open, or a custom plan, the amount its days hold, in the header's
+              // words ("7–8 pages"), so the two never disagree; the draft's is marked as not saved.
+              value={draftOpen || (isDevVariant() && user.customPlan && days.length > 0) ? amount : quotaSummary}
+              subtitle={draftOpen ? t('plan.edit.amountDraft') : undefined}
+              accessibilityLabel={draftOpen ? `${t('plan.edit.dailyAmount')}, ${amount}, ${t('plan.edit.amountDraft')}` : undefined}
               accessory="chevron"
               onPress={presentQuota}
               testID="plan-quota"
@@ -760,7 +792,9 @@ export default function PlanEditScreen() {
           <GroupedSection
             divider={false}
             footer={
-              user.customPlan
+              draftOpen
+                ? t('plan.edit.amountDraftFooter')
+                : user.customPlan
                 ? t('plan.edit.amountCustomFooter')
                 : tempMode === 'pages'
                   ? t('plan.edit.pagesFooter')

@@ -213,6 +213,47 @@ describe('the schedule in the new design', () => {
     expect(mockApp.saveUser).not.toHaveBeenCalled();
   });
 
+  it('[REVO-43] the draft’s daily amount: Daily amount shows it, marked not saved; its sheet changes the draft; Save keeps it with the days', async () => {
+    // Majd, Nov 26 2026: "update the daily amount row if it decides to change the amount because it can be confusing to
+    // the user if the two disagree". 30 pages, 4 a day with Fridays off: 8 days of pages fit in two weeks of 6, so the 30
+    // pages spread over 12 days, 2 or 3 a day.
+    mockRoute.params = { draft: { mode: 'pages', perDay: 4, restDays: [5] } };
+    await mount(<PlanEditScreen />);
+    expect(screen.getByText('2–3 pages a day')).toBeTruthy();
+    expect(screen.getByTestId('plan-quota').props.accessibilityLabel).toBe('Daily amount, 2–3 pages, Revo’s draft, not saved yet');
+    expect(screen.getByText('Revo’s draft, not saved yet')).toBeTruthy();
+
+    // Its sheet starts from the draft (3, the most on a day) and changes the draft, not the setting: 6 a day with Fridays
+    // off is one week, 5 a day.
+    fireEvent.press(screen.getByTestId('plan-quota'));
+    const sheet = screen.getAllByTestId('gorhom-sheet').find((s) => within(s).queryByText('Part of Revo’s schedule: it changes the days, and nothing is saved until you tap Save.'))!;
+    for (let i = 0; i < 3; i++) fireEvent.press(within(sheet).getByLabelText('Increase pages per day'));
+    await act(async () => {
+      fireEvent.press(within(sheet).getByText('Save'));
+    });
+    expect(mockApp.saveUser).not.toHaveBeenCalled();
+    expect(screen.getByText('5 pages a day')).toBeTruthy();
+    expect(screen.getByText('Every page comes round every 7 days')).toBeTruthy();
+    expect(screen.getByTestId('plan-quota').props.accessibilityLabel).toBe('Daily amount, 5 pages, Revo’s draft, not saved yet');
+
+    // Save keeps the amount with the days: Daily amount, Home and Revo agree afterwards.
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('plan-save'));
+    });
+    const saved = (mockApp.saveUser as jest.Mock).mock.calls.at(-1)[0] as User;
+    expect(saved.customPlan?.days).toHaveLength(7);
+    expect(saved).toMatchObject({ scheduleMode: 'pages', dailyPageCapacity: 5 });
+  });
+
+  it('[REVO-43] a juz draft saves its juz a day; with no draft the amount is left as it was', async () => {
+    mockRoute.params = { draft: { mode: 'juz', perDay: 1 } };
+    await mount(<PlanEditScreen />);
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('plan-save'));
+    });
+    expect((mockApp.saveUser as jest.Mock).mock.calls.at(-1)[0]).toMatchObject({ scheduleMode: 'juz', dailyJuzCount: 1, dailyPageCapacity: baseUser.dailyPageCapacity });
+  });
+
   it('a v2 top bar: back, the title, Save as a solid pill (off until something changes)', async () => {
     await mount(<PlanEditScreen />);
     expect(flat(screen.getByTestId('plan-edit').props.style).backgroundColor).toBe(palette.bg);

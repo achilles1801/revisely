@@ -118,6 +118,8 @@ export const plan: NonNullable<ArStrings['plan']> = {
     yourDays: 'أيامك',
     dayFooter: 'اضغط على يوم لتغيير ما فيه.',
     amountCustomFooter: 'تبقى أيام خطتك كما هي. لاستخدام هذا المقدار، اختر «إنشاء خطة جديدة».',
+    amountDraft: 'مسودة ⁨Revo⁩، لم تُحفظ بعد',
+    amountDraftFooter: 'جزء من جدول ⁨Revo⁩: يغيّر الأيام، ولا يُحفظ شيء حتى تضغط حفظ.',
     notInPlan: 'ليست في خطتك',
     notInPlanFooter: 'خطتك المخصّصة لا تضيف الصفحات الجديدة وحدها. أضفها حيث تناسب، ثم اضغط «حفظ».',
     add: 'إضافة',
