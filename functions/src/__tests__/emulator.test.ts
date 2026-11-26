@@ -4,6 +4,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { buildCoachRequest } from '../coach/prompt';
 import { buildAskRequest, buildReviewRequest } from '../revo/prompt';
+import { buildLocateRequest } from '../revo/tafsir/locate';
 import { compiledSchemas, driftOf, inTestEmulator, kindOf, Recording, schemaSha256, shortRequest, testNow } from '../emulator';
 import type { RevoContext } from '../revo/types';
 
@@ -88,6 +89,13 @@ describe('the recorded replies', () => {
       const sha = schemaSha256(request.output_config);
       expect({ sha, compiled: schemas[sha]?.compiled ?? 'never checked' }).toEqual({ sha, compiled: true });
     }
+  });
+
+  // [REVO-44] Revisely Dev asks every question first whether it's about the Qur'an, with a schema of its own (Haiku 5.5).
+  it('[REVO-44] the Qur’an check’s reply schema is one the real API compiled', () => {
+    const request = buildLocateRequest('Why was Musa afraid of the snake?');
+    const sha = schemaSha256({ format: request.output_config?.format });
+    expect({ sha, compiled: compiledSchemas()[sha]?.compiled ?? 'never checked', model: compiledSchemas()[sha]?.model }).toEqual({ sha, compiled: true, model: request.model });
   });
 
   it.each(Object.keys(requests) as (keyof typeof requests)[])('%s is a Messages API reply with text and usage', (name) => {

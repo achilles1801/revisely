@@ -107,6 +107,8 @@ export interface CompiledSchema {
   compiled: boolean;
   /** The API's own words when it refused it. */
   error?: string;
+  /** How it was checked, when not by check-revo-schemas.js (a real reply recorded with it). */
+  how?: string;
 }
 
 export function compiledSchemas(): Record<string, CompiledSchema> {

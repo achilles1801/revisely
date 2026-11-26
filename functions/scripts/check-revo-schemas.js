@@ -28,6 +28,7 @@ const { ANTHROPIC_URL, ANTHROPIC_VERSION } = require(path.join(lib, 'coach/call.
 const { REVO_MODEL } = require(path.join(lib, 'coach/pricing.js'));
 const { REVO_OUTPUT_CONFIG, REVO_SCHEDULE_OUTPUT_CONFIG } = require(path.join(lib, 'revo/replySchema.js'));
 const { schemaSha256 } = require(path.join(lib, 'emulator.js'));
+const { LOCATE_MODEL, buildLocateRequest } = require(path.join(lib, 'revo/tafsir/locate.js'));
 
 const FILE = path.join(__dirname, '..', 'test-recordings', 'anthropic', 'compiled-schemas.json');
 const DRY = process.argv.includes('--dry');
@@ -41,6 +42,8 @@ if (!key && !DRY) {
 const SCHEMAS = [
   { name: 'every question but the schedule\'s', outputConfig: REVO_OUTPUT_CONFIG, model: REVO_MODEL },
   { name: 'Edit schedule in Revisely Dev', outputConfig: REVO_SCHEDULE_OUTPUT_CONFIG, model: REVO_MODEL },
+  // Revisely Dev asks it first for every question: is it about the Qur'an, and where (REVO-44).
+  { name: 'is it about the Qur’an (tafsir/locate.ts)', outputConfig: buildLocateRequest('x').output_config, model: LOCATE_MODEL },
 ];
 
 (async () => {
