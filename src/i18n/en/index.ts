@@ -21,6 +21,7 @@ import { prayer } from './prayer';
 import { premium } from './premium';
 import { preview } from './preview';
 import { qibla } from './qibla';
+import { ramadan } from './ramadan';
 import { read } from './read';
 import { reader } from './reader';
 import { recite } from './recite';
@@ -62,6 +63,7 @@ export const en = {
   premium,
   preview,
   qibla,
+  ramadan,
   read,
   reader,
   recite,

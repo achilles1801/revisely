@@ -1762,14 +1762,34 @@ shows up once and they must go through it and complete it … just the main stuf
 
 ## The Ramadan theme (Revisely Dev)
 
-- **THEME-1.** Settings → Appearance → Ramadan theme (on until turned off, kept on that phone, not the account) dresses
+- **THEME-1.** Settings → Appearance → Ramadan theme (kept on that phone, not the account; when it shows: THEME-2) dresses
   the app for Ramadan and changes nothing it does (Majd, Nov 21 2026): on Home, light falling softly over the glow,
   lanterns hanging in the top bar's empty side (gone while the timer chip shows there) and a crescent by the greeting;
   string lights along the tab bar. None of it is drawn over the mushaf page, a revision session's page or a Recite take,
-  none of it takes a touch or is read by VoiceOver, and with Reduce Motion it stays still. The store app has no switch
-  and never shows it (`lib/ramadanTheme`, `components/ramadan`). The Settings row is just its name and the switch. It is
-  on by default (Majd, Nov 22 2026: "yes ramadan theme as default for dev too"), and at the next release
-  (`RAMADAN_THEME_RELEASED`, Majd, Nov 21 2026) every app has it, the same way.
+  none of it takes a touch or is read by VoiceOver, and with Reduce Motion it stays still. The store app has no row and
+  never shows it (`lib/ramadanTheme`, `components/ramadan`). At the next release (`RAMADAN_THEME_RELEASED`, Majd, Nov 21
+  2026) every app has it, the same way.
+- **THEME-2.** (Revisely Dev) The Ramadan theme row offers Auto, On and Off (Majd, Nov 26 2026, his pick of the v2 mocks).
+  - Auto shows the theme from two weeks before 1 Ramadan through the third day of Eid. Under the row it says when, for
+    example "On from 25 January to 11 March".
+  - On shows it every day, and Off never.
+  - A phone that hasn't chosen is On in Revisely Dev (Majd, Nov 22 2026: "yes ramadan theme as default for dev too"), and
+    Auto in every app once the theme is released.
+  - A choice made before Auto existed is kept: on is On, off is Off.
+  - The dates are the first day of fasting and Eid al-Fitr. They come from config/app's `ramadan`, read once a launch
+    (set with `set-app-config.js --ramadan`), so they can be corrected after the moon sighting without an update. The
+    phone keeps the last good dates it read, and ignores two days that aren't 29 or 30 apart.
+  - Until a read answers, the Umm al-Qura calendar's expected dates stand: 8 February and 9 March 2027, the same as the
+    site.
+  - Revisely Dev only: Settings → Testing → Ramadan dates puts today at any point in the month (75 or 10 days before,
+    day 1, 12, 23 or 29, Eid, after Eid). It sets the dates around today, so anything counted from the phone's own days
+    still counts them, and the choice is kept on the phone.
+- **THEME-3.** (Revisely Dev) While the theme shows, Settings has a crescent beside its title, and the Appearance row
+  reads "Light · Indigo · Ramadan" (the theme, the accent, then Ramadan).
+- **THEME-4.** (Revisely Dev) While the theme shows, every sheet and menu (`v2/Sheet`, `v2/ActionSheet`) has string
+  lights along its top edge, inside its rounded corners, as the tab bar does (Majd, Nov 26 2026: "sheets i want option
+  B"). The reader and a revision session draw none of it, nor does a sheet opened over them, so the mushaf page and a
+  Recite take stay plain. The lights are drawn the same way as the tab bar's (THEME-1).
 
 ## Recite on the phone (Revisely Dev)
 

@@ -2918,14 +2918,15 @@ describe('what friends asked, Nov 25 2026', () => {
     // Kept on the account at once, so it's never shown again, even if the app closes now.
     const { parseReciteCheckSettings } = jest.requireActual('../../../lib/reciteCheck/settings');
     await settle(async () => expect(parseReciteCheckSettings(await AsyncStorage.getItem('@revisely_recite_check:v1:u1')).amberExplained).toBe(true));
-    // About 6 seconds, then the words again.
-    await settle(() => expect(screen.queryByTestId('recite-note')).toBeNull(), 9000);
+    // About 6 seconds (AMBER_NOTE_MS, a real timer), then the words again. The wait leaves room for a loaded CI runner,
+    // where this file runs about five times slower than on a laptop (it failed there with 9 s, Nov 26 2026).
+    await settle(() => expect(screen.queryByTestId('recite-note')).toBeNull(), 20000);
     await event({ type: 'at', w: A23 + 9 });
     expect(screen.getByTestId('recite-words')).toBeTruthy();
     await amber('h2', A23 + 8);
     await flush();
     expect(screen.queryByTestId('recite-note')).toBeNull();
-  }, 20000);
+  }, 40000);
 
   const finishedTake = async () => {
     await startTake('check');

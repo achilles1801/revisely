@@ -67,6 +67,7 @@ import { pagesToUnrevise, removeRevisedPages, removeRoundPages } from '../../lib
 import { dismissPresentedRevisionReminders } from '../../lib/reminders/sync';
 import { t, formatNumber } from '../../i18n';
 import { backIcon } from '../../i18n/direction';
+import { RamadanQuiet } from '../../components/ramadan/quiet';
 
 const NO_PAGES: number[] = [];
 
@@ -82,7 +83,16 @@ const FOOTER_HEIGHT = CAPSULE_HEIGHT + spacing.sm;
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'ActiveRevision'>;
 
+/** Wrapped so the Ramadan theme never dresses its page or the sheets over it (THEME-1, THEME-4). */
 export default function ActiveRevisionScreen() {
+  return (
+    <RamadanQuiet>
+      <ActiveRevisionScreenBody />
+    </RamadanQuiet>
+  );
+}
+
+function ActiveRevisionScreenBody() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProp<HomeStackParamList, 'ActiveRevision'>>();
   const { user, pages, logs, updatePages, addLog, updateLog, loadData, error } = useApp();

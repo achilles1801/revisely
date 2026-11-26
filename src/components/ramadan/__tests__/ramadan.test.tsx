@@ -1,4 +1,4 @@
-// The Ramadan theme's pieces (BEHAVIOUR.md THEME-1; the scenario ramadanTheme covers Home and Settings): its colours
+// The Ramadan theme's pieces (BEHAVIOUR.md THEME-1, THEME-2; the scenario ramadanTheme covers Home and Settings): its colours
 // for every accent, the falling light's and the bulbs' maths, and the tab bar's string lights only in Revisely Dev with
 // the switch on.
 
@@ -23,13 +23,17 @@ import { TabBar } from '../../../navigation/TabBar';
 import {
   __resetRamadanThemeForTests,
   __setRamadanReleasedForTests,
+  getRamadanChoice,
   loadRamadanTheme,
   RAMADAN_THEME_KEY,
   RAMADAN_THEME_RELEASED,
+  ramadanChoiceOf,
   ramadanThemeOffered,
   ramadanThemeOn,
-  setRamadanTheme,
+  ramadanThemeShows,
+  setRamadanChoice,
 } from '../../../lib/ramadanTheme';
+import { __resetRamadanDatesForTests } from '../../../lib/ramadanDates';
 import { ACCENTS, paletteV2, ramadanV2 } from '../../../theme/v2';
 import { MOTES, moteOpacity } from '../RamadanSky';
 import { bulbBrightness, scallops } from '../StringLights';
@@ -53,6 +57,10 @@ describe('the Ramadan theme’s colours', () => {
     expect(contrast(t.gold, p.bg)).toBeGreaterThanOrEqual(3);
     expect(contrast(t.mote, p.bg)).toBeGreaterThanOrEqual(2.5);
     expect(t.bulbs[1]).toBe(p.doneText);
+  });
+
+  it('takes the default accent’s bulb for an accent it doesn’t know (a stand-in palette)', () => {
+    expect(ramadanV2(false, '#000000' as never).bulbs[1]).toBe(paletteV2(false, 'indigo').doneText);
   });
 });
 
@@ -122,65 +130,91 @@ async function tabBar() {
   await act(async () => {});
 }
 
-describe('[THEME-1] the switch', () => {
+describe('[THEME-1] [THEME-2] the choice: Automatic, On or Off', () => {
   beforeEach(async () => {
     __resetRamadanThemeForTests();
+    __resetRamadanDatesForTests();
     mockVariant.dev = true;
     await AsyncStorage.clear();
   });
 
-  it('is on in Revisely Dev until this phone turns it off, and the choice is kept on this phone', async () => {
-    // Majd, Nov 22 2026: "yes ramadan theme as default for dev too". Nothing stored is no choice: on.
+  it('is On in Revisely Dev until this phone chooses, and the choice is kept on this phone', async () => {
+    // Majd, Nov 22 2026: "yes ramadan theme as default for dev too". Nothing stored is no choice: On.
+    expect(getRamadanChoice()).toBe('on');
     expect(ramadanThemeOn()).toBe(true);
     await loadRamadanTheme();
     expect(ramadanThemeOn()).toBe(true);
-    await setRamadanTheme(false);
-    expect(await AsyncStorage.getItem(RAMADAN_THEME_KEY)).toBe('0');
+    await setRamadanChoice('off');
+    expect(await AsyncStorage.getItem(RAMADAN_THEME_KEY)).toBe('off');
     __resetRamadanThemeForTests();
     await loadRamadanTheme();
     expect(ramadanThemeOn()).toBe(false);
-    await setRamadanTheme(true);
-    expect(await AsyncStorage.getItem(RAMADAN_THEME_KEY)).toBe('1');
+    await setRamadanChoice('auto');
     __resetRamadanThemeForTests();
     await loadRamadanTheme();
-    expect(ramadanThemeOn()).toBe(true);
+    expect(getRamadanChoice()).toBe('auto');
+  });
+
+  it('reads the old switch’s 1 and 0 as On and Off', async () => {
+    expect(ramadanChoiceOf('1')).toBe('on');
+    expect(ramadanChoiceOf('0')).toBe('off');
+    expect(ramadanChoiceOf('auto')).toBe('auto');
+    expect(ramadanChoiceOf('maybe')).toBeNull();
+    await AsyncStorage.setItem(RAMADAN_THEME_KEY, '0');
+    await loadRamadanTheme();
+    expect(getRamadanChoice()).toBe('off');
+  });
+
+  it('Automatic shows it from two weeks before 1 Ramadan through Eid’s third day', () => {
+    // The expected dates for 1448: 1 Ramadan on 8 February 2027, Eid on 9 March.
+    expect(ramadanThemeShows('2026-11-25', 'auto')).toBe(false);
+    expect(ramadanThemeShows('2027-01-24', 'auto')).toBe(false);
+    expect(ramadanThemeShows('2027-01-25', 'auto')).toBe(true);
+    expect(ramadanThemeShows('2027-03-11', 'auto')).toBe(true);
+    expect(ramadanThemeShows('2027-03-12', 'auto')).toBe(false);
+    // On is always, Off never.
+    expect(ramadanThemeShows('2026-11-25', 'on')).toBe(true);
+    expect(ramadanThemeShows('2027-02-20', 'off')).toBe(false);
   });
 
   it('the store app never shows it before the release, whatever is stored', async () => {
     mockVariant.dev = false;
     expect(ramadanThemeOffered()).toBe(false);
-    await AsyncStorage.setItem(RAMADAN_THEME_KEY, '1');
+    await AsyncStorage.setItem(RAMADAN_THEME_KEY, 'on');
     await loadRamadanTheme();
     expect(ramadanThemeOn()).toBe(false);
+    expect(ramadanThemeShows('2027-02-20', 'on')).toBe(false);
   });
 
   it('is Revisely Dev’s until the release flips RAMADAN_THEME_RELEASED (the release PR changes this line)', () => {
     expect(RAMADAN_THEME_RELEASED).toBe(false);
   });
 
-  it('once released, every app offers it, on unless this phone turned it off', async () => {
+  it('once released, every app offers it, Automatic unless this phone chose', async () => {
     mockVariant.dev = false;
     __setRamadanReleasedForTests(true);
     expect(ramadanThemeOffered()).toBe(true);
     await loadRamadanTheme();
-    expect(ramadanThemeOn()).toBe(true);
-    await setRamadanTheme(false);
+    expect(getRamadanChoice()).toBe('auto');
+    expect(ramadanThemeShows('2027-02-20')).toBe(true);
+    expect(ramadanThemeShows('2026-11-25')).toBe(false);
+    await setRamadanChoice('off');
     __resetRamadanThemeForTests();
     __setRamadanReleasedForTests(true);
     await loadRamadanTheme();
-    expect(ramadanThemeOn()).toBe(false);
+    expect(ramadanThemeShows('2027-02-20')).toBe(false);
   });
 
-  it('puts string lights on the tab bar in Revisely Dev only, with the switch on', async () => {
+  it('puts string lights on the tab bar in Revisely Dev only, while it shows', async () => {
     await act(async () => {
-      await setRamadanTheme(false);
+      await setRamadanChoice('off');
     });
     await tabBar();
     expect(screen.queryByTestId('ramadan-lights', HIDDEN)).toBeNull();
     screen.unmount();
 
     await act(async () => {
-      await setRamadanTheme(true);
+      await setRamadanChoice('on');
     });
     await tabBar();
     const lights = screen.getByTestId('ramadan-lights', HIDDEN);

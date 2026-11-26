@@ -498,13 +498,12 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     ),
   },
   {
-    // Majd, Nov 21 2026: a Ramadan look to try, Revisely Dev only.
+    // Majd, Nov 21 2026: a Ramadan look to try, Revisely Dev only; Nov 26: Auto, sheets' lights.
     title: 'The Ramadan theme',
-    covers: ['THEME-1'],
+    covers: ['THEME-1', 'THEME-2', 'THEME-3', 'THEME-4'],
     routes: ['Settings', 'Dashboard'],
     text: lines(
-      '- Settings → Appearance → “Ramadan theme” adds falling light, lanterns and a crescent at the top of Home and string lights along the tab bar. It changes nothing the app does. On until turned off there, on that phone only.',
-      '- Never over the Qur’an’s pages, a session’s pages or a Recite take.',
+      '- Settings → Appearance → “Ramadan theme”: Auto (two weeks before Ramadan to three days after Eid), On or Off. Decoration only, never on the Qur’an’s pages, a session or a take.',
     ),
   },
   {

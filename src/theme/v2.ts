@@ -790,7 +790,8 @@ export function ramadanV2(isDark: boolean, accent: AccentName = DEFAULT_ACCENT):
     mote: b.mote,
     moteOpacity: b.moteOpacity,
     wire: b.wire,
-    // doneText: the accent itself for every accent (Jade's accentText is ink).
-    bulbs: [b.amber, paletteV2(isDark, accent).doneText, b.third],
+    // doneText: the accent itself for every accent (Jade's accentText is ink). An accent it doesn't know (a test's stand-in
+    // palette) takes the default's, so a bulb never goes missing.
+    bulbs: [b.amber, paletteV2(isDark, ACCENTS.includes(accent) ? accent : DEFAULT_ACCENT).doneText, b.third],
   };
 }

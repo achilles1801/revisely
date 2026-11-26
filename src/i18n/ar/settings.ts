@@ -253,6 +253,13 @@ export const settings: NonNullable<ArStrings['settings']> = {
     light: 'فاتح',
     dark: 'داكن',
     ramadan: 'سمة رمضان',
+    ramadanValue: 'رمضان',
+    ramadanAuto: 'تظهر من {{from}} إلى {{to}}',
+    ramadanChoice: {
+      auto: 'تلقائي',
+      on: 'تشغيل',
+      off: 'إيقاف',
+    },
   },
   language: {
     row: 'اللغة',
@@ -308,6 +315,7 @@ export const settings: NonNullable<ArStrings['settings']> = {
     version: 'ريفايزلي · ⁨v{{version}}⁩',
   },
   testing: {
+    ramadanDates: 'تواريخ رمضان',
     reminders: 'التذكيرات المجدولة',
     remindersSub: 'ما سيُظهره هذا الهاتف، ومتى',
     remindersNone: 'لا توجد تذكيرات مجدولة: التذكيرات متوقفة، أو هذا الهاتف لا يسمح بالإشعارات.',
