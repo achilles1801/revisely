@@ -387,9 +387,9 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['ATHAN-1', 'ATHAN-2', 'ATHAN-3', 'ATHAN-4'],
     routes: ['Settings', 'PrayerNotifications', 'AthanVoice'],
     text: lines(
-      '- On iPhone, a prayer’s notification can play the athan: Settings → Prayer → “Prayer notifications” → a prayer that is on → “Sound” → “Athan”, then “Voice” to choose it for that prayer. The same sheet opens from the prayer times on Home: tap a prayer’s name there. Settings → Prayer → “Athan voice” chooses one voice for every prayer set to the athan. Fajr uses the voice’s own Fajr athan when it has one; a voice with Fajr in its name is used for Fajr only.',
+      '- On iPhone, a prayer’s notification can play the athan: Settings → Prayer → “Prayer notifications” → a prayer that is on → “Sound” → “Athan”, then “Voice” to choose it for that prayer. Tapping a prayer’s name in Home’s prayer times opens it too. Settings → Prayer → “Athan voice” chooses one voice for every prayer set to the athan. Fajr uses the voice’s Fajr athan if it has one; a voice named for Fajr is for Fajr only.',
       '- An iPhone notification can play only the first 30 seconds of an athan. A reminder before the prayer keeps the standard tone. Silent mode and Focus still apply.',
-      '- A voice downloads when chosen (the play button listens to it first); until it has, that prayer plays the standard tone. Android doesn’t have the athan yet.',
+      '- A voice downloads when chosen (play listens first); until then, the standard tone. Android doesn’t have the athan yet.',
       '- To hear the whole athan, tap the prayer’s notification within 15 minutes of it: the app opens and plays that voice’s whole athan from the start, with “Stop”. It needs a connection, and it stops if the app is left.',
     ),
   },
@@ -554,8 +554,8 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['ACCOUNT-4', 'ACCOUNT-5', 'ACCOUNT-6', 'ACCOUNT-7'],
     routes: ['Dashboard', 'Settings'],
     text: lines(
-      '- Settings → your name: your picture (Google’s, or your initial) in Premium’s ring, latest badge, pages revised (every revision counts), longest streak and time in Revisely. Home’s picture opens it. “Name and email” has “Delete account”.',
-      '- Badges for pages revised, two a tier: Bronze 10/50, Silver 100/250, Gold 500/1K, Platinum 2.5K/5K, Diamond 10K/25K, Emerald 50K/100K. The bar opens “Badges”. A new one shows once, on the end card or Account.',
+      '- Settings → your name: picture (or initial) in Premium’s ring, latest badge, pages revised (each revision counts), longest streak, time in Revisely. Home’s picture opens it. “Name and email” has “Delete account”.',
+      '- Badges by pages revised, two a tier: Bronze 10/50, Silver 100/250, Gold 500/1K, Platinum 2.5K/5K, Diamond 10K/25K, Emerald 50K/100K. The bar opens “Badges”. A new one shows once (end card or Account).',
     ),
   },
 ];
