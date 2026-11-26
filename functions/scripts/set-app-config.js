@@ -59,6 +59,13 @@
  *                                server or auto (the phone when it has the engine and
  *                                passed its speed check). Unset: the server. A take the
  *                                engine can't run goes to the server whatever this says.
+ *   ramadan.start / .eid         The Ramadan theme's dates (src/lib/ramadanDates.ts,
+ *                                THEME-2): the first day of fasting and Eid al-Fitr,
+ *                                YYYY-MM-DD, 29 or 30 days apart. Correct them after
+ *                                the moon sighting. Unset: the Umm al-Qura calendar's
+ *                                expected dates in the app. Phones read it once a
+ *                                launch where the theme is offered, and keep the
+ *                                last good value.
  *
  * Run from the functions/ directory:
  *   GOOGLE_APPLICATION_CREDENTIALS=~/secrets/revisely-admin.json \
@@ -80,6 +87,7 @@
  *   ... node scripts/set-app-config.js --recite-where auto       # phone, server, auto, or unset
  *   ... node scripts/set-app-config.js --early-access on         # every new account gets Premium (PREM-1)
  *   ... node scripts/set-app-config.js --early-access off        # paid Premium: new accounts stop; grants stay
+ *   ... node scripts/set-app-config.js --ramadan 2027-02-08,2027-03-09   # 1 Ramadan, 1 Shawwal (or unset)
  *
  * A minimum above what the store has now is refused without --force: the app
  * would ignore it until the store caught up, then block everyone below it at once.
@@ -150,6 +158,15 @@ function parseArgs(argv) {
       }
       opts.reciteWhere = v;
     }
+    else if (a === '--ramadan') {
+      const v = argv[++i];
+      const m = /^(\d{4}-\d{2}-\d{2}),(\d{4}-\d{2}-\d{2})$/.exec(v || '');
+      const days = m ? (Date.parse(`${m[2]}T00:00:00Z`) - Date.parse(`${m[1]}T00:00:00Z`)) / 86400000 : NaN;
+      if (v !== 'unset' && !(days === 29 || days === 30)) {
+        throw new Error(`--ramadan needs START,EID 29 or 30 days apart, like 2027-02-08,2027-03-09, or unset (got ${v ?? 'nothing'})`);
+      }
+      opts.ramadan = v === 'unset' ? 'unset' : { start: m[1], eid: m[2] };
+    }
     else if (a === '--force') opts.force = true;
     else if (a === '--clear-min') opts.clearMin = true;
     else if (flags[a]) {
@@ -175,7 +192,7 @@ async function main() {
   } catch (err) {
     console.error(err.message);
     console.error(
-      'Usage: node scripts/set-app-config.js --show | [--min-ios V] [--min-android V] [--latest-android V [--latest-android-code N]] [--clear-min] [--revo testers|everyone|off] [--revo-patterns on|off] [--revo-recite on|off] [--whats-new on|off] [--recite-check on|off] [--recite-where phone|server|auto|unset] [--early-access on|off] [--force]',
+      'Usage: node scripts/set-app-config.js --show | [--min-ios V] [--min-android V] [--latest-android V [--latest-android-code N]] [--clear-min] [--revo testers|everyone|off] [--revo-patterns on|off] [--revo-recite on|off] [--whats-new on|off] [--recite-check on|off] [--recite-where phone|server|auto|unset] [--early-access on|off] [--ramadan START,EID|unset] [--force]',
     );
     process.exit(1);
   }
@@ -206,6 +223,7 @@ async function main() {
           reciteCheck: data.reciteCheckOff === true ? 'off' : 'on',
           reciteWhere: data.recite?.where ?? 'server (unset)',
           earlyAccess: data.earlyAccess === true ? 'on' : 'off',
+          ramadan: data.ramadan ?? 'the app\'s expected dates (unset)',
         },
         null,
         2,
@@ -214,7 +232,7 @@ async function main() {
     console.log(`App Store has ${store ?? 'unknown'}.`);
   };
   const changes = opts.minIos || opts.minAndroid || opts.latestAndroid || opts.clearMin || opts.revo || opts.revoPatterns || opts.revoRecite || opts.whatsNew
-    || opts.reciteCheck || opts.earlyAccess;
+    || opts.reciteCheck || opts.reciteWhere || opts.earlyAccess || opts.ramadan;
   if (opts.show || !changes) {
     show(current);
     return;
@@ -253,6 +271,7 @@ async function main() {
   if (opts.reciteCheck) update.reciteCheckOff = opts.reciteCheck === 'off' ? true : FieldValue.delete();
   if (opts.reciteWhere) update['recite.where'] = opts.reciteWhere === 'unset' ? FieldValue.delete() : opts.reciteWhere;
   if (opts.earlyAccess) update.earlyAccess = opts.earlyAccess === 'on';
+  if (opts.ramadan) update.ramadan = opts.ramadan === 'unset' ? FieldValue.delete() : opts.ramadan;
   if (opts.clearMin && (opts.minIos || opts.minAndroid)) {
     console.error('--clear-min with a minimum: pick one.');
     process.exit(1);

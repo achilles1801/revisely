@@ -20,7 +20,7 @@ import { AppInfo } from '../../components/settings/AppInfo';
 import { useDesign } from '../../design/DesignContext';
 import { ACCENT_LABELS, layoutV2, radiusV2, typeV2 } from '../../theme/v2';
 import { AccentSetting } from '../../components/settings/AccentPicker';
-import { TopBar } from '../../components/v2/TopBar';
+import { BarTitle, TopBar } from '../../components/v2/TopBar';
 import { Mark } from '../../components/v2/Mark';
 import { PillButton } from '../../components/v2/PillButton';
 import { Tap } from '../../components/v2/Tap';
@@ -106,7 +106,7 @@ import { getRevisionDateForUser } from '../../lib/fajrBoundary';
 import { revisablePages } from '../../lib/memorizedAyahs';
 import { scheduleSummary } from '../../lib/scheduleSummary';
 import { ReciteCheckNotice } from '../../components/reciteCheck/ReciteCheckNotice';
-import { currentLanguage, t, formatNumber } from '../../i18n';
+import { currentLanguage, dayMonth, t, formatNumber } from '../../i18n';
 import {
   chooseLanguage,
   languageChoice,
@@ -118,7 +118,10 @@ import {
 } from '../../i18n/choice';
 import { LANGUAGE_NAMES } from '../../i18n/language';
 import { isDevVariant } from '../../lib/variant';
-import { ramadanThemeOffered, setRamadanTheme, useRamadanThemeSaved } from '../../lib/ramadanTheme';
+import { RAMADAN_CHOICES, ramadanThemeOffered, setRamadanChoice, useRamadanChoice, useRamadanTheme, type RamadanChoice } from '../../lib/ramadanTheme';
+import { RAMADAN_TESTS, ramadanDates, ramadanTestLabel, ramadanWindow, setRamadanTest, useRamadanTest } from '../../lib/ramadanDates';
+import { localDay } from '../../lib/fajrBoundary';
+import { WithCrescent } from '../../components/ramadan';
 import { CheckerModelRow } from '../../components/settings/CheckerModelRow';
 import { ReciteWhereRow } from '../../components/settings/ReciteWhereRow';
 import { ScheduledRemindersRow } from '../../components/settings/ScheduledRemindersRow';
@@ -225,10 +228,13 @@ function ThemeSegmentedControl<T extends string>({
   options,
   value,
   onChange,
+  testIDPrefix,
 }: {
   options: Array<{ value: T; label: string }>;
   value: T;
   onChange: (v: T) => void;
+  /** Each pill's testID is `${testIDPrefix}-${value}`. */
+  testIDPrefix?: string;
 }) {
   return (
     <View style={v2.pills}>
@@ -240,6 +246,7 @@ function ThemeSegmentedControl<T extends string>({
           variant={opt.value === value ? 'solid' : 'outline'}
           onPress={() => onChange(opt.value)}
           accessibilityLabel={opt.value === value ? t('settings.selected', { label: opt.label }) : opt.label}
+          testID={testIDPrefix ? `${testIDPrefix}-${opt.value}` : undefined}
         />
       ))}
     </View>
@@ -271,7 +278,11 @@ export default function SettingsScreen() {
   const { firebaseUser, signOutUser, deleteAccount } = useAuth();
   const { theme, palette, themeMode, setThemeMode } = useTheme();
   const design = useDesign();
-  const ramadanTheme = useRamadanThemeSaved();
+  // The Ramadan theme (THEME-2, THEME-3): Automatic, On or Off; whether it shows now; Revisely Dev's test dates.
+  const ramadanChoice = useRamadanChoice();
+  const ramadanShows = useRamadanTheme();
+  const ramadanTest = useRamadanTest();
+  const [ramadanTestSheet, setRamadanTestSheet] = useState(false);
   // Activity is a tab (TAB-2): its rows here go to it.
   const openActivity = () => navigation.getParent()?.navigate('ActivityTab', { screen: 'Activity' });
   const tabFootprint = useTabBarFootprint();
@@ -641,7 +652,21 @@ export default function SettingsScreen() {
   const storageValue = storedBytes > 0 ? formatBytes(storedBytes) : undefined;
   const themeLabel =
     themeMode === 'system' ? t('settings.appearance.system') : themeMode === 'dark' ? t('settings.appearance.dark') : t('settings.appearance.light');
-  const appearanceValue = `${themeLabel} · ${ACCENT_LABELS[design.accent]}`; // i18n-ignore (a list's separator)
+  const appearanceValue = [themeLabel, ACCENT_LABELS[design.accent], ramadanShows ? t('settings.appearance.ramadanValue') : null]
+    .filter(Boolean)
+    .join(' · '); // i18n-ignore (a list's separator)
+  // Automatic's span, under the choice: "On from 25 January to 12 March".
+  const ramadanSpan = (() => {
+    const today = localDay(new Date());
+    const { from, to } = ramadanWindow(ramadanDates(today));
+    const day = (key: string) => dayMonth(new Date(`${key}T00:00:00`));
+    return t('settings.appearance.ramadanAuto', { from: day(from), to: day(to) });
+  })();
+  const ramadanLabels: Record<RamadanChoice, string> = {
+    auto: t('settings.appearance.ramadanChoice.auto'),
+    on: t('settings.appearance.ramadanChoice.on'),
+    off: t('settings.appearance.ramadanChoice.off'),
+  };
   // Your account at the top of the first level (it opens the Account page) and of the Account page.
   const premiumLine = reciteCheck && premium.has ? (earlyAccessOn ? t('settings.root.premiumEarly') : t('settings.root.premium')) : null;
   const accountWho = [localUser.name?.trim(), firebaseUser?.email, premiumLine].filter(Boolean).join(', '); // i18n-ignore (a list for VoiceOver)
@@ -670,7 +695,13 @@ export default function SettingsScreen() {
 
   return (
     <TopSafeAreaView style={styles.container}>
-      <TopBar title={page ? pageTitle(page) : t('settings.title')} onBack={() => navigation.goBack()} separator />
+      <TopBar
+        title={page ? pageTitle(page) : t('settings.title')}
+        // The Ramadan theme (THEME-3): a crescent by the first level's title while it shows.
+        center={page == null && ramadanShows ? <WithCrescent><BarTitle title={t('settings.title')} /></WithCrescent> : undefined}
+        onBack={() => navigation.goBack()}
+        separator
+      />
 
       <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={[v2.content, { paddingBottom: tabFootprint + spacing.lg }]} testID={page ? `settings-${page}-scroll` : 'settings-scroll'}>
         {page == null ? (
@@ -1286,19 +1317,22 @@ export default function SettingsScreen() {
                 testID="settings-language"
               />
             ) : null}
-            {/* Revisely Dev's until the release switch (THEME-1): decorations, kept on this phone. Just the
-                name, no subtitle (Majd, Nov 21 2026). */}
+            {/* Revisely Dev's until the release switch (THEME-1, THEME-2): Automatic, On or Off, kept on this phone.
+                Automatic says when it shows (Majd, Nov 26 2026). */}
             {ramadanThemeOffered() ? (
               <Row
                 icon="moon-outline"
                 label={t('settings.appearance.ramadan')}
+                subtitle={ramadanChoice === 'auto' ? ramadanSpan : undefined}
                 rightSlot={
-                  <SettingSwitch
-                    value={ramadanTheme}
-                    onValueChange={(on) => void setRamadanTheme(on)}
-                    accessibilityLabel={t('settings.appearance.ramadan')}
-                    testID="settings-ramadan-theme"
-                  />
+                  <View testID="settings-ramadan-theme">
+                    <ThemeSegmentedControl
+                      value={ramadanChoice}
+                      onChange={(choice) => void setRamadanChoice(choice)}
+                      options={RAMADAN_CHOICES.map((value) => ({ value, label: ramadanLabels[value] }))}
+                      testIDPrefix="settings-ramadan"
+                    />
+                  </View>
                 }
               />
             ) : null}
@@ -1390,6 +1424,18 @@ export default function SettingsScreen() {
         ) : null}
         {page === 'testing' ? (
           <>
+            {/* Revisely Dev: try any part of Ramadan (THEME-2); the dates are set around today. */}
+            {isDevVariant() && ramadanThemeOffered() ? (
+              <Section>
+                <Row
+                  icon="moon-outline"
+                  label={t('settings.testing.ramadanDates')}
+                  value={ramadanTestLabel(ramadanTest)}
+                  onPress={() => setRamadanTestSheet(true)}
+                  testID="settings-ramadan-dates"
+                />
+              </Section>
+            ) : null}
             {firebaseUser && showsResetMyData(user) && (
               <Section>
                 <View testID="reset-data-row">
@@ -1531,6 +1577,18 @@ export default function SettingsScreen() {
           },
         ]}
         testID="check-level-sheet"
+      />
+      <ActionSheet
+        visible={ramadanTestSheet}
+        onClose={() => setRamadanTestSheet(false)}
+        title={t('settings.testing.ramadanDates')}
+        actions={[null, ...RAMADAN_TESTS].map((test) => ({
+          key: test ?? 'real',
+          label: ramadanTestLabel(test),
+          selected: ramadanTest === test,
+          onPress: () => void setRamadanTest(test),
+        }))}
+        testID="ramadan-dates-sheet"
       />
       <ActionSheet
         visible={testWhereSheet}

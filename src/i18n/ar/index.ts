@@ -21,6 +21,7 @@ import { prayer } from './prayer';
 import { preview } from './preview';
 import { premium } from './premium';
 import { qibla } from './qibla';
+import { ramadan } from './ramadan';
 import { read } from './read';
 import { reader } from './reader';
 import { recite } from './recite';
@@ -63,6 +64,7 @@ export const ar: ArStrings = {
   premium,
   preview,
   qibla,
+  ramadan,
   read,
   reader,
   recite,
