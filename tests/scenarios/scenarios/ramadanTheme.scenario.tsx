@@ -9,7 +9,7 @@ import { setNow, setZone, ZONES } from '../harness/clock';
 import { deleteServerFields, setServerDoc } from '../harness/serverDocs';
 import { newAccount, pagesRange } from '../harness/account';
 import { Home } from '../harness/screens';
-import { Phone, type Booted, type OpenApp, revoMomentSeen } from '../harness/phone';
+import { Phone, type Booted, type OpenApp, ramadanIntroSeen, revoMomentSeen } from '../harness/phone';
 
 const DECORATIONS = ['ramadan-sky', 'ramadan-lanterns', 'ramadan-crescent'];
 /** The decorations are hidden from VoiceOver, so queries must look at hidden elements too. */
@@ -60,7 +60,23 @@ async function account(): Promise<Phone> {
   await app.untilSynced();
   await app.close();
   revoMomentSeen(phone, uid);
+  ramadanIntroSeen(phone);
   return phone;
+}
+
+/** A Revisely Dev phone on day 12 of Ramadan (Settings → Testing → Ramadan dates), five pages a day. */
+async function ramadanDay12(): Promise<{ phone: Phone; uid: string }> {
+  setZone(ZONES.london);
+  setNow('2026-11-21 19:00');
+  const phone = new Phone();
+  const app = await newAccount(phone, { memorized: pagesRange(542, 604), user: { dailyPageCapacity: 5 } });
+  const uid = app.uid;
+  await app.untilSynced();
+  await app.close();
+  revoMomentSeen(phone, uid);
+  ramadanIntroSeen(phone);
+  phone.storage.set('@revisely_ramadan_test:v1', 'day12');
+  return { phone, uid };
 }
 
 async function openHome(phone: Phone, dev: boolean): Promise<{ app: OpenApp; home: Home }> {
@@ -214,6 +230,73 @@ describe('the Ramadan theme', () => {
     await app.idle(100);
     expect(app.screen.queryAllByTestId('ramadan-crescent', HIDDEN)).toHaveLength(0);
     expect(app.screen.queryByText(/· Ramadan$/)).toBeNull();
+    await app.close();
+  });
+
+  it('[THEME-7] the theme’s one card shows the first time it does on this phone, then never again', async () => {
+    const phone = await account();
+    phone.storage.delete('@revisely_ramadan_intro:v1');
+    let { app } = await openHome(phone, true);
+    await app.until(() => app.screen.queryByTestId('ramadan-intro-done') != null, 'the Ramadan theme’s card');
+    expect(app.screen.getByText('Ramadan theme')).toBeTruthy();
+    expect(app.screen.getByText(/Turn it off any time in Settings → Appearance/)).toBeTruthy();
+    await tap(app, 'ramadan-intro-done');
+    await app.until(() => app.screen.queryByTestId('ramadan-intro-done') == null, 'the card to close');
+    await app.close();
+    expect(phone.storage.get('@revisely_ramadan_intro:v1')).toBe('1');
+    ({ app } = await openHome(phone, true));
+    await app.idle(300);
+    expect(app.screen.queryByTestId('ramadan-intro-done')).toBeNull();
+    await app.close();
+  });
+
+  it('[THEME-7] the end card in Ramadan: gold light and lanterns for the confetti, the day of the month, and the khatmah card once', async () => {
+    const { phone, uid } = await ramadanDay12();
+    // Everything else read since 1 Ramadan (10 November, on these test dates): with today's five pages, all 604.
+    const pages = Array.from({ length: 604 }, (_, i) => i + 1);
+    await setServerDoc(`users/${uid}/readingSessions/ramadan-read`, {
+      date: '2026-11-15',
+      startedAt: Date.parse('2026-11-15T20:00:00Z'),
+      endedAt: Date.parse('2026-11-15T21:00:00Z'),
+      durationSeconds: 3600,
+      mode: 'stopwatch',
+      targetSeconds: null,
+      pages,
+      pagesVisited: [],
+    });
+    let { app, home } = await openHome(phone, true);
+    let session = await home.startSession();
+    await session.swipeThrough();
+    await app.until(() => session.endCard().includes('Day 12 of Ramadan'), 'the end card’s day of Ramadan');
+    expect(app.screen.queryByTestId('ramadan-end-card', HIDDEN)).not.toBeNull();
+    expect(app.screen.queryByTestId('confetti', HIDDEN)).toBeNull();
+    await app.until(() => app.screen.queryByTestId('session-end-khatmah') != null, 'the khatmah card');
+    expect(session.endCard()).toContain('You’ve been through the whole Qur’an this Ramadan');
+    await session.back();
+    await app.close();
+    // Kept as shown for this Ramadan (its 1 Ramadan, on these test dates).
+    expect(phone.storage.get('@revisely_ramadan_khatmah:v1')).toBe('2026-11-10');
+
+    // Another session's end the same day (revising ahead): the day of Ramadan again, the khatmah card not.
+    ({ app, home } = await openHome(phone, true));
+    session = await home.openAhead();
+    await session.swipeThrough();
+    await app.until(() => session.endCard().includes('Day 12 of Ramadan'), 'the end card’s day of Ramadan');
+    await app.idle(300);
+    expect(app.screen.queryByTestId('session-end-khatmah')).toBeNull();
+    await session.back();
+    await app.close();
+
+    // Off: the confetti as ever, no day of Ramadan.
+    phone.storage.set('@revisely_ramadan_theme:v1', 'off');
+    setNow('2026-11-23 19:00');
+    ({ app, home } = await openHome(phone, true));
+    session = await home.startSession();
+    await session.swipeThrough();
+    await app.until(() => session.endCard().includes('Revision complete'), 'the end card');
+    expect(app.screen.queryByTestId('ramadan-end-card', HIDDEN)).toBeNull();
+    expect(app.screen.queryByTestId('confetti', HIDDEN)).not.toBeNull();
+    expect(session.endCard()).not.toContain('Ramadan');
     await app.close();
   });
 

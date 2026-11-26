@@ -50,6 +50,7 @@ import { useJournalDesign } from '../../lib/release/journalDesign';
 import { RunningTimerChip } from '../../components/timer/RunningTimerChip';
 import { HeroGlow } from '../../components/v2/HeroGlow';
 import { RamadanHome, WithCrescent } from '../../components/ramadan';
+import { RamadanIntro } from '../../components/ramadan/RamadanIntro';
 import { useRamadanTheme } from '../../lib/ramadanTheme';
 import { QiblaSheet } from '../../components/qibla/QiblaSheet';
 import { PrayerSheet, PrayerTab } from '../../components/prayer/PrayerSheet';
@@ -563,6 +564,8 @@ export default function DashboardScreen() {
     <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       <HeroGlow />
       {ramadan ? <RamadanHome /> : null}
+      {/* The theme's one card, the first time it shows on this phone (THEME-7). */}
+      {ramadan ? <RamadanIntro /> : null}
       <TopBar
         left={<RunningTimerChip onOpenQuran={() => navigation.getParent()?.navigate('Read')} />}
         center={ramadan ? <WithCrescent>{salam}</WithCrescent> : salam}

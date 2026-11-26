@@ -1826,6 +1826,17 @@ shows up once and they must go through it and complete it … just the main stuf
   lights along its top edge, inside its rounded corners, as the tab bar does (Majd, Nov 26 2026: "sheets i want option
   B"). The reader and a revision session draw none of it, nor does a sheet opened over them, so the mushaf page and a
   Recite take stay plain. The lights are drawn the same way as the tab bar's (THEME-1).
+- **THEME-7.** (Revisely Dev) In Ramadan, with the theme showing (Majd's pick of the v2 mocks, Nov 26 2026):
+  - **The end card.** When a session's end card shows every page done, gold falling light and a pair of lanterns at each
+    top corner take the confetti's place. Under the count a line says "Day 12 of Ramadan", or "Eid Mubarak" on Eid's
+    three days. The session's pages before it stay as they are (THEME-1).
+  - **The khatmah card.** The first end card on which every one of the Qur'an's 604 pages has been revised or read
+    since 1 Ramadan also says "You've been through the whole Qur'an this Ramadan". It comes once a Ramadan on that
+    phone, with three lanterns a corner and more light. A reading's pages are the ones the user gave it, or else the
+    pages the reader opened while it ran.
+  - **The theme's card.** The first time the theme shows on a phone, Home opens one card, "What's new: Ramadan theme".
+    It says what the theme is and how to turn it off (with Auto, that it goes after Eid by itself), and once closed it
+    never shows again on that phone.
 
 ## Recite on the phone (Revisely Dev)
 

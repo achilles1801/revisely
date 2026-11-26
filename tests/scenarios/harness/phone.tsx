@@ -87,6 +87,11 @@ export function revoMomentSeen(phone: Phone, uid: string): void {
   phone.storage.set(`@revisely_revo_moment_seen:v1:${uid}`, '1');
 }
 
+/** The Ramadan theme's one card (THEME-7) seen on this phone: every new Phone starts so (its constructor). */
+export function ramadanIntroSeen(phone: Phone): void {
+  phone.storage.set('@revisely_ramadan_intro:v1', '1');
+}
+
 export class Phone {
   /** What the app saved on this phone (AsyncStorage), kept across launches. */
   readonly storage = new Map<string, string>();
@@ -104,6 +109,10 @@ export class Phone {
     this.folder = fs.mkdtempSync(path.join(os.tmpdir(), `revisely-${name}-`));
     fs.mkdirSync(path.join(this.folder, 'Documents'), { recursive: true });
     fs.mkdirSync(path.join(this.folder, 'Caches'), { recursive: true });
+    // The Ramadan theme's one card (THEME-7) as seen: in Revisely Dev it would open over Home on a phone's first launch
+    // and hold the one modal turn (SHEET-1), so every Dev scenario's sheets would wait behind it. The scenario that tests
+    // the card deletes this.
+    ramadanIntroSeen(this);
   }
 
   /** Launches the app (a cold start). `screen` renders a screen of the app inside the providers. */

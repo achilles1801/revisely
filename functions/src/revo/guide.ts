@@ -500,10 +500,10 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     // Majd, Nov 21 2026: a Ramadan look to try, Revisely Dev only; Nov 26: Auto, sheets' lights.
     title: 'The Ramadan theme',
-    covers: ['THEME-1', 'THEME-2', 'THEME-3', 'THEME-4'],
+    covers: ['THEME-1', 'THEME-2', 'THEME-3', 'THEME-4', 'THEME-7'],
     routes: ['Settings', 'Dashboard'],
     text: lines(
-      '- Settings → Appearance → “Ramadan theme”: Auto (two weeks before Ramadan to three days after Eid), On or Off. Decoration only, never on the Qur’an’s pages, a session or a take.',
+      '- Settings → Appearance → “Ramadan theme”: Auto (two weeks before to three days after Eid), On or Off. Decoration only, never on a page, session or take; the end card says the day.',
     ),
   },
   {
