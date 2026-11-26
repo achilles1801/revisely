@@ -220,8 +220,10 @@ export class Home {
     return this.text('today-post') ?? '';
   }
 
+  /** Where today starts, without the "Change" after it (HOME-3: it opens Jump to). */
   title(): string | null {
-    return this.text('today-title');
+    const text = this.text('today-title');
+    return text == null ? null : text.replace(/\s*Change$/, '');
   }
 
   detail(): string | null {

@@ -110,8 +110,9 @@ describe('the help on Home', () => {
     expect(labels.filter((l) => /[\uE000-\uF8FF]/.test(l))).toEqual([]);
     const text = flatText(app.screen.getByTestId('help-sheet-home'));
     // The labels it names are the ones Home shows; no page numbers (NAME-1).
-    expect(text).toContain('Jump to…');
-    expect(text).toContain('Edit schedule');
+    // HOME-3: "Change" opens Jump to; Edit schedule is in Settings now, not on Home.
+    expect(text).toContain('Change');
+    expect(text).not.toContain('Edit schedule');
     expect(text).toContain('Add to today');
     expect(text).not.toMatch(/\bp{1,2}\.\s?\d|\bpages? \d/);
     // A tester has Revo, so Ask Revo is offered; and the way to hide the buttons.
