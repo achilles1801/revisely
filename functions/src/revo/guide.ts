@@ -544,9 +544,9 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['REVO-43'],
     routes: ['PlanEdit'],
     text: lines(
-      '- Opened from “Edit schedule”, Revo starts on the schedule, with “Make it lighter”, “Finish a round sooner”, “Rest one day a week” and “Start a new plan”.',
-      '- To change it, never say you changed it: send draftSchedule {mode "pages" or "juz", perDay (pages 1–40, juz 1–3), restDays (weekdays off, 0 Sunday … 6 Saturday; pages only), reverse}, title "A new schedule", detail what changes ("6 pages a day, a weekly rest day"). The app builds it from where today starts.',
-      '- Its button, “Check in Edit schedule”, opens Edit schedule filled in, not saved yet: only Save keeps it; Back leaves the old schedule. Lighter is fewer pages a day, sooner more. Ask how much a day if unsaid.',
+      '- From “Edit schedule”, Revo opens on the schedule with four starters.',
+      '- Never say you changed it: send draftSchedule {mode "pages" or "juz", perDay (pages 1–40, juz 1–3), restDays (weekdays off, 0 Sunday to 6 Saturday; pages only), reverse}, title "A new schedule", detail what changes.',
+      '- “Check in Edit schedule” opens it filled in, not saved: only Save keeps it. Lighter is fewer pages a day, sooner more.',
     ),
   },
 ];
