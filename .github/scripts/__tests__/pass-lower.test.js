@@ -67,15 +67,23 @@ describe("ci.yml's pass-lower job", () => {
   const expr = ci.match(/\n  pass-lower:\n(?:    .*\n)*?    if: \$\{\{ (.+) \}\}\n/)[1];
 
   /** The job's `if:` as JavaScript (== and != compare strings in GitHub's expressions too). */
-  function runs({ event = 'pull_request', draft = 'false', upper = '', lower = `[{"number":12,"sha":"${L}"}]`, required = 'success' }) {
+  function runs({ event = 'pull_request', draft = 'false', upper = '', lower = `[{"number":12,"sha":"${L}"}]`, required = 'success', runCancelled = false }) {
     const github = { event_name: event };
     const needs = { plan: { outputs: { draft, upper, lower } }, required: { result: required } };
+    const cancelled = () => runCancelled;
     // eslint-disable-next-line no-new-func
-    return new Function('github', 'needs', `return (${expr.replace(/([!=])=/g, '$1==')});`)(github, needs);
+    return new Function('github', 'needs', 'cancelled', `return (${expr.replace(/([!=])=/g, '$1==')});`)(github, needs, cancelled);
   }
 
   it('runs after a passed run of the PR on top, with PRs under it', () => {
     expect(runs({})).toBe(true);
+  });
+
+  it('runs after a skipped job: its own status function, not the success() GitHub would add', () => {
+    // Without one, success() is false when any job before it was skipped, and `scenarios-wait` is skipped on
+    // almost every PR: until Nov 26 2026 the job never ran (#1010's green run gave #987, under it, no Required).
+    expect(expr).toMatch(/^!cancelled\(\) && /);
+    expect(runs({ runCancelled: true })).toBe(false);
   });
 
   it("doesn't run for a draft, a PR that is itself under another, one with nothing under it, or a failed run", () => {
