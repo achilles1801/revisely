@@ -308,7 +308,10 @@ export function mergeSessionAdd(existing: FirestoreSession | null, op: SessionAd
     const totalAssignedPages =
       (added.length > 0 ? assignedPages.length : existing.totalAssignedPages) || pagesRevised.length;
     // Credit only for pages this session has revised (see aheadWithin).
-    const ahead = aheadWithin(withoutCredit(mergeAhead(existing.ahead, op.ahead), op.uncredit), checkedOf(op, pagesRevised));
+    const ahead = aheadWithin(
+      withoutCredit(mergeAhead(existing.ahead, op.ahead), op.uncredit),
+      checkedOf(op, pagesRevised),
+    );
     // Pages revised ahead are in pagesRevised too: only this day's assigned pages count here.
     const revisedHere = countOf(assignedPages, revisedIn(pagesRevised, ahead));
     const completed = existing.state === 'COMPLETED' || revisedHere >= totalAssignedPages;
@@ -348,7 +351,10 @@ export function mergeSessionAdd(existing: FirestoreSession | null, op: SessionAd
     weaknessUpdates: [],
     completionPercentage: 0,
   };
-  const ahead = aheadWithin(withoutCredit(mergeAhead(undefined, op.ahead), op.uncredit), checkedOf(op, op.pagesRevised));
+  const ahead = aheadWithin(
+    withoutCredit(mergeAhead(undefined, op.ahead), op.uncredit),
+    checkedOf(op, op.pagesRevised),
+  );
   // Nothing revised: an empty session. A first save of catch-up pages alone (credited to the days
   // they were missed, SESS-7) keeps them: it returned the empty session and lost their credit.
   if (op.pagesRevised.length === 0 && Object.keys(ahead).length === 0) return base;
