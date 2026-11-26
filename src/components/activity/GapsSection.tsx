@@ -37,7 +37,7 @@ import {
   type GapsView,
 } from '../../lib/insightsGaps';
 import { pushBackLine, type PushBack } from '../../lib/gapsCycle';
-import { useFirstSection } from './sectionPlace';
+import { useFirstSection, useSectionAlone } from './sectionPlace';
 
 /** The Days switch, kept on the phone: '1' shows every length in exact days. */
 export const GAPS_IN_DAYS_KEY = 'insights.gapsInDays';
@@ -108,6 +108,7 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
   const switchable = gapsHaveNatural(view) || (revision?.late === true && pushBack != null && naturalDiffers(pushBack.days));
   // The first section shown has no hairline above it (ACT-29).
   const first = useFirstSection();
+  const alone = useSectionAlone();
   // A range longer than the account counts from its first day, and says so (ACT-22): "since 2 November".
   const since = !all && firstDay && view.rangeStart === firstDay.slice(0, 10) ? t('insights.gaps.since', { date: gapDate(firstDay, 'long') }) : null;
   const inWords = since ?? props.inWords;
@@ -145,14 +146,19 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
   );
 
   return (
-    <View style={[styles.section, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID="insights-gaps">
+    <View style={[styles.section, !first && !alone && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID="insights-gaps">
       <View style={styles.head}>
+        {/* Alone on its own page (ACT-35): the top bar names it. */}
+        {alone ? (
+          <View style={styles.flex} />
+        ) : (
         <View style={styles.flex}>
           <ChromeText style={[styles.title, { color: palette.text }]} accessibilityRole="header">
             {t('insights.gaps.title')}
           </ChromeText>
           <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{t('insights.gaps.detail')}</ChromeText>
         </View>
+        )}
         {switchable ? (
           <Tap
             onPress={() => setInDays(!inDays)}

@@ -1168,8 +1168,9 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   (ACT-18: Month or Week, Today, ‹ ›, its totals and key, always shown) and the picked day's entry (ACT-34), which shows no
   note ("the note shouldn't be shown on the journal day card -- it adds to the overstimulation"); the day itself has it. Under
   them, "Your revision" with the range chip (ACT-22), then the sections in ACT-29's order as quiet rows: the name, one grey
-  line, the figure at the end and ›, the whole row one button that opens the section on a page of its own, drawn as Insights
-  drew it, with its name and the range chip at the top (one range: a change there is the list's too). A section with nothing
+  line, the figure at the end and ›, the whole row one button that opens the section on a page of its own: its name and the
+  range chip in the top bar (one range: a change there is the list's too), then the section as Insights drew it, starting at
+  its figure with no title or subtitle of its own (board A4); its own controls (Ask, Days) stay. A section with nothing
   to say yet has no row: Gaps until a gap can be measured, Weak spots until a page is rated weak (none without Smart
   Tracking), Recitation until a take, Memorization until a page was memorized in the last twelve months, Pace until ten timed
   items. While one the account can have is missing, a grey line says the others show once they have something to say. Edit
