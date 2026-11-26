@@ -435,6 +435,33 @@ export const activity = {
     alwaysShown: 'Always shown',
     showAll: 'Show all, in the usual order',
   },
+  /** The one Activity tab (ACT-35, Revisely Dev): the sections' list under the calendar and the day. */
+  oneTab: {
+    yourRevision: 'Your revision',
+    /** Under the rows when a section has nothing to say yet (Gaps, Weak spots, Recitation, Memorization, Pace). */
+    othersLater: 'The other sections show here once they have something to say.',
+    /** VoiceOver, on a row: "Opens Coverage". */
+    opensSection: 'Opens {{section}}',
+    /** Weak spots' row: "Al-Hashr, last page first". */
+    weakFirst: '{{label}} first',
+    /** After Coverage's figure at All time: "3.1 cycles". */
+    cycles_one: 'cycle',
+    cycles_other: 'cycles',
+    /** The week at the top (Majd's T1): its title, "Month ›" and its grey line. */
+    thisWeek: 'This week',
+    month: 'Month',
+    openMonth: 'Open the month',
+    /** The month page's title. */
+    calendar: 'Calendar',
+    weekRevised_one: '{{done}} of {{count}} day revised',
+    weekRevised_other: '{{done}} of {{count}} days revised',
+    weekRead: '{{time}} read',
+    /** The day in C2's form: "20 of 20 revised", then the other kinds in one grey line. */
+    revised: 'revised',
+    memorizedPages_one: '{{count}} page memorized',
+    memorizedPages_other: '{{count}} pages memorized',
+    readTime: '{{time}} read',
+  },
   blocks: {
     insights: 'Insights',
     insightsFor: 'Insights for {{range}}',

@@ -16,6 +16,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { typeV2 } from '../../theme/v2';
 import { t } from '../../i18n';
 import { chevron, forwardIcon } from '../../i18n/direction';
+import { SectionRow } from './SectionRow';
 import { ChromeText, STACK_AT_SCALE } from './ChromeText';
 import { Tap } from '../v2/Tap';
 import {
@@ -36,7 +37,7 @@ import {
   type GapsView,
 } from '../../lib/insightsGaps';
 import { pushBackLine, type PushBack } from '../../lib/gapsCycle';
-import { useFirstSection } from './sectionPlace';
+import { useFirstSection, useSectionAlone } from './sectionPlace';
 
 /** The Days switch, kept on the phone: '1' shows every length in exact days. */
 export const GAPS_IN_DAYS_KEY = 'insights.gapsInDays';
@@ -67,6 +68,9 @@ export interface GapsSectionProps {
   /** Last revised (ACT-30): the link at the section's end, and the full revision line (longest waiting first: the
    * late pages at the top). */
   onOpenLastRevised?: (sort?: 'waiting') => void;
+  /** Drawn as its row on the one Activity tab (ACT-35): the row's tap, and whether it is the list's last. */
+  row?: () => void;
+  last?: boolean;
 }
 
 export function GapsSection(props: GapsSectionProps) {
@@ -80,7 +84,7 @@ export function GapsSection(props: GapsSectionProps) {
   return <Gaps view={view} {...props} />;
 }
 
-function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpenLastRevised, ...props }: GapsSectionProps & { view: GapsView }) {
+function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpenLastRevised, row, last, ...props }: GapsSectionProps & { view: GapsView }) {
   const { palette } = useTheme();
   // Every length in exact days (Majd, Nov 16 2026: "'days' specifically should always be an option"), kept.
   const [inDays, setInDaysState] = useState(false);
@@ -104,6 +108,7 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
   const switchable = gapsHaveNatural(view) || (revision?.late === true && pushBack != null && naturalDiffers(pushBack.days));
   // The first section shown has no hairline above it (ACT-29).
   const first = useFirstSection();
+  const alone = useSectionAlone();
   // A range longer than the account counts from its first day, and says so (ACT-22): "since 2 November".
   const since = !all && firstDay && view.rangeStart === firstDay.slice(0, 10) ? t('insights.gaps.since', { date: gapDate(firstDay, 'long') }) : null;
   const inWords = since ?? props.inWords;
@@ -114,6 +119,20 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
   const shown = allShown ? gaps : gaps.slice(0, GAPS_SHOWN);
   const longest = Math.max(1, ...gaps.map((g) => g.days));
 
+  if (row) {
+    return (
+      <SectionRow
+        title={t('insights.gaps.title')}
+        line={summary}
+        figure={figure.value}
+        unit={figure.text}
+        red={figure.red}
+        onPress={row}
+        separator={!last}
+        testID="insights-row-gaps"
+      />
+    );
+  }
   const figureInner = (
     <>
       <ChromeText style={[styles.big, { color: figure.red ? palette.red : palette.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
@@ -127,14 +146,19 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
   );
 
   return (
-    <View style={[styles.section, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID="insights-gaps">
+    <View style={[styles.section, !first && !alone && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID="insights-gaps">
       <View style={styles.head}>
+        {/* Alone on its own page (ACT-35): the top bar names it. */}
+        {alone ? (
+          <View style={styles.flex} />
+        ) : (
         <View style={styles.flex}>
           <ChromeText style={[styles.title, { color: palette.text }]} accessibilityRole="header">
             {t('insights.gaps.title')}
           </ChromeText>
           <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{t('insights.gaps.detail')}</ChromeText>
         </View>
+        )}
         {switchable ? (
           <Tap
             onPress={() => setInDays(!inDays)}

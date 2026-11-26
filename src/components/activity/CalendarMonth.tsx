@@ -21,7 +21,7 @@ import { ActionSheet } from '../v2/ActionSheet';
 import { ChoiceChip } from './ChoiceChip';
 import { dayMarks, dayPreview } from '../../lib/activityInsights';
 import { useJournalDesign } from '../../lib/release/journalDesign';
-import { DayEntry, type DayEntryLine } from './DayEntry';
+import { DayEntry, type DayEntryExtra, type DayEntryLine, type DayEntryRing } from './DayEntry';
 import { spotTestsTail, type SpotTestsDay } from '../../lib/spotTests';
 import { formatDayLong, formatMinutesLong } from '../../lib/activityFormat';
 import { describePassage, fewPlaces } from '../../lib/passages';
@@ -85,6 +85,9 @@ export function CalendarMonth({
   onPick,
   onOpen,
   noteOf,
+  showNote = true,
+  layout = 'full',
+  onMonth,
   onAddNote,
   spotTests,
   recordings,
@@ -110,6 +113,14 @@ export function CalendarMonth({
   onOpen: (day: string, block?: PreviewBlock) => void;
   /** The day's note, for its entry (ACT-34). */
   noteOf?: (day: string) => string | null;
+  /** The picked day's entry shows its note (ACT-34); the one Activity tab's doesn't (ACT-35). */
+  showNote?: boolean;
+  /**
+   * 'strip' (the one Activity tab, ACT-35; Majd's T1): this week in one line, "Month ›" (`onMonth`) and the picked day in C2's
+   * form. 'full': the month or week, as Overview draws it. The one tab's month page is 'full' with C2's day (`showNote` off).
+   */
+  layout?: 'full' | 'strip';
+  onMonth?: () => void;
   /** The entry's Add a note (ACT-34). */
   onAddNote?: (day: string) => void;
   /** Spot tests by day: their own line in the entry (ACT-34). */
@@ -225,6 +236,22 @@ export function CalendarMonth({
     entryLines.push({ key: 'spot', label: t('activity.day.spotTest'), value: tests.pages.length > 0 ? fewPlaces(tests.pages) : tail, tail: tests.pages.length > 0 ? tail : undefined });
   }
   if (preview.notes) previewRows.push({ key: 'notes', kind: 'notes', label: t('activity.day.notes'), value: t('activity.calendar.oneNote') });
+  // C2's form (ACT-35, the one Activity tab): the revision as a ring and its figure, the other kinds in one grey line.
+  const ring: DayEntryRing | null = preview.revised
+    ? {
+        share: preview.revised.assigned > 0 ? preview.revised.done / preview.revised.assigned : 1,
+        figure:
+          preview.revised.assigned > 0
+            ? t('common.nOfTotal', { n: preview.revised.done, total: preview.revised.assigned })
+            : t('common.pages', { count: preview.revised.pages.length }),
+        detail: [fewPlaces(preview.revised.pages), minutesText(preview.revised.minutes)].filter(Boolean).join(' · ') || undefined,
+      }
+    : null;
+  const extras: DayEntryExtra[] = [];
+  if (preview.memorizedPages > 0) extras.push({ key: 'memorized', text: t('activity.oneTab.memorizedPages', { count: preview.memorizedPages }) });
+  if (preview.readPages > 0) extras.push({ key: 'read', text: t('activity.oneTab.readTime', { time: minutesText(preview.readMinutes) ?? t('common.pages', { count: preview.readPages }) }) });
+  if (takes && takes.takes > 0) extras.push({ key: 'recited', text: t('activity.day.takes', { count: takes.takes }) });
+  if (tests && tests.tests > 0) extras.push({ key: 'spot', text: `${t('activity.day.spotTest')} · ${spotTestsTail(tests)}` });
 
   // The sections under the header, in the user's order, those hidden left out (ACT-29): the header (the month or
   // week, Week | Month, Today and the arrows) stays on top, since everything below follows it.
@@ -300,13 +327,17 @@ export function CalendarMonth({
   // Open are one button, each row another, edge to edge with no gap between them. Chrome, so it
   // stops growing at 1.4×, and the date gives way: at the largest text it pushed Open off the
   // screen and the rows clipped into each other (Nov 2026).
+  // The one tab's day (no note) is C2's form; elsewhere ACT-34's lines.
+  const c2 = !showNote;
   const dayPart = journalDesign ? (
     <DayEntry
       date={formatDayLong(shownDay)}
       lines={entryLines}
       note={noteOf?.(shownDay) ?? null}
+      showNote={showNote}
       onOpen={() => onOpen(shownDay)}
       onAddNote={() => (onAddNote ?? onOpen)(shownDay)}
+      {...(c2 ? { ring, extras } : {})}
     />
   ) : (
     <View style={styles.preview} testID="calendar-preview">
@@ -378,6 +409,54 @@ export function CalendarMonth({
   // The totals are the month's: none in a week.
   const shown = sectionsToShow(sections, (id) => id !== 'totals' || span === 'month');
 
+  if (layout === 'strip') {
+    // This week (Majd's T1, Nov 26 2026): the days revised so far and the time read, in one grey line, over its seven days.
+    const soFar = weekShown.filter((d) => d <= today);
+    const revisedSoFar = soFar.filter((d) => dayMarks(d, data).ring != null).length;
+    const readWeek = data.read.filter((r) => weekShown.includes(r.day)).reduce((n, r) => n + (r.minutes ?? 0), 0);
+    const line = [
+      t('activity.oneTab.weekRevised', { done: revisedSoFar, count: soFar.length }),
+      readWeek > 0 ? t('activity.oneTab.weekRead', { time: formatMinutesLong(readWeek) }) : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    return (
+      <View testID="calendar-strip">
+        <View style={styles.stripHead}>
+          <Text style={[styles.monthTitle, { color: palette.text }]} numberOfLines={1} maxFontSizeMultiplier={MAX_SCALE} accessibilityRole="header" testID="calendar-strip-title">
+            {t('activity.oneTab.thisWeek')}
+          </Text>
+          {onMonth ? (
+            <Tap onPress={onMonth} accessibilityRole="button" accessibilityLabel={t('activity.oneTab.openMonth')} hitSlop={8} style={styles.monthLink} testID="calendar-month-link">
+              <Text style={[typeV2.name, { color: palette.link }]} maxFontSizeMultiplier={MAX_SCALE}>
+                {t('activity.oneTab.month')}
+              </Text>
+              <Ionicons name={forwardIcon()} size={15} color={palette.link} />
+            </Tap>
+          ) : null}
+        </View>
+        <Text style={[typeV2.meta, styles.stripLine, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE} testID="calendar-week-line">
+          {line}
+        </Text>
+        <View style={styles.grid}>
+          <View style={styles.weekRow}>
+            {weekdayLetters().map((w, i) => (
+              <Text key={i} style={[styles.letter, { color: palette.secondary }]} maxFontSizeMultiplier={MAX_SCALE}>
+                {w}
+              </Text>
+            ))}
+          </View>
+          <View style={styles.weekRow}>
+            {weekShown.map((d) => (
+              <DayCell key={d} day={d} today={today} picked={picked} data={data} onPick={onPick} onOpen={onOpen} />
+            ))}
+          </View>
+        </View>
+        <View style={[styles.stripRule, { backgroundColor: palette.separator }]} />
+        {dayPart}
+      </View>
+    );
+  }
   return (
     <View testID="calendar-month">
       {/* Header: what you're looking at on the left (the title and its Week | Month chip), where to go
@@ -692,6 +771,11 @@ function LegendItem({ label, children }: { label: string; children: React.ReactN
 }
 
 const styles = StyleSheet.create({
+  // The one tab's week (ACT-35): its title and Month, its grey line, then the seven days.
+  stripHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 16, paddingTop: 12 },
+  monthLink: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  stripLine: { paddingHorizontal: 16, paddingTop: 2 },
+  stripRule: { height: StyleSheet.hairlineWidth, marginTop: 6 },
   summary: { minHeight: 40, flexDirection: 'row', alignItems: 'center' },
   monthHead: { minHeight: 44, paddingTop: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', columnGap: 12, rowGap: 8 },
   monthHeadWrap: { flexWrap: 'wrap' },

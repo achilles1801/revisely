@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { pageOfVerse } from '../../lib/verses';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -32,12 +31,9 @@ import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { buildActivityDays } from '../../lib/activity';
-import { firstNoteText, journalFirstDay, shiftDay } from '../../lib/journal';
-import { addToPlanParams, firstTomorrowPages, putFirstTomorrow } from '../../lib/weakSpotActions';
-import { revisablePages } from '../../lib/memorizedAyahs';
-import { describePassage } from '../../lib/passages';
-import { logger } from '../../lib/logger';
-import { UndoToast } from '../../components/revision/UndoToast';
+import { firstNoteText, journalFirstDay } from '../../lib/journal';
+import { activityOneTabEnabled } from '../../lib/release/activityOneTab';
+import { useInsightsActions } from './useInsightsActions';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { Tap } from '../../components/v2/Tap';
@@ -58,39 +54,17 @@ const RECENT_ITEMS = 3;
  */
 export default function ActivityScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { user, logs, pages, saveUser } = useApp();
+  const { user, logs } = useApp();
   const { palette } = useTheme();
   // Room for the tab bar (and the mini player) and for Revo's button.
   const tabFootprint = useTabBarFootprint() + useRevoFootprint();
 
   // The day picked in the calendar (today until one is tapped).
   const [pickedDay, setPickedDay] = useState<string | null>(null);
-  // "Revise these first tomorrow" (Insights): the weak pages lead tomorrow's session, labelled From Insights,
-  // in front of its own pages (ACT-24). A toast says so, with Undo (it put the carry back as it was);
-  // before, the tap saved with no sign of it and read as a dead button (Majd, Nov 8 2026).
-  const [carryToast, setCarryToast] = useState<{ text: string; undo?: () => void } | null>(null);
-  const userRef = useRef(user);
-  userRef.current = user;
-  const reviseTomorrow = (weak: number[]) => {
-    if (!user || weak.length === 0) return;
-    putFirstTomorrow({ user, saveUser, today, pages: weak, name: describePassage(weak, { form: 'short' }), latest: () => userRef.current })
-      .then(({ text, undo }) =>
-        setCarryToast({ text, undo: () => void undo().catch((err) => logger.warn('Could not undo "first tomorrow"', err)) }),
-      )
-      .catch((err) => {
-        logger.warn('Could not put pages first tomorrow', err);
-        setCarryToast({ text: t('activity.screen.couldntPutFirst') });
-      });
-  };
-
-  const { day: today, date: revisionDate } = useRevisionDay(user);
-  // "Add to plan" (a custom plan, under "First tomorrow"): tomorrow's day of the plan with the pages
-  // added; the plan changes only when it is saved (ACT-24).
-  const addToPlan = (added: number[]) => {
-    if (user?.customPlan) navigation.navigate('PlanDayEdit', addToPlanParams(user, revisablePages(pages), revisionDate, added));
-  };
-  // Pages already first tomorrow: their buttons say so ("First tomorrow ✓") and can't be tapped again.
-  const firstTomorrow = useMemo(() => firstTomorrowPages(user, shiftDay(today, 1)), [user, today]);
+  const { day: today } = useRevisionDay(user);
+  // Insights' buttons (the weak pages first tomorrow, with its toast; the reader; Settings), shared with a section's page.
+  const { props: insightsActions, toast: carryToast } = useInsightsActions(tabFootprint);
+  const oneTab = activityOneTabEnabled();
   const { readings, journal, recordings, loading, loadError, load } = useActivitySources();
   // Pull to refresh reads everything again (ACT-27): the readings and notes, and Overview's and Insights'
   // items (they were left out, so a pull never changed Coverage). The spinner always ends (usePullToRefresh).
@@ -148,7 +122,7 @@ export default function ActivityScreen() {
           blocks ? (
             <>
               {/* Its help (HELP-1) explains the tab on show. */}
-              <HelpButton screen={view === 'insights' ? 'insights' : 'activity'} />
+              <HelpButton screen={view === 'insights' && !oneTab ? 'insights' : 'activity'} />
               <IconButton icon="search" label={t('common.search')} onPress={() => navigation.navigate('ActivityAll')} size={22} />
             </>
           ) : (
@@ -180,32 +154,19 @@ export default function ActivityScreen() {
           )}
           {blocks ? (
             <ActivityBlocksViews
+              {...insightsActions}
               today={today}
               noteDays={noteDays}
               noteOf={noteOf}
               onAddNote={(date) => navigation.navigate('ActivityDay', { date, addNote: true })}
               onOpenDay={openDay}
-              onReviseTomorrow={reviseTomorrow}
-              firstTomorrow={firstTomorrow}
-              // The reader over Activity, so back returns here (as a day's strip does, ACT-20).
-              onOpenPage={(pageNumber) => navigation.navigate('QuranReader', { pageNumber })}
-              // Insights' Recitation rows (RINS-2): those ayahs, highlighted until the page is turned.
-              onOpenAyahs={(sura, from, to) =>
-                navigation.navigate('QuranReader', {
-                  pageNumber: pageOfVerse({ sura, ayah: from }),
-                  highlight: { sura, ayah: from, ...(to > from ? { last: { sura, ayah: to } } : {}) },
-                })
-              }
-              onSeeAllPages={() => navigation.navigate('PagesByStrength')}
-              onOpenLastRevised={(sort) => navigation.navigate('LastRevised', sort ? { sort } : undefined)}
-              onTurnOnSmartTracking={() => navigation.navigate('Settings', { section: 'revision' })}
               onViewChange={setView}
               onShowTop={showTop}
               refreshRef={blocksRefresh}
-              // First tomorrow on every plan, for that day only (Majd, Nov 8 2026: a custom plan's day
-              // used to open, and saving it replaced that day in every cycle).
-              onPlanIt={reviseTomorrow}
-              onAddToPlan={user?.customPlan ? addToPlan : undefined}
+              // The one tab's rows (ACT-35): each section on a page of its own.
+              onOpenSection={(section) => navigation.navigate('ActivitySection', { section })}
+              // This week's "Month ›" (Majd's T1): the full calendar on its own page.
+              onOpenMonth={() => navigation.navigate('ActivityMonth')}
             />
           ) : (
             <View style={v2.graph}>
@@ -242,19 +203,7 @@ export default function ActivityScreen() {
           ) : null}
         </ScrollView>
       )}
-      <UndoToast
-        visible={carryToast != null}
-        message={carryToast?.text ?? ''}
-        onUndo={carryToast?.undo ? () => {
-          const undo = carryToast.undo;
-          setCarryToast(null);
-          undo?.();
-        } : undefined}
-        actionLabel={t('common.undo')}
-        duration={6000}
-        onDismiss={() => setCarryToast(null)}
-        bottomInset={tabFootprint}
-      />
+      {carryToast}
       <HelpToast screen="activity" bottomInset={tabFootprint} />
       <HelpToast screen="insights" bottomInset={tabFootprint} />
     </TopSafeAreaView>
