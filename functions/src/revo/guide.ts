@@ -46,7 +46,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Home’s top bar: a gear (Settings) on the right, a running timer on the left. No compass: the next-prayer line opens the Prayer sheet.',
       '- Home’s Today post: where today starts (e.g. "Starts at Al-Mujadila", or "Starts at Al-Hadid, 2nd page" mid-surah) and how much it is; “Change” after it opens Jump to. Under it, one button: “Start revision”, “Continue revision” or “Review session”. Then "… of the Quran memorized ›" with a dot per juz; its › opens the memorized pages. Then “Recent sessions” (the last three) and “See all”.',
       '- Read tab: “Search the Quran” under its title, “Recent pages”, then every surah, grouped by juz. Tap one to open the reader.',
-      '- The app names places by surah or juz and which page of it ("Maryam, 5th page", "Juz 2, first 5 pages"); part of a page ends "· start", "· middle" or "· end". A start can show the page’s first words under it. Ayah numbers only where a verse is cited or played. Mushaf page numbers are a detail (today’s › menu, the reader, the session, “Jump to…”’s Page tab).',
+      '- The app names places by surah or juz and which page of it ("Maryam, 5th page", "Juz 2, first 5 pages"); part of a page ends "· start", "· middle" or "· end". A start can show the page’s first words under it. Ayah numbers only where a verse is cited or played. Mushaf page numbers are a detail (the reader, the session, “Jump to…”’s Page tab).',
       '- Revo: the round button in a bottom corner of Home, Activity (Overview, Insights, a day, See all, Pages by strength) and “Edit schedule”; drag it to the other corner and it stays. None on the Read tab or in a session.',
     ),
   },
