@@ -1826,6 +1826,31 @@ shows up once and they must go through it and complete it … just the main stuf
   lights along its top edge, inside its rounded corners, as the tab bar does (Majd, Nov 26 2026: "sheets i want option
   B"). The reader and a revision session draw none of it, nor does a sheet opened over them, so the mushaf page and a
   Recite take stay plain. The lights are drawn the same way as the tab bar's (THEME-1).
+- **THEME-5.** (Revisely Dev) While the theme shows, the one Activity tab (ACT-35) is dressed too:
+  - lanterns hang in its top bar's empty start side, as on Home;
+  - light falls softly behind this week;
+  - the site's eight-point star sits before "Your revision";
+  - Revo's button has its crescent (THEME-8).
+  - The week's rings and marks keep their own colours, since they are figures.
+  - In the last ten nights (the 21st on), five lanterns hang instead of three, and the light is denser.
+- **THEME-6.** (Revisely Dev) While the theme shows, Insights on the one Activity tab opens with a Ramadan row, before
+  the sections:
+  - **Before the month:** "Ramadan", "Build your Qur'an habit before it begins", and the days to go ("75 days").
+  - **During it:** the day ("Day 12 of Ramadan", "Day 12 · every day so far", or from the 21st "Day 23 · the last ten
+    nights"), and the days revised of the days so far ("2 of 12 days"). Under that, a moon for each day of the month,
+    waxing and waning: lit gold on a day revised, a grey disc on a day missed, an outline for a day to come. In the last
+    ten nights each odd night has a small star.
+  - **On Eid's three days:** "Eid Mubarak", "Your Ramadan: 27 of 29 days", with "· a khatmah" once all 604 pages have
+    been revised or read.
+  - **After Eid** there is no row.
+  - The row opens the month's own page:
+    - the opening words of Al-Baqarah 185 in the mushaf's script, cited;
+    - the days revised of the days so far, and today's day and date;
+    - every day's moon with its number, the last ten nights named;
+    - the khatmah (pages revised or read since 1 Ramadan, of 604) as the accent's bar;
+    - the pages and minutes revised and read.
+    The figures are the end card's (THEME-7).
+  - In Ramadan and on Eid, the day card shows the day's Hijri date beside its date, "12 Ramadan" or "1 Shawwal".
 - **THEME-7.** (Revisely Dev) In Ramadan, with the theme showing (Majd's pick of the v2 mocks, Nov 26 2026):
   - **The end card.** When a session's end card shows every page done, gold falling light and a pair of lanterns at each
     top corner take the confetti's place. Under the count a line says "Day 12 of Ramadan", or "Eid Mubarak" on Eid's

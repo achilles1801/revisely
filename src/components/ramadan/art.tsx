@@ -2,7 +2,7 @@
 // Drawn for Revisely, in the theme's tokens (ramadanV2): no game's or brand's art.
 
 import React, { useId } from 'react';
-import Svg, { Circle, Defs, Ellipse, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, Ellipse, Path, Polygon, RadialGradient, Rect, Stop } from 'react-native-svg';
 import type { RamadanTokens } from '../../theme/v2';
 
 /** A lantern's width over its height (its viewBox is 24 × 48). */
@@ -60,6 +60,68 @@ export function Sparkle({ size, color }: { size: number; color: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 10 10">
       <Path d="M5 0 L6.1 3.9 L10 5 L6.1 6.1 L5 10 L3.9 6.1 L0 5 L3.9 3.9 Z" fill={color} />
+    </Svg>
+  );
+}
+
+/** The lit part of a moon `age` days old (of 29.53): a crescent or gibbous on the right waxing, the left waning. */
+export function moonPath(c: number, r: number, age: number): string {
+  const phi = (2 * Math.PI * age) / 29.53;
+  const k = Math.cos(phi);
+  const rx = Math.max(Math.abs(k) * r, 0.01).toFixed(2);
+  if (age < 29.53 / 2) return `M${c} ${c - r} A${r} ${r} 0 0 1 ${c} ${c + r} A${rx} ${r} 0 0 ${k > 0 ? 0 : 1} ${c} ${c - r} Z`;
+  return `M${c} ${c - r} A${r} ${r} 0 0 0 ${c} ${c + r} A${rx} ${r} 0 0 ${k > 0 ? 1 : 0} ${c} ${c - r} Z`;
+}
+
+/**
+ * Ramadan's day `day` as that night's moon (THEME-6): lit gold on a day revised, a grey disc on a day missed, an outline
+ * for a day to come. `missed` and `ahead` take the palette's colours, so they read on either ground.
+ */
+export function Moon({
+  size,
+  day,
+  state,
+  tokens,
+  missed,
+  ahead,
+}: {
+  size: number;
+  day: number;
+  state: 'lit' | 'missed' | 'ahead';
+  tokens: RamadanTokens;
+  missed: string;
+  ahead: string;
+}) {
+  const c = size / 2;
+  const r = size / 2 - 0.5;
+  return (
+    <Svg width={size} height={size}>
+      {state === 'lit' ? (
+        <>
+          <Circle cx={c} cy={c} r={r} fill={tokens.gold} fillOpacity={0.25} />
+          <Path d={moonPath(c, r, day + 0.6)} fill={tokens.gold} />
+        </>
+      ) : state === 'missed' ? (
+        <Circle cx={c} cy={c} r={r} fill={missed} fillOpacity={0.35} />
+      ) : (
+        <Circle cx={c} cy={c} r={r - 0.3} fill="none" stroke={ahead} strokeWidth={0.8} />
+      )}
+    </Svg>
+  );
+}
+
+/** An eight-point star (two squares), the site's ornament: a mark on Insights' "Your revision" (THEME-5). */
+export function Star8({ size, color }: { size: number; color: string }) {
+  const c = size / 2;
+  const inner = (c * Math.cos(Math.PI / 4)) / Math.cos(Math.PI / 8);
+  const points = Array.from({ length: 16 }, (_, k) => {
+    const a = (Math.PI / 8) * k - Math.PI / 2;
+    const rr = k % 2 === 0 ? c : inner;
+    return `${(c + rr * Math.cos(a)).toFixed(2)},${(c + rr * Math.sin(a)).toFixed(2)}`;
+  }).join(' ');
+  return (
+    <Svg width={size} height={size}>
+      <Polygon points={points} fill={color} />
     </Svg>
   );
 }

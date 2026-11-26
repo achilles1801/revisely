@@ -28,6 +28,7 @@ import PagesByStrengthScreen from '../screens/activity/PagesByStrengthScreen';
 import LastRevisedScreen from '../screens/activity/LastRevisedScreen';
 import ActivitySectionScreen from '../screens/activity/ActivitySectionScreen';
 import ActivityMonthScreen from '../screens/activity/ActivityMonthScreen';
+import ActivityRamadanScreen from '../screens/activity/ActivityRamadanScreen';
 import type { InsightsSection } from '../lib/activitySections';
 import { activityBlocksEnabled } from '../components/activity/DayBlocks';
 import type { ActivityKind } from '../lib/activityItems';
@@ -84,6 +85,8 @@ export type HomeStackParamList = {
   ActivityMonth: { calendarAt?: { month: string; gap?: { from: string; to: string; cue: string } } } | undefined;
   // One section of the one Activity tab on a page of its own (ACT-35, Revisely Dev).
   ActivitySection: { section: InsightsSection };
+  /** The Ramadan row's own page (THEME-6). */
+  ActivityRamadan: undefined;
   // date is a revision day, YYYY-MM-DD.
   /** focusRecordingId: scroll to that recording and highlight it. focusBlock: scroll to that block
    *  (a row of Overview's picked day, ACT-18). */
@@ -184,6 +187,7 @@ function sharedScreens() {
       <HomeStack.Screen name="LastRevised" component={LastRevisedScreen} />
       <HomeStack.Screen name="ActivitySection" component={ActivitySectionScreen} />
       <HomeStack.Screen name="ActivityMonth" component={ActivityMonthScreen} />
+      <HomeStack.Screen name="ActivityRamadan" component={ActivityRamadanScreen} />
       <HomeStack.Screen name="QuranReader" component={QuranReaderScreen} />
     </>
   );

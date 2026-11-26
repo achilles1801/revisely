@@ -25,7 +25,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { Tap } from '../v2/Tap';
 import { ChromeText } from './ChromeText';
-import { typeV2 } from '../../theme/v2';
+import { ramadanV2, typeV2 } from '../../theme/v2';
+import { Star8 } from '../ramadan/art';
+import { useRamadanDecor } from '../ramadan/quiet';
+import { RamadanRow } from '../ramadan/RamadanRow';
+import { useRamadanMonth } from '../ramadan/useRamadanMonth';
 import { journalFirstDay } from '../../lib/journal';
 import { smartTrackingOn } from '../../lib/smartTracking';
 import { gapsInsightsEnabled } from '../../lib/insightsGaps';
@@ -100,13 +104,18 @@ interface Props {
   calendarAt?: { month: string; gap?: Omit<CalendarGap, 'key'> } | null;
   /** The one tab's "Month ›" (Majd's T1): the full calendar on a page of its own. */
   onOpenMonth?: () => void;
+  /** The Ramadan row (THEME-6): its own page. */
+  onOpenRamadan?: () => void;
   /** That page (ACT-35): the month, Week | Month, Today and the arrows, and the picked day in C2's form. */
   monthPage?: boolean;
 }
 
-export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, onShowTop, refreshRef, section, onOpenSection, onOpenCalendar, calendarAt, onOpenMonth, monthPage }: Props) {
+export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, onShowTop, refreshRef, section, onOpenSection, onOpenCalendar, calendarAt, onOpenMonth, onOpenRamadan, monthPage }: Props) {
   const { pages, logs, user } = useApp();
-  const { palette } = useTheme();
+  const { palette, isDark } = useTheme();
+  // The Ramadan theme (THEME-5, THEME-6): the list's star and its first row.
+  const ramadanDecor = useRamadanDecor();
+  const ramadanMonth = useRamadanMonth();
   // One Activity tab (ACT-35, Revisely Dev until released): the calendar and the day, then the sections as rows.
   const oneTab = activityOneTabEnabled();
   const revo = useRevoAvailable(user);
@@ -429,11 +438,21 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
       <RNView testID="activity-blocks-views">
         {calendar('tab')}
         <RNView style={[styles.listHead, { borderTopColor: palette.separator }]} testID="activity-sections-list">
-          <ChromeText style={[typeV2.meta, styles.listTitle, { color: palette.secondary }]} accessibilityRole="header">
-            {t('activity.oneTab.yourRevision')}
-          </ChromeText>
+          <RNView style={styles.listTitleRow}>
+            {/* The Ramadan theme (THEME-5): the site's eight-point star before the list's name. */}
+            {ramadanDecor ? (
+              <RNView accessibilityElementsHidden importantForAccessibility="no-hide-descendants" testID="ramadan-star">
+                <Star8 size={10} color={ramadanV2(isDark, palette.accent).gold} />
+              </RNView>
+            ) : null}
+            <ChromeText style={[typeV2.meta, styles.listTitle, { color: palette.secondary }]} accessibilityRole="header">
+              {t('activity.oneTab.yourRevision')}
+            </ChromeText>
+          </RNView>
           <InsightsRangeChip firstDay={firstDay} />
         </RNView>
+        {/* The Ramadan row first (THEME-6): before the month, during it, on Eid. */}
+        {ramadanMonth && onOpenRamadan ? <RamadanRow month={ramadanMonth} onPress={onOpenRamadan} /> : null}
         <InsightsView
           data={insightsData}
           {...insightsActions}
@@ -528,6 +547,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   listTitle: { letterSpacing: 0.6, textTransform: 'uppercase', flexShrink: 1 },
+  listTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 1 },
   editRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, marginTop: 8 },
   // The range chip wraps under the tabs when the row can't hold all three (large text, an SE).
   switch: { paddingHorizontal: layoutV2.gutter, paddingTop: layoutV2.rowPad, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 8, rowGap: 8 },

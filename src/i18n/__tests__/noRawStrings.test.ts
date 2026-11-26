@@ -31,6 +31,7 @@ const EXTRACTED: string[] = [
   'components/player',
   'components/prayer',
   'components/qibla',
+  'components/ramadan',
   'components/reader',
   'components/recite',
   'components/reciteCheck',

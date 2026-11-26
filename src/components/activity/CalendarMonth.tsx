@@ -21,6 +21,7 @@ import { ActionSheet } from '../v2/ActionSheet';
 import { ChoiceChip } from './ChoiceChip';
 import { dayMarks, dayPreview } from '../../lib/activityInsights';
 import { useJournalDesign } from '../../lib/release/journalDesign';
+import { useRamadanHijri } from '../ramadan/useRamadanHijri';
 import { DayEntry, type DayEntryExtra, type DayEntryLine, type DayEntryRing } from './DayEntry';
 import { spotTestsTail, type SpotTestsDay } from '../../lib/spotTests';
 import { formatDayLong, formatMinutesLong } from '../../lib/activityFormat';
@@ -329,6 +330,8 @@ export function CalendarMonth({
   // screen and the rows clipped into each other (Nov 2026).
   // The one tab's day (no note) is C2's form; elsewhere ACT-34's lines.
   const c2 = !showNote;
+  // The Ramadan theme (THEME-6): the picked day's Hijri date in Ramadan or Eid.
+  const hijri = useRamadanHijri(shownDay);
   const dayPart = journalDesign ? (
     <DayEntry
       date={formatDayLong(shownDay)}
@@ -337,7 +340,7 @@ export function CalendarMonth({
       showNote={showNote}
       onOpen={() => onOpen(shownDay)}
       onAddNote={() => (onAddNote ?? onOpen)(shownDay)}
-      {...(c2 ? { ring, extras } : {})}
+      {...(c2 ? { ring, extras, hijri } : {})}
     />
   ) : (
     <View style={styles.preview} testID="calendar-preview">
