@@ -32,7 +32,10 @@ export default {
     // 1024 with no alpha, as the App Store requires. The splash is the
     // expo-splash-screen plugin below.
     icon: DEV ? "./assets/dev/icon.png" : "./assets/icon.png",
-    userInterfaceStyle: "light",
+    // Revisely Dev follows the phone's light or dark setting (Majd, Nov 25 2026: "system setting dark/light mode"):
+    // Settings → Appearance then offers System (ThemeContext's systemAppearanceAvailable). The store app stays "light"
+    // until its own native release, so its fingerprints don't move.
+    userInterfaceStyle: DEV ? "automatic" : "light",
     newArchEnabled: true,
     ios: {
       supportsTablet: false,
