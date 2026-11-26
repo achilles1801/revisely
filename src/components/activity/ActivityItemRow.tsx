@@ -15,6 +15,8 @@ const KIND_ICON: Record<ActivityKind, keyof typeof Ionicons.glyphMap> = {
   reading: 'stopwatch-outline',
   recording: 'mic-outline',
   log: 'create-outline',
+  // Test me's own mark in Recite's menu.
+  spotTest: 'shuffle',
 };
 
 /**

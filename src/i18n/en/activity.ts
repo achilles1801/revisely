@@ -560,7 +560,7 @@ export const activity = {
     showKind: 'Show {{kind}}',
     /** "4 takes · 7 mistakes". */
     takesCount: '{{takes}} · {{mistakes}}',
-    mistakes_one: '{{count}} mistakes',
+    mistakes_one: '{{count}} mistake',
     mistakes_other: '{{count}} mistakes',
     title: 'All activity',
     nothingMatches: 'Nothing matches.',

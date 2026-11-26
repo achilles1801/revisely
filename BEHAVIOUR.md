@@ -937,7 +937,11 @@ Recite with Mark mistakes remembers each take (Majd, Nov 15 2026; Tarteel's bigg
   passages and how many takes) that opens the day at its takes. (Majd, Nov 20 2026: "after I finished my recording, I
   go to my journal to go take a look at it ... today is Thursday, so I'll go to Thursday to see what I did". Before,
   the preview had no takes and the day one quiet "1 take ›" row.) All activity has
-  Recitations, with All takes, With mistakes and Page hidden. Show on the page opens the reader at the
+  Recitations, with All takes, With mistakes and Page hidden. In Revisely Dev a spot test is its own kind there too (ACT-34;
+  Majd, Nov 26 2026: "why are spot tests not searchable under all activity? they should be"): a row in All, "Spot test ·
+  Stopped early" over its ayat and mistakes, that the search finds by its surahs, pages and date, and by "spot test",
+  "finished" or "stopped"; and a Spot tests filter after Recitations, which then lists the other takes alone. Its row shows
+  the test on its page with its marks, as a take in Recitations does. Show on the page opens the reader at the
   take's page with that take's marks at full strength and nothing else, until Done. Its bar has ▶ for the
   take's audio while that audio is on the phone. Each mark has its card, and Not a mistake there updates the
   take. The progress page's takes open it too.

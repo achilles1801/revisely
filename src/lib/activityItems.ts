@@ -7,14 +7,18 @@ import { describePageRuns, pageRuns } from './pageRanges';
 import { describePassage, describeSession, plainText } from './passages';
 import { getSurahsForPage } from './quranData';
 import { formatClock } from './readingTimer';
+import { spotTestOutcome } from './spotTests';
+import type { SpotTestRecord } from './reciteMemory/record';
 import { formatDate, formatDay, t } from '../i18n';
 
 // Activity as single things done (a revision session, a timed reading, a
 // recording, a day's log), newest first: Recent on Activity and Home, and the
-// searchable list behind "See all" (new design).
+// searchable list behind "See all" (new design). There, in Revisely Dev, a spot
+// test is one too (RMEM-5, ACT-34).
 
-export type ActivityKind = 'revision' | 'reading' | 'recording' | 'log';
+export type ActivityKind = 'revision' | 'reading' | 'recording' | 'log' | 'spotTest';
 
+/** Every account's kinds; All activity adds Recitations and Spot tests after Revision where Recite keeps takes. */
 export const ACTIVITY_KINDS: ActivityKind[] = ['revision', 'reading', 'recording', 'log'];
 
 export const ACTIVITY_KIND_LABELS: Record<ActivityKind, string> = {
@@ -30,7 +34,21 @@ export const ACTIVITY_KIND_LABELS: Record<ActivityKind, string> = {
   get log() {
     return t('lib.activity.kindLog');
   },
+  get spotTest() {
+    return t('lib.activity.kindSpotTest');
+  },
 };
+
+/**
+ * What a spot test's item needs: the take (one with `spotTest`), and what the screen names from the word data, its ayat
+ * ("Ar-Ra'd 1–4"), how it went ("1 mistake") and its pages.
+ */
+export interface SpotTestItemSource {
+  take: { id: string; day: string; createdAt: number; spotTest: Pick<SpotTestRecord, 'finished'> };
+  passage: string;
+  result: string;
+  pages: number[];
+}
 
 /** What the list needs of a recording (lib/recordings' RecordingMeta has it). */
 export interface RecordingItemSource {
@@ -57,6 +75,8 @@ export interface ActivityItem {
   done?: boolean;
   log?: RevisionLog;
   recordingId?: string;
+  /** A spot test's take and the page it starts on: it opens there, with its marks, as a take does. */
+  take?: { id: string; page: number };
   /** The words a search matches, lowercased, each after a space. */
   search: string;
 }
@@ -196,6 +216,19 @@ function logItem(day: JournalEntry, note: JournalNote, user?: User | null): Acti
   });
 }
 
+/** A spot test (ACT-34): how it ended ("Spot test · Stopped early"), then its ayat and how it went. */
+export function spotTestItem({ take, passage, result, pages }: SpotTestItemSource): ActivityItem {
+  return item({
+    key: `spot-${take.id}`,
+    kind: 'spotTest',
+    day: take.day,
+    at: take.createdAt,
+    title: t('lib.activity.spotTest', { outcome: spotTestOutcome(take.spotTest) }),
+    detail: [passage, result].filter(Boolean).join(' · '),
+    take: { id: take.id, page: pages[0] ?? 1 },
+  }, pages);
+}
+
 function weekdayName(day: string): string {
   const [y, m, d] = day.split('-').map(Number);
   return formatDate(new Date(y, m - 1, d), { weekday: 'short' });
@@ -233,11 +266,14 @@ export function buildActivityItems(
     readings = [],
     journal = [],
     recordings = [],
+    spotTests = [],
   }: {
     logs: RevisionLog[];
     readings?: ReadingSession[];
     journal?: JournalEntry[];
     recordings?: RecordingItemSource[];
+    /** All activity's, in Revisely Dev (RMEM-5); Recent never lists them. */
+    spotTests?: SpotTestItemSource[];
   },
   user?: User | null,
 ): ActivityItem[] {
@@ -252,6 +288,7 @@ export function buildActivityItems(
     if (s) out.push(readingItem(s));
   }
   for (const r of recordings) if (DAY_RE.test(r.day)) out.push(recordingItem(r));
+  for (const s of spotTests) if (DAY_RE.test(s.take.day)) out.push(spotTestItem(s));
   for (const day of journal) {
     if (!DAY_RE.test(day.date)) continue;
     for (const note of day.entries) if (!isJournalNoteEmpty(note)) out.push(logItem(day, note, user));

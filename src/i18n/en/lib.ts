@@ -322,6 +322,7 @@ export const lib = {
     kindReading: 'Reading',
     kindRecording: 'Recordings',
     kindLog: 'Daily log',
+    kindSpotTest: 'Spot tests',
     revisedOf_one: 'Revised {{revised}} of {{count}} page',
     revisedOf_other: 'Revised {{revised}} of {{count}} pages',
     revisedPages_one: 'Revised {{count}} page',
@@ -329,6 +330,8 @@ export const lib = {
     readFor: 'Read for {{time}}',
     timedSession: 'Timed session',
     recorded: 'Recorded {{time}}',
+    /** A spot test in All activity: "Spot test · Stopped early". */
+    spotTest: 'Spot test · {{outcome}}',
     duringRevision: 'During revision',
     whileReading: 'While reading',
     logMemorized: 'Memorized {{text}}',
