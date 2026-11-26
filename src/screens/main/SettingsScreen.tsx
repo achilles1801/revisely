@@ -121,7 +121,7 @@ import { isDevVariant } from '../../lib/variant';
 import { RAMADAN_CHOICES, ramadanThemeOffered, setRamadanChoice, useRamadanChoice, useRamadanTheme, type RamadanChoice } from '../../lib/ramadanTheme';
 import { RAMADAN_TESTS, ramadanDates, ramadanTestLabel, ramadanWindow, setRamadanTest, useRamadanTest } from '../../lib/ramadanDates';
 import { localDay } from '../../lib/fajrBoundary';
-import { WithCrescent } from '../../components/ramadan';
+import { WithCrescent } from '../../components/ramadan/WithCrescent';
 import { CheckerModelRow } from '../../components/settings/CheckerModelRow';
 import { ReciteWhereRow } from '../../components/settings/ReciteWhereRow';
 import { ScheduledRemindersRow } from '../../components/settings/ScheduledRemindersRow';
