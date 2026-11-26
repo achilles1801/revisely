@@ -52,6 +52,14 @@
       {
         "source": "/audit",
         "destination": "/index.html"
+      },
+      {
+        "source": "/premium",
+        "destination": "/index.html"
+      },
+      {
+        "source": "/staff",
+        "destination": "/index.html"
       }
     ],
     "headers": [

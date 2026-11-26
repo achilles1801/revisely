@@ -66,11 +66,53 @@
       ]
     },
     {
+      "collectionGroup": "reciteLabelClips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "order", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "reciteLabelClips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "queue", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "order", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "labels",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "by.uid", "order": "ASCENDING" },
+        { "fieldPath": "at", "order": "ASCENDING" },
+        { "fieldPath": "answers", "order": "ASCENDING" },
+        { "fieldPath": "ms", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "labels",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "by.uid", "order": "ASCENDING" },
+        { "fieldPath": "at", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "consoleAudit",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "kind", "order": "ASCENDING" },
         { "fieldPath": "at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "entitlements",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "premium.source", "order": "ASCENDING" },
+        { "fieldPath": "premium.until", "order": "ASCENDING" }
       ]
     }
   ],

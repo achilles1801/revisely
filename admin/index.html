@@ -33,6 +33,9 @@ html, body { margin: 0; }
       <a href="/" data-view="overview" hidden><span class="k"></span>Overview</a>
       <a href="/open-door" data-view="opendoor" hidden><span class="k"></span>Open Door <span class="badge" id="odBadge" hidden></span></a>
       <a href="/audit" data-view="audit" hidden><span class="k"></span>Audit log</a>
+      <a href="/premium" data-view="premium" hidden><span class="k"></span>Premium</a>
+      <a href="/staff" data-view="staff" hidden><span class="k"></span>Staff <span class="badge" id="staffBadge" hidden></span></a>
+      <a href="/label" id="labelsTab" hidden>Label recitations ›</a>
     </nav>
   </div>
 </header>
@@ -223,15 +226,56 @@ html, body { margin: 0; }
 <section id="view-audit" hidden aria-labelledby="auditTitle">
   <div class="od-head">
     <h2 id="auditTitle">Audit log</h2>
-    <span class="sub">Every decision and role change: who, what, when. Never applicants’ answers.</span>
+    <span class="sub">Every decision, role change and recitation label: who, what, when. Never applicants’ answers.</span>
     <div class="seg" role="group" aria-label="Show" id="auditKinds" style="margin-left:auto">
       <button type="button" data-kind="decisions" aria-pressed="true">Open Door decisions</button>
       <button type="button" data-kind="roles">Role changes</button>
+      <button type="button" data-kind="labels">Labels</button>
     </div>
   </div>
   <div class="conn" id="auditConn" hidden></div>
   <div class="w"><div class="tbl-wrap"><table id="auditTable"><thead></thead><tbody></tbody></table></div>
   <div class="queue-f" style="border:0;padding:10px 0 0"><span id="auditRange"></span><span class="sp"></span><button type="button" class="btn" id="auditNewer" disabled>‹ Newer</button><button type="button" class="btn" id="auditOlder" disabled>Older ›</button></div></div>
+</section>
+
+<section id="view-premium" hidden aria-labelledby="premiumTitle">
+  <div class="od-head">
+    <h2 id="premiumTitle">Premium</h2>
+    <span class="sub">Who has Premium, from where, and what ends soon. Counts only.</span>
+    <span class="sub" id="premiumAsOf" style="margin-left:auto"></span>
+    <button type="button" class="btn" id="premiumRefresh">Refresh</button>
+  </div>
+  <div class="conn" id="premiumConn" hidden></div>
+  <div class="tiles" id="premiumTop"></div>
+  <div class="sec-h" style="margin-top:18px"><h2>Premium now, by where it came from</h2><span class="sub">An account with two grants counts under the one that lasts longest</span></div>
+  <div class="tiles premium-sources" id="premiumSources"></div>
+  <p class="foot">From each account’s entitlements, as the app and the recitation checker read them. Subscriptions show here once a paid plan exists.</p>
+</section>
+
+<section id="view-staff" hidden aria-labelledby="staffTitle">
+  <div class="od-head">
+    <h2 id="staffTitle">Staff</h2>
+    <span class="sub">Who can use Revisely Console, and what their role opens. Owners only.</span>
+  </div>
+  <div class="conn" id="staffConn" hidden></div>
+  <div class="w req-box" id="staffReqBox">
+    <div class="w-h"><h3>Access requests</h3><span class="sub" id="staffReqSub">People who signed in to the console without a role. They see nothing until you act.</span></div>
+    <div class="req-list" id="staffReqs"></div>
+  </div>
+  <div class="w"><div class="w-h"><h3>Have a role</h3></div><div class="tbl-wrap"><table id="staffTable"><thead><tr><th>Account</th><th>Role</th><th>Last sign-in</th><th></th></tr></thead><tbody></tbody></table></div></div>
+  <div class="w" id="staffInvitesBox" hidden><div class="w-h"><h3>Invited</h3><span class="sub">The role attaches when they first sign in with this email.</span></div>
+    <div class="tbl-wrap"><table id="staffInvites"><thead><tr><th>Email</th><th>Role</th><th>Invited</th><th></th></tr></thead><tbody></tbody></table></div></div>
+  <details class="w staff-more">
+    <summary>Add someone by email instead</summary>
+    <form class="staff-give" id="staffGive" autocomplete="off">
+      <input id="staffEmail" type="email" placeholder="Their email" spellcheck="false" autocapitalize="off" required aria-label="Their email">
+      <select id="staffRole" aria-label="Role"></select>
+      <button type="submit" class="btn">Add</button>
+      <p class="sub">Already signed in once: the role is theirs now. Not yet: they get it the first time they sign in with this email (Google, or the email link).</p>
+    </form>
+  </details>
+  <div class="sec-h" style="margin-top:18px"><h2>What each role opens</h2></div>
+  <div class="grid staff-roles" id="staffRoles"></div>
 </section>
 </main>
 
