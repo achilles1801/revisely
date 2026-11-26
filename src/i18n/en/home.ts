@@ -63,9 +63,6 @@ export const home = {
   },
   /** screens/main/DashboardScreen: Home itself. */
   screen: {
-    /** The row into today's journal (HOME-2). */
-    journal: 'Today’s journal',
-    journalAddNote: 'Add a note',
     loadFailed: "Couldn't load your data",
     saveFailed: "Couldn't save",
     carryFailed: "Couldn't update today's session",

@@ -23,12 +23,12 @@ jest.mock('../recite/micSource', () => ({ isMicStreamAvailable: () => true }));
 const APP_STORE = [{}, { previewTester: false }] as const;
 const TESTER = { previewTester: true };
 
-describe('the journal’s new look: one switch (ACT-33, ACT-34, HOME-2)', () => {
+describe('the journal’s new look: one switch (ACT-33, ACT-34)', () => {
   const { journalDesignEnabled, JOURNAL_DESIGN_RELEASED, setJournalDesignReleasedForTests } =
     require('../release/journalDesign') as typeof import('../release/journalDesign');
   afterEach(() => setJournalDesignReleasedForTests(undefined));
 
-  it('[ACT-33] [ACT-34] [HOME-2] is Revisely Dev’s until released, then everyone’s', () => {
+  it('[ACT-33] [ACT-34] is Revisely Dev’s until released, then everyone’s', () => {
     expect(JOURNAL_DESIGN_RELEASED).toBe(false);
     expect(journalDesignEnabled()).toBe(false);
     setJournalDesignReleasedForTests(true);
@@ -46,6 +46,19 @@ describe('the Account page’s new look: one switch (ACCOUNT-4 to ACCOUNT-7)', (
     expect(accountDesignEnabled()).toBe(false);
     setAccountDesignReleasedForTests(true);
     expect(accountDesignEnabled()).toBe(true);
+  });
+});
+
+describe('Home, version 3: one switch (HOME-4, HOME-5)', () => {
+  const { homeV3Enabled, HOME_V3_RELEASED, setHomeV3ForTests } =
+    require('../release/homeV3') as typeof import('../release/homeV3');
+  afterEach(() => setHomeV3ForTests(undefined));
+
+  it('[HOME-4] [HOME-5] is Revisely Dev’s until released, then everyone’s', () => {
+    expect(HOME_V3_RELEASED).toBe(false);
+    expect(homeV3Enabled()).toBe(false);
+    setHomeV3ForTests(true);
+    expect(homeV3Enabled()).toBe(true);
   });
 });
 

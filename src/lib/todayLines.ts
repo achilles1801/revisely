@@ -35,7 +35,11 @@ export { NBHY, NBSP };
  * revised reads "Left" instead of "Missed". Several days say how many
  * ("Missed 3 days"). Null when nothing is left over.
  */
-export function catchUpLine(leftovers: Leftovers, partial: PartialPages = NONE): { title: string; label: string } | null {
+export function catchUpLine(
+  leftovers: Leftovers,
+  partial: PartialPages = NONE,
+  { quiet = false }: { quiet?: boolean } = {},
+): { title: string; label: string } | null {
   if (leftovers.pages.length === 0) return null;
   const what = describePagesToRevise(leftovers.pages, partial, { form: 'short', sentence: true, max: 2 });
   const missed = leftovers.days.every((d) => d.missed);
@@ -45,7 +49,14 @@ export function catchUpLine(leftovers: Leftovers, partial: PartialPages = NONE):
         ? t('lib.today.yesterday')
         : t('lib.today.daysAgo', { count: leftovers.days[0].ago })
       : t('lib.today.days', { count: leftovers.days.length });
-  const title = missed ? t('lib.today.missed', { when, what }) : t('lib.today.left', { when, what });
+  // Quiet (HOME-5): the grey line under the Today post's button, its "Add to today" after it, so no "Revise".
+  const title = quiet
+    ? missed
+      ? t('lib.today.missedQuiet', { when, what })
+      : t('lib.today.leftQuiet', { when, what })
+    : missed
+      ? t('lib.today.missed', { when, what })
+      : t('lib.today.left', { when, what });
   return { title, label: spoken(title) };
 }
 

@@ -45,8 +45,7 @@ import { HEADER_MAX_SCALE, TodayPost, memorizedText } from '../../components/hom
 import { SessionPost } from '../../components/home/feed/SessionPost';
 import { KahfPost } from '../../components/home/feed/KahfPost';
 import { RecentSection } from '../../components/activity/ActivityItemRow';
-import { TodayJournalRow } from '../../components/home/feed/TodayJournalRow';
-import { useJournalDesign } from '../../lib/release/journalDesign';
+import { useHomeV3 } from '../../lib/release/homeV3';
 import { RunningTimerChip } from '../../components/timer/RunningTimerChip';
 import { HeroGlow } from '../../components/v2/HeroGlow';
 import { RamadanHome, WithCrescent } from '../../components/ramadan';
@@ -115,7 +114,8 @@ export default function DashboardScreen() {
   const { user, pages, logs, addLog, updateLog, deleteLog, loadData, error, saveUser, pendingChanges } = useApp();
   const { firebaseUser } = useAuth();
   const { day: revisionDay, date: revisionDate } = useRevisionDay(user);
-  const journalDesign = useJournalDesign();
+  // Home, version 3 (Revisely Dev): today alone, one solid button (HOME-4, HOME-5).
+  const homeV3 = useHomeV3();
 
   const homePrefs = useHomePrefs();
   // Room for the tab bar (and the mini player) and for Revo's button.
@@ -543,7 +543,8 @@ export default function DashboardScreen() {
 
   // A feed: Today in one post (its pages, the action, how much is memorized),
   // Friday's Al-Kahf, then the last few sessions; the rest is behind "See
-  // all", searchable. A running timer shows in the top bar.
+  // all", searchable. In Revisely Dev, no sessions: they are in Activity
+  // (HOME-4). A running timer shows in the top bar.
   const recent = sessionLogs.slice(0, COMPACT_SESSION_LIMIT);
   // How much of the Quran is memorized: everyone sees it (no setting).
   const memorized = memorizedText(pages);
@@ -624,9 +625,10 @@ export default function DashboardScreen() {
           onPrimary={handleCtaPress}
           onMemorization={() => navigation.navigate('Memorization', { edit: true })}
           onJump={() => setJumpOpen(true)}
-          catchUp={catchUpLine(leftovers, partial)}
+          catchUp={catchUpLine(leftovers, partial, { quiet: homeV3 })}
           onCarryOver={handleCarryOver}
           carrying={carrying}
+          quietCatchUp={homeV3}
           ahead={aheadNext ? { lead: aheadNext.lead, first: aheadNext.plan.pages[0] } : null}
           onAhead={() =>
             aheadNext &&
@@ -635,40 +637,39 @@ export default function DashboardScreen() {
           help={<HelpButton screen="home" size={20} color={palette.secondary} maxFontSizeMultiplier={HEADER_MAX_SCALE} />}
         />
 
-        {journalDesign ? (
-          <TodayJournalRow day={revisionDay} onOpen={() => navigation.navigate('ActivityDay', { date: revisionDay })} />
-        ) : null}
-
         {showKahfCard && (
           <KahfPost
             state={kahfState === 'done' ? 'done' : 'prompt'}
             eve={revisionDay !== kahfFriday}
             saving={kahfSaving}
+            quietRead={homeV3}
             onRead={openKahf}
             onMarkRead={markKahfRead}
             onDismiss={() => setHomePrefs({ kahfDismissedDay: kahfFriday })}
           />
         )}
 
-        <RecentSection
-          title={t('home.screen.recent')}
-          count={recent.length}
-          emptyText={t('home.screen.noSessions')}
-          onSeeAll={() => navigation.navigate('ActivityAll', { kind: 'revision' })}
-          testID="home-recent"
-        >
-          {recent.map((log, i) => (
-            <SessionPost
-              key={log.id}
-              log={log}
-              today={revisionDay}
-              juzPlan={user?.scheduleMode === 'juz'}
-              onEdit={() => handleEditSession(log)}
-              onDelete={() => deleteLog(log.id)}
-              separator={i < recent.length - 1}
-            />
-          ))}
-        </RecentSection>
+        {homeV3 ? null : (
+          <RecentSection
+            title={t('home.screen.recent')}
+            count={recent.length}
+            emptyText={t('home.screen.noSessions')}
+            onSeeAll={() => navigation.navigate('ActivityAll', { kind: 'revision' })}
+            testID="home-recent"
+          >
+            {recent.map((log, i) => (
+              <SessionPost
+                key={log.id}
+                log={log}
+                today={revisionDay}
+                juzPlan={user?.scheduleMode === 'juz'}
+                onEdit={() => handleEditSession(log)}
+                onDelete={() => deleteLog(log.id)}
+                separator={i < recent.length - 1}
+              />
+            ))}
+          </RecentSection>
+        )}
       </ScrollView>
       {editModal}
       <UpdateReadySheet />

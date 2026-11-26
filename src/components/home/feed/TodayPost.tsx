@@ -86,6 +86,7 @@ export function TodayPost({
   catchUp,
   onCarryOver,
   carrying,
+  quietCatchUp = false,
   ahead,
   onAhead,
   help,
@@ -122,6 +123,11 @@ export function TodayPost({
   catchUp: { title: string; label: string } | null;
   onCarryOver: () => void;
   carrying: boolean;
+  /**
+   * HOME-5 (Revisely Dev): the catch-up is a grey line under the button, ending in "Add to today" in the accent colour
+   * (catchUpLine's quiet form); else the line, then "Add to today" as a button, above it (CARRY-1).
+   */
+  quietCatchUp?: boolean;
   /** Done today: the next revision day, for the quiet line that opens it (revise ahead). */
   ahead?: { lead: string; first: number } | null;
   onAhead?: () => void;
@@ -216,7 +222,7 @@ export function TodayPost({
         testID="today-post"
         footer={
           <>
-            {catchUp ? (
+            {catchUp && !quietCatchUp ? (
               // The missed pages come first: one line, then the button that adds them to today.
               <View style={styles.catchUp}>
                 <Text style={[typeV2.body, { color: palette.secondary }]} {...fit} testID="today-catch-up">
@@ -238,6 +244,29 @@ export function TodayPost({
               variant={lines.solid ? 'solid' : 'outline'}
               testID="today-cta"
             />
+            {catchUp && quietCatchUp ? (
+              // HOME-5: Home's one button stays the Today post's; the missed pages are a quiet line under it, and a tap
+              // anywhere on it adds them. "Add to today" is held together so it never breaks across lines.
+              <Tap
+                onPress={onCarryOver}
+                disabled={carrying}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={t('home.today.addToTodayLabel', { line: catchUp.label })}
+                accessibilityState={{ disabled: carrying }}
+                style={styles.memorized}
+                testID="today-carry-over"
+              >
+                <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={LINES_MAX_SCALE}>
+                  <Text testID="today-catch-up">{catchUp.title}</Text>
+                  {NBSP}
+                  {NBSP}
+                  <Text style={[styles.add, { color: palette.accentText }]} testID="today-add">
+                    {(carrying ? t('home.today.adding') : t('home.today.addToToday')).split(' ').join(NBSP)}
+                  </Text>
+                </Text>
+              </Tap>
+            ) : null}
             {ahead && onAhead && status === 'completed' ? (
               // Quiet: a grey line, not a second button. Opens that day's pages.
               <Tap
@@ -302,4 +331,5 @@ const styles = StyleSheet.create({
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
   bar: { flex: 1 },
   memorized: { width: '100%', marginTop: 4 },
+  add: { fontWeight: '600' },
 });

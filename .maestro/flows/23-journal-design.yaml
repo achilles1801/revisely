@@ -1,7 +1,8 @@
-# The journal's new look (Revisely Dev; `e2e/journal-design` turns it on here): Home's row, the day's entry under the
-# calendar, and Revised elsewhere's search and juz grid. Every screen in light and dark, each beside its mock in
-# ~/Documents/revisely-today-mocks/journal-and-elsewhere/png.
-# Rules (BEHAVIOUR.md): ACT-33, ACT-34, HOME-2
+# The journal's new look and Home, version 3 (Revisely Dev; `e2e/journal-design` and `e2e/home-v3` turn them on here):
+# Home with no journal row or Recent sessions, the day's entry under the calendar, and Revised elsewhere's search and juz
+# grid. Every screen in light and dark, each beside its mock in ~/Documents/revisely-today-mocks/journal-and-elsewhere/png
+# (Home: ~/Documents/revisely-today-mocks/home-v3/png/v2).
+# Rules (BEHAVIOUR.md): ACT-33, ACT-34, HOME-4
 appId: com.revisionbuddy.app
 ---
 - runFlow:
@@ -19,10 +20,18 @@ appId: com.revisionbuddy.app
     link: revisely://e2e/journal-design?on=1
     optional: true
 - runFlow: ../subflows/open-link-prompt.yaml
+- openLink:
+    link: revisely://e2e/home-v3?on=1
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
 - extendedWaitUntil:
     visible:
-      id: today-journal
+      id: today-post
     timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: home-recent
+    timeout: 10000
 - runFlow:
     file: ../subflows/journal-design-screens.yaml
     env:

@@ -1,5 +1,5 @@
-// The journal's new look (Majd's picks, Nov 23 2026): Revised elsewhere picks from a search and the 30 juz (ACT-33), the day
-// under Overview's calendar is one entry (ACT-34), and Home has one quiet row into today's journal (HOME-2).
+// The journal's new look (Majd's picks, Nov 23 2026): Revised elsewhere picks from a search and the 30 juz (ACT-33), and the
+// day under Overview's calendar is one entry (ACT-34). (Home's row into today's journal went on Nov 26: HOME-4.)
 //
 // One switch, so it can reach App Store users on its own: off, it is Revisely Dev's; on, everyone's. Turning it on is this one
 // line (JOURNAL_DESIGN_RELEASED = true), with the three rules' lines moving from Revo's Dev guide to the main guide (and the
