@@ -125,11 +125,15 @@ async function collect() {
     const m = r.result.message;
     input += (m.usage?.input_tokens ?? 0) + (m.usage?.cache_read_input_tokens ?? 0) + (m.usage?.cache_creation_input_tokens ?? 0);
     output += m.usage?.output_tokens ?? 0;
+    const raw = (m.content.find((b) => b.type === 'text') || {}).text || '';
     try {
-      const got = JSON.parse(m.content.find((b) => b.type === 'text').text).lines;
+      const got = JSON.parse(raw).lines;
       if (Array.isArray(got)) lines.set(r.custom_id, got);
     } catch {
-      bad++;
+      // A numbered reply cut off at max_tokens: its complete lines still name their pieces, so they are kept.
+      const salvaged = [...raw.matchAll(/\{"piece":\s*(\d+),\s*"line":\s*"((?:[^"\\]|\\.)*)"\}/g)].map((x) => ({ piece: Number(x[1]), line: JSON.parse(`"${x[2]}"`) }));
+      if (salvaged.length > 0) lines.set(r.custom_id, salvaged);
+      else bad++;
     }
   }
   let written = 0;
