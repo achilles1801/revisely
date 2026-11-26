@@ -77,6 +77,11 @@ export const SCREEN_MASKS = {
       .flatMap((n) => [n, `${n}-dark`])
       .map((n) => [n, merge(revoButton, sessionMinutes(1272, 1081))]),
   ),
+  // 17-jump-after-ahead: Home done after a session (02-home-done's layout), alone and under "A new update is
+  // ready". Its session took a different number of minutes in each run.
+  ...Object.fromEntries(
+    ['17-home-after-jump', '17-update-after-jump'].map((n) => [n, sessionMinutes(1272, 1081)]),
+  ),
   // All activity: the session's row, its minutes.
   ...Object.fromEntries(['11-see-all', '11-see-all-dark'].map((n) => [n, sessionMinutes(777, 640)])),
 };
