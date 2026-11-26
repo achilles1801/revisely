@@ -57,7 +57,7 @@ export function kindOf(request: MessagesRequest): RecordingKind {
   const system = request.system.map((s) => s.text).join('\n');
   if (!system.startsWith('You are Revo')) return 'coach';
   const last = request.messages[request.messages.length - 1];
-  return last?.role === 'user' && last.content.endsWith(REVIEW_INSTRUCTION) ? 'revo-review' : 'revo-ask';
+  return last?.role === 'user' && typeof last.content === 'string' && last.content.endsWith(REVIEW_INSTRUCTION) ? 'revo-review' : 'revo-ask';
 }
 
 /** The request a recording was made with, in short. */

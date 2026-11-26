@@ -136,3 +136,20 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
   Activity, the daily log, Settings at a section, prayer times, the Qibla or the reader at a surah or juz
   (`REVO_SCREENS`, the same list in `functions/src/revo/types.ts` and `src/lib/revo/types.ts`; `src/lib/revo/screens`
   maps each to its route). A new screen goes in both lists, `screenTarget` and the guide's `SCREEN_HINTS`.
+- **Answers from the tafsir** (Revisely Dev; Majd, Nov 26 2026: "all answers MUST stem from those tafseer books"; plan,
+  boards and measurements in `~/Documents/revisely-revo-mocks/tafsir/NOTE.md`). Revo answers questions about the Qur'an
+  only from Tafsir al-Tabari, Ibn Kathir, al-Qurtubi and al-Sa'di, and shows each book's words.
+  - **The texts:** QUL's (Tarteel's Quranic Universal Library), from spa5k/tafsir_api's per-surah JSON.
+    `functions/scripts/tafsir/build-tafsir.js --raw <dir> --out <dir>` writes one file per Madani 1405 page (the passages
+    that touch it, from the four and Ibn Kathir's abridged English; harakat kept, the editors' `[[...]]` notes removed;
+    pieces of about a sentence as offsets), 604 files, 109 MB; uploaded to dev Storage `tafsir/v1/` (`gcloud storage cp
+    -r <out>/v1 gs://revisely-dev.firebasestorage.app/tafsir/`). Production's Storage gets them with the release.
+  - **Retrieval** (`functions/src/revo/tafsir/select.ts`): the ayat asked about are the index (page → passages); al-Sa'di's
+    passages whole, then up to 6 pieces from each of the other three, focused by keyword search (BM25) over Ibn Kathir's
+    English. Measured with count_tokens on seven pages: 8,500–11,000 tokens a question, against 27,000–29,000 for a
+    whole page (Arabic is ~1.3 characters a token; the model gets it without harakat, ~20% fewer).
+  - **The request** (`request.ts`): its own small system prompt, the books as documents with Anthropic's Citations on
+    (each quote comes back as exact words and their place, guaranteed real; quoted words cost no output tokens), no
+    structured output (Citations can't be combined with it), the rules and al-Sa'di cached. `reply.ts` maps each
+    citation back to the book's own text, harakat and all; an answer with no source is shown only when short (the
+    books don't say). A question asked elsewhere in Revo first goes to Haiku 5.5 (`locate.ts`) for its ayat.

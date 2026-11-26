@@ -41,15 +41,18 @@ export interface MessagesRequest {
   model: string;
   max_tokens: number;
   /** Revo (Sonnet 5.5) sends `between_tools`: no extended thinking. Left out, the model's default. */
-  thinking?: { type: 'between_tools' } | { type: 'adaptive' };
+  thinking?: { type: 'between_tools' } | { type: 'adaptive' } | { type: 'disabled' };
   system: { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }[];
-  messages: { role: 'user' | 'assistant'; content: string }[];
+  /** A message is text, or content blocks (Revo's answers from the tafsir send documents with citations on). */
+  messages: { role: 'user' | 'assistant'; content: string | Record<string, unknown>[] }[];
   /** Revo's requests only: structured output, its reply as one JSON object (revo/replySchema.ts). The coach sends none. */
   output_config?: { format: { type: 'json_schema'; schema: Record<string, unknown> } };
 }
 
 export interface CoachReply {
   text: string;
+  /** The reply's content blocks as the API sent them (text blocks with their citations). */
+  content?: unknown[];
   usage: Usage;
   attempts: number;
   /** Why the model stopped: 'end_turn', or 'max_tokens' when the reply was cut off. */
@@ -108,7 +111,13 @@ export async function callCoach(request: MessagesRequest, deps: CallDeps): Promi
         .join('')
         .trim();
       if (text === '') throw new CoachCallError('The coach gave no answer. Try again.', res.status, false);
-      return { text, usage: body.usage ?? {}, attempts: attempt, ...(typeof body.stop_reason === 'string' ? { stopReason: body.stop_reason } : {}) };
+      return {
+        text,
+        content: body.content ?? [],
+        usage: body.usage ?? {},
+        attempts: attempt,
+        ...(typeof body.stop_reason === 'string' ? { stopReason: body.stop_reason } : {}),
+      };
     }
 
     const retryable = res.status === 429 || res.status >= 500;
