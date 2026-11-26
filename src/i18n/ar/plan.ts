@@ -114,6 +114,7 @@ export const plan: NonNullable<ArStrings['plan']> = {
     everyPage_many: 'تأتي كل صفحة كل {{count}} يومًا',
     everyPage_other: 'تأتي كل صفحة كل {{count}} يوم',
     customNote: 'الحفظ يجعل هذه خطتك الخاصة، فالصفحات التي تحفظها لاحقًا لن تنضم إليها وحدها.',
+    revoDraft: 'جدول ⁨Revo⁩، لم يُحفظ بعد. لا يتغيّر شيء حتى تضغط حفظ.',
     yourDays: 'أيامك',
     dayFooter: 'اضغط على يوم لتغيير ما فيه.',
     amountCustomFooter: 'تبقى أيام خطتك كما هي. لاستخدام هذا المقدار، اختر «إنشاء خطة جديدة».',

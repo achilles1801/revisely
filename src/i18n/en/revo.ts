@@ -38,11 +38,32 @@ export const revo = {
     movedRight: 'Moved to the right',
   },
   /** The card under an answer with the one thing Revo suggests. */
+  /** Revo opened from Edit schedule (REVO-43): the schedule in its header's words, then four starters. */
+  schedule: {
+    line: 'Your schedule is {{perDay}}: {{repeats}}. Tell me what you’d like to change, and I’ll draft it for you to check.',
+    empty: 'Tell me how much you can revise a day, and I’ll draft a schedule for you to check.',
+    lighter: 'Make it lighter',
+    sooner: 'Finish a round sooner',
+    rest: 'Rest one day a week',
+    newPlan: 'Start a new plan',
+  },
   card: {
     reviseFirst: 'Add to my plan',
     openPage: 'Open in the reader',
     startRevision: 'Start revision',
     added: 'Added to tomorrow’s revision',
+    /** A drafted schedule's button (REVO-43): it opens Edit schedule filled in, not saved. */
+    draftSchedule: 'Check in Edit schedule',
+    aDay: 'A day',
+    aRound: 'A round',
+    rest: 'Rest days',
+    restNone: 'None',
+    restCount_one: '{{count}} a round',
+    restCount_other: '{{count}} a round',
+    everyDays_one: 'Every day',
+    everyDays_other: 'Every {{count}} days',
+    /** A row for screen readers: "A day: 10 pages, then 6 pages". */
+    rowLabel: '{{label}}: {{now}}, then {{draft}}',
   },
   chat: {
     resting: 'Revo is resting',

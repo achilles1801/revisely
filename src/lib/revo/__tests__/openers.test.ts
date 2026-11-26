@@ -276,6 +276,14 @@ describe('where Revo is opened from (REVO-38) and where its button shows (REVO-2
   });
 });
 
+describe('Revo opened from Edit schedule (REVO-43)', () => {
+  it('[REVO-43] the schedule in Edit schedule’s words, an offer to draft it, and four starters', () => {
+    const { text, chips } = opened({ kind: 'schedule' });
+    expect(text).toBe('Assalamu alaikum, Majd. Your schedule is 2 pages a day: every page comes round every 5 days. Tell me what you’d like to change, and I’ll draft it for you to check.');
+    expect(chips).toEqual(['Make it lighter', 'Finish a round sooner', 'Rest one day a week', 'Start a new plan']);
+  });
+});
+
 describe('Revo’s first line in Arabic (REVO-38, openers.ar.ts)', () => {
   const { i18n } = jest.requireActual('../../../i18n') as typeof import('../../../i18n');
   beforeAll(() => i18n.changeLanguage('ar'));

@@ -18,6 +18,7 @@ import ReadIndexScreen from '../screens/read/ReadIndexScreen';
 import QuranReaderScreen from '../screens/read/QuranReaderScreen';
 import QuranSearchScreen from '../screens/read/QuranSearchScreen';
 import { RevoHost } from '../components/revo/RevoHost';
+import type { ScheduleDraft } from '../lib/revo/scheduleDraft';
 import { ReportProblemHost } from '../components/report/ReportProblemHost';
 import ListenBackScreen from '../screens/activity/ListenBackScreen';
 import ActivityScreen from '../screens/activity/ActivityScreen';
@@ -69,7 +70,8 @@ export type HomeStackParamList = {
   // editedDay is set by PlanDayEdit when navigating back, so PlanEdit can
   // merge the day-level edit into its in-memory days[] without round-tripping
   // through a context or store.
-  PlanEdit: { editedDay?: { index: number; pages: number[] } } | undefined;
+  /** `draft`: a schedule Revo drafted (REVO-43), shown filled in and not saved. */
+  PlanEdit: { editedDay?: { index: number; pages: number[] }; draft?: ScheduleDraft } | undefined;
   /** `basePages`: the day as saved, when `initialPages` already adds to it ("Add to plan"); `note`: one line under the title. */
   PlanDayEdit: { dayIndex: number; initialPages: number[]; basePages?: number[]; note?: string };
   // Revision sessions, timed sessions and the daily log, day by day.

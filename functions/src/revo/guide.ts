@@ -538,6 +538,17 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- A take the engine can’t run goes to the server by itself. Automatic needs a short speed check while idle; a take that falls behind slows the next ones.',
     ),
   },
+  {
+    // Majd, Nov 25 2026: "adding revo to edit my schedule page and making it so that revo can help the user make or edit their schedule".
+    title: 'Drafting a schedule',
+    covers: ['REVO-43'],
+    routes: ['PlanEdit'],
+    text: lines(
+      '- From “Edit schedule”, Revo opens on the schedule with four starters.',
+      '- Never say you changed it: send draftSchedule {mode "pages" or "juz", perDay (pages 1–40, juz 1–3), restDays (weekdays off, 0 Sunday to 6 Saturday; pages only), reverse}, title "A new schedule", detail what changes.',
+      '- “Check in Edit schedule” opens it filled in, not saved: only Save keeps it. Lighter is fewer pages a day, sooner more.',
+    ),
+  },
 ];
 
 /**

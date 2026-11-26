@@ -1567,6 +1567,21 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   isnt working"). The field ends in send, grey until there is a question. To speak a question, the keyboard's own mic
   key dictates, on iPhone and Android.
 
+- **REVO-43.** (Revisely Dev) Revo helps make or change the schedule, and never changes it itself (Majd, Nov 25 2026:
+  "adding revo to edit my schedule page and making it so that revo can help the user make or edit their schedule"; of the
+  orchestrator's description of the starters and the draft, "all ur picks ... are fine"). Opened from Edit schedule, its
+  first line is the schedule in Edit schedule's words ("10 pages a day: every page comes round every 11 days"), with four
+  starters: "Make it lighter", "Finish a round sooner", "Rest one day a week" and "Start a new plan". A schedule Revo
+  proposes is a card, "A new schedule": a day, a round and rest days, as they are and with the draft (struck through,
+  then the new), worked out on the phone from the account's pages whatever Revo wrote. Its days are built as Create new
+  plan builds them (Balanced, or By Juz), from where today starts. Rest days are weekdays (the board: "6 pages a day with
+  Fridays off"; pages a day only, one to three): the round is then whole weeks counted from today, the pages spread
+  evenly over the other days, so a plan saved today keeps those weekdays off (a missed day that Keep daily amount carries
+  can still land on one, as in any plan).
+  "Check in Edit schedule" opens Edit schedule filled in, marked "Revo's schedule, not saved yet": only Save keeps it,
+  and Back leaves the schedule as it was (with Discard changes?, as any edit). Not now hides the card. The store app
+  never gets such a card.
+
 ## Memorizing
 
 - **MEM-1.** What is memorized is kept by the ayah (most people memorize ayahs, not pages: Majd, Nov 7

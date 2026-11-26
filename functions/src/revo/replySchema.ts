@@ -59,6 +59,19 @@ export const ACTION_SCHEMAS: Record<string, Schema> = {
     },
     ['section', 'surah', 'juz'],
   ),
+  // Revisely Dev only (REVO-43): reply.ts drops it for the store app.
+  draftSchedule: object(
+    {
+      kind: kind('draftSchedule'),
+      title: text,
+      detail: text,
+      mode: { type: 'string', enum: ['pages', 'juz'] },
+      perDay: whole,
+      restDays: wholes,
+      reverse: { type: 'boolean' },
+    },
+    ['restDays', 'reverse'],
+  ),
 };
 
 export const REVO_REPLY_SCHEMA: Schema = object({
