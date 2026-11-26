@@ -368,7 +368,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['Dashboard', 'Activity'],
     text: lines(
       '- A day’s + → “Revised elsewhere”: a search for a surah or juz above the 30 juz. A tap chooses a juz; a hold opens it for its halves or parts. Extra pages never change the day’s schedule.',
-      '- Activity is one tab: the calendar, the picked day as one entry (tap to open; no note shown), then “Your revision”: a row per section opening its page (empty ones hidden), “Edit sections” last. Spot tests have their own line and block, “Finished” or “Stopped early”.',
+      '- Activity is one tab: “This week” (“Month” opens the calendar), the picked day (tap to open; no note), then “Your revision”: a row per section opening its page (empty ones hidden), “Edit sections” last. Spot tests have their own line and block, “Finished” or “Stopped early”.',
       '- Home: the “Today’s journal” row under Today opens today’s journal.',
     ),
   },

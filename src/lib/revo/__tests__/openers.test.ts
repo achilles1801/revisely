@@ -263,12 +263,14 @@ describe('where Revo is opened from (REVO-38) and where its button shows (REVO-2
     // [ACT-35] A section's own page opens as Insights; Weak spots' as its Ask.
     expect(revoPlaceOf({ name: 'ActivitySection', params: { section: 'coverage' } })).toEqual({ kind: 'insights' });
     expect(revoPlaceOf({ name: 'ActivitySection', params: { section: 'weak' } })).toEqual({ kind: 'weakSpots' });
+    // Its full calendar opens with the month's line.
+    expect(revoPlaceOf({ name: 'ActivityMonth' })).toEqual({ kind: 'overview' });
     for (const name of ['Dashboard', 'ActivityAll', 'Settings']) expect(revoPlaceOf({ name })).toEqual({ kind: 'home' });
     expect(revoPlaceOf(null)).toEqual({ kind: 'home' });
   });
 
   it('[REVO-25] the button shows on Home and Activity’s screens, never on the Read tab, in a session, an editor or Settings', () => {
-    expect([...REVO_BUTTON_ROUTES].sort()).toEqual(['Activity', 'ActivityAll', 'ActivityDay', 'ActivitySection', 'Dashboard', 'PagesByStrength']);
+    expect([...REVO_BUTTON_ROUTES].sort()).toEqual(['Activity', 'ActivityAll', 'ActivityDay', 'ActivityMonth', 'ActivitySection', 'Dashboard', 'PagesByStrength']);
     for (const name of ['ReadIndex', 'QuranReader', 'ActiveRevision', 'PlanEdit', 'PlanDayEdit', 'Memorization', 'Settings', 'JournalEntry']) {
       expect(REVO_BUTTON_ROUTES.has(name)).toBe(false);
     }
