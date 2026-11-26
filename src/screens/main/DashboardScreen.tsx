@@ -77,6 +77,7 @@ import { useNewBadge } from '../../lib/badgeSeen';
 import { usePremium } from '../../lib/premium';
 import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { ProfilePicture } from '../../components/account/ProfilePicture';
+import { useAccountPhoto } from '../../lib/accountPicture';
 import { pendingEntries } from '../../lib/offline/outbox';
 import { todaySnapshot } from '../../lib/todaySnapshot';
 import { JumpSheet } from '../../components/home/JumpSheet';
@@ -250,6 +251,7 @@ export default function DashboardScreen() {
   const latestBadge = accountV2 && journey ? latestMilestone(journey.pagesRevised) : undefined;
   useNewBadge(accountV2 ? user?.id : null, latestBadge);
   const premiumNow = usePremium(user?.id, accountV2 && reciteLiveForAccount(user));
+  const photoUrl = useAccountPhoto(firebaseUser);
 
   // Done today: the next revision day, which Home's quiet line opens (#168). It goes on past the cycle's
   // end (AHEAD-3): a day that repeats today's pages opens as a new round, and one that begins the plan
@@ -597,7 +599,7 @@ export default function DashboardScreen() {
             accountV2 ? (
               <ProfilePicture
                 size={premiumNow.has ? 35 : 40}
-                photoUrl={firebaseUser?.photoURL}
+                photoUrl={photoUrl}
                 initial={avatarInitial(userName, firebaseUser?.email)}
                 premium={premiumNow.has}
                 badge={latestBadge ?? null}

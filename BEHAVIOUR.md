@@ -320,7 +320,7 @@ current basic sounds". October 2026's version was removed for the voices it offe
   scenarios stay loadable for the automated tests; their Offline queue holds its changes on the phone until
   "Send held changes" (or the next start of the app), then sends them in order.
 - **ACCOUNT-1.** Delete account (Settings → Account, confirmed twice) removes the account from the server with everything of it
-  (pages, sessions, notes, Revo's and the coach's data, backed-up recordings) and signs the phone out. Offline, or when
+  (pages, sessions, notes, Revo's and the coach's data, backed-up recordings, its picture) and signs the phone out. Offline, or when
   the server refuses (App Check), nothing is deleted and the user stays signed in.
 - **ACCOUNT-3.** Delete account always ends, in "Account deleted" (signed out) or an error with Try again: never an
   endless spinner. The app waits for the server at most 30 seconds. With no answer (lost, or offline), it asks whether
@@ -349,6 +349,12 @@ current basic sounds". October 2026's version was removed for the voices it offe
   badge and "New badge · <name>" under the bar. Badges an account had before this phone first read it aren't new.
 - **ACCOUNT-7.** (Revisely Dev.) Home's Today post shows the account's picture in its mark's place, with Premium's ring
   when it has Premium and the latest badge at its lower corner; a tap on the picture opens Settings → Account.
+- **ACCOUNT-8.** (Revisely Dev.) The account's picture is its sign-in photo (Google's), or the first letter of its name
+  when there is none. A tap on the picture on Account opens Picture: "Choose a photo" and "Take a photo" (where the phone
+  has Revisely Dev's photo picker), "Use your Google photo" (a Google account whose picture is another) and "Remove
+  photo" (back to the first letter). A photo chosen is cropped square, kept in the account's own folder, which only the
+  account can open, and shown on Account, Settings' first row and Home at once; the picture it replaces, if it was one
+  of these, is deleted. A change that fails says so and leaves the picture as it was.
 - **ACCOUNT-2.** A sign-up or sign-in that fails (an address already registered, a wrong password, Google or Apple
   refused, no connection) leaves the sign-in screen as it was: the same mode, the name, the email and the password
   still typed, with the error under them. A password reset that fails keeps the email. While an attempt runs, it

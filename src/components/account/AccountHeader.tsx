@@ -3,7 +3,7 @@
 // the latest badge, the Premium pill, "Revising since …", the bar to the next badge (a tap opens the Badges sheet) and
 // three figures: pages revised, the longest streak, time in Revisely. No email under the name.
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -28,6 +28,7 @@ export function AccountHeader({
   moment,
   onBadges,
   onPicture,
+  pictureBusy = false,
 }: {
   name: string;
   initial: string;
@@ -42,6 +43,8 @@ export function AccountHeader({
   onBadges: () => void;
   /** Changing the picture (where it can be changed). */
   onPicture?: () => void;
+  /** The picture is being changed. */
+  pictureBusy?: boolean;
 }) {
   const { palette } = useTheme();
   const revised = journey?.pagesRevised ?? 0;
@@ -59,12 +62,17 @@ export function AccountHeader({
           : t('account.bar.next', { count: next - revised, n: formatNumber(next - revised), badge: badgeName(next) });
   const who = [name, premium ? t('account.premium') : null, latest ? badgeName(latest) : null].filter(Boolean).join(', '); // i18n-ignore (a list for VoiceOver)
 
-  const picture = <ProfilePicture size={88} photoUrl={photoUrl} initial={initial} premium={premium} camera={!!onPicture} testID="account-picture" />;
+  const picture = (
+    <View style={pictureBusy ? styles.busy : null}>
+      <ProfilePicture size={88} photoUrl={photoUrl} initial={initial} premium={premium} camera={!!onPicture} testID="account-picture" />
+      {pictureBusy ? <ActivityIndicator style={StyleSheet.absoluteFill} color={palette.secondary} /> : null}
+    </View>
+  );
   return (
     <View style={[styles.wrap, { borderBottomColor: palette.separator }]} testID="account-header">
       <View style={styles.head} accessible accessibilityLabel={t('account.headerLabel', { who })}>
         {onPicture ? (
-          <Tap onPress={onPicture} accessibilityRole="button" testID="account-picture-button">
+          <Tap onPress={onPicture} disabled={pictureBusy} accessibilityRole="button" accessibilityLabel={t('account.picture.change')} testID="account-picture-button">
             {picture}
           </Tap>
         ) : (
@@ -163,6 +171,7 @@ function Figure({ value, label, testID }: { value: string; label: string; testID
 
 const styles = StyleSheet.create({
   wrap: { borderBottomWidth: layoutV2.hairline },
+  busy: { opacity: 0.6 },
   head: { alignItems: 'center', paddingTop: 24, paddingHorizontal: layoutV2.gutter },
   nameRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, maxWidth: '100%' },
   name: { fontSize: 22, lineHeight: 28, fontWeight: '700', letterSpacing: -0.3, textAlign: 'center', flexShrink: 1 },

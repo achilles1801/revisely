@@ -425,8 +425,8 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Settings → Mushaf and Recite → “Keep my recitations as test data” (on by default) keeps each take and its result for Revisely’s tests; software checks them, nobody listens. Every account that recites has it. Settings → Testing → “Premium” turns Premium off to see Mark mistakes locked.',
       '- Settings → About → “Licences” shows the recitation model’s licence (the Quran Muaalem License) in full, offline too.',
       '- Settings → Testing → “Mistake detection model” says which model the checker runs (for example v7); a tap asks again.',
-      '- Settings → Appearance → “Language”: “Phone’s language”, English or العربية (Arabic, right to left). It restarts Revisely (“Restart”, or “Not now”). In Arabic, Revo answers in Arabic too. Untranslated text shows in English. The store app is English only for now. In Arabic the mushaf turns as a printed one does.',
-      '- Rating Revisely: Settings → Help and support → “Rate Revisely” opens the store’s review page. After a day’s revision with a streak of 7 days or more, the end card may show “Enjoying Revisely? Rate it”: at most 3 times ever, four months apart, never in an account’s first week, never again once tapped or dismissed. Rating is optional and nothing is given for it.',
+      '- Settings → Appearance → “Language”: “Phone’s language”, English or العربية (Arabic). It restarts Revisely (“Restart”, or “Not now”). In Arabic, Revo answers in Arabic too. Untranslated text shows in English. The store app is English only for now. In Arabic the mushaf turns as a printed one does.',
+      '- Rating Revisely: Settings → Help and support → “Rate Revisely” opens the store’s review page. After a day’s revision with a streak of 7 days or more, the end card may show “Enjoying Revisely? Rate it”: at most 3 times ever, four months apart, never in an account’s first week, never again once tapped or dismissed. Rating is optional; nothing is given for it.',
     ),
   },
   {
@@ -551,10 +551,10 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     // The Account page's new look (Majd approved the boards, Nov 26 2026): Revisely Dev until released.
     title: 'Account and badges',
-    covers: ['ACCOUNT-4', 'ACCOUNT-5', 'ACCOUNT-6', 'ACCOUNT-7'],
+    covers: ['ACCOUNT-4', 'ACCOUNT-5', 'ACCOUNT-6', 'ACCOUNT-7', 'ACCOUNT-8'],
     routes: ['Dashboard', 'Settings'],
     text: lines(
-      '- Settings → your name: picture (or initial) in Premium’s ring, latest badge, pages revised (each revision counts), longest streak, time in Revisely. Home’s picture opens it. “Name and email” has “Delete account”.',
+      '- Settings → your name: picture (photo or initial; tap to change) in Premium’s ring, latest badge, pages revised (each revision counts), longest streak, time in Revisely. Home’s picture opens it. “Name and email” has “Delete account”.',
       '- Badges by pages revised, two a tier: Bronze 10/50, Silver 100/250, Gold 500/1K, Platinum 2.5K/5K, Diamond 10K/25K, Emerald 50K/100K. The bar opens “Badges”. A new one shows once (end card or Account).',
     ),
   },

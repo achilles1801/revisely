@@ -108,6 +108,7 @@ import { BadgesSheet } from '../../components/account/BadgesSheet';
 import { ProfilePicture } from '../../components/account/ProfilePicture';
 import { BadgeMark } from '../../components/account/BadgeMark';
 import { GoogleGIcon } from '../../components/GoogleGIcon';
+import { canPickPhoto, googlePhotoOf, pickPhoto, removePhoto, restoreGooglePhoto, setPhoto, useAccountPhoto } from '../../lib/accountPicture';
 import { checkLevel, maddChecked, setReciteCheckSettings, strictOffered, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { TEST_LENGTHS, type TestLength } from '../../lib/reciteLive/testLength';
 import { getJuzForPage } from '../../lib/quranData';
@@ -489,6 +490,10 @@ export default function SettingsScreen() {
   const latestBadge = journey ? latestMilestone(journey.pagesRevised) : undefined;
   const badgeMoment = useBadgeMoment(accountV2 && accountShown ? user?.id : null, latestBadge);
   const [badgesOpen, setBadgesOpen] = useState(false);
+  // The picture (ACCOUNT-8): its photo now, and the menu a tap on it opens.
+  const photoUrl = useAccountPhoto(firebaseUser);
+  const [pictureMenu, setPictureMenu] = useState(false);
+  const [pictureBusy, setPictureBusy] = useState(false);
 
   if (!localUser) {
     return (
@@ -689,6 +694,28 @@ export default function SettingsScreen() {
   };
   // Your account at the top of the first level (it opens the Account page) and of the Account page.
   const hasPremium = reciteCheck && premium.has;
+  const googlePhoto = googlePhotoOf(firebaseUser);
+  const changePicture = (run: () => Promise<void>) => {
+    setPictureBusy(true);
+    run()
+      .catch((err) => {
+        logger.warn('Account picture could not be changed', err);
+        Alert.alert(t('account.picture.failed'), t('account.picture.failedBody'));
+      })
+      .finally(() => setPictureBusy(false));
+  };
+  const pictureActions = [
+    ...(canPickPhoto()
+      ? [
+          { key: 'choose', label: t('account.picture.choose'), icon: 'images-outline' as const, onPress: () => changePicture(async () => { const a = await pickPhoto('library'); if (a) await setPhoto(a); }) },
+          { key: 'take', label: t('account.picture.take'), icon: 'camera-outline' as const, onPress: () => changePicture(async () => { const a = await pickPhoto('camera'); if (a) await setPhoto(a); }) },
+        ]
+      : []),
+    ...(googlePhoto && googlePhoto !== photoUrl
+      ? [{ key: 'google', label: t('account.picture.google'), icon: 'logo-google' as const, onPress: () => changePicture(restoreGooglePhoto) }]
+      : []),
+    ...(photoUrl ? [{ key: 'remove', label: t('account.picture.remove'), icon: 'trash-outline' as const, destructive: true, onPress: () => changePicture(removePhoto) }] : []),
+  ];
   const createdDay = localUser.createdAt ? new Date(localUser.createdAt) : null;
   const sinceMonth =
     createdDay && !Number.isNaN(createdDay.getTime()) && dateToLocalISODay(createdDay) !== dateToLocalISODay(new Date())
@@ -701,7 +728,7 @@ export default function SettingsScreen() {
     .join(', '); // i18n-ignore (a list for VoiceOver)
   const accountRowV2 = (
     <View style={[v2.profileRow, { borderBottomColor: palette.separator }]}>
-      <ProfilePicture size={40} photoUrl={firebaseUser?.photoURL} initial={avatarInitial(localUser.name, firebaseUser?.email)} premium={hasPremium} testID="settings-account-picture" />
+      <ProfilePicture size={40} photoUrl={photoUrl} initial={avatarInitial(localUser.name, firebaseUser?.email)} premium={hasPremium} testID="settings-account-picture" />
       <View style={{ flex: 1, minWidth: 0, marginLeft: layoutV2.markGap }}>
         <View style={v2.nameLine}>
           {localUser.name?.trim() ? (
@@ -809,9 +836,11 @@ export default function SettingsScreen() {
             <AccountHeader
               name={localUser.name?.trim() || t('settings.account.notSet')}
               initial={avatarInitial(localUser.name, firebaseUser?.email)}
-              photoUrl={firebaseUser?.photoURL}
+              photoUrl={photoUrl}
               premium={hasPremium}
               since={sinceMonth}
+              pictureBusy={pictureBusy}
+              onPicture={pictureActions.length > 0 ? () => setPictureMenu(true) : undefined}
               journey={journey}
               timeInApp={appSeconds != null ? formatDuration(appSeconds) : '—'}
               moment={badgeMoment}
@@ -829,6 +858,13 @@ export default function SettingsScreen() {
             <Section>
               <Row icon="log-out-outline" label={t('common.signOut')} onPress={handleSignOut} testID="settings-sign-out" />
             </Section>
+            <ActionSheet
+              visible={pictureMenu}
+              onClose={() => setPictureMenu(false)}
+              title={t('account.picture.title')}
+              actions={pictureActions}
+              testID="account-picture-menu"
+            />
             <BadgesSheet
               visible={badgesOpen}
               onClose={() => setBadgesOpen(false)}

@@ -53,6 +53,17 @@ export const account = {
     newRowSub_one: '{{n}} page revised',
     newRowSub_other: '{{n}} pages revised',
   },
+  /** Tapping the picture on Account (ACCOUNT-8). */
+  picture: {
+    title: 'Picture',
+    change: 'Change your picture',
+    choose: 'Choose a photo',
+    take: 'Take a photo',
+    google: 'Use your Google photo',
+    remove: 'Remove photo',
+    failed: 'Couldn’t change your picture',
+    failedBody: 'Check your connection and try again.',
+  },
   /** Settings → Account → Name and email. */
   details: {
     name: 'Name',

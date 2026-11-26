@@ -136,3 +136,38 @@ it('[ACCOUNT-6] a badge won in a session left before its end card shows on Accou
   await app.until(() => text(app, 'account-pages-revised').startsWith('12'), 'Account again');
   expect(text(app, 'account-bar-caption')).toBe('38 more for Bronze II');
 });
+
+it('[ACCOUNT-8] the sign-in photo is the picture on Home and Account; Remove photo, from a tap on it, goes back to the first letter everywhere', async () => {
+  setZone(ZONES.london);
+  setNow('2026-11-03 19:00');
+  const phone = new Phone();
+  const first = await newAccount(phone, { memorized: pagesRange(542, 604), user: { dailyPageCapacity: 20 } });
+  await first.untilSynced();
+  // A photo on the sign-in profile, as Google's would be.
+  const authMod = first.mods.require<typeof import('firebase/auth')>('firebase/auth');
+  await first.act(async () => {
+    await authMod.updateProfile(authMod.getAuth().currentUser!, { photoURL: 'https://example.com/picture.jpg' });
+  });
+  await first.close();
+
+  const app = await phone.open(homeAndSettings);
+  const home = new Home(app);
+  await home.ready();
+  await app.until(() => app.screen.queryByTestId('today-picture-mark-photo') != null, 'the photo on Home');
+
+  await press(app, 'today-picture');
+  await app.until(() => app.screen.queryByTestId('account-picture-photo') != null, 'the photo on Account');
+  // This phone has no photo picker and the account no Google photo: Picture offers Remove photo alone.
+  await press(app, 'account-picture-button');
+  await app.until(() => app.screen.queryByTestId('sheet-action-remove') != null, 'the Picture menu');
+  expect(app.screen.queryByTestId('sheet-action-choose')).toBeNull();
+  expect(app.screen.queryByTestId('sheet-action-google')).toBeNull();
+  await press(app, 'sheet-action-remove');
+  await app.until(() => app.screen.queryByTestId('account-picture-initial') != null, 'the first letter on Account', 15_000);
+  const live = app.mods.require<typeof import('firebase/auth')>('firebase/auth');
+  expect(live.getAuth().currentUser?.photoURL || null).toBeNull();
+
+  await goBack(app);
+  await home.ready();
+  await app.until(() => app.screen.queryByTestId('today-picture-mark-initial') != null, 'the first letter on Home');
+});

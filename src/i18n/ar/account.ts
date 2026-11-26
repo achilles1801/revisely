@@ -76,6 +76,16 @@ export const account = {
     newRowSub_many: 'روجعت {{n}} صفحة',
     newRowSub_other: 'روجعت {{n}} صفحة',
   },
+  picture: {
+    title: 'الصورة',
+    change: 'تغيير صورتك',
+    choose: 'اختيار صورة',
+    take: 'التقاط صورة',
+    google: 'استخدام صورة ⁨Google⁩',
+    remove: 'إزالة الصورة',
+    failed: 'تعذّر تغيير صورتك',
+    failedBody: 'تحقق من اتصالك وحاول مرة أخرى.',
+  },
   details: {
     name: 'الاسم',
     signedInWith: 'تسجيل الدخول عبر {{provider}}',
