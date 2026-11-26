@@ -7,6 +7,7 @@ import { markPreviewTester } from '../harness/admin';
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { Home, activityStack, flatText, homeStack } from '../harness/screens';
 import { Phone, type OpenApp } from '../harness/phone';
+import { boxedMarks, offCentreMarks } from '../../../jest/rings';
 
 async function tap(app: OpenApp, testID: string): Promise<void> {
   const { fireEvent } = app.mods.rtl;
@@ -99,5 +100,11 @@ it('[ACT-35] Activity is one tab: this week and the day, then the sections as ro
   expect(text(app, 'calendar-month-title')).toBe('November 2026');
   // The page reads its own items: today's ring once they're in.
   await app.until(() => text(app, 'preview-ring-figure') === '5 of 5 revised', 'today’s ring on the month page');
+  // Today is done, so the day's ring holds its check, in the ring's centre: it sat at the ring's top-left corner, cut by
+  // the ring (Majd, Nov 26 2026: "check mark bug still here"; jest/rings.ts).
+  const { Ionicons } = app.mods.require<any>('@expo/vector-icons');
+  const ring = app.screen.getByTestId('preview-ring');
+  expect(boxedMarks(ring as never, Ionicons)).toBe(1);
+  expect(offCentreMarks(ring as never, Ionicons)).toEqual([]);
   await app.close();
 });

@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { DesignProvider } from '../../../design/DesignContext';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { SessionEndCard } from '../SessionEndCard';
+import { boxedMarks, offCentreMarks } from '../../../../jest/rings';
 
 jest.mock('@expo/vector-icons', () => {
   const { Text: RNText } = require('react-native');
@@ -43,5 +44,14 @@ describe('SessionEndCard: asking for a rating (SESS-8)', () => {
     expect(screen.queryByTestId('session-end-rate')).toBeNull();
     await show({ total: 3, done: 3, celebrate: 1 });
     expect(screen.queryByTestId('session-end-rate')).toBeNull();
+  });
+});
+
+describe('SessionEndCard: the done check', () => {
+  it('sits in the centre of its circle (jest/rings.ts)', async () => {
+    await show({ total: 3, done: 3, celebrate: 1 });
+    const { Ionicons } = require('@expo/vector-icons');
+    expect(boxedMarks(screen.UNSAFE_root as never, Ionicons)).toBe(1);
+    expect(offCentreMarks(screen.UNSAFE_root as never, Ionicons)).toEqual([]);
   });
 });
