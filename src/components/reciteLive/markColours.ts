@@ -44,3 +44,12 @@ export function toneFill(p: Colours, tone: string, byTier: boolean = COLOURS_FOL
   if (tone === 'tajweed') return p.markTajweed;
   return undefined;
 }
+
+/**
+ * Whether any of these marks shows amber (RECITE-31's note, the first time a take shows one): a wrong haraka or letter
+ * and "Not clear", or "Not clear" alone once the colours follow the tiers.
+ */
+export function anyAmber(marks: Iterable<Pick<Mark, 'kind' | 'sure'>>, byTier: boolean = COLOURS_FOLLOW_TIERS): boolean {
+  for (const m of marks) if (colourGroup(m, byTier) === 'slip') return true;
+  return false;
+}

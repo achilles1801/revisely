@@ -24,10 +24,18 @@ export interface ReciteCheckSettings {
   /** What a tap on the reader's mic starts (held, it picks): Record, or Recite (the page follows you). */
   mode: 'record' | 'recite';
   /**
-   * Recite marks mistakes too (Premium; Majd, Nov 14 2026: one "Mark mistakes" switch under Recite). Kept on until
-   * turned off. Without Premium it is shown off and locked, whatever is kept.
+   * Recite marks mistakes too (Premium; Majd, Nov 14 2026: one "Mark mistakes" switch under Recite). On from the start
+   * for anyone who has it (RECITE-32; Majd, Nov 25 2026: a friend saw no marks until he was told to turn it on), kept as
+   * set once set. Without Premium it is shown off and locked, whatever is kept.
    */
   markMistakes: boolean;
+  /**
+   * Mark mistakes was set on this phone (its switch, or any change that names it) since it came on from the start
+   * (RECITE-32). Until then a kept value is only the old default and reads as on.
+   */
+  markMistakesSet: boolean;
+  /** The bar has explained the amber marks once (RECITE-31): never again on this account and phone. */
+  amberExplained: boolean;
   /**
    * Mistakes to mark (contract draft 4, Majd): Words and harakat (wrong, skipped and added words, letter and haraka
    * slips) or Strict (the same and tajweed, with the madd settings above).
@@ -61,7 +69,9 @@ export const RECITE_CHECK_DEFAULTS: ReciteCheckSettings = {
   keep: true,
   noticeSeen: false,
   mode: 'recite',
-  markMistakes: false,
+  markMistakes: true,
+  markMistakesSet: false,
+  amberExplained: false,
   level: 'words',
   saveRecording: true,
   showPast: true,
@@ -106,7 +116,10 @@ export function parseReciteCheckSettings(raw: string | null): ReciteCheckSetting
     noticeSeen: s.noticeSeen === true,
     // A kept "check" (the three-way menu before Nov 14 2026) is Recite with mistakes marked.
     mode: s.mode === 'record' ? 'record' : s.mode === 'recite' || s.mode === 'check' ? 'recite' : d.mode,
-    markMistakes: typeof s.markMistakes === 'boolean' ? s.markMistakes : s.mode === 'check' ? true : d.markMistakes,
+    // Kept as set once set on this phone (RECITE-32); a value from before (only the old default, off) reads as on.
+    markMistakes: s.markMistakesSet === true && typeof s.markMistakes === 'boolean' ? s.markMistakes : d.markMistakes,
+    markMistakesSet: s.markMistakesSet === true && typeof s.markMistakes === 'boolean',
+    amberExplained: s.amberExplained === true,
     level: pick(s.level, ['words', 'strict'] as const, d.level),
     saveRecording: typeof s.saveRecording === 'boolean' ? s.saveRecording : d.saveRecording,
     showPast: typeof s.showPast === 'boolean' ? s.showPast : d.showPast,
@@ -148,6 +161,8 @@ export function loadReciteCheckSettings(uid: string | null | undefined): void {
 export function setReciteCheckSettings(uid: string | null | undefined, update: Partial<ReciteCheckSettings>): void {
   if (!uid) return;
   if (owner !== uid) loadReciteCheckSettings(uid);
+  // Naming Mark mistakes sets it: kept as it is from then on (RECITE-32).
+  if ('markMistakes' in update) update = { ...update, markMistakesSet: true };
   current = { ...current, ...update };
   if (pending) pending = { ...pending, ...update };
   emit();

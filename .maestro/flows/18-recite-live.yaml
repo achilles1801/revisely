@@ -3,7 +3,7 @@
 # UI on and a take plays a recorded event log (src/lib/e2e/reciteLive.ts: An-Naml 23–24 on page
 # 379 with a wrong word and a haraka slip, the moment of Majd's Tarteel screenshots of Nov 14 2026).
 # Screenshots of each state for the mocks (~/Documents/revisely-recite-mocks/option-A-final-2.png and
-# mistakes-toggle-after.png): the reader with the mic, the mic's menu (Mark mistakes off, then on),
+# mistakes-toggle-after.png): the reader with the mic, the mic's menu (Mark mistakes, on from the start),
 # following, a mark and the score, the hidden view, done, and the locked switch's
 # Premium page. Last, a Recite take begun in the middle of the page (An-Naml 25), as a take can start anywhere on it.
 appId: com.revisionbuddy.app
@@ -121,17 +121,13 @@ appId: com.revisionbuddy.app
       id: check-intro
     timeout: 30000
 
-# Premium on: Mark mistakes unlocks. Switch it on (the menu stays), then Recite.
+# Premium on: Mark mistakes unlocks, on from the start (RECITE-32). Then Recite.
 - longPressOn:
     id: recite-mic
 - extendedWaitUntil:
     visible:
-      id: recite-mistakes-off
+      id: recite-mistakes-on
     timeout: 10000
-- tapOn:
-    id: recite-mistakes
-- assertVisible:
-    id: recite-mistakes-on
 - runFlow:
     file: ../subflows/shot.yaml
     env:

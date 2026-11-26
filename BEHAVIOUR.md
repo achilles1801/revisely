@@ -821,6 +821,17 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   they have begun it; it doesn't wait for a word of the next page (Majd, Nov 25 2026: "when i finish reciting the last
   verse it should automatically take me to the next page and wait for me to begin if i didn't already"). Once per page.
   Never past a session's last page, and never in a stretch with an end of its own (Test me), which stops there instead.
+- **RECITE-31.** The first amber mark explains itself, once (Majd, Nov 25 2026, from a friend's "Whats does yellow
+  mean?"). The first time a take shows an amber mark (a wrong haraka or letter, or Not clear) on an account on this phone,
+  the bar's line says what amber is, with an amber dot, in place of the words for 6 seconds or until that take ends
+  ("Amber: a wrong haraka or letter, or not clear. Tap a mark to see."), then the words come back. Never again on that account and phone, in the
+  reader or a session. Quiet, as RECITE-5's slow line is: never a pop-up, a sound or speech over the recitation, and never
+  over the page; Undo (RECITE-25) has the line first. A red mark never shows it.
+- **RECITE-32.** Mark mistakes is on from the start for anyone who has it (Majd, Nov 25 2026: a friend saw no marks until
+  he was told "toggle on mark mistakes"). A first tap on the mic recites with mistakes marked. Holding the mic still
+  turns the switch off, and it stays as it was set, on this phone, for that account. A switch that was only ever at its
+  old default (off) reads as on: every account starts with it on once from this change. Without Premium it stays off
+  and locked, whatever is kept (PREM-1).
 
 What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).
 
@@ -1407,7 +1418,10 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   (REVO-41), 14 above the tab bar and the mini player. It shows on Home, Activity (Overview and Insights), a day in Activity, See
   all and Pages by strength, and nowhere else. There is no Revo on the Read tab (its list or the reader) or in a
   revision session, and their help sheets offer no "Ask Revo" (Majd, Nov 8 2026: "no revo in the revision
-  sessions. there should also be no revo in the mushaf tab at all"); none in an editor or Settings either. The
+  sessions. there should also be no revo in the mushaf tab at all"); none in an editor or Settings either. The one way
+  to Revo from the reader or a session is a finished take's summary (Majd, Nov 25 2026: "the reader stays free of Revo"):
+  its row "Ask Revo about this take" closes the summary and opens Revo with the take attached, only for an account with
+  Revo on, and never while the take still runs. The
   screens it shows on end their lists with room for it (`useRevoFootprint`), so their last row scrolls clear of it;
   other screens leave none.
 

@@ -41,6 +41,10 @@ export const reciteLive = {
     /** Said once to screen reader users when a take ends (the microphone already off). */
     resultSpoken: 'Take done. {{result}}',
     slow: 'Slow connection: checking is behind',
+    /** Said once, the first time a take shows an amber mark (RECITE-31), with an amber dot before it. */
+    amberNote: 'Amber: a wrong haraka or letter, or not clear. Tap a mark to see.',
+    /** The same, if amber is ever only "Not clear" (markColours' COLOURS_FOLLOW_TIERS). */
+    amberNoteUnclear: 'Amber: not heard clearly, never counted. Tap a mark to see.',
     scoreLabel: 'Score {{score}}. Show your mistakes',
     resume: 'Resume',
     pause: 'Pause',
@@ -143,6 +147,8 @@ export const reciteLive = {
     seeLabel: 'See your mistakes, part of Premium',
     see: 'See your mistakes',
     seeSub: 'Mark mistakes shows each one as you recite',
+    /** The summary's last row (REVO-25): Revo, with this take attached. */
+    askRevo: 'Ask Revo about this take',
   },
   test: {
     title: 'Test me',

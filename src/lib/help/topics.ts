@@ -257,9 +257,9 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'reader-outline',
         title: 'Recite',
         text:
-          'Hold [[mic]] → {{Recite}} and start anywhere: it finds you on the page, or elsewhere in the Qur’an. ' +
-          'With {{Mark mistakes}} on, it marks your mistakes.',
-        covers: ['RECITE-1'],
+          'Tap [[mic]] and start anywhere: it finds you on the page, or elsewhere in the Qur’an. ' +
+          '{{Mark mistakes}} is on from the start; hold [[mic]] to turn it off.',
+        covers: ['RECITE-1', 'RECITE-32'],
         when: 'liveRecite',
       },
       {
