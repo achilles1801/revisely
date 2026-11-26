@@ -76,8 +76,10 @@ it('[ACT-35] Activity is one tab: this week and the day, then the sections as ro
   // A row opens the section on its own page, drawn in full.
   await tap(app, 'insights-row-coverage');
   await app.until(() => shows(app, 'activity-section'), 'Coverage’s page');
-  await app.until(() => shows(app, 'insights-coverage-figure'), 'Coverage drawn in full');
-  expect(app.screen.getByTestId('insights-coverage-figure').props.accessibilityLabel).toBe('22% 5 of 23 memorized pages in 30 days');
+  // The page reads its own items: 0% until they're in (a loaded CI runner read it before, Nov 26 2026).
+  const coverage = () => app.screen.queryByTestId('insights-coverage-figure')?.props.accessibilityLabel;
+  await app.until(() => /^22%/.test(coverage() ?? ''), 'Coverage drawn in full, 22%');
+  expect(coverage()).toBe('22% 5 of 23 memorized pages in 30 days');
   expect(shows(app, 'juz-tile-30')).toBe(true);
 
   // Its range is the list's: 7 days here, and the list says 7 days once Back comes to it.
