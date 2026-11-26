@@ -252,17 +252,34 @@ function timesOf(t: PrayerTimes): Times {
     maghrib: toMinute(valid(t.maghrib)),
     isha: toMinute(valid(t.isha)),
   };
+  // A high-latitude Fajr is a part of the night before the real sunrise (the one
+  // no method has moved). Just south of the Arctic Circle around the June
+  // solstice the night is a few minutes long, and a seventh of it rounds to
+  // nothing: adhan gives Fajr in the sunrise's own minute. Fajr then comes a
+  // minute before the real sunrise; otherwise it stays as adhan gives it (it
+  // starts the revision day and the athan).
   // A method that moves sunrise earlier (Turkey's 7 minutes, Dubai's 3) can move
-  // it to or past a high-latitude Fajr, which adhan works out from the sunrise
-  // it hasn't moved (a seventh of a night of under 49 minutes, near the Arctic
-  // Circle around the June solstice). Fajr stays as adhan gives it: it starts
-  // the revision day and the athan. The move stops a minute after Fajr. A set
-  // whose Fajr is after even the unmoved sunrise (a noon "Fajr" near the date
-  // line) is left as it is, for dayTimes to set aside.
+  // it to or past that Fajr (a seventh of a night of under 49 minutes): the move
+  // stops a minute after Fajr, never after the real sunrise. A set whose Fajr is
+  // after even the real sunrise (a noon "Fajr" near the date line) is left as it
+  // is, for dayTimes to set aside.
   const moved = -(t.calculationParameters.methodAdjustments.sunrise ?? 0) * MINUTE_MS;
   const { fajr, sunrise } = times;
-  if (fajr && sunrise && moved > 0 && sunrise.getTime() <= fajr.getTime() && fajr.getTime() < sunrise.getTime() + moved) {
-    times.sunrise = new Date(fajr.getTime() + MINUTE_MS);
+  if (fajr && sunrise) {
+    const real = sunrise.getTime() + moved;
+    const f = fajr.getTime() === real ? real - MINUTE_MS : fajr.getTime();
+    times.fajr = new Date(f);
+    if (moved > 0 && sunrise.getTime() <= f && f < real) times.sunrise = new Date(f + MINUTE_MS);
+  }
+  // The same at nightfall: a high-latitude Isha is a part of the night after the
+  // real sunset, so it can round into Maghrib's minute, and a method that moves
+  // Maghrib later (Turkey's 7 minutes, Dubai's 3) can move it past Isha. Isha
+  // then comes a minute after Maghrib: later, never earlier (Isha's time lasts
+  // the night; Maghrib keeps the method's margin after sunset).
+  const late = Math.max(0, (t.calculationParameters.methodAdjustments.maghrib ?? 0) * MINUTE_MS);
+  const { maghrib, isha } = times;
+  if (maghrib && isha && isha.getTime() <= maghrib.getTime() && maghrib.getTime() - isha.getTime() <= late) {
+    times.isha = new Date(maghrib.getTime() + MINUTE_MS);
   }
   return times;
 }
