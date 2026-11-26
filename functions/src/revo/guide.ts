@@ -369,7 +369,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     text: lines(
       '- A day’s + → “Revised elsewhere”: a search for a surah or juz above the 30 juz. A tap chooses a juz; a hold opens it for its halves or parts. Extra pages never change the day’s schedule.',
       '- Activity is one tab: “This week” (“Month” opens the calendar), the picked day (tap to open; no note), then “Your revision”: a row per section opening its page (empty ones hidden), “Edit sections” last. Spot tests: own line, block and search filter, “Finished” or “Stopped early”. A note can show under a take or spot test (Note sheet’s Show under, or its menu’s “Add a note”).',
-      '- Home: no “Recent sessions” (see Activity). Appearance → “Home background”, default “Glow and an ayah”.',
+      '- Home: no “Recent sessions” (Activity has them). “Home background” is in Appearance.',
     ),
   },
   {
