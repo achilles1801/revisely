@@ -18,8 +18,21 @@ export class CoachCallError extends Error {
     message: string,
     readonly status: number | null,
     readonly retryable: boolean,
+    /** The API's own error message, for the logs (never shown to the user; it never holds the key). */
+    readonly detail?: string,
   ) {
     super(message);
+  }
+}
+
+/** The API's error message from a failed response, at most 200 characters; undefined when there's none. */
+async function errorDetail(res: Response): Promise<string | undefined> {
+  try {
+    const body = (await res.json()) as { error?: { message?: unknown } };
+    const message = body?.error?.message;
+    return typeof message === 'string' && message !== '' ? message.slice(0, 200) : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -107,6 +120,7 @@ export async function callCoach(request: MessagesRequest, deps: CallDeps): Promi
       retryable ? 'The coach is busy. Try again later.' : 'The coach could not answer this question.',
       res.status,
       retryable,
+      await errorDetail(res),
     );
   }
   throw new CoachCallError('The coach is busy. Try again later.', null, true);

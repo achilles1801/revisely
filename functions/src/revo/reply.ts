@@ -130,12 +130,16 @@ export function checkAction(v: unknown, allowed: ReadonlySet<number>, opts: { dr
   return null;
 }
 
-/** A drafted schedule (REVO-43, Revisely Dev): pages a day 1–40 or juz a day 1–3; rest on 1–3 weekdays (pages only). */
+/**
+ * A drafted schedule (REVO-43, Revisely Dev): pages a day 1–40 or juz a day 1–3; rest on 1–3 weekdays (pages only).
+ * The schema asks for every field (replySchema.ts): restDays [] is no rest day and reverse false the usual order, so
+ * the app gets neither then, as before.
+ */
 function checkDraft(v: Obj, title: string, detail: string): RevoAction | null {
   const mode = v.mode === 'pages' || v.mode === 'juz' ? v.mode : null;
   if (!mode || !wholeIn(v.perDay, 1, mode === 'pages' ? 40 : 3)) return null;
   const out: RevoAction = { kind: 'draftSchedule', title, detail, mode, perDay: v.perDay };
-  if (v.restDays != null) {
+  if (v.restDays != null && !(Array.isArray(v.restDays) && v.restDays.length === 0)) {
     const r = v.restDays;
     if (mode !== 'pages' || !Array.isArray(r) || r.length < 1 || r.length > 3 || new Set(r).size !== r.length) return null;
     if (!r.every((w) => wholeIn(w, 0, 6))) return null;

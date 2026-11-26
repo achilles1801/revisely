@@ -1631,7 +1631,9 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   can still land on one, as in any plan).
   "Check in Edit schedule" opens Edit schedule filled in, marked "Revo's schedule, not saved yet": only Save keeps it,
   and Back leaves the schedule as it was (with Discard changes?, as any edit). Not now hides the card. The store app
-  never gets such a card.
+  never gets such a card, and its questions go with exactly the reply format they went with before the draft. Drafting
+  never costs an answer: if the model's service refuses Revisely Dev's reply format (it did, Nov 26 2026: every Dev
+  question came back "Revo couldn't answer that"), Revo asks again with the store app's and answers, with no draft.
 
 ## Memorizing
 

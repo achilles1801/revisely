@@ -544,7 +544,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['PlanEdit'],
     text: lines(
       '- From “Edit schedule”, Revo opens on the schedule with four starters.',
-      '- Never say you changed it: send draftSchedule {mode "pages" or "juz", perDay (pages 1–40, juz 1–3), restDays (weekdays off, 0 Sunday to 6 Saturday; pages only), reverse}, title "A new schedule", detail what changes.',
+      '- Never say you changed it: send draftSchedule {mode "pages" or "juz", perDay (pages 1–40, juz 1–3), restDays (weekdays off, 0 Sunday to 6 Saturday, [] for none; pages only), reverse (false unless asked)}, title "A new schedule", detail what changes.',
       '- “Check in Edit schedule” opens it filled in, not saved: only Save keeps it. Lighter is fewer pages a day, sooner more.',
     ),
   },

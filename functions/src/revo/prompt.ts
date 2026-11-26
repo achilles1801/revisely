@@ -10,7 +10,7 @@ import { attachedText } from './attachText';
 import { DEV_GUIDE_SYSTEM, GUIDE_PROMPT, OPEN_SCREEN_ACTION } from './guide';
 import { RECITATION_SYSTEM, recitationText } from './recitation';
 import { gapsText } from './gaps';
-import { REVO_OUTPUT_CONFIG } from './replySchema';
+import { REVO_DEV_OUTPUT_CONFIG, REVO_OUTPUT_CONFIG } from './replySchema';
 import { RevoAttachment, RevoContext, RevoPattern, StoredMessage } from './types';
 
 export { REVO_MODEL };
@@ -343,8 +343,18 @@ function request(messages: MessagesRequest['messages'], blocks: { dev?: boolean;
     thinking: REVO_THINKING,
     system,
     messages,
-    output_config: REVO_OUTPUT_CONFIG,
+    // Revisely Dev's schema has the drafted schedule (REVO-43); the store's stays as it was (replySchema.ts).
+    output_config: blocks.dev ? REVO_DEV_OUTPUT_CONFIG : REVO_OUTPUT_CONFIG,
   };
+}
+
+/**
+ * A Revisely Dev question asked again with the store app's schema, for when the API refuses Dev's (a 400: Nov 26
+ * 2026, "Schema is too complex for compilation"). Its answer can't carry a draft. Null for a request that has the
+ * store's already.
+ */
+export function withStoreSchema(request: MessagesRequest): MessagesRequest | null {
+  return request.output_config === REVO_DEV_OUTPUT_CONFIG ? { ...request, output_config: REVO_OUTPUT_CONFIG } : null;
 }
 
 /** Whether a request carries the user's recitation: the context's summary, or a take attached now or earlier in the chat. */
