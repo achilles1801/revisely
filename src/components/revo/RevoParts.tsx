@@ -6,6 +6,10 @@ import { useTheme } from '../../context/ThemeContext';
 import { useReduceMotion } from '../../design/motion';
 import { Tap } from '../v2/Tap';
 import { RevoMark } from './RevoMark';
+import { MarkCrescent } from '../ramadan/MarkCrescent';
+import { Sparkle } from '../ramadan/art';
+import { useRamadanDecor } from '../ramadan/quiet';
+import { ramadanV2 } from '../../theme/v2';
 import { t, formatTime } from '../../i18n';
 import { forwardIcon, backIcon } from '../../i18n/direction';
 
@@ -15,7 +19,10 @@ export function RevoHeader({ onHistory, onMemory }: { onHistory: () => void; onM
   return (
     <View style={styles.header}>
       <View style={[styles.capsule, { backgroundColor: palette.bubble }]} accessibilityRole="header" accessibilityLabel={t('revo.revo')}>
-        <RevoMark size={28} />
+        <View>
+          <RevoMark size={28} />
+          <MarkCrescent size={12} />
+        </View>
         <Text style={[styles.capsuleText, { color: palette.text }]} maxFontSizeMultiplier={1.3}>
           {t('revo.revo')}
         </Text>
@@ -242,8 +249,11 @@ export function ReviewRow({ at, onOpen }: { at: number; onOpen: () => void }) {
 
 /** Revo is thinking: three dots that pulse (still with Reduce Motion). */
 export function Typing() {
-  const { palette } = useTheme();
+  const { palette, isDark } = useTheme();
   const reduceMotion = useReduceMotion();
+  // The Ramadan theme (THEME-8): three gold sparkles in place of the grey dots.
+  const ramadan = useRamadanDecor();
+  const gold = ramadanV2(isDark, palette.accent).gold;
   const pulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (reduceMotion) return;
@@ -257,13 +267,15 @@ export function Typing() {
         <Animated.View
           key={i}
           style={[
-            styles.typingDot,
-            { backgroundColor: palette.secondary },
+            ramadan ? styles.typingSparkle : [styles.typingDot, { backgroundColor: palette.secondary }],
             !reduceMotion && {
               opacity: pulse.interpolate({ inputRange: [0, (i + 1) / 4, 1], outputRange: [0.3, 1, 0.3] }),
             },
           ]}
-        />
+          testID={ramadan ? 'revo-typing-sparkle' : undefined}
+        >
+          {ramadan ? <Sparkle size={i === 1 ? 11 : 9} color={gold} /> : null}
+        </Animated.View>
       ))}
     </View>
   );
@@ -311,4 +323,5 @@ const styles = StyleSheet.create({
   reviewLine: { fontSize: 13 },
   typing: { flexDirection: 'row', gap: 6, paddingVertical: 10 },
   typingDot: { width: 7, height: 7, borderRadius: 3.5 },
+  typingSparkle: { width: 11, height: 11, alignItems: 'center', justifyContent: 'center' },
 });

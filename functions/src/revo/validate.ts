@@ -27,6 +27,7 @@ import {
   RevoPattern,
   RevoPlanTally,
   RevoGaps,
+  RevoRamadan,
   RevoRecitation,
   RevoRecitedAyah,
   RevoRecitedPassage,
@@ -187,7 +188,9 @@ export function validateContext(v: unknown): RevoContext {
   // `gaps` comes from Revisely Dev from Nov 16 2026, and from every app with the mistake detection release (Insights'
   // Gaps, ACT-28). `recitation` likewise, for an account that recites.
   // `language` ('ar') comes from apps in Arabic (Revisely Dev's picker), from Nov 22 2026: the answer is asked for in it.
-  keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'patterns', 'passages', 'pageNames', 'recitation', 'app', 'gaps', 'language', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
+  // `ramadan` comes from Revisely Dev only (with `app: 'dev'`), during Ramadan, from Nov 26 2026 (THEME-8).
+  keys(c, ['totals', 'today', 'weakPages', 'week', 'streak', 'patterns', 'passages', 'pageNames', 'recitation', 'app', 'gaps', 'language', 'ramadan', 'localTime'], 'context', ['totals', 'today', 'weakPages', 'week']);
+  if (c.ramadan !== undefined && c.app !== 'dev') fail('context.ramadan');
   if (c.app !== undefined && c.app !== 'dev') fail('context.app');
   if (c.language !== undefined && c.language !== 'ar') fail('context.language');
 
@@ -289,7 +292,28 @@ export function validateContext(v: unknown): RevoContext {
     ...(c.app === 'dev' ? { app: 'dev' as const } : {}),
     ...(c.language === 'ar' ? { language: 'ar' as const } : {}),
     ...(c.gaps !== undefined ? { gaps: validateGaps(c.gaps, 'context.gaps') } : {}),
+    ...(c.ramadan !== undefined ? { ramadan: validateRamadan(c.ramadan, 'context.ramadan') } : {}),
     localTime: lt,
+  };
+}
+
+// ── Ramadan (Revisely Dev, THEME-8) ────────────────────────────────────────────────────────────────
+
+/** Ramadan so far: a day within the month, days revised no more than days so far, pages within the Qur'an. */
+function validateRamadan(v: unknown, path: string): RevoRamadan {
+  const r = obj(v, path);
+  keys(r, ['day', 'length', 'revisedDays', 'covered', 'nextPage', 'nextWords'], path, ['day', 'length', 'revisedDays', 'covered']);
+  const length = int(r.length, 29, 30, `${path}.length`);
+  const day = int(r.day, 1, length, `${path}.day`);
+  const revisedDays = int(r.revisedDays, 0, day, `${path}.revisedDays`);
+  const covered = int(r.covered, 0, 604, `${path}.covered`);
+  if ((r.nextPage === undefined) !== (r.nextWords === undefined)) fail(`${path}.nextPage`);
+  return {
+    day,
+    length,
+    revisedDays,
+    covered,
+    ...(r.nextPage === undefined ? {} : { nextPage: int(r.nextPage, 1, 604, `${path}.nextPage`), nextWords: passageText(r.nextWords, MAX_PAGE_NAME, `${path}.nextWords`) }),
   };
 }
 

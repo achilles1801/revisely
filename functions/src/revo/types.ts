@@ -73,7 +73,25 @@ export interface RevoContext {
    * (prompt.ts ARABIC_SYSTEM, a system block of its own). English requests never carry it.
    */
   language?: 'ar';
+  /**
+   * Ramadan so far (BEHAVIOUR.md THEME-8), from Revisely Dev only (with `app: 'dev'`) during the month, from Nov 26
+   * 2026: the app's lib/revo/ramadan, checked in validate.ts and written out in prompt.ts.
+   */
+  ramadan?: RevoRamadan;
   localTime: string | null;
+}
+
+/** Ramadan so far: today's day of the month, the days revised, and the pages through the Qur'an since 1 Ramadan. */
+export interface RevoRamadan {
+  day: number;
+  /** 29 or 30. */
+  length: number;
+  revisedDays: number;
+  /** Different pages revised or read since 1 Ramadan, of 604. */
+  covered: number;
+  /** The first page not yet, with the app's words for it; absent once all 604 are. */
+  nextPage?: number;
+  nextWords?: string;
 }
 
 /** A passage of one surah by its ayahs, with the app's words for it ("Al-Kahf, ayahs 22–23"). */

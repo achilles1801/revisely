@@ -1837,6 +1837,18 @@ shows up once and they must go through it and complete it … just the main stuf
   - **The theme's card.** The first time the theme shows on a phone, Home opens one card, "What's new: Ramadan theme".
     It says what the theme is and how to turn it off (with Auto, that it goes after Eid by itself), and once closed it
     never shows again on that phone.
+- **THEME-8.** (Revisely Dev) Revo, while the theme shows (not inside the reader or a session):
+  - Revo's mark, its button and the disc in its sheet's header, carries a small crescent.
+  - While it thinks, its three dots are gold sparkles.
+  - During Ramadan its first line opens "Ramadan Kareem, Majd." in place of "Assalamu alaikum, Majd.", and on Eid's
+    three days "Eid Mubarak, Majd.".
+  - Opened from Home during Ramadan, its suggestions are "Plan a khatmah by Eid", "What should I revise for
+    taraweeh?" and "How's my Ramadan going?". Opened from a part of a screen, they stay that part's.
+  - During Ramadan, what it's told includes the month so far, from the same figures as the end card: the day of the
+    month, its length, the days with a revision, the pages revised or read since 1 Ramadan, and the first page not yet
+    with its words.
+  - Asked for a khatmah by Eid, it divides the pages left by the days to Eid and offers to open the Qur'an at that
+    first page.
 
 ## Recite on the phone (Revisely Dev)
 

@@ -10,6 +10,9 @@ import { revoBackAt } from '../../lib/revo/availability';
 import { REVO_MESSAGES, RevoError, revoBackend } from '../../lib/revo/backend';
 import { greetingState, type GreetingOpens } from '../../lib/revo/greeting';
 import { placeFacts, revoOpener } from '../../lib/revo/openers';
+import { ramadanOpener } from '../../lib/revo/ramadan';
+import { ramadanPhase } from '../../lib/ramadanDates';
+import { useRamadanDecor } from '../ramadan/quiet';
 import { prepare } from '../../lib/revo/facts';
 import type { RevoPlace } from '../../lib/revo/place';
 import { useRevoContext } from '../../lib/revo/useRevoContext';
@@ -128,7 +131,14 @@ export function RevoChat({
       return null;
     }
   }, [context, place, sources, strength]);
-  const opener = useMemo(() => (context ? revoOpener(name, context, facts, open, extras) : null), [context, name, facts, open, extras]);
+  // In Ramadan with the theme showing (THEME-8): "Ramadan Kareem" first, and from Home the Ramadan suggestions.
+  const ramadanShows = useRamadanDecor();
+  const phase = ramadanShows ? ramadanPhase(day) : null;
+  const phaseKey = phase?.kind ?? null;
+  const opener = useMemo(
+    () => (context ? ramadanOpener(revoOpener(name, context, facts, open, extras), name, phase, facts != null) : null),
+    [context, name, facts, open, extras, phaseKey], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const greeting = opener?.text ?? null;
   const lastRevo = [...messages].reverse().find((m) => m.role === 'revo');
   const chips = chatId ? (lastRevo?.chips ?? []) : (opener?.chips ?? []);
