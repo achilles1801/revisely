@@ -114,6 +114,39 @@ describe('revised ahead', () => {
     await app.close();
   });
 
+  it('[AHEAD-2] [AHEAD-6] in the day’s session, unchecking a page revised ahead takes back its credit to the day, not Monday’s revision', async () => {
+    const { phone } = await account();
+    let { app, home } = await openHome(phone, '2026-11-02 21:00');
+    const session = await home.startSession();
+    await session.swipeThrough(5);
+    await session.keepGoing();
+    await session.check();
+    await session.swipe();
+    await session.check();
+    await session.back();
+    await app.untilSynced();
+    await app.close();
+
+    // Tuesday: 6 and 7 show checked; page 6 unchecked, then Back.
+    ({ app, home } = await openHome(phone, '2026-11-03 18:00'));
+    let tue = await home.startSession();
+    expect(tue.current()).toBe(8);
+    await tue.swipeBack();
+    await tue.swipeBack();
+    expect(tue.current()).toBe(6);
+    await tue.uncheck();
+    await tue.back();
+    await app.untilSynced();
+    // Monday still revised page 6; only its credit to Tuesday is gone.
+    expect(credit(app)).toEqual([{ day: '2026-11-02', revised: [...MON, 6, 7], ahead: { '2026-11-03': [7] } }]);
+    // It stays unchecked: the session opens on it now.
+    tue = await home.startSession();
+    expect(tue.current()).toBe(6);
+    expect(await tue.isChecked()).toBe(false);
+    await tue.back();
+    await app.close();
+  });
+
   it('[AHEAD-5] Keep going, then Back without revising: no credit for that day', async () => {
     const { phone } = await account();
     const { app, home } = await openHome(phone, '2026-11-02 21:00');

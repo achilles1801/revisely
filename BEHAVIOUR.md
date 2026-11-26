@@ -159,7 +159,9 @@ How the tests are made: `tests/scenarios/README.md`.
   (#198). After Keep daily amount filled today with leftovers (CARRY-2), the next day starts with
   today's own pages.
 - **AHEAD-2.** A page revised ahead counts for the day it is scheduled on, not the day it was revised.
-  That day then needs only the pages left, and is done when none are.
+  That day then needs only the pages left, and is done when none are. Its session shows the page checked, and
+  unchecking it there takes back its credit to the day, as in the day's review (SESS-4): the session that revised
+  it keeps the revision (AHEAD-6). (Nov 26 2026: unchecking one changed nothing, and it came back checked.)
 - **AHEAD-3.** The end card's Keep going goes on to the next revision day's pages not done yet, which
   the session then holds alone (the day before is not behind them). Done again, it goes on to the day
   after. It never stops at the end of a cycle: once every day of the cycle is done (ahead or not), it
