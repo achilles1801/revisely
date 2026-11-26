@@ -22,6 +22,8 @@ jest.mock('react-native/Libraries/AppState/AppState', () => require('./appState'
 
 // Our Cloud Functions: the app's calls go to the functions emulator (harness/functions).
 require('./functions').installFunctionsRoute();
+// expo/fetch (a native module: the app reads a streamed answer with it) goes the same way as the phone's fetch.
+jest.mock('expo/fetch', () => ({ fetch: (input: RequestInfo, init?: RequestInit) => global.fetch(input, init) }));
 // App Check: the phone's attestation (App Attest, Play Integrity) is the edge stood in for; the
 // token it hands out is one the functions emulator accepts (harness/appCheck).
 jest.mock('@react-native-firebase/app', () => require('./appCheck'), { virtual: true });

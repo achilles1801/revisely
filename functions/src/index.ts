@@ -1,4 +1,4 @@
-import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
+import { onCall, onRequest, HttpsError, type CallableResponse } from 'firebase-functions/v2/https';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { setGlobalOptions, logger } from 'firebase-functions/v2';
 import { failure } from './failure';
@@ -29,8 +29,9 @@ import { checkDigestCaller, DIGEST_AUDIENCE, ledgerDayCounts, parseWeek } from '
 import { adminCoachStore } from './coach/admin';
 import { CoachError, handleAskCoach, handleSetOptIn } from './coach/handler';
 import { callCoach } from './coach/call';
+import type { StreamEvents } from './coach/stream';
 import { adminRevoStore, deleteRevoData } from './revo/admin';
-import { RevoError, handleClear, handleDayInReview, handleRevoAsk, handleSetOptions } from './revo/handler';
+import { RevoError, type RevoStreamChunk, handleClear, handleDayInReview, handleRevoAsk, handleSetOptions } from './revo/handler';
 import { inTestEmulator, recordedAnthropic, testNow } from './emulator';
 import { asTafsirPage, cachedLoader } from './revo/tafsir/pages';
 import type { TafsirAnswer } from './revo/tafsir/reply';
@@ -389,13 +390,22 @@ function tafsirAhead(page: number): Promise<TafsirAnswer | null> {
   return aheadAnswers.get(page)!;
 }
 
-function revoDeps(caller: CallerRequest) {
+/** Revo's dependencies; with the callable's response when the phone asked for the answer as it is written. */
+function revoDeps(caller: CallerRequest & { acceptsStreaming?: boolean }, response?: CallableResponse<RevoStreamChunk>) {
   return {
     store: adminRevoStore(adminDb),
     tafsirPages,
     tafsirAhead,
-    call: (request: Parameters<typeof callCoach>[0]) =>
-      callCoach(request, { apiKey: ANTHROPIC_COACH_KEY.value(), fetch: anthropicFor(caller.auth?.uid) }),
+    call: (request: Parameters<typeof callCoach>[0], stream?: StreamEvents) =>
+      callCoach(request, { apiKey: ANTHROPIC_COACH_KEY.value(), fetch: anthropicFor(caller.auth?.uid), ...(stream ? { onStream: stream } : {}) }),
+    ...(caller.acceptsStreaming && response
+      ? {
+          stream: (chunk: RevoStreamChunk) => {
+            // A chunk the phone didn't take (it went away) changes nothing: the answer is still kept.
+            void response.sendChunk(chunk).catch(() => undefined);
+          },
+        }
+      : {}),
     now: clockOf(caller.rawRequest),
     // Each line names the account (its pseudonymous uid), so the metrics collector can add up use and
     // cost per account (scripts/metrics). Logs are kept 30 days; never the question, answer or notes.
@@ -415,9 +425,9 @@ function revoFailure(name: string, err: unknown, message: string): HttpsError {
   return new HttpsError('internal', message);
 }
 
-export const revoAsk = onCall(REVO_CALL_OPTIONS, async (request) => {
+export const revoAsk = onCall(REVO_CALL_OPTIONS, async (request, response) => {
   try {
-    return await handleRevoAsk(request.auth, request.data, revoDeps(request));
+    return await handleRevoAsk(request.auth, request.data, revoDeps(request, response));
   } catch (err) {
     throw revoFailure('revoAsk', err, 'Revo is unavailable. Try again.');
   }

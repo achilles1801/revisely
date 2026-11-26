@@ -97,6 +97,8 @@ export function RevoChat({
   const [messages, setMessages] = useState<RevoMessage[]>([]);
   // A question sent and not answered yet (shown with Revo thinking).
   const [pending, setPending] = useState<{ text: string; attached: { kind: string; label: string }[] } | null>(null);
+  // The pending question's answer so far, while it is written (Revisely Dev, an answer from the tafsir: REVO-44).
+  const [streamed, setStreamed] = useState('');
   const [refusal, setRefusal] = useState<{ kind: RevoRefusal; message: string; retry?: string } | null>(null);
   const scroll = useRef<ScrollView>(null);
   // Whether the list shows its end. A list that gets shorter (the keyboard coming up, the sheet
@@ -194,7 +196,7 @@ export function RevoChat({
         attach: sent.length === 1 ? sent[0] : null,
         ...(sent.length > 1 ? { attachments: sent } : {}),
         ...(about ? { quran: about.scope } : {}),
-      });
+      }, isDevVariant() ? { onText: setStreamed } : undefined);
       // Checked by the backend, and read here, never inside a state update: React throws an
       // updater's error again while rendering, outside this try (REACT-NATIVE-10).
       const { question: asked, reply } = result;
@@ -216,6 +218,7 @@ export function RevoChat({
       if (sent.length > 0) onAttachments(sent);
     } finally {
       setPending(null);
+      setStreamed('');
     }
   };
 
@@ -320,7 +323,14 @@ export function RevoChat({
         {pending ? (
           <>
             <UserBubble text={pending.text} attached={pending.attached} testID="revo-question" />
-            <Typing />
+            {streamed ? (
+              // The answer as it is written; the finished one, with the books' words under it, takes its place.
+              <View style={styles.revo} testID="revo-streaming">
+                <RevoText text={streamed} />
+              </View>
+            ) : (
+              <Typing />
+            )}
           </>
         ) : null}
         {refusal && refusal.kind !== 'daily' && refusal.kind !== 'monthly' && refusal.kind !== 'resting' ? (

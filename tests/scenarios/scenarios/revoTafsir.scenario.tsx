@@ -62,7 +62,7 @@ async function ask(app: OpenApp, question: string) {
   await tap(app, 'revo-send');
 }
 
-type Logged = { kind: string; problems: string[]; messages: { role: string; content: unknown }[] };
+type Logged = { kind: string; problems: string[]; messages: { role: string; content: unknown }[]; stream?: boolean };
 async function modelRequests(uid: string): Promise<Logged[]> {
   const docs = await listServerDocs(`emulator/anthropic/accounts/${uid}/requests`);
   return docs.sort((a, b) => Number(a.at) - Number(b.at)) as unknown as Logged[];
@@ -126,6 +126,14 @@ it('[REVO-44] a question about the Qur’an asked in Revo (Revisely Dev): the ay
     // It counted as one of the day's 20 questions.
     expect(asks.calls).toBe(1);
     expect(await getServerDoc(`revoUsage/${uid}`)).toMatchObject({ day: '2026-11-26', count: 1 });
+
+    // Revisely Dev took the answer as it was written: the model streamed it, and its pieces reached the phone in order,
+    // adding up to the answer kept (the books' words come with the finished one).
+    expect(requests[1].stream).toBe(true);
+    const pieces = (asks.streams[0] ?? []) as { text: string }[];
+    expect(pieces.length).toBeGreaterThan(1);
+    const kept = (asks.results[0] as { result: { reply: { text: string } } }).result.reply.text;
+    expect(pieces.map((p) => p.text).join('').trim()).toBe(kept);
   } finally {
     asks.restore();
     await app.close();

@@ -139,6 +139,36 @@ function respond(r: Pick<Recording, 'status' | 'body'>): Response {
 }
 
 /**
+ * A recorded reply as the API streams it (`stream: true`): the server-sent events that add up to it, in the documented
+ * order (coach/stream.ts reads them). A text block's citations come before its text, in pieces of a few words.
+ */
+export function sseOf(body: Record<string, unknown>): string {
+  const { content, usage, stop_reason: stopReason, stop_sequence: stopSequence, ...message } = body as {
+    content?: Record<string, unknown>[];
+    usage?: Record<string, unknown>;
+    stop_reason?: unknown;
+    stop_sequence?: unknown;
+  };
+  const events: Record<string, unknown>[] = [
+    { type: 'message_start', message: { ...message, content: [], stop_reason: null, stop_sequence: null, usage: { ...usage, output_tokens: 1 } } },
+  ];
+  (content ?? []).forEach((block, index) => {
+    if (block.type !== 'text') {
+      events.push({ type: 'content_block_start', index, content_block: block }, { type: 'content_block_stop', index });
+      return;
+    }
+    const { text, citations, ...rest } = block as { text?: unknown; citations?: unknown[] };
+    events.push({ type: 'content_block_start', index, content_block: { ...rest, text: '', ...(citations ? { citations: [] } : {}) } });
+    for (const citation of citations ?? []) events.push({ type: 'content_block_delta', index, delta: { type: 'citations_delta', citation } });
+    for (const piece of String(text ?? '').match(/[\s\S]{1,24}/g) ?? []) events.push({ type: 'content_block_delta', index, delta: { type: 'text_delta', text: piece } });
+    events.push({ type: 'content_block_stop', index });
+  });
+  events.push({ type: 'message_delta', delta: { stop_reason: stopReason ?? null, stop_sequence: stopSequence ?? null }, usage: { output_tokens: usage?.output_tokens ?? 0 } });
+  events.push({ type: 'message_stop' });
+  return events.map((e) => `event: ${String(e.type)}\ndata: ${JSON.stringify(e)}\n\n`).join('');
+}
+
+/**
  * The Messages API as the test emulator answers it: a recorded real reply for the kind of request,
  * after checking that our code sent a well-formed one. Throws (a refused connection) in `network`
  * mode, as fetch does.
@@ -173,6 +203,7 @@ export function recordedAnthropic(db: Firestore, uid: string | undefined): Fetch
     const mode = String(settings.get('mode') ?? 'recorded');
     const refuseSchemaWith = settings.get('refuseSchemaWith');
     const kind = request ? kindOf(request) : null;
+    const streamed = (request as { stream?: unknown } | null)?.stream === true;
     // `replies.<kind>` is for that kind of request only (a free question asks two: where it is, then the answer).
     const perKind = (settings.get('replies') as Record<string, unknown> | undefined)?.[kind ?? ''];
     const given = (perKind ?? settings.get('reply')) as { text?: unknown; content?: unknown; stopReason?: unknown } | undefined;
@@ -189,6 +220,7 @@ export function recordedAnthropic(db: Firestore, uid: string | undefined): Fetch
       thinking: (request as { thinking?: unknown } | null)?.thinking ?? null,
       messages: request?.messages ?? null,
       outputSchemaSha256: request ? (shortRequest(request).outputSchemaSha256 ?? null) : null,
+      stream: streamed,
     });
     if (problems.length > 0) {
       // As Anthropic answers a malformed request: a 400, which our code treats as no answer.
@@ -206,9 +238,12 @@ export function recordedAnthropic(db: Firestore, uid: string | undefined): Fetch
     if (mode === 'network') throw new TypeError('fetch failed');
     if (mode === 'overloaded') return respond(recording('error-529'));
     if (mode === 'rejected') return respond(recording('error-401'));
+    // A request with `stream: true` gets its reply as the API streams it.
+    const reply = (r: Pick<Recording, 'status' | 'body'>) =>
+      streamed && r.status === 200 ? new Response(sseOf(r.body as Record<string, unknown>), { status: 200, headers: { 'content-type': 'text/event-stream' } }) : respond(r);
     if (given && Array.isArray(given.content) && kind === 'revo-tafsir') {
       // A cited answer from the tafsir the test wrote (text blocks with their citations).
-      return respond({ status: 200, body: { ...(answer!.body as Record<string, unknown>), content: given.content, stop_reason: 'end_turn' } });
+      return reply({ status: 200, body: { ...(answer!.body as Record<string, unknown>), content: given.content, stop_reason: 'end_turn' } });
     }
     if (given && typeof given.text === 'string') {
       // The recorded reply with the test's text in it (usage and the rest as recorded).
@@ -217,8 +252,8 @@ export function recordedAnthropic(db: Firestore, uid: string | undefined): Fetch
         content: [{ type: 'text', text: given.text }],
         stop_reason: typeof given.stopReason === 'string' ? given.stopReason : 'end_turn',
       };
-      return respond({ status: 200, body });
+      return reply({ status: 200, body });
     }
-    return respond(answer!);
+    return reply(answer!);
   };
 }

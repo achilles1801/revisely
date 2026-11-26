@@ -19,6 +19,8 @@ export interface Served {
   sent: unknown[];
   /** What it answered each time: the callable's JSON (`{ result }` or `{ error }`), or the network error. */
   answers: Record<string, unknown>[];
+  /** For each call that asked for its answer as it is written (expo/fetch, `Accept: text/event-stream`): the pieces. */
+  streams: unknown[][];
 }
 
 interface FunctionsNet {
@@ -34,7 +36,7 @@ function state(): FunctionsNet {
 /** Calls made to `name` since the start of the file (or since `forget`). */
 export function served(name: string): Served {
   const s = state().served;
-  if (!s.has(name)) s.set(name, { calls: 0, sent: [], answers: [] });
+  if (!s.has(name)) s.set(name, { calls: 0, sent: [], answers: [], streams: [] });
   return s.get(name)!;
 }
 
@@ -65,6 +67,7 @@ export function installFunctionsRoute(): void {
     }
     const headers = { ...((init?.headers ?? {}) as Record<string, string>), 'X-Revisely-Test-Now': String(Date.now()) };
     const res = await real(`${ORIGIN}/${project}/us-central1/${name}`, { ...init, headers });
+    if ((init?.headers as Record<string, string> | undefined)?.Accept === 'text/event-stream' && res.ok && res.body) return streamed(res, record);
     const text = await res.text();
     try {
       record.answers.push(JSON.parse(text));
@@ -83,4 +86,43 @@ export function installFunctionsRoute(): void {
   }) as typeof fetch;
   (routed as { __scenarioFunctions?: boolean }).__scenarioFunctions = true;
   global.fetch = routed;
+}
+
+/**
+ * A callable's answer as it is written (the app reads it with expo/fetch): its body handed over as it arrives, as text
+ * made again in the test's own realm (Node's buffers are of another, as with Response.json above). The pieces and the
+ * last event are recorded once the body ends.
+ */
+function streamed(res: Response, record: Served): Response {
+  const source = res.body!.getReader();
+  const decoder = new TextDecoder();
+  const pieces: unknown[] = [];
+  record.streams.push(pieces);
+  let whole = '';
+  const finish = () => {
+    let last: Record<string, unknown> = { status: res.status, text: whole.slice(0, 200) };
+    for (const part of whole.split('\n\n')) {
+      const data = part.split('\n').find((l) => l.startsWith('data:'));
+      if (!data) continue;
+      const event = JSON.parse(data.slice(5)) as Record<string, unknown>;
+      if ('message' in event) pieces.push(event.message);
+      else last = event;
+    }
+    record.answers.push(last);
+  };
+  const body = {
+    getReader: () => ({
+      read: async (): Promise<{ done: boolean; value?: Uint8Array }> => {
+        const { done, value } = await source.read();
+        if (done) {
+          finish();
+          return { done: true };
+        }
+        const text = decoder.decode(value, { stream: true });
+        whole += text;
+        return { done: false, value: new TextEncoder().encode(text) };
+      },
+    }),
+  };
+  return { ok: res.ok, status: res.status, headers: res.headers, body } as unknown as Response;
 }

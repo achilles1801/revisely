@@ -14,7 +14,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import { callFunction } from '../../services/firestoreService';
+import { callFunction, callFunctionStreaming } from '../../services/firestoreService';
 import { knownOffline } from '../networkState';
 import type {
   QuranScope,
@@ -46,6 +46,12 @@ export interface RevoBackend {
     attachments?: RevoAttachment[];
     /** A question about these ayat, answered from the tafsir (Revisely Dev: the page open in the mushaf, or a held ayah). */
     quran?: QuranScope;
+  }, opts?: {
+    /**
+     * The answer so far, as it is written (Revisely Dev: an answer from the tafsir streams; others come whole). The
+     * result is the finished answer either way.
+     */
+    onText?: (soFar: string) => void;
   }): Promise<RevoAskResult>;
   dayInReview(input: { day: string; context: RevoContext }): Promise<{ chatId: string } | null>;
   setOptions(input: Partial<RevoSettings>): Promise<RevoSettings>;
@@ -145,6 +151,23 @@ async function call(name: string, data: Record<string, unknown>): Promise<unknow
   return callableResult(out);
 }
 
+/** A call whose answer streams: each piece of text (functions RevoStreamChunk) adds to what `onText` shows. */
+async function callStreaming(name: string, data: Record<string, unknown>, onText: (soFar: string) => void): Promise<unknown> {
+  let soFar = '';
+  let out: unknown;
+  try {
+    out = await callFunctionStreaming(signedIn(), name, data, (chunk) => {
+      const text = (chunk as { text?: unknown } | null)?.text;
+      if (typeof text !== 'string' || text === '') return;
+      soFar += text;
+      onText(soFar.trimStart());
+    });
+  } catch (err) {
+    throw refusalOf(err);
+  }
+  return callableResult(out);
+}
+
 const isStr = (v: unknown): v is string => typeof v === 'string';
 const isMessage = (v: unknown): v is RevoMessage => {
   const m = v as Partial<RevoMessage> | null;
@@ -215,8 +238,10 @@ const firebaseRevo: RevoBackend = {
       () => cb([]),
     );
   },
-  async ask(input) {
-    const result = askResultOf(await call('revoAsk', input as unknown as Record<string, unknown>));
+  async ask(input, opts) {
+    const onText = opts?.onText;
+    const out = onText ? await callStreaming('revoAsk', input as unknown as Record<string, unknown>, onText) : await call('revoAsk', input as unknown as Record<string, unknown>);
+    const result = askResultOf(out);
     if (!result) throw new RevoError('unavailable', REVO_MESSAGES.unavailable);
     return result;
   },

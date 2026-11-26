@@ -226,6 +226,51 @@ describe('Revo’s conversation', () => {
     expect(screen.getByTestId('revo-answer-up').props.accessibilityState).toMatchObject({ selected: true });
   });
 
+  it('[REVO-44] in Revisely Dev an answer shows as it is written, then the finished one takes its place', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const dev = jest.spyOn(require('../../../lib/variant') as typeof import('../../../lib/variant'), 'isDevVariant').mockReturnValue(true);
+    let finish: () => void = () => undefined;
+    const streaming: RevoBackend = {
+      ...backend,
+      ask: jest.fn(async (input, opts) => {
+        opts?.onText?.('Her gift was');
+        opts?.onText?.('Her gift was a test of him.');
+        await new Promise<void>((resolve) => (finish = resolve));
+        return backend.ask(input);
+      }),
+    };
+    __setRevoBackendForTests(streaming);
+    try {
+      render(<Chat />);
+      await flush();
+      fireEvent.changeText(screen.getByTestId('revo-input'), 'Why did she send a gift?');
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('revo-send'));
+      });
+      await flush();
+      expect(screen.getByTestId('revo-streaming')).toHaveTextContent('Her gift was a test of him.');
+      expect(screen.queryByTestId('revo-typing')).toBeNull();
+      await act(async () => finish());
+      await flush();
+      expect(screen.queryByTestId('revo-streaming')).toBeNull();
+      expect(screen.getByTestId('revo-answer')).toBeTruthy();
+    } finally {
+      dev.mockRestore();
+    }
+  });
+
+  it('the store app asks for the answer whole (no stream)', async () => {
+    const ask = jest.spyOn(backend, 'ask');
+    render(<Chat />);
+    await flush();
+    fireEvent.changeText(screen.getByTestId('revo-input'), 'How is my pace?');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('revo-send'));
+    });
+    await flush();
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({ question: 'How is my pace?' }), undefined);
+  });
+
   it('a failed question says so and can be tried again; what was attached comes back', async () => {
     const failing: RevoBackend = { ...backend, ask: jest.fn(async () => Promise.reject(new RevoError('unavailable', 'busy'))) };
     __setRevoBackendForTests(failing);
