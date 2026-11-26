@@ -4,6 +4,9 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { buildCoachRequest } from '../coach/prompt';
 import { buildAskRequest, buildReviewRequest } from '../revo/prompt';
+import { asTafsirPage } from '../revo/tafsir/pages';
+import { selectPieces } from '../revo/tafsir/select';
+import { buildTafsirRequest } from '../revo/tafsir/request';
 import { buildLocateRequest } from '../revo/tafsir/locate';
 import { compiledSchemas, driftOf, inTestEmulator, kindOf, Recording, schemaSha256, shortRequest, testNow } from '../emulator';
 import type { RevoContext } from '../revo/types';
@@ -108,5 +111,23 @@ describe('the recorded replies', () => {
     for (const k of ['input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens']) {
       expect(typeof body.usage[k]).toBe('number');
     }
+  });
+});
+
+// Revo's tafsir requests, built as scripts/tafsir/record-replies.js builds them: record them again with it when these fail.
+describe('the recorded tafsir replies', () => {
+  const page = asTafsirPage(JSON.parse(readFileSync(join(__dirname, '..', '..', 'test-recordings', 'tafsir', 'p379.json'), 'utf8')), 379);
+  const q = 'Why did she send a gift instead of answering?';
+  const requests = {
+    'revo-tafsir': buildTafsirRequest({ question: q, place: 'surah 27, ayat 23 to 35', books: selectPieces([page], { start: page.start, end: page.end }, q, true) }).request,
+    'revo-locate': buildLocateRequest('How was my week?'),
+  } as const;
+
+  it.each(Object.keys(requests) as (keyof typeof requests)[])('%s is answered by its own recording', (name) => {
+    expect(kindOf(requests[name])).toBe(name);
+  });
+
+  it.each(Object.keys(requests) as (keyof typeof requests)[])('%s was recorded with the request the functions send now', (name) => {
+    expect(driftOf(shortRequest(requests[name]), recording(name).request)).toEqual([]);
   });
 });

@@ -1,25 +1,25 @@
 {
-  "recordedAt": "2026-11-26T06:42:18.255Z",
+  "recordedAt": "2026-11-26T07:22:22.731Z",
   "how": "scripts/tafsir/record-replies.js: the real API, the request revoAsk builds for the gift question on page 379 (test-recordings/tafsir/p379.json).",
   "request": {
-    "model": "claude-sonnet-5-5",
+    "model": "claude-haiku-5-5",
     "max_tokens": 2000,
     "thinking": {
-      "type": "between_tools"
+      "type": "disabled"
     },
     "systemSha256": "b508f0041c66108035a3b4634e75fd95652fc6a49283434a6b21f5a4669d3365",
     "outputSchemaSha256": "8f612858b9afa6f5335d36110bae1d040c3ae3886401fcb8660d60b9255e55e5"
   },
   "status": 200,
   "body": {
-    "model": "claude-sonnet-5-5",
-    "id": "msg_011ChR5rTaeZryYr76tTsJ6v",
+    "model": "claude-haiku-5-5",
+    "id": "msg_011ChR8unqxEpurBsE3sw1dz",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "She didn't want to rush into war or into submission before she knew who Sulayman really was. The gift was a test and a way to buy time: it would show her whether he was a worldly king, who would be pleased by wealth, or a prophet, who would not, and it might also soften him. The books also say she saw that war would ruin her people.\n\nAl-Sa'di says she told her people that "
+        "text": "The question is about Bilqis (the queen of Sheba) sending a gift to Sulayman. The books give a few reasons, and they fit together.\n\nAl-Sa'di says she wanted to test him before committing: she sent the gift to see whether he was a king or a prophet, and to judge from his response how to act. "
       },
       {
         "citations": [
@@ -33,11 +33,29 @@
           }
         ],
         "type": "text",
-        "text": "kings who enter a town ruin it with killing, capture and plunder, and that she would not obey him before testing him and sending someone to look into his affairs"
+        "text": "Her point was that it was not sound to obey him before testing him and sending someone to examine his condition, so that we would be acting with insight."
       },
       {
         "type": "text",
-        "text": ".\n\nIbn Kathir says "
+        "text": " "
+      },
+      {
+        "citations": [
+          {
+            "type": "char_location",
+            "cited_text": "فقالت: وإني مرسلة إليهم بهدية فناظرة بم يرجع المرسلون منه. ",
+            "document_index": 0,
+            "document_title": "Tafsir al-Sa'di",
+            "start_char_index": 2658,
+            "end_char_index": 2717
+          }
+        ],
+        "type": "text",
+        "text": "She said: I am sending them a gift, and I will look at what the messengers come back with."
+      },
+      {
+        "type": "text",
+        "text": "\n\nIbn Kathir reports the same aim: "
       },
       {
         "citations": [
@@ -51,11 +69,11 @@
           }
         ],
         "type": "text",
-        "text": "she would send him a gift befitting his status and wait to see his response"
+        "text": "'I will send him a gift befitting for one of his status, and will wait and see what his response will be."
       },
       {
         "type": "text",
-        "text": ", and he reports from Ibn 'Abbas and others that "
+        "text": " "
       },
       {
         "citations": [
@@ -69,11 +87,11 @@
           }
         ],
         "type": "text",
-        "text": "she said: if he accepts the gift he is a king, so fight him; if he does not, he is a Prophet, so follow him"
+        "text": "Ibn 'Abbas and others said: \"She said to her people, if he accepts the gift, he is a king, so fight him; but if he does not accept it, he is a Prophet, so follow him.\""
       },
       {
         "type": "text",
-        "text": ".\n\nAl-Qurtubi says "
+        "text": "\n\nAl-Qurtubi adds the same test, that a king would be pleased with wealth and a prophet would not: "
       },
       {
         "citations": [
@@ -87,11 +105,11 @@
           }
         ],
         "type": "text",
-        "text": "she wanted to try this man with a gift: if he were a worldly king, money would please him and they would deal with him accordingly, but if he were a prophet, money would not please him and he would hold them to the matter of religion, so they should believe in him and follow his religion"
+        "text": "if he is a worldly king, money will satisfy him and we will deal with him accordingly, and if he is a prophet, money will not satisfy him and he will insist on matters of religion"
       },
       {
         "type": "text",
-        "text": "."
+        "text": ".\n\nNote that the books describe her motive, not a ruling. For the full story, a qualified teacher can take you through it."
       }
     ],
     "container": null,
@@ -100,13 +118,13 @@
     "stop_details": null,
     "usage": {
       "input_tokens": 4194,
-      "cache_creation_input_tokens": 3727,
+      "cache_creation_input_tokens": 3644,
       "cache_read_input_tokens": 0,
       "cache_creation": {
-        "ephemeral_5m_input_tokens": 3727,
+        "ephemeral_5m_input_tokens": 3644,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 418,
+      "output_tokens": 498,
       "output_tokens_details": {
         "thinking_tokens": 0
       },

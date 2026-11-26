@@ -2,7 +2,7 @@
 /**
  * Records the two model replies the emulator answers Revo's tafsir requests with (functions/src/emulator.ts):
  * `revo-tafsir` (the gift question on An-Naml 23–35, built from test-recordings/tafsir/p379.json exactly as revoAsk
- * builds it) and `revo-locate` (a question that isn't about the Qur'an). Two real calls, about $0.03.
+ * builds it) and `revo-locate` (a question that isn't about the Qur'an). Two real calls on Haiku 5.5, about $0.001.
  *
  *   ANTHROPIC_API_KEY=… node scripts/tafsir/record-replies.js      # build the functions first
  */

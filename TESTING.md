@@ -89,7 +89,9 @@ was made with (model, `max_tokens`, `thinking`, the system prompt): record it ag
 **What they hold now** (each file's `how` says): `revo-ask` and `revo-review` are real replies, recorded
 on Nov 10 2026. Since then the guide changed the system prompt without the coach key at hand, so their
 request hash was moved by hand (`recordedAt: null`, the recording's time kept in `how`): the replies
-answer an older prompt. `coach` is still written by hand in the Messages API's shape. To record real
+answer an older prompt. `coach` is still written by hand in the Messages API's shape. `revo-tafsir` and `revo-locate`
+(Revo's answers from the tafsir) are real replies on Haiku 5.5, recorded Nov 26 2026 with
+`functions/scripts/tafsir/record-replies.js`, which records them again. To record real
 ones (a few cents, with the coach key, from the repository root):
 
 ```bash

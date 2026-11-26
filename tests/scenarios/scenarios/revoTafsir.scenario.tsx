@@ -98,12 +98,12 @@ it('[REVO-44] a question about the Qur’an asked in Revo (Revisely Dev): the ay
     // The answer first (the recorded reply, functions/test-recordings/anthropic/revo-tafsir.json), then each book's own
     // words: al-Sa'di's and al-Qurtubi's Arabic (as the books have it) with Revo's English, labelled, and Ibn Kathir's
     // own English words.
-    expect(app.screen.getByText(/The gift was a test and a way to buy time/)).toBeTruthy();
+    expect(app.screen.getByText(/The books give a few reasons, and they fit together/)).toBeTruthy();
     expect(app.screen.getByText('From the tafsir')).toBeTruthy();
     expect(app.screen.getByTestId('revo-tafsir-source-saadi')).toBeTruthy();
     expect(app.screen.getByTestId('revo-tafsir-source-ibnKathirEn')).toBeTruthy();
     expect(app.screen.getByTestId('revo-tafsir-source-qurtubi')).toBeTruthy();
-    expect(app.screen.getByText(/I will send him a gift befitting for one of his status/)).toBeTruthy();
+    expect(app.mods.rtl.within(app.screen.getByTestId('revo-tafsir-source-ibnKathirEn')).getByText(/I will send him a gift befitting for one of his status/)).toBeTruthy();
     expect(app.screen.getAllByText(/Revo’s translation/).length).toBe(2);
     // al-Qurtubi's words keep the book's harakat.
     const qurtubi = app.mods.rtl.within(app.screen.getByTestId('revo-tafsir-source-qurtubi')).queryAllByText(/.+/).map((e: { props: { children: unknown } }) => String(e.props.children));
