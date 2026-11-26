@@ -293,7 +293,7 @@ describe('[DAY-1] [DAY-2] [DAY-3] [DAY-6] [DAY-8] revision day', () => {
   // Turkey's method (Diyanet) shows sunrise 7 minutes early, Dubai's 3. Near the
   // Arctic Circle around the June solstice, a seventh of the night is less than
   // that, so the moved sunrise came at or before the high-latitude Fajr.
-  it('far north around the June solstice, with every method: Fajr comes before sunrise, and sunrise before Dhuhr', () => {
+  it('far north around the June solstice, with every method: the six times come in order, Fajr to Isha', () => {
     const zoneAt = (lng: number) => (lng < -10 ? CITIES.reykjavik.zone : lng < 15 ? 'Europe/Oslo' : 'Europe/Helsinki');
     // Mostly the methods that move sunrise: the rest are checked too.
     const methods = fc.oneof({ arbitrary: fc.constantFrom('Turkey', 'Dubai'), weight: 2 }, { arbitrary: methodArb, weight: 1 });
@@ -309,12 +309,55 @@ describe('[DAY-1] [DAY-2] [DAY-3] [DAY-6] [DAY-8] revision day', () => {
           const prefs = getPrayerPrefs();
           const t = dayTimes({ latitude, longitude }, day, { method, highLatitude: prefs.highLatitude, madhab: prefs.madhab, adjustments: prefs.adjustments });
           expect(t.day).toBe(dayOf(day));
-          if (t.fajr && t.sunrise) expect(t.fajr.getTime()).toBeLessThan(t.sunrise.getTime());
-          if (t.sunrise && t.dhuhr) expect(t.sunrise.getTime()).toBeLessThan(t.dhuhr.getTime());
+          const shown = [t.fajr, t.sunrise, t.dhuhr, t.asr, t.maghrib, t.isha].filter((x): x is Date => x !== null);
+          for (let i = 1; i < shown.length; i++) expect(shown[i].getTime()).toBeGreaterThan(shown[i - 1].getTime());
         },
       ),
-      { numRuns: runs(300) },
+      {
+        numRuns: runs(300),
+        // Found by CI (Nov 26 2026): Fajr in the real sunrise's minute (7 minutes after Turkey's moved one);
+        // the day before, Turkey's and Dubai's later Maghrib came after Isha.
+        examples: [
+          [65.72734246842994, 0, 13, 'Turkey'],
+          [65.72734246842994, 0, 13, 'MuslimWorldLeague'],
+          [65.72734246842994, 0, 12, 'Turkey'],
+          [65.72734246842994, 0, 12, 'Dubai'],
+        ],
+      },
     );
+  });
+
+  // Was a known bug (fixed Nov 26 2026, timesOf): just south of the Arctic Circle
+  // the night around the solstice is a few minutes long, a seventh of it rounded
+  // to nothing, and adhan gave Fajr in the real sunrise's own minute, with every
+  // method (Turkey's moved sunrise then came 7 minutes before Fajr). At nightfall,
+  // Turkey's and Dubai's later Maghrib came after the high-latitude Isha.
+  it('example: 65.73° N on 2026-06-19, Turkey and Dubai: Isha a minute after Maghrib, Maghrib unmoved', () => {
+    useZone('Europe/Oslo');
+    const prefs = getPrayerPrefs();
+    const place = { latitude: 65.72734246842994, longitude: 0 };
+    const day = new Date(2026, 5, 19);
+    const settings = (method: string) => ({ method, highLatitude: prefs.highLatitude, madhab: prefs.madhab, adjustments: prefs.adjustments });
+    const sunset = dayTimes(place, day, settings('NorthAmerica')).maghrib!.getTime();
+    for (const [method, late] of [['Turkey', 7], ['Dubai', 3]] as const) {
+      const t = dayTimes(place, day, settings(method));
+      expect(t.maghrib!.getTime()).toBe(sunset + late * MINUTE);
+      expect(t.isha!.getTime()).toBe(t.maghrib!.getTime() + MINUTE);
+    }
+  });
+
+  it('example: 65.73° N on 2026-06-20, every method: Fajr a minute before the real sunrise, never after the shown one', () => {
+    useZone('Europe/Oslo');
+    const prefs = getPrayerPrefs();
+    const place = { latitude: 65.72734246842994, longitude: 0 };
+    const day = new Date(2026, 5, 20);
+    const real = dayTimes(place, day, { method: 'MuslimWorldLeague', highLatitude: prefs.highLatitude, madhab: prefs.madhab, adjustments: prefs.adjustments }).sunrise!;
+    for (const method of ['MuslimWorldLeague', 'Turkey', 'Dubai', 'NorthAmerica']) {
+      const t = dayTimes(place, day, { method, highLatitude: prefs.highLatitude, madhab: prefs.madhab, adjustments: prefs.adjustments });
+      expect(t.fajr!.getTime()).toBe(real.getTime() - MINUTE);
+      expect(t.fajr!.getTime()).toBeLessThan(t.sunrise!.getTime());
+      expect(t.sunrise!.getTime()).toBeLessThanOrEqual(real.getTime());
+    }
   });
 
   it('example: Tromsø with Turkey’s method on 2026-06-21: Fajr before sunrise, both to the minute', () => {
