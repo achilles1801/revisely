@@ -80,6 +80,10 @@ export const revo = {
   },
   composer: {
     placeholder: 'Ask Revo anything',
+    dictate: 'Speak your question',
+    listening: 'Listening…',
+    stopDictating: 'Stop',
+    speechDenied: 'Allow speech recognition for Revisely in Settings to speak your question',
     send: 'Send',
   },
   /** Adding a day from the month in the + sheet. */

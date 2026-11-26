@@ -80,6 +80,10 @@ export const revo: NonNullable<ArStrings['revo']> = {
   },
   composer: {
     placeholder: 'اسأل ⁨Revo⁩ عن أي شيء',
+    dictate: 'قل سؤالك',
+    listening: 'أستمع…',
+    stopDictating: 'إيقاف',
+    speechDenied: 'اسمح لريفايزلي بالتعرّف على الكلام من الإعدادات لتقول سؤالك',
     send: 'إرسال',
   },
   month: {

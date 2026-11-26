@@ -1639,10 +1639,14 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   corner is kept on that phone, per account, across launches. Until it's moved it sits at the end of the line: right, or
   left in Arabic. VoiceOver and TalkBack have an action for it ("Move to the left", "Move to the right"), and say where
   it went. Lists leave the same room at their end on either side.
-- **REVO-42.** Nothing in Revo's field is a control that does nothing. It has no mic: the old one only put the cursor in
-  the field, so with the keyboard already up it did nothing (two testers, Nov 25 2026: "Mic burton doesn't work", "Mic
-  isnt working"). The field ends in send, grey until there is a question. To speak a question, the keyboard's own mic
-  key dictates, on iPhone and Android.
+- **REVO-42.** Nothing in Revo's field is a control that does nothing (two testers, Nov 25 2026: "Mic burton doesn't
+  work", "Mic isnt working": the old mic only put the cursor in the field). Where the build has the speech module
+  (Revisely Dev, from its next native build; Majd, Nov 25 2026: "yes i want it"), an empty field ends in a mic: a tap
+  asks for the microphone and speech recognition the first time, then the words appear in the field as they're heard,
+  after anything already typed, in Arabic when the app is in Arabic and English otherwise. A pause ends it, and so does
+  the stop button that takes the mic's place; nothing is sent until send. Refused, the field says to allow speech
+  recognition in Settings. Without the module (the store app until that native release) there is no mic: the field
+  ends in send, grey until there is a question, and the keyboard's own mic key dictates.
 
 - **REVO-43.** (Revisely Dev) Revo helps make or change the schedule, and never changes it itself (Majd, Nov 25 2026:
   "adding revo to edit my schedule page and making it so that revo can help the user make or edit their schedule"; of the
