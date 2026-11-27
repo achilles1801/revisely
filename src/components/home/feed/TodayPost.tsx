@@ -131,14 +131,18 @@ export function TodayPost({
   quietCatchUp?: boolean;
   /** The hairline under the post: only when something follows it (HOME-6: with nothing under it, Home's ground runs on). */
   separator?: boolean;
-  /** Done today: the next revision day, for the quiet line that opens it (revise ahead). */
+  /** Done today, or a rest day (HOME-9): the next revision day, for the quiet line (or the rest day's detail) that opens it. */
   ahead?: { lead: string; first: number } | null;
   onAhead?: () => void;
   /** Home's ? (HELP-1), at the right of the header, where ⋯ was. */
   help?: React.ReactNode;
 }) {
   const { palette } = useTheme();
-  const lines = todayLines(status, pages, done, carried, carriedLeft, partial, carriedInsights);
+  // With pages memorized, a day with no pages is a rest day (HOME-9): never "Mark memorized pages".
+  const lines = todayLines(status, pages, done, carried, carriedLeft, partial, carriedInsights, {
+    memorized: memorized.fraction > 0,
+    next: ahead ?? null,
+  });
   const grace = streakGrace ?? null;
   // In grace the streak that can come back shows dimmed, with a ring for the missed pages (SESS-6).
   const meta = grace
@@ -243,12 +247,14 @@ export function TodayPost({
                 />
               </View>
             ) : null}
-            <PillButton
-              title={lines.cta}
-              onPress={onPrimary}
-              variant={lines.solid ? 'solid' : 'outline'}
-              testID="today-cta"
-            />
+            {lines.cta ? (
+              <PillButton
+                title={lines.cta}
+                onPress={onPrimary}
+                variant={lines.solid ? 'solid' : 'outline'}
+                testID="today-cta"
+              />
+            ) : null}
             {catchUp && quietCatchUp ? (
               // HOME-5: Home's one button stays the Today post's; the missed pages are a quiet line under it, and a tap
               // anywhere on it adds them. "Add to today" is held together so it never breaks across lines.
@@ -272,7 +278,7 @@ export function TodayPost({
                 </Text>
               </Tap>
             ) : null}
-            {ahead && onAhead && status === 'completed' ? (
+            {ahead && onAhead && status === 'completed' && !lines.rest ? (
               // Quiet: a grey line, not a second button. Opens that day's pages.
               <Tap
                 onPress={onAhead}

@@ -511,6 +511,12 @@ current basic sounds". October 2026's version was removed for the voices it offe
   the day on the homepage takes me to the page which is correct, but then when I swipe out of the page, it should
   actually take me back to the homepage, not to the third tab"). The Read tab stays as it was. (Before: the page opened
   in the Read tab, and back went to its surah list.)
+- **HOME-9.** Home never asks to mark memorized pages while any page is marked memorized. A day with no pages to
+  revise (a rest day in the plan) reads "Rest day", then where the next revision day starts ("Tomorrow starts at
+  Al-Kahf"), with "Revise ahead" as an outline that opens that day; with no next day, "Nothing is scheduled today." and
+  no button. "Nothing to revise yet" and "Mark memorized pages" are for an account with nothing memorized (Majd, Nov 27
+  2026, on a rest day of his plan: "telling me to mark memorized pages when i already have memorized pages marked?").
+  (Before: any day with no pages showed the new account's words and button.)
 
 ## Sheets and updates
 

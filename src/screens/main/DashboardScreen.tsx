@@ -275,8 +275,11 @@ export default function DashboardScreen() {
   // Done today: the next revision day, which Home's quiet line opens (#168). It goes on past the cycle's
   // end (AHEAD-3): a day that repeats today's pages opens as a new round, and one that begins the plan
   // again reads "Next cycle starts at …".
+  // A rest day (no pages today, pages memorized; HOME-9) names it too, and its "Revise ahead" opens it.
   const aheadNext = useMemo(() => {
-    if (!user || !assignment || todayStatus.status !== 'completed' || assignment.pages.length === 0) return null;
+    if (!user || !assignment) return null;
+    const restDay = assignment.pages.length === 0 && revisablePages(pages).length > 0;
+    if (!restDay && (todayStatus.status !== 'completed' || assignment.pages.length === 0)) return null;
     const plan = nextRevisionDayPlan(user, pages, revisionDay, new Set(assignment.pages), logs);
     if (!plan || plan.pages.length === 0) return null;
     return { plan, lead: aheadLead(user, pages, revisionDay, plan) };
@@ -452,7 +455,10 @@ export default function DashboardScreen() {
   };
 
   const handleCtaPress = () => {
-    if (todayStatus.status === 'completed' && carriedLeft > 0) {
+    if (assignment.totalPages === 0 && aheadNext && revisablePages(pages).length > 0) {
+      // A rest day (HOME-9), revised ahead today or not: "Revise ahead" opens the next revision day.
+      navigation.navigate('ActiveRevision', { aheadDay: aheadNext.plan.day, ...(aheadNext.plan.round ? { round: true } : {}) });
+    } else if (todayStatus.status === 'completed' && carriedLeft > 0) {
       // Today is done, and pages added from earlier days are left: the session holds them.
       navigation.navigate('ActiveRevision');
     } else if (todayStatus.status === 'completed') {
