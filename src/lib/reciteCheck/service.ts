@@ -2,7 +2,7 @@ import { getAuth } from 'firebase/auth';
 import { currentRelease } from '../releaseInfo';
 import type { VerseKey } from '../verses';
 import { CheckResult, parseCheckResult } from './result';
-import type { ReciteCheckSettings } from './settings';
+import { keepsTakes, type ReciteCheckSettings } from './settings';
 import { pairAnswered, pairClosed } from '../reciteLive/pairService';
 import { checker } from './endpoints';
 import { t } from '../../i18n';
@@ -39,7 +39,8 @@ export function checkQuery(from: VerseKey, to: VerseKey | null, s: ReciteCheckSe
     mot: String(s.muttasil),
     aar: String(s.aared),
     letters: s.letters ? '1' : '0',
-    keep: s.keep ? '1' : '0',
+    // Only where the training switch is offered and on (RECITE-26).
+    keep: keepsTakes(s) ? '1' : '0',
   };
   if (to) {
     q.s2 = String(to.sura);

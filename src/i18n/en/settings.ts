@@ -276,9 +276,9 @@ export const settings = {
     showPastSub: 'Lightly, until each is said right on 2 different days',
     mistakeSound: 'Sound on a mistake',
     mistakeSoundSub: 'A short tone and a tap as a mistake is marked',
-    /** Revisely Dev only, for every account that recites (RECITE-26). */
-    keep: 'Keep my recitations as test data',
-    keepSub: 'Recitation checks, for Revisely’s tests. Software checks them; nobody listens.',
+    /** For every account that recites: Revisely Dev's, and the store app's once released (RECITE-26, lib/release/trainingTakes). */
+    keep: 'Help improve mistake detection',
+    keepSub: 'Your recitations and their results help train it. Software checks them; nobody listens.',
   },
   notifications: {
     /** Reminders' switch for the revision reminders (REMIND-1). */

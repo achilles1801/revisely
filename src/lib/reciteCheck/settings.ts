@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isDevVariant } from '../variant';
 import { strictReleased } from '../release/mistakeDetection';
+import { TRAINING_STORE_DEFAULT, trainingTakesOffered } from '../release/trainingTakes';
 import { DEFAULT_TEST_LENGTH, TEST_LENGTHS, type TestLength } from '../reciteLive/testLength';
 
 /**
@@ -17,8 +18,16 @@ export interface ReciteCheckSettings {
   aared: 0 | 2 | 4 | 6;
   /** Letters and harakat (experimental: on learners it flags many correct words). */
   letters: boolean;
-  /** Keep each recitation and its result in revisely-dev as test data for the lab (on for testers). */
+  /**
+   * "Help improve mistake detection" (RECITE-26): ask the checker to keep each take, its result and its labels, to train
+   * the model. On by default in Revisely Dev; in the store app it counts only once set (`keepSet`), see keepsTakes.
+   */
   keep: boolean;
+  /**
+   * The switch was set on this phone (it, or any change that names it). Until then a kept `keep` is only the old default,
+   * written with the other settings: the store app reads TRAINING_STORE_DEFAULT instead (RECITE-26).
+   */
+  keepSet: boolean;
   /** The AI notice has been shown (it comes before the first check). */
   noticeSeen: boolean;
   /** What a tap on the reader's mic starts (held, it picks): Record, or Recite (the page follows you). */
@@ -67,6 +76,7 @@ export const RECITE_CHECK_DEFAULTS: ReciteCheckSettings = {
   aared: 0,
   letters: false,
   keep: true,
+  keepSet: false,
   noticeSeen: false,
   mode: 'recite',
   markMistakes: true,
@@ -80,6 +90,18 @@ export const RECITE_CHECK_DEFAULTS: ReciteCheckSettings = {
   testJuz: null,
   testProgress: true,
 };
+
+/**
+ * What "Help improve mistake detection" shows (RECITE-26): Revisely Dev reads the saved value (on by default); the store
+ * app reads it only once the user has set it, and TRAINING_STORE_DEFAULT before that, so a `keep` the phone saved with
+ * the other settings, never chosen, never opts anyone in.
+ */
+export const trainingSwitchOn = (s: Pick<ReciteCheckSettings, 'keep' | 'keepSet'>): boolean =>
+  isDevVariant() || s.keepSet ? s.keep : TRAINING_STORE_DEFAULT;
+
+/** Whether a take asks the checker to keep it (RECITE-26): the switch is offered here (lib/release/trainingTakes) and on. */
+export const keepsTakes = (s: Pick<ReciteCheckSettings, 'keep' | 'keepSet'>): boolean =>
+  trainingTakesOffered() && trainingSwitchOn(s);
 
 /** Whether Strict is offered: Revisely Dev's, until its own switch is on (lib/release/mistakeDetection). */
 export const strictOffered = (): boolean => isDevVariant() || strictReleased();
@@ -113,6 +135,7 @@ export function parseReciteCheckSettings(raw: string | null): ReciteCheckSetting
     aared: pick(s.aared, [0, 2, 4, 6] as const, d.aared),
     letters: typeof s.letters === 'boolean' ? s.letters : d.letters,
     keep: typeof s.keep === 'boolean' ? s.keep : d.keep,
+    keepSet: s.keepSet === true && typeof s.keep === 'boolean',
     noticeSeen: s.noticeSeen === true,
     // A kept "check" (the three-way menu before Nov 14 2026) is Recite with mistakes marked.
     mode: s.mode === 'record' ? 'record' : s.mode === 'recite' || s.mode === 'check' ? 'recite' : d.mode,
@@ -163,6 +186,8 @@ export function setReciteCheckSettings(uid: string | null | undefined, update: P
   if (owner !== uid) loadReciteCheckSettings(uid);
   // Naming Mark mistakes sets it: kept as it is from then on (RECITE-32).
   if ('markMistakes' in update) update = { ...update, markMistakesSet: true };
+  // Naming the training switch sets it: from then on the store app reads what the user chose (RECITE-26).
+  if ('keep' in update) update = { ...update, keepSet: true };
   current = { ...current, ...update };
   if (pending) pending = { ...pending, ...update };
   emit();

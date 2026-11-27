@@ -198,6 +198,23 @@ describe('the check’s settings on the phone', () => {
     expect(parseReciteCheckSettings(await AsyncStorage.getItem('@revisely_recite_check:v1:u32'))).toMatchObject({ markMistakes: false, markMistakesSet: true });
   });
 
+  it('[RECITE-26] the training switch counts as set only once named: saving other settings writes keep, never keepSet', async () => {
+    const storage = require('@react-native-async-storage/async-storage');
+    const AsyncStorage = storage.default ?? storage;
+    const { setReciteCheckSettings, parseReciteCheckSettings, resetReciteCheckSettingsForTests } = require('../settings') as typeof import('../settings');
+    expect(parseReciteCheckSettings(null)).toMatchObject({ keep: true, keepSet: false });
+    expect(parseReciteCheckSettings(JSON.stringify({ keep: true }))).toMatchObject({ keep: true, keepSet: false });
+    expect(parseReciteCheckSettings(JSON.stringify({ keep: false, keepSet: true }))).toMatchObject({ keep: false, keepSet: true });
+    expect(parseReciteCheckSettings(JSON.stringify({ keepSet: true }))).toMatchObject({ keepSet: false });
+    resetReciteCheckSettingsForTests();
+    setReciteCheckSettings('u26', { mistakeSound: false });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(parseReciteCheckSettings(await AsyncStorage.getItem('@revisely_recite_check:v1:u26'))).toMatchObject({ keep: true, keepSet: false });
+    setReciteCheckSettings('u26', { keep: true });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(parseReciteCheckSettings(await AsyncStorage.getItem('@revisely_recite_check:v1:u26'))).toMatchObject({ keep: true, keepSet: true });
+  });
+
   it('[RECITE-31] the amber note is unseen until shown, then kept', () => {
     const { parseReciteCheckSettings } = require('../settings') as typeof import('../settings');
     expect(parseReciteCheckSettings(null).amberExplained).toBe(false);

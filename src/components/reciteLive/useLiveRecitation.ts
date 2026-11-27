@@ -14,7 +14,7 @@ import { AudioSource, decodePcm, startMicStream } from '../../lib/recite/micSour
 import { SAMPLE_RATE } from '../../lib/recite/segmenter';
 import { wordLineOn } from '../../lib/reciteLive/wordLine';
 import { getQuranWords, loadQuranWords, QuranWords } from '../../lib/recite/quranWords';
-import { checkLevel, type ReciteCheckSettings } from '../../lib/reciteCheck/settings';
+import { checkLevel, keepsTakes, type ReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { sendLabel, warmUpReciteCheck } from '../../lib/reciteCheck/service';
 import type { LiveEvent, Mark } from '../../lib/reciteLive/contract';
 import type { ClientFrame, LiveConnect, LiveConnection, StartFrame } from '../../lib/reciteLive/feed';
@@ -177,9 +177,9 @@ export function startFrameFor(
     aar: settings.aared,
     letters: true,
     tajweed: checkLevel(settings) === 'strict',
-    // Kept as test data only on Revisely Dev's checker: production's keeps nothing (recite-server-prod-plan.md), so the
-    // store app never asks, and never says a take was kept.
-    keep: settings.keep && isDevVariant(),
+    // "Help improve mistake detection" (RECITE-26): Revisely Dev's, and the store app's once its release switch is on
+    // (lib/release/trainingTakes). Until then the store app never asks, and never says a take was kept.
+    keep: keepsTakes(settings),
     follow: mode === 'recite',
     // Mark mistakes: the summary at once, where a slip went a moment later (contract draft 8)
     ...(mode === 'check' ? { namesAfter: true } : {}),
@@ -371,7 +371,7 @@ export function useLiveRecitation({
   // earlier take's mark reads it there, as a past take's does (RECITE-22). `savedTick` shows the screen it came.
   const savedAudio = useRef<TakeFile | null>(null);
   const [, setSavedTick] = useState(0);
-  // The take went with Keep as test data on: the checker stores it (its `done` no longer says so; a `kept` event
+  // The take went with Help improve mistake detection on: the checker stores it (its `done` no longer says so; a `kept` event
   // follows, after the phone has hung up).
   const [testData, setTestData] = useState(false);
   const onSavedRef = useRef(onRecordingSaved);
@@ -1361,7 +1361,7 @@ export function useLiveRecitation({
     mic,
     /** The take is being kept as a recording (Save recordings on). */
     recording,
-    /** The take went to the checker with Keep as test data on (it is stored there). */
+    /** The take went to the checker with Help improve mistake detection on (it is stored there). */
     testData,
     /** The take's time in seconds, as of now (read it when needed; `clock` re-renders what shows it). */
     get seconds() {

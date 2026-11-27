@@ -340,7 +340,8 @@ current basic sounds". October 2026's version was removed for the voices it offe
   scenarios stay loadable for the automated tests; their Offline queue holds its changes on the phone until
   "Send held changes" (or the next start of the app), then sends them in order.
 - **ACCOUNT-1.** Delete account (Settings → Account, confirmed twice) removes the account from the server with everything of it
-  (pages, sessions, notes, Revo's and the coach's data, backed-up recordings, its picture) and signs the phone out. Offline, or when
+  (pages, sessions, notes, Revo's and the coach's data, backed-up recordings, its picture, the takes it kept to help improve
+  mistake detection, RECITE-26) and signs the phone out. Offline, or when
   the server refuses (App Check), nothing is deleted and the user stays signed in.
 - **ACCOUNT-3.** Delete account always ends, in "Account deleted" (signed out) or an error with Try again: never an
   endless spinner. The app waits for the server at most 30 seconds. With no answer (lost, or offline), it asks whether
@@ -865,12 +866,18 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   mistake's Undo (RECITE-4) is in the take's bar, in the words' place, for 5 s (15 with VoiceOver or TalkBack), the bar's
   buttons staying; Stop ends it, and the summary's Removed list has Put back. Before, both were notes over the page's
   last lines. A mark's card, opened from its word, is the one thing over the page, on purpose.
-- **RECITE-26.** (Revisely Dev) "Keep my recitations as test data" (on by default: each take and its result are kept on
-  revisely-dev for the lab, and nobody listens to them) is on Settings → Mushaf and Recite, for every account that
-  recites, tester or not. Off, takes are no longer kept. Revisely Dev is shared by link with people who aren't testers
-  (Majd, Nov 22 2026: "i just need to have the link to send to my friends"), and the Testing page shows only to
-  testers, so before this they had no way to turn it off. The store app never shows it: production's checker keeps
-  nothing.
+- **RECITE-26.** (Revisely Dev) "Help improve mistake detection" keeps each take's audio, the checker's result and every
+  "Not a mistake" or Put back with it, to train the model; software checks them, and nobody listens to them. It is on
+  Settings → Mushaf and Recite, for every account that recites, tester or not. Revisely Dev has it on by default: Revisely
+  Dev is shared by link with people who aren't testers (Majd, Nov 22 2026: "i just need to have the link to send to my
+  friends"), and the Testing page shows only to testers, so before this they had no way to turn it off. The store app
+  shows it only once its release switch is on (`lib/release/trainingTakes`; Majd, Nov 26 2026: "once we get a lot of
+  users and use their recordings to better train our model and we truly cross that final bar then we can charge"), and
+  there it starts on (`TRAINING_STORE_DEFAULT`; Majd, Nov 26 2026: "start on") until the user sets it: a value saved on
+  the phone before, which the user never chose, never counts. Until the release switch is on, the store app never asks
+  for a take to be kept. Off, takes are no longer kept, and the ones already kept stay. Kept takes are held with no
+  time limit (Majd, Nov 26 2026, on how long to hold them and whether turning it off deletes them: "forever; keep it").
+  Deleting the account deletes the takes it kept.
 - **RECITE-27.** (Revisely Dev) A take needs at least one ayah recited, in every mode, on the server and on the phone.
   Less than that (the mic pressed for two seconds, nothing said) isn't a take: no summary, a short line saying to recite
   at least one ayah, nothing in Activity, Insights or Revo, no remembered marks and no saved audio. In Test me that place

@@ -109,7 +109,8 @@ import { ProfilePicture } from '../../components/account/ProfilePicture';
 import { BadgeMark } from '../../components/account/BadgeMark';
 import { GoogleGIcon } from '../../components/GoogleGIcon';
 import { canPickPhoto, googlePhotoOf, pickPhoto, removePhoto, restoreGooglePhoto, setPhoto, useAccountPhoto } from '../../lib/accountPicture';
-import { checkLevel, maddChecked, setReciteCheckSettings, strictOffered, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
+import { checkLevel, maddChecked, setReciteCheckSettings, strictOffered, trainingSwitchOn, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
+import { trainingTakesOffered } from '../../lib/release/trainingTakes';
 import { TEST_LENGTHS, type TestLength } from '../../lib/reciteLive/testLength';
 import { getJuzForPage } from '../../lib/quranData';
 import { getRevisionDateForUser } from '../../lib/fajrBoundary';
@@ -1179,16 +1180,17 @@ export default function SettingsScreen() {
                     }
                   />
                 ) : null}
-                {/* Revisely Dev's checker only: production's keeps nothing (recite-server-prod-plan.md). Here, not on the
-                    Testing page, so every Dev account that recites can turn it off (RECITE-26), testers or not. */}
-                {isDevVariant() ? (
+                {/* "Help improve mistake detection" (RECITE-26): Revisely Dev's, and the store app's once its release switch
+                    is on (lib/release/trainingTakes). Here, not on the Testing page, so every account that recites can
+                    turn it off, testers or not. */}
+                {trainingTakesOffered() ? (
                   <Row
                     icon="flask-outline"
                     label={t('settings.recite.keep')}
                     subtitle={t('settings.recite.keepSub')}
                     rightSlot={
                       <SettingSwitch
-                        value={reciteCheckSettings.keep}
+                        value={trainingSwitchOn(reciteCheckSettings)}
                         onValueChange={(keep) => setReciteCheckSettings(user?.id, { keep })}
                         accessibilityLabel={t('settings.recite.keep')}
                         testID="settings-recite-check-keep"
