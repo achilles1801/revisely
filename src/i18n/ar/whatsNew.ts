@@ -12,4 +12,9 @@ export const whatsNew: NonNullable<ArStrings['whatsNew']> = {
     follows: 'الصفحة تتابع تلاوتك',
     marks: 'كل خطأ، أثناء تلاوتك',
   },
+  tour: {
+    skip: 'تخطٍّ',
+    again: 'شاهد مجددًا',
+    example: 'مثال',
+  },
 };

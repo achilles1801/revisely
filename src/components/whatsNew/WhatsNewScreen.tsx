@@ -33,6 +33,7 @@ import { RevoMark } from '../revo/RevoMark';
 import {
   releaseFor,
   cardsFor,
+  isTourMoment,
   whatsNewParts,
   whatsNewPlainText,
   type WhatsNewCard,
@@ -45,6 +46,7 @@ import { useNeedOpen } from './needs';
 import { pictureFor } from './pictures';
 import { RevoMoment } from './RevoMoment';
 import { ReciteMoment } from './ReciteMoment';
+import { TourMoment } from './tour/TourMoment';
 import { markRevoMomentSeen } from '../../lib/revo/momentSeen';
 import { isDevVariant } from '../../lib/variant';
 import { loadQuranWords } from '../../lib/recite/quranWords';
@@ -274,6 +276,31 @@ export function WhatsNewScreen({
               total={cards.length}
               title={card.title}
               words={<CardText text={card.text ?? ''} style={[typeV2.body, styles.center, styles.text, { color: palette.secondary }]} />}
+              closable={mode === 'replay'}
+              onNext={advance}
+              onClose={onClose}
+            />
+          </View>
+        </GestureDetector>
+      </View>
+    );
+  }
+
+  // The tour (1.0.6): each card a slide that plays by itself, then its words and Next (past 1.6× text, its words as any
+  // card's). Skip jumps the slide to its words; the walkthrough stays required as a whole (NEW-2).
+  if (isTourMoment(card.moment) && fontScale <= PICTURE_UP_TO) {
+    return (
+      <View style={[styles.screen, { backgroundColor: palette.bg }]} testID={`whats-new-${mode}`}>
+        <GestureDetector gesture={Gesture.Race(back, forward)}>
+          <View style={styles.flex} testID={`whats-new-card-${card.id}`}>
+            <TourMoment
+              key={card.id}
+              moment={card.moment}
+              step={index + 1}
+              total={cards.length}
+              title={card.title}
+              words={<CardText text={card.text ?? ''} style={[typeV2.body, styles.center, styles.text, { color: palette.secondary }]} />}
+              last={last}
               closable={mode === 'replay'}
               onNext={advance}
               onClose={onClose}

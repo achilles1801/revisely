@@ -15,7 +15,9 @@ import { FIVE_LANTERNS, HangingLanterns, THREE_LANTERNS } from './HangingLantern
 import { useRamadanDecor } from './quiet';
 import { RamadanSky } from './RamadanSky';
 
-export const RAMADAN_INTRO_KEY = '@revisely_ramadan_intro:v1';
+import { RAMADAN_INTRO_KEY } from './introKey';
+
+export { RAMADAN_INTRO_KEY };
 const ART = 190;
 
 export function RamadanIntro() {

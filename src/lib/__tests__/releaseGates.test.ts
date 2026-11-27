@@ -231,7 +231,8 @@ describe('the mistake detection release (1.0.5): everyone’s, through one switc
     const { CURRENT_RELEASE: current, NEXT_RELEASE } = require('../help/whatsNew') as typeof import('../help/whatsNew');
     expect(current.id).toBe('1.0.5');
     expect(current.live).toBe(true);
-    expect(NEXT_RELEASE).toBeNull();
+    // The next release (the tour, 1.0.6) stays dark until its release PR.
+    expect(NEXT_RELEASE?.live ?? false).toBe(false);
     expect(needsOf(current).filter((n) => !needOpen(n, user, 'everyone'))).toEqual([]);
   });
 

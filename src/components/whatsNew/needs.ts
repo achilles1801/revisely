@@ -15,6 +15,11 @@ import { revoAvailable } from '../../lib/revo/availability';
 import { useRevoRelease, type RevoRelease } from '../../lib/revo/release';
 import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { gapsInsightsEnabled } from '../../lib/insightsGaps';
+import { isDevVariant } from '../../lib/variant';
+import { activityOneTabEnabled } from '../../lib/release/activityOneTab';
+import { homeV3Enabled } from '../../lib/release/homeV3';
+import { accountDesignEnabled } from '../../lib/release/accountDesign';
+import { ramadanThemeOffered } from '../../lib/ramadanTheme';
 
 type Who = Pick<User, 'previewTester'> | null | undefined;
 
@@ -42,6 +47,27 @@ export function needOpen(need: WhatsNewNeed, user: Who, revo: RevoRelease): bool
     case 'reciteRevo':
       // Revo told what Recite found (RINS-1, RINS-3): both open.
       return reciteLiveForAccount(user) && revoAvailable(user, revo);
+    // The tour's (1.0.6). Revo's answers from the tafsir and Revo in the mushaf (REVO-44, REVO-45) have no switch of
+    // their own yet: Revisely Dev's, with Revo open to the account.
+    case 'tafsir':
+      return isDevVariant() && revoAvailable(user, revo);
+    case 'revoDev':
+      // Revo's schedule drafts and its greeting's tafsir (REVO-43, REVO-46): Revisely Dev's, as the tafsir.
+      return isDevVariant() && revoAvailable(user, revo);
+    case 'recitePage':
+      // The page turning once its last ayah is said (RECITE-30): Revisely Dev's, with Recite.
+      return isDevVariant() && reciteLiveForAccount(user);
+    case 'spotTests':
+      // A spot test's own entry in Activity (ACT-34, RMEM-5): Revisely Dev's, with Recite.
+      return isDevVariant() && reciteLiveForAccount(user);
+    case 'activityTab':
+      return activityOneTabEnabled();
+    case 'homeToday':
+      return homeV3Enabled();
+    case 'account':
+      return accountDesignEnabled();
+    case 'ramadan':
+      return ramadanThemeOffered();
   }
 }
 

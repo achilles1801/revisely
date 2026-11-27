@@ -1911,7 +1911,10 @@ shows up once and they must go through it and complete it … just the main stuf
   (REVO-21), or Later, which goes on and turns nothing on. While it plays, Skip in its top corner takes it
   to that end and a touch anywhere else does nothing; past 1.6× text it is words and Next like any card.
   A swipe right or Android's back goes to the card before. Leaving the app part way (or a restart) reopens
-  it on the card it was on, on that phone.
+  it on the card it was on, on that phone. The tour (1.0.6, Revisely Dev's until released) is nine cards, each a slide
+  that plays by itself (a screen of the app with what's new moving over it), then its words and Next; Skip, in the top
+  corner while it plays, jumps that slide to its words, and Watch again then plays it again. A slide whose feature isn't
+  open to the account is left out (NEW-1). Reduce Motion and VoiceOver go to each slide's words at once.
 - **NEW-3.** Settings → About → What's new shows the release's cards again, with a ✕, and changes nothing
   (testers see the row before the release is switched on). A tester's Settings → Testing → Show What's
   new at launch runs it as App Store users will see it from the next launch, resuming the same way;
@@ -2023,7 +2026,7 @@ shows up once and they must go through it and complete it … just the main stuf
     pages the reader opened while it ran.
   - **The theme's card.** The first time the theme shows on a phone, Home opens one card, "What's new: Ramadan theme".
     It says what the theme is and how to turn it off (with Auto, that it goes after Eid by itself), and once closed it
-    never shows again on that phone.
+    never shows again on that phone. A phone that has seen What's new's Ramadan slide (NEW-2's tour) never shows it.
 - **THEME-8.** (Revisely Dev) Revo, while the theme shows (not inside the reader or a session):
   - Revo's mark, its button and the disc in its sheet's header, carries a small crescent.
   - While it thinks, its three dots are gold sparkles.

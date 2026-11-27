@@ -20,16 +20,39 @@ import { WHATS_NEW_AR } from './whatsNew.ar';
  * whose feature isn't open to the account is left out (components/whatsNew/needs decides, with each
  * feature's own gate), and a live release may not need a feature that is still testers only.
  */
-export type WhatsNewNeed = 'activity' | 'sittings' | 'revo' | 'help' | 'translations' | 'recite' | 'insights' | 'reciteRevo';
+export type WhatsNewNeed =
+  | 'activity'
+  | 'sittings'
+  | 'revo'
+  | 'help'
+  | 'translations'
+  | 'recite'
+  | 'insights'
+  | 'reciteRevo'
+  // The tour's (1.0.6): each feature's own gate, Revisely Dev's until its release.
+  | 'tafsir'
+  | 'revoDev'
+  | 'recitePage'
+  | 'spotTests'
+  | 'activityTab'
+  | 'homeToday'
+  | 'account'
+  | 'ramadan';
 
 /** The pictures (components/whatsNew/pictures): a part of the screen the card is about. */
 export type WhatsNewPicture = 'activity' | 'elsewhere' | 'ayah' | 'marks' | 'again' | 'gaps';
 
 /**
  * A card that plays as a full-screen moment instead of a picture over words (components/whatsNew):
- * 'revo' is RevoMoment (lib/whatsNew/revoMoment), ending on Turn on Revo or Later.
+ * 'revo' is RevoMoment (lib/whatsNew/revoMoment), ending on Turn on Revo or Later. The tour's (TOUR_MOMENTS) are
+ * components/whatsNew/tour, each a slide of one film (lib/whatsNew/tour).
  */
-export type WhatsNewMoment = 'revo' | 'recite';
+export type WhatsNewMoment = 'revo' | 'recite' | TourMoment;
+
+/** The tour's slides (1.0.6; Majd, Nov 26 2026: one "ultimate" What's new), in the order they play. */
+export const TOUR_MOMENTS = ['ask', 'books', 'schedule', 'reciteUp', 'spot', 'activityTab', 'homeToday', 'badges', 'ramadan'] as const;
+export type TourMoment = (typeof TOUR_MOMENTS)[number];
+export const isTourMoment = (m: WhatsNewMoment | undefined): m is TourMoment => (TOUR_MOMENTS as readonly string[]).includes(m ?? '');
 
 export interface WhatsNewRow {
   id: string;
@@ -239,7 +262,107 @@ export const CURRENT_RELEASE: WhatsNewRelease = RELEASES[RELEASES.length - 1];
  * and in the run at launch (releaseFor). The release PR appends it to RELEASES with `live: true`, opening its
  * features' gates in the same change, and sets this back to null.
  */
-export const NEXT_RELEASE: WhatsNewRelease | null = null;
+export const NEXT_RELEASE: WhatsNewRelease | null = {
+  // The tour (Majd, Nov 26 2026: "one "ultimate" what's new guide/slides that are out of this world in terms of animation
+  // and basically showing off all the new features"; the orchestrator's picks: nine slides, two for the tafsir, Ramadan
+  // last). Each card is a slide that plays by itself (components/whatsNew/tour); a slide whose feature isn't open to the
+  // account drops out (its `needs`). Boards: ~/Documents/revisely-whatsnew-mocks/ultimate/.
+  id: '1.0.6',
+  live: false,
+  cards: [
+    {
+      id: 'ask',
+      title: 'Ask about any page',
+      text: 'Tap [[revo]] at the foot of the page, or hold an ayah and pick {{Ask Revo}}. It answers from the tafsir.',
+      moment: 'ask',
+      covers: ['REVO-45', 'REVO-44'],
+      needs: 'tafsir',
+    },
+    {
+      id: 'books',
+      title: 'In the books’ own words',
+      text:
+        'Every answer shows its sources: Tafsir al-Tabari, Ibn Kathir, al-Qurtubi and al-Sa’di, quoted as they wrote it. ' +
+        'Tap a quote for the whole passage.',
+      moment: 'books',
+      covers: ['REVO-44'],
+      needs: 'tafsir',
+    },
+    {
+      // Majd, Nov 26 2026: "i want the users to take away the fact that they shouldn't feel lost or overwhelmed or confused
+      // about making a schedule and that revo can help them do the whole thing they just say what they want".
+      id: 'schedule',
+      title: 'Just say what you want',
+      text:
+        'No need to work out a schedule yourself. Tell Revo how much you can do and when, typing or with [[mic]], and it ' +
+        'builds the whole thing for you to check.',
+      moment: 'schedule',
+      covers: ['REVO-43', 'REVO-42'],
+      needs: 'revoDev',
+    },
+    {
+      id: 'recite',
+      title: 'Recite keeps up',
+      text: 'Finish a page and the next one is there, waiting for you. A stumble is marked on the word you were reaching for.',
+      moment: 'reciteUp',
+      covers: ['RECITE-30', 'RECITE-2', 'RECITE-31'],
+      needs: 'recitePage',
+    },
+    {
+      // Majd, Nov 26 2026: the feature is spot testing, not the word Hasbuk.
+      id: 'spot',
+      title: 'Spot test yourself',
+      text:
+        'Hold [[mic]] and pick {{Test me}}: an ayah at random from what you’ve memorized. Recite on from there, and every ' +
+        'test is kept in Activity.',
+      moment: 'spot',
+      covers: ['RECITE-8', 'ACT-34', 'RMEM-5'],
+      needs: 'spotTests',
+    },
+    {
+      id: 'activity',
+      title: 'Activity, in one place',
+      text: 'This week on top, the day you pick under it, and your revision as rows. {{Month}} opens the whole calendar.',
+      moment: 'activityTab',
+      covers: ['ACT-35'],
+      needs: 'activityTab',
+    },
+    {
+      // Majd, Nov 26 2026: market the new, clean Home, and show its background with the ayah (and Ramadan's decorations)
+      // without saying they're Ramadan's.
+      id: 'home',
+      title: 'A calmer Home',
+      text:
+        'Just today: where you start, one button to begin, and an ayah to carry with you. Past sessions and notes now ' +
+        'live in Activity.',
+      moment: 'homeToday',
+      covers: ['HOME-4', 'HOME-5', 'HOME-6', 'HOME-7'],
+      needs: 'homeToday',
+    },
+    {
+      // Majd, Nov 26 2026: "the main take away is users feel inclined to come back and keep revising pages so they can
+      // unlock new badges".
+      id: 'badges',
+      title: 'Unlock your next badge',
+      text:
+        'Every page you revise brings your next badge closer, through six tiers from Bronze to Emerald. Come back each ' +
+        'day and watch them unlock.',
+      moment: 'badges',
+      covers: ['ACCOUNT-4', 'ACCOUNT-5', 'ACCOUNT-7', 'ACCOUNT-8'],
+      needs: 'account',
+    },
+    {
+      id: 'ramadan',
+      title: 'Ready for Ramadan',
+      text:
+        'Lanterns on Home and Activity, a moon for each day of the month, and Revo’s Ramadan help. It comes two weeks ' +
+        'before and goes after Eid.',
+      moment: 'ramadan',
+      covers: ['THEME-2', 'THEME-5', 'THEME-6', 'THEME-8'],
+      needs: 'ramadan',
+    },
+  ],
+};
 
 /** Every release with cards, the next one included (the drift check reads them all). */
 export const ALL_RELEASES: readonly WhatsNewRelease[] = NEXT_RELEASE ? [...RELEASES, NEXT_RELEASE] : RELEASES;
