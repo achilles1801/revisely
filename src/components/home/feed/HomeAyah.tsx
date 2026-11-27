@@ -5,6 +5,7 @@ import { currentLanguage, t } from '../../../i18n';
 import { ayahForDay } from '../../../lib/homeAyah';
 import { surahNameIn } from '../../../lib/passages';
 import { getSaheehVerse, peekSaheehVerse, type SaheehVerse } from '../../../lib/saheeh';
+import { keepHomeAyah, useKeptHomeAyah } from '../../../lib/homeAyahKept';
 import { pageOfVerse } from '../../../lib/verses';
 import { arabicFullV2, layoutV2, typeV2 } from '../../../theme/v2';
 import { Tap } from '../../v2/Tap';
@@ -22,7 +23,10 @@ export function HomeAyah({ day, onOpen }: { day: string; onOpen: (page: number) 
   const { palette } = useTheme();
   const { sura, ayah, arabic } = ayahForDay(day);
   const english = currentLanguage() === 'en';
-  const [verse, setVerse] = useState<SaheehVerse | null>(() => (english ? peekSaheehVerse(sura, ayah) : null));
+  const [loadedVerse, setVerse] = useState<SaheehVerse | null>(() => (english ? peekSaheehVerse(sura, ayah) : null));
+  // Kept on the phone (HOME-8): the translation is there with Home's first frame, before the sura's file is read.
+  const keptVerse = useKeptHomeAyah(sura, ayah);
+  const verse = english ? (loadedVerse ?? keptVerse) : null;
 
   useEffect(() => {
     if (!english) return undefined;
@@ -30,6 +34,7 @@ export function HomeAyah({ day, onOpen }: { day: string; onOpen: (page: number) 
     setVerse(peekSaheehVerse(sura, ayah));
     getSaheehVerse(sura, ayah)
       .then((v) => {
+        keepHomeAyah(sura, ayah, v);
         if (live) setVerse(v);
       })
       // Not on the phone and no connection: the Arabic and where it is, as in Arabic.

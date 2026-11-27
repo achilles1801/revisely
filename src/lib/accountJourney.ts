@@ -4,7 +4,8 @@
 //
 // Pages revised counts every revision: each page of each revision item, so a page revised on three days is three, from a
 // session or the daily log (Majd's pick, Nov 26 2026). A page revised twice on one day is one, as Activity shows it.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../context/AppContext';
 import { useRevisionDay } from '../hooks/useRevisionDay';
 import type { RevisionLog, UserPage } from '../types';
@@ -88,6 +89,44 @@ function useOlderItems(uid: string | null | undefined, before: string): HistoryI
   return key ? items : null;
 }
 
+// Pages revised as last worked out, per account, kept on the phone (HOME-8): Home's picture wears its latest badge from
+// the first frame, before the history has been read from the server. Read as the app starts, as homePrefs does.
+export const PAGES_REVISED_KEY = '@revisely_pages_revised:v1';
+let revisedKept: Record<string, number> = {};
+let revisedLoaded = false;
+const revisedListeners = new Set<() => void>();
+AsyncStorage.getItem(PAGES_REVISED_KEY)
+  .then((raw) => {
+    const v = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    const out: Record<string, number> = {};
+    for (const [uid, n] of Object.entries(v ?? {})) if (typeof n === 'number' && Number.isFinite(n)) out[uid] = n;
+    revisedKept = { ...out, ...revisedKept };
+  })
+  .catch(() => undefined)
+  .finally(() => {
+    revisedLoaded = true;
+    revisedListeners.forEach((l) => l());
+  });
+
+function keepPagesRevised(uid: string, n: number): void {
+  if (revisedKept[uid] === n) return;
+  revisedKept = { ...revisedKept, [uid]: n };
+  revisedListeners.forEach((l) => l());
+  AsyncStorage.setItem(PAGES_REVISED_KEY, JSON.stringify(revisedKept)).catch(() => undefined);
+}
+
+/** Pages revised as this phone last worked them out for the account; null when it never has. */
+export function usePagesRevisedOnPhone(uid: string | null | undefined): number | null {
+  const kept = useSyncExternalStore(
+    (l) => {
+      revisedListeners.add(l);
+      return () => void revisedListeners.delete(l);
+    },
+    () => (revisedLoaded ? revisedKept : null),
+  );
+  return uid && kept && typeof kept[uid] === 'number' ? kept[uid] : null;
+}
+
 export interface AccountJourney {
   pagesRevised: number;
   /** In days; null when not asked for. */
@@ -115,7 +154,7 @@ export function useAccountJourney({
   const own = useActivityHistory(day, load && !shared && uid != null, logs.length);
   const history = shared ?? own;
   const olderItems = useOlderItems(uid, historyStart(day));
-  return useMemo(() => {
+  const journey = useMemo(() => {
     if (!user || !history || !olderItems) return null;
     const items = withPhoneSessions([...olderItems, ...history], logs, Date.now());
     let longestStreak: number | null = null;
@@ -125,6 +164,10 @@ export function useAccountJourney({
     }
     return { pagesRevised: pagesRevisedOf(items), longestStreak, reachedOn: milestoneDaysOf(items) };
   }, [user, pages, logs, history, olderItems, streak, day]);
+  useEffect(() => {
+    if (uid && journey) keepPagesRevised(uid, journey.pagesRevised);
+  }, [uid, journey]);
+  return journey;
 }
 
 /** Tests only. */

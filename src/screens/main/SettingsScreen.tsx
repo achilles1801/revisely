@@ -108,7 +108,7 @@ import { BadgesSheet } from '../../components/account/BadgesSheet';
 import { ProfilePicture } from '../../components/account/ProfilePicture';
 import { BadgeMark } from '../../components/account/BadgeMark';
 import { GoogleGIcon } from '../../components/GoogleGIcon';
-import { canPickPhoto, googlePhotoOf, pickPhoto, removePhoto, restoreGooglePhoto, setPhoto, useAccountPhoto } from '../../lib/accountPicture';
+import { accountPhotoLink, canPickPhoto, googlePhotoOf, pickPhoto, removePhoto, restoreGooglePhoto, setPhoto, useAccountPhoto } from '../../lib/accountPicture';
 import { checkLevel, maddChecked, setReciteCheckSettings, strictOffered, trainingSwitchOn, useReciteCheckSettings } from '../../lib/reciteCheck/settings';
 import { trainingTakesOffered } from '../../lib/release/trainingTakes';
 import { TEST_LENGTHS, type TestLength } from '../../lib/reciteLive/testLength';
@@ -496,7 +496,9 @@ export default function SettingsScreen() {
   const badgeMoment = useBadgeMoment(accountV2 && accountShown ? user?.id : null, latestBadge);
   const [badgesOpen, setBadgesOpen] = useState(false);
   // The picture (ACCOUNT-8): its photo now, and the menu a tap on it opens.
-  const photoUrl = useAccountPhoto(firebaseUser);
+  const photoUrl = useAccountPhoto(firebaseUser, user?.id);
+  // The link the account has now, for the menu's choices (photoUrl can be the phone's copy).
+  const photoLink = accountPhotoLink(firebaseUser);
   const [pictureMenu, setPictureMenu] = useState(false);
   const [pictureBusy, setPictureBusy] = useState(false);
 
@@ -716,10 +718,10 @@ export default function SettingsScreen() {
           { key: 'take', label: t('account.picture.take'), icon: 'camera-outline' as const, onPress: () => changePicture(async () => { const a = await pickPhoto('camera'); if (a) await setPhoto(a); }) },
         ]
       : []),
-    ...(googlePhoto && googlePhoto !== photoUrl
+    ...(googlePhoto && googlePhoto !== photoLink
       ? [{ key: 'google', label: t('account.picture.google'), icon: 'logo-google' as const, onPress: () => changePicture(restoreGooglePhoto) }]
       : []),
-    ...(photoUrl ? [{ key: 'remove', label: t('account.picture.remove'), icon: 'trash-outline' as const, destructive: true, onPress: () => changePicture(removePhoto) }] : []),
+    ...(photoLink ? [{ key: 'remove', label: t('account.picture.remove'), icon: 'trash-outline' as const, destructive: true, onPress: () => changePicture(removePhoto) }] : []),
   ];
   const createdDay = localUser.createdAt ? new Date(localUser.createdAt) : null;
   const sinceMonth =
