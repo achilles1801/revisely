@@ -823,7 +823,12 @@ export interface BadgeMaterial {
 }
 
 /** What's new's tour (components/whatsNew/tour): the example account's photo, a sunset, never an account's own. */
-export const EXAMPLE_PHOTO = { sky: ['#F6C7A1', '#F4A98A'], sun: '#FFF3E4', hill: '#D9825F', hillDeep: '#B9603F' } as const;
+export const EXAMPLE_PHOTO = {
+  sky: ['#F6C7A1', '#F4A98A'],
+  sun: '#FFF3E4',
+  hill: '#D9825F',
+  hillDeep: '#B9603F',
+} as const;
 
 export const BADGE_MATERIALS: Record<BadgeTier, BadgeMaterial> = {
   bronze: { light: '#E2A878', deep: '#9C5D30', rim: '#7A4520', ink: '#3E2210' },
