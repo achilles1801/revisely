@@ -6,12 +6,20 @@ import type { QuranWords } from '../../lib/recite/quranWords';
 import { pageLines, subtractSpans, type Span } from '../../lib/recite/pageLines';
 import { verseKey, type WordFollow } from '../../lib/recite/hiddenPage';
 import { markerCorners } from '../../lib/recite/markerOutline';
+import { hiddenInk, rectMinus } from '../../lib/recite/hiddenInk';
 import { Wash } from './Wash';
 
 /** Where the faint rule runs in a line's band (from the top): about the baseline. */
 const RULE_AT = 0.74;
-/** Room past a word's box, or a marker's, that its ink is drawn through (anti-aliasing). */
+/** Room past a marker's opening that its ink is drawn through (anti-aliasing). */
 const INK_EDGE = 1;
+/**
+ * Room past a shown word's box: none. A word's box is fitted to its ink with half the gap to the next ink
+ * (scripts/check-word-boxes.py), so the unit more each side it once had showed the next word's edge, while still hidden,
+ * wherever two words sit within a unit or two (Majd, Nov 26 2026: the hamzat wasl's sign over ٱلأعلى beside أنت, page 316).
+ * Its ink past its box is a notch (lib/recite/hiddenInk).
+ */
+const WORD_EDGE = 0;
 /** Room past a line's text that its cover takes. */
 const COVER_EDGE = 4;
 /** A rule shorter than this (bounds units) is the gap at a line's end beside its last word shown, not a hidden word. */
@@ -34,6 +42,8 @@ export interface HiddenInkPlan {
   lines: { line: number; covers: Rect[]; rules: Span[]; ruleY: number; top: number; bottom: number }[];
   /** What the covers leave open: the verse markers, whole, in their own rows, and each run of words shown, in bounds space. */
   open: { line: number; box: Rect; kind: 'marker' | 'shown' }[];
+  /** The hidden words' patches (lib/recite/hiddenInk), also in their lines' covers: drawn again over the following ink. */
+  patches: Rect[];
 }
 
 /**
@@ -80,10 +90,10 @@ export function hiddenInkPlan(words: QuranWords, page: number, shown: (w: number
   const open: HiddenInkPlan['open'] = [];
   for (const l of pageLines(page)) {
     const shownSpans = runs.get(l.line) ?? [];
-    const band = (a: number, b: number): Rect => ({ x0: a - INK_EDGE, x1: b + INK_EDGE, y0: l.coverTop, y1: l.coverBottom });
-    l.markers.forEach(([a, b], k) => open.push({ line: l.line, box: { ...band(a, b), y0: l.markerRows[k][0], y1: l.markerRows[k][1] }, kind: 'marker' }));
-    for (const [a, b] of shownSpans) open.push({ line: l.line, box: band(a, b), kind: 'shown' });
-    const shownHoles: Span[] = shownSpans.map(([a, b]) => [a - INK_EDGE, b + INK_EDGE]);
+    const band = (a: number, b: number, edge: number): Rect => ({ x0: a - edge, x1: b + edge, y0: l.coverTop, y1: l.coverBottom });
+    l.markers.forEach(([a, b], k) => open.push({ line: l.line, box: { ...band(a, b, INK_EDGE), y0: l.markerRows[k][0], y1: l.markerRows[k][1] }, kind: 'marker' }));
+    for (const [a, b] of shownSpans) open.push({ line: l.line, box: band(a, b, WORD_EDGE), kind: 'shown' });
+    const shownHoles: Span[] = shownSpans.map(([a, b]) => [a - WORD_EDGE, b + WORD_EDGE]);
     // A marker's opening is its hole as measured (its ink and half the gap to the next ink): a unit more each side showed
     // the next word's edge where the gap is narrow (Majd, Nov 25 2026: the sliver beside page 592's ٦).
     const holes: Span[] = [...l.markers, ...shownHoles];
@@ -133,14 +143,43 @@ export function hiddenInkPlan(words: QuranWords, page: number, shown: (w: number
       bottom: l.coverBottom,
     });
   }
-  return { lines, open };
+  // Where a straight edge can't part two words' ink (lib/recite/hiddenInk): each shown word's notches cut from every cover
+  // (its ink there, and no other's), then each hidden word's patches over its own ink past its box.
+  const ink = hiddenInk(page, from).filter((r) => r.w >= from && r.w < to);
+  const notches = ink.filter((r) => r.kind === 'notch' && shown(r.w)).map((r) => r.rect);
+  if (notches.length > 0) {
+    for (const l of lines) {
+      let covers = l.covers;
+      for (const n of notches) covers = covers.flatMap((c) => rectMinus(c, n));
+      l.covers = covers;
+    }
+  }
+  const patches: Rect[] = [];
+  for (const r of ink) {
+    if (r.kind !== 'patch' || shown(r.w)) continue;
+    patches.push(r.rect);
+    const line = lines.find((l) => l.line === words.lineOf(r.w));
+    if (line) line.covers.push(r.rect);
+  }
+  return { lines, open, patches };
 }
 
-/** The newest word's box for its following ink: its own x, its line's band (as the runs of words shown). */
+/**
+ * The newest word's box for its following ink: its own box, in the rows of its line's cover that no other line's cover
+ * shares, so the ink drawn again there is its line's (another line's that reaches in is a patch, drawn again over it).
+ */
 export function followBox(words: QuranWords, plan: HiddenInkPlan, w: number): Rect {
   const r = words.rect(w);
   const line = plan.lines.find((l) => l.line === words.lineOf(w));
-  return { x0: r.x0 - INK_EDGE, x1: r.x1 + INK_EDGE, y0: line?.top ?? r.y0, y1: line?.bottom ?? r.y1 };
+  if (!line) return r;
+  let y0 = line.top;
+  let y1 = line.bottom;
+  for (const o of plan.lines) {
+    if (o === line) continue;
+    if (o.top < line.top && o.bottom > y0) y0 = Math.min(o.bottom, line.bottom);
+    if (o.bottom > line.bottom && o.top < y1) y1 = Math.max(o.top, line.top);
+  }
+  return { x0: r.x0 - WORD_EDGE, x1: r.x1 + WORD_EDGE, y0, y1: Math.max(y0, y1) };
 }
 
 /** Whether a hidden page shows word `w`: recited (or peeked) by the take, or in a verse shown whole. */
@@ -222,6 +261,15 @@ export function HiddenInkLayer({
       {image && inked ? (
         <PageInk testID="live-follow-ink" box={followBox(words, plan, inked.w)} scale={scale} image={image} tint={{ colour: inked.colour }} />
       ) : null}
+      {image && inked
+        ? plan.patches.map((c, i) => (
+            <View
+              key={`patch-${i}`}
+              testID="hidden-patch"
+              style={[styles.abs, { backgroundColor: colors.cover, left: c.x0 * scale, top: c.y0 * scale, width: (c.x1 - c.x0) * scale, height: (c.y1 - c.y0) * scale }]}
+            />
+          ))
+        : null}
     </View>
   );
 }

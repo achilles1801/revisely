@@ -77,6 +77,7 @@ import { followBox, hiddenInkPlan } from '../../../src/components/reciteLive/Hid
 import { hiddenTakeInfo, keepRecited, revealedOnHide } from '../../../src/lib/reciteLive/hideSwitch';
 import { pageLines } from '../../../src/lib/recite/pageLines';
 import { markerCorners } from '../../../src/lib/recite/markerOutline';
+import { hiddenInk } from '../../../src/lib/recite/hiddenInk';
 import { CAP_S, chainView, endsAyah, nextLinkStart, ROLL_FROM_S, ROLL_NOW_S, rolloverDue } from '../../../src/lib/reciteLive/chain';
 
 const words = quranWords();
@@ -1639,7 +1640,9 @@ describe('[RECITE-20] a hidden page is drawn empty: faint rules where words are 
         const lines = pageLines(page);
         expect(plan.lines.map((l) => l.line)).toEqual(lines.map((l) => l.line));
         const lineOf = (line: number) => lines.find((x) => x.line === line)!;
-        const coversOn = (line: number) => plan.lines.find((x) => x.line === line)!.covers;
+        // A hidden word's patches (lib/recite/hiddenInk: its own ink past its box, and no other's) aside.
+        const patches = new Set(plan.patches);
+        const coversOn = (line: number) => plan.lines.find((x) => x.line === line)!.covers.filter((c) => !patches.has(c));
         const openOn = (line: number, kind: 'marker' | 'shown') => plan.open.filter((p) => p.kind === kind && p.line === line).map((p) => p.box);
         const coveredAt = (line: number, x: number, y: number) => coversOn(line).some((c) => c.x0 <= x && x <= c.x1 && c.y0 <= y && y <= c.y1);
         const [from, to] = words.pageRange(page);
@@ -1695,14 +1698,18 @@ describe('[RECITE-20] a hidden page is drawn empty: faint rules where words are 
           const rules = plan.lines.find((x) => x.line === l.line)!.rules;
           for (const box of openOn(l.line, 'shown')) for (const [a, b] of rules) expect(Math.min(b, box.x1 - 1) - Math.max(a, box.x0 + 1)).toBeLessThanOrEqual(0);
         }
-        // The newest word's ink: its own x, its line's band.
+        // The patches are the hidden words' only.
+        const ink = hiddenInk(page, from);
+        expect(plan.patches).toEqual(ink.filter((r) => r.kind === 'patch' && !shown(r.w)).map((r) => r.rect));
+        // The newest word's ink: its own box, in its line's own rows (no other line's cover shares them).
         if (length > 0) {
           const w = start + length - 1 < to ? start + length - 1 : to - 1;
           const box = followBox(words, plan, w);
           const l = lines.find((x) => x.line === words.lineOf(w))!;
-          expect([box.y0, box.y1]).toEqual([l.coverTop, l.coverBottom]);
-          expect(box.x0).toBeLessThan(words.rect(w).x0);
-          expect(box.x1).toBeGreaterThan(words.rect(w).x1);
+          expect([box.x0, box.x1]).toEqual([words.rect(w).x0, words.rect(w).x1]);
+          expect(box.y0).toBeGreaterThanOrEqual(l.coverTop);
+          expect(box.y1).toBeLessThanOrEqual(l.coverBottom);
+          for (const o of lines) if (o !== l) expect(Math.min(box.y1, o.coverBottom) - Math.max(box.y0, o.coverTop)).toBeLessThanOrEqual(0);
         }
       }),
       { numRuns: runs(150) },
