@@ -4,7 +4,7 @@
 // Kept tiny on purpose: screens read it without importing Revo or the app's context.
 
 import { createContext, useContext, useSyncExternalStore } from 'react';
-import { NavigationRouteContext } from '@react-navigation/native';
+import { NavigationRouteContext, type Route } from '@react-navigation/native';
 
 /**
  * The screens the button shows on (REVO-25): Home and Activity's (a section's own page and the full calendar too, ACT-35), and Edit schedule (Majd, Nov 25 2026: "yes the revo
@@ -67,6 +67,9 @@ export function useRevoPresent(): boolean {
   return useSyncExternalStore(subscribe, () => present, () => present);
 }
 
+/** Where a test mocks navigation without the route context: no route, as outside a screen. */
+const NoRoute = createContext<Route<string> | undefined>(undefined);
+
 /**
  * Room to leave at the end of a scroll view for Revo's button: REVO_BUTTON_FOOTPRINT where the
  * button shows (Revo on, on one of its screens), else 0. Add it to the bottom padding, beside
@@ -77,11 +80,8 @@ export function useRevoPresent(): boolean {
  * session or Settings keeps it, so coming back moves nothing (TAB-3). Before, it followed the screen in front, and
  * Home lost 60pt under every pushed screen and got it back as the swipe ended: today's ayah jumped up.
  */
-/** Where a test mocks navigation without the route context: no route, as outside a screen. */
-const NoRoute = createContext<{ name: string } | undefined>(undefined);
-
 export function useRevoFootprint(): number {
-  const route = useContext<{ name: string } | undefined>(NavigationRouteContext ?? NoRoute);
+  const route = useContext(NavigationRouteContext ?? NoRoute);
   const isPresent = useSyncExternalStore(subscribe, () => present, () => present);
   const inFront = useSyncExternalStore(subscribe, () => present && buttonRoute, () => present && buttonRoute);
   // Outside a screen (a component tested alone): the screen in front, as RevoHost reports it.
