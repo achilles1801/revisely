@@ -29,7 +29,11 @@ export function isActive(state: RecitationState): boolean {
 }
 
 /** The recitation, and whether the mini player should show it. */
-export function useMiniPlayer(): { state: RecitationState; visible: boolean } {
+/**
+ * The recitation, and whether the mini player shows: a recitation going on (`active`) that no screen in front presents
+ * (the reader and the session show it in their own player bar).
+ */
+export function useMiniPlayer(): { state: RecitationState; visible: boolean; active: boolean } {
   const recitation = getRecitation();
   const [state, setState] = useState<RecitationState>(() => recitation.getState());
   const [presented, setPresented] = useState(isPresented);
@@ -42,7 +46,8 @@ export function useMiniPlayer(): { state: RecitationState; visible: boolean } {
       listeners.delete(update);
     };
   }, []);
-  return { state, visible: isActive(state) && !presented };
+  const active = isActive(state);
+  return { state, visible: active && !presented, active };
 }
 
 /** For tests. */
