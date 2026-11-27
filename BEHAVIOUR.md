@@ -1316,6 +1316,12 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   items. While one the account can have is missing, a grey line says the others show once they have something to say. Edit
   sections is the list's last row (Insights' sections; the week and the day stay). A section's Consistency figure or gap
   opens the full calendar's page there. Revo's button is on a section's page too, opening as Insights' (Weak spots' as its Ask).
+- **ACT-36.** After a cold start, Activity (and Insights in it) is filled the moment it shows, with no spinner and no
+  outlines: it draws from what the phone kept from its last reads for the account (the timed readings, the daily log, the
+  items for its days and Insights' year of memorization), before the server answers or Auth has checked the saved
+  sign-in. Each fresh answer then replaces them in place and is kept for the next start; a read that fails meanwhile
+  (offline, or before Auth) leaves them as they are, quietly. Before anything is kept (a first start, another account) it
+  loads as before.
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
   strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
   stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,

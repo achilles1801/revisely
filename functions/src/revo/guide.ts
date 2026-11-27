@@ -591,6 +591,7 @@ export const GUIDE_INTERNAL_KINDS = [
 export const GUIDE_INTERNAL: Readonly<Record<string, string>> = {
   'RECITE-10': 'timing: how a take keeps up with the server and resumes a connection gone quiet; nothing to do',
   'ACT-27': 'timing: Activity refreshes by itself and with a pull; nothing to ask Revo about',
+  'ACT-36': 'timing: Activity draws what the phone kept on a cold start, then refreshes quietly; nothing to ask Revo about',
   'HOME-8': 'timing: Home draws what the phone knows on a cold start, then refreshes quietly; nothing to ask Revo about',
   'NEW-4': 'timing: what waits for the walkthrough to end; nothing for Revo to explain',
   'ONBOARD-2': 'server: the server repairs a sign-up stopped half way; nothing to do',

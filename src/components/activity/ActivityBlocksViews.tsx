@@ -40,6 +40,8 @@ import { CalendarMonth } from './CalendarMonth';
 import { InsightsView } from './InsightsView';
 import { useRecitation } from '../../lib/reciteInsights/useRecitation';
 import { useActivityReload } from './useActivityReload';
+import { getAuth } from 'firebase/auth';
+import { keepActivity, keptItemsFrom, useActivityKept } from '../../lib/activityKept';
 import { listRecordings, onRecordingsChanged } from '../../lib/recordings';
 import { sortTakeAudio } from '../../lib/reciteMemory/apart';
 import { coverageSince } from '../../lib/recency';
@@ -109,6 +111,8 @@ interface Props {
   /** That page (ACT-35): the month, Week | Month, Today and the arrows, and the picked day in C2's form. */
   monthPage?: boolean;
 }
+
+const NO_YEAR: { day: string; pages: number[] }[] = [];
 
 export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, onShowTop, refreshRef, section, onOpenSection, onOpenCalendar, calendarAt, onOpenMonth, onOpenRamadan, monthPage }: Props) {
   const { pages, logs, user } = useApp();
@@ -181,11 +185,18 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
   const load = useCallback(
     () =>
       firestoreService
-        .getActivityItemsBetween(rangeFrom, rangeTo)
-        .then(setData)
+        .getActivityItemsBetween(rangeFrom, rangeTo, undefined, true)
+        .then((got) => {
+          setData(got);
+          const owner = getAuth().currentUser?.uid;
+          if (owner) keepActivity(owner, 'items', { from: rangeFrom, to: rangeTo, data: got });
+        })
         .catch((err) => logger.warn('Could not load the Activity items for the calendar', err)),
     [rangeFrom, rangeTo],
   );
+  // Until the server's answer is in, the items the phone kept from the last read (ACT-36): no outlines.
+  const kept = useActivityKept(user?.id);
+  const shownData = useMemo(() => data ?? keptItemsFrom(kept, rangeFrom), [data, kept, rangeFrom]);
   // Also when the outbox sends a change: a session saved before the screen opened shows once the server
   // has it, without leaving the screen (ACT-27).
   useActivityReload(load, undefined, true);
@@ -263,12 +274,18 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
   }, [pager]);
 
   // Insights' twelve months of memorization (the calendar's window is 90 days).
-  const [yearOfMemorizing, setYearOfMemorizing] = useState<{ day: string; pages: number[] }[]>([]);
+  const [loadedYear, setYearOfMemorizing] = useState<{ day: string; pages: number[] }[] | null>(null);
+  const yearOfMemorizing = loadedYear ?? kept?.year?.list ?? NO_YEAR;
   const loadYear = useCallback(async () => {
     if (!insightsOn) return;
+    const from = shiftDays(today, -400);
     await firestoreService
-      .getMemorizationsBetween(shiftDays(today, -400), today)
-      .then(setYearOfMemorizing)
+      .getMemorizationsBetween(from, today, undefined, true)
+      .then((list) => {
+        setYearOfMemorizing(list);
+        const owner = getAuth().currentUser?.uid;
+        if (owner) keepActivity(owner, 'year', { from, list });
+      })
       .catch((err) => logger.warn('Could not load the year of memorization for Insights', err));
   }, [insightsOn, today]);
   useActivityReload(loadYear, undefined, true);
@@ -323,7 +340,7 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
     if (calendarAt) openCalendarRef.current(calendarAt.month, calendarAt.gap);
   }, [calendarAt]);
   // The account's first day: a range longer than the account counts from it ("50 of 56 days").
-  const firstDay = useMemo(() => journalFirstDay(user, (data?.revisions ?? []).map((r) => ({ date: r.day }))), [user, data]);
+  const firstDay = useMemo(() => journalFirstDay(user, (shownData?.revisions ?? []).map((r) => ({ date: r.day }))), [user, shownData]);
   // The day each memorized page counts from when never revised: under 30 days, "not revised yet" (ACT-25).
   const coverageSinceByPage = useMemo(() => {
     const out = new Map<number, string>();
@@ -344,9 +361,9 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
     return pushBack({ user, memorized: plan, today, lastRevised: (p) => lastBy.get(p) ?? null, since: (p) => coverageSinceByPage.get(p) ?? null });
   }, [gapsOn, insightsOn, user, pages, today, coverageSinceByPage]);
 
-  const revised: Revised[] = useMemo(() => (data?.revisions ?? []).map((r) => ({ day: r.day, countsFor: r.countsFor, pages: r.pages, assigned: r.assigned, minutes: r.minutes })), [data]);
-  const memorized: Memorized[] = useMemo(() => (data?.memorized ?? []).map((m) => ({ day: m.day, pages: m.pages })), [data]);
-  const read: Read[] = useMemo(() => (data?.reads ?? []).map((r) => ({ day: r.day, pages: r.pages, minutes: r.minutes })), [data]);
+  const revised: Revised[] = useMemo(() => (shownData?.revisions ?? []).map((r) => ({ day: r.day, countsFor: r.countsFor, pages: r.pages, assigned: r.assigned, minutes: r.minutes })), [data]);
+  const memorized: Memorized[] = useMemo(() => (shownData?.memorized ?? []).map((m) => ({ day: m.day, pages: m.pages })), [data]);
+  const read: Read[] = useMemo(() => (shownData?.reads ?? []).map((r) => ({ day: r.day, pages: r.pages, minutes: r.minutes })), [data]);
 
   // What every section reads (ACT-22), for Insights, the one tab's rows and a section's page alike.
   const insightsData = {
@@ -355,8 +372,8 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
     learning: learningSet,
     rating: (p: number) => ratingByPage.get(p),
     ratedWeak,
-    revised: data?.revisions ?? [],
-    read: data?.reads ?? [],
+    revised: shownData?.revisions ?? [],
+    read: shownData?.reads ?? [],
     memorizations: yearOfMemorizing,
     capacity: user?.dailyPageCapacity ?? 20,
     revo,
@@ -368,7 +385,7 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
     firstTomorrow,
     // Gaps waits for the items: drawn from none, it fell back on the pages' last revisions and read "Today you
     // revised" over a strip of "revised on 0 days" while they loaded (ACT-28).
-    gaps: gapsOn && data != null,
+    gaps: gapsOn && shownData != null,
     pushBack: fullRevision,
     itemsFrom: rangeFrom,
     recitation,
