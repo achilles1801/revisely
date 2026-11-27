@@ -254,7 +254,7 @@ function nextPlanByRule(w: World, after: string, taken: ReadonlySet<number>, log
 const keepGoingArb = fc.tuple(historyArb, fc.integer({ min: -5, max: 45 }), fc.uniqueArray(fc.integer({ min: 1, max: 30 }), { maxLength: 10 }));
 
 describe('[AHEAD-3] [AHEAD-4] Keep going (nextRevisionDayPlan)', () => {
-  it('is a later day, with that day’s pages not done yet (revisionDayPlan), in order; a new round exactly when they repeat what is taken', () => {
+  it('is a later day, with that day’s pages not done yet (revisionDayPlan less the done), in order; a new round exactly when they repeat what is taken', () => {
     fc.assert(
       fc.property(keepGoingArb, ([{ w, logs }, afterOffset, takenList]) => {
         useZone(w.zone);
@@ -263,7 +263,8 @@ describe('[AHEAD-3] [AHEAD-4] Keep going (nextRevisionDayPlan)', () => {
         const plan = nextRevisionDayPlan(w.user, w.pages, after, taken, logs);
         fc.pre(plan !== null);
         expect(plan!.day > after).toBe(true);
-        expect(plan!.pages).toEqual(revisionDayPlan(w.user, w.pages, plan!.day, logs).pages);
+        // The day as its session holds it (revisionDayPlan: all of it, AHEAD-1), less the pages done.
+        expect(plan!.pages).toEqual(revisionDayPlan(w.user, w.pages, plan!.day).pages.filter((p) => !creditIndex(logs).get(plan!.day)?.has(p)));
         expect(plan!.pages.length).toBeGreaterThan(0);
         expect(plan!.round === true).toBe(plan!.pages.some((p) => taken.has(p)));
         const credited = creditIndex(logs).get(plan!.day) ?? new Set<number>();

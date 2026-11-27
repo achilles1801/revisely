@@ -7,8 +7,8 @@
 //     done (a partly done day keeps its remaining pages); a fully done day is
 //     passed over, so the next one after it is offered.
 
-import { nextRevisionDayPlan, revisionDayPlan } from '../aheadPlan';
-import { doneOnDay, reviewedOn } from '../aheadCredit';
+import { firstNotDone, nextRevisionDayPlan, revisionDayPlan } from '../aheadPlan';
+import { creditedOnDay, doneOnDay, reviewedOn } from '../aheadCredit';
 import { todayLines } from '../todayLines';
 import { getRevisionDayForUser, getFajrTimeFor } from '../fajrBoundary';
 import type { RevisionLog, User, UserPage } from '../../types';
@@ -111,7 +111,9 @@ describe('"Tomorrow starts at": the next day not yet done', () => {
   it('5 + 2 (partial): Wednesday continues with its remaining three, not its first five', () => {
     const logs = tuesdaySession({ [WED]: [11, 12] });
     expect(nextRevisionDayPlan(baseUser, pages, TUE, new Set(TODAY), logs)).toEqual({ day: WED, pages: [13, 14, 15] });
-    expect(revisionDayPlan(baseUser, pages, WED, logs).pages).toEqual([13, 14, 15]);
+    // The whole day (AHEAD-1): its done pages show checked, and the session opens on the first not done.
+    expect(revisionDayPlan(baseUser, pages, WED).pages).toEqual([11, 12, 13, 14, 15]);
+    expect(firstNotDone(revisionDayPlan(baseUser, pages, WED).pages, creditedOnDay(logs, WED))).toBe(13);
   });
 
   it('5 + 5 (full): Wednesday is done, so the next is Thursday, all five pages', () => {

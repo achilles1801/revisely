@@ -257,8 +257,12 @@ function setup(revised: number[], dayPages: number[] = DAY_PAGES) {
   return todaysLog;
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   jest.clearAllMocks();
+  // Each test opens its own session: no place kept from another (SESS-9, lib/sessionPlace).
+  require('../../../lib/sessionPlace').resetSessionPlacesForTests();
+  const storage = require('@react-native-async-storage/async-storage');
+  await (storage.default ?? storage).clear();
   mockReduceMotion = false;
   mockPager.scrolled = [];
   mockRecite.dev = false;

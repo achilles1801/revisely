@@ -58,6 +58,35 @@ describe('done for the day', () => {
     await app.close();
   });
 
+  // Majd, Nov 26 2026: "i went back and clicked revise ahead and it took me back to the first page as if i never did
+  // anything with my place lost". The day left out its pages done before, so the page he had finished vanished.
+  it('[AHEAD-1] [SESS-1] left after its first page and opened again: the whole day, that page checked, on the next', async () => {
+    const { phone } = await account();
+    const { app, home } = await openHome(phone, '2026-11-02 21:00');
+    const mon = await home.startSession();
+    await mon.swipeThrough(5);
+    await mon.back();
+    await app.untilSynced();
+
+    let tue = await home.openAhead();
+    expect(tue.pages()).toEqual(TUE);
+    await tue.swipe();
+    expect(tue.current()).toBe(7);
+    await tue.back();
+    await app.untilSynced();
+    expect(plain(home.ahead())).toBe(`Tomorrow starts at ${place(7)}`);
+
+    tue = await home.openAhead();
+    expect(tue.pages()).toEqual(TUE);
+    expect(tue.current()).toBe(7);
+    expect(await tue.isChecked()).toBe(false);
+    await tue.swipeBack();
+    expect(tue.current()).toBe(6);
+    expect(await tue.isChecked()).toBe(true);
+    await tue.back();
+    await app.close();
+  });
+
   it('[AHEAD-1] [DAY-2] [DAY-3] S1 (PR #197): before Fajr, tomorrow is the day after the revision day', async () => {
     const { phone } = await account({ fajrBoundaryEnabled: true, locationCoords: CITIES.chicago });
     // Tuesday 00:30: still Monday until Fajr.
@@ -93,9 +122,11 @@ describe('revised ahead', () => {
     // Done · 7 (Monday's five and the two ahead), and tomorrow goes on from its first page not done.
     expect(home.title()).toMatch(/^Done · 7 pages/);
     expect(plain(home.ahead())).toBe(`Tomorrow starts at ${place(8)}`);
+    // The whole day, 6 and 7 checked (AHEAD-1), on 7: the page the session was on when it was left (SESS-9).
     const rest = await home.openAhead();
-    expect(rest.pages()).toEqual([8, 9, 10]);
-    expect(rest.current()).toBe(8);
+    expect(rest.pages()).toEqual(TUE);
+    expect(rest.current()).toBe(7);
+    expect(await rest.isChecked()).toBe(true);
     await rest.back();
     await app.close();
 
@@ -402,7 +433,9 @@ describe('pages from Insights that a later day has as its own', () => {
     expect(tue.pages()).toEqual([11, 12, ...TUE]);
     await tue.swipeThrough(7);
     await tue.keepGoing();
-    expect(tue.pages()).toEqual([13, 14, 15]);
+    // The whole of Wednesday, 11 and 12 checked (revised from Insights), on 13 (AHEAD-1).
+    expect(tue.pages()).toEqual(WED);
+    expect(tue.current()).toBe(13);
     await tue.back();
     await app.untilSynced();
     expect(credit(app)).toEqual([

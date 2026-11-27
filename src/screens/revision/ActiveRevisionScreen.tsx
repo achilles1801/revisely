@@ -57,7 +57,8 @@ import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algori
 import { catchUpDayOf, duePagesOf, insightsExtrasOf, insightsPagesOn } from '../../lib/carryOver';
 import { revisablePages } from '../../lib/memorizedAyahs';
 import { creditedOnDay, doneOnDay, sessionCredit, takeBackCredit } from '../../lib/aheadCredit';
-import { aheadDayLabel, nextRevisionDayPlan, revisionDayPlan, startsCycle, type RevisionDayPlan } from '../../lib/aheadPlan';
+import { aheadDayLabel, firstNotDone, nextRevisionDayPlan, revisionDayPlan, startsCycle, type RevisionDayPlan } from '../../lib/aheadPlan';
+import { primeSessionPlace, saveSessionPlace, sessionPlaceFor } from '../../lib/sessionPlace';
 import { describePageRange, describePassage, surahName, surahsOfPages } from '../../lib/passages';
 import {
   getHizbForPage,
@@ -139,10 +140,17 @@ function ActiveRevisionScreenBody() {
   const [round, setRound] = useState(() => route.params?.round === true);
   const [openedAhead] = useState<RevisionDayPlan | null>(() => {
     if (!user || !sessionDay || !openAheadDay || openAheadDay <= sessionDay) return null;
-    const plan = revisionDayPlan(user, pages, openAheadDay, logs);
+    // The whole day, its pages done before shown checked (AHEAD-1).
+    const plan = revisionDayPlan(user, pages, openAheadDay);
     return plan.pages.length > 0 ? plan : null;
   });
   const openedCredited = openedAhead ? creditedPagesOf(logs, openedAhead) : NO_PAGES;
+  // Where a day of this session opens (SESS-9): the page it was on when left, while that page is still the day's; else
+  // its first page not done (AHEAD-1).
+  const placeOn = (day: string, dayPages: readonly number[], done: ReadonlySet<number>): number | undefined => {
+    const kept = sessionDay ? sessionPlaceFor(user?.id, sessionDay, day) : null;
+    return kept != null && dayPages.includes(kept) ? kept : firstNotDone(dayPages, done);
+  };
 
   // Keep going (#168): the revision days after today, each with its pages, in
   // order. The session's pages are today's, then these.
@@ -203,9 +211,25 @@ function ActiveRevisionScreenBody() {
     () => new Map(ratingsFromTodaysLogs),
   );
   const [currentPageNumber, setCurrentPageNumber] = useState<number | null>(
-    () => openedAhead?.pages[0] ?? null,
+    () => (openedAhead ? (placeOn(openedAhead.day, openedAhead.pages, new Set(openedCredited)) ?? null) : null),
   );
   const [sessionStartTime] = useState(Date.now());
+  // The page on screen is kept as this day's place (SESS-9), once the kept places have loaded (saving before would
+  // write over the place it is about to open on). Swipes, Recite's page turns and Jump all go through onPageChange.
+  const [placeReady, setPlaceReady] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void primeSessionPlace(user?.id).then(() => {
+      if (live) setPlaceReady(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [user?.id]);
+  useEffect(() => {
+    if (!placeReady || !user || !sessionDay || currentPageNumber == null || !lastSectionPages.includes(currentPageNumber)) return;
+    saveSessionPlace(user.id, { sessionDay, day: lastSectionDay, page: currentPageNumber });
+  }, [placeReady, user, sessionDay, currentPageNumber, lastSectionDay, lastSectionPages]);
   // Pages from Insights this session has revised as extras of a day it holds (ACT-24): page → that day. They aren't
   // the schedule coming round: Keep going counts each for the later day that has it as its own (AHEAD-3).
   const revisedExtras = useMemo(() => {
@@ -694,14 +718,15 @@ function ActiveRevisionScreenBody() {
       if (plan.pages.length === 0) return;
       const credited = creditedOnDay(logs, plan.day);
       const already = plan.pages.filter((p) => credited.has(p));
-      // The header names the page the pager opens on, the day's first.
-      setCurrentPageNumber(plan.pages[0]);
+      // The header names the page the pager opens on: the day's first not done (AHEAD-1), counting the pages this
+      // session has already marked (pages from Insights revised in front of an earlier day, AHEAD-3).
+      setCurrentPageNumber(placeOn(plan.day, plan.pages, new Set([...already, ...completedPages])) ?? plan.pages[0]);
       // Pages already credited to that day are done, as on the day itself.
       setCompletedPages((prev) => new Set([...prev, ...already]));
       already.forEach((p) => silentlySavedRef.current.add(p));
       setAheadDays((prev) => [...prev, plan]);
     },
-    [logs],
+    [logs, completedPages],
   );
   const keepGoing = useCallback(async () => {
     if (!keepGoingPlan) return;
@@ -731,19 +756,21 @@ function ActiveRevisionScreenBody() {
         checked: heldAsRevised(sessionDay),
       });
     }
+    // The whole day, its pages done before shown checked (AHEAD-1); the plan names the day and whether it is a round.
+    const day: RevisionDayPlan = user ? { ...keepGoingPlan, pages: revisionDayPlan(user, pages, keepGoingPlan.day).pages } : keepGoingPlan;
     if (!keepGoingPlan.round) {
-      addSection(keepGoingPlan);
+      addSection(day);
       return;
     }
     // The cycle has come round (AHEAD-3): the next day repeats pages this session holds. Everything so far
     // is saved, then the session starts a new round holding that day alone, its pages unchecked.
     await commitPendingPages();
-    const already = creditedPagesOf(logsRef.current, keepGoingPlan);
+    const already = creditedPagesOf(logsRef.current, day);
     silentlySavedRef.current = new Set(already);
     setCompletedPages(new Set(already));
-    setCurrentPageNumber(keepGoingPlan.pages[0]);
+    setCurrentPageNumber(placeOn(day.day, day.pages, new Set(already)) ?? day.pages[0]);
     setRound(true);
-    setAheadDays([keepGoingPlan]);
+    setAheadDays([day]);
   }, [keepGoingPlan, addSection, haptics, commitPendingPages, user, sessionDay, revisedExtras, addLog, assignment, pages, heldAsRevised]);
 
   // Home's "Tomorrow starts at …" (#168) when the user wasn't loaded at mount:
@@ -753,7 +780,7 @@ function ActiveRevisionScreenBody() {
     if (openedAheadRef.current || !user || !sessionDay || !openAheadDay) return;
     if (openAheadDay <= sessionDay) return;
     openedAheadRef.current = true;
-    addSection(revisionDayPlan(user, pages, openAheadDay, logs));
+    addSection(revisionDayPlan(user, pages, openAheadDay));
   }, [openAheadDay, user, pages, logs, sessionDay, addSection]);
   // Saved as soon as the last page is in (the render after the swipe).
   useEffect(() => {
@@ -815,13 +842,12 @@ function ActiveRevisionScreenBody() {
 
   const todaysPages = assignment.pages;
 
-  // A later day (Home's "Tomorrow starts at …", Keep going): its first page,
-  // the first not yet done (its plan leaves out the ones done). Today: the
-  // first of today's not yet revised.
+  // A later day (Home's "Tomorrow starts at …", Keep going): the first of its pages not yet done, the done ones
+  // shown checked (AHEAD-1). Today: the first of today's not yet revised.
   const resumePage =
     lastSectionDay !== sessionDay
-      ? lastSectionPages[0]
-      : (assignment.pages.find((p) => !alreadyRevisedToday.has(p)) ?? assignment.pages[0]);
+      ? (placeOn(lastSectionDay, lastSectionPages, completedPages) ?? lastSectionPages[0])
+      : (placeOn(sessionDay ?? '', assignment.pages, alreadyRevisedToday) ?? assignment.pages[0]);
   const displayPageNumber = currentPageNumber || resumePage;
   // The day of the page on screen: its own pages and count (the header says
   // "Revising ahead" for a day revised ahead).
