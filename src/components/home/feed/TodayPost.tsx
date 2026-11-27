@@ -2,8 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
-import { computeMemorizationStats } from '../../../lib/memorizationStats';
-import { aheadLine, NBSP, todayLines, type TodayStatus, type PartialPages } from '../../../lib/todayLines';
+import { aheadLine, NBSP, todayLines, type TodayLines, type TodayStatus, type PartialPages } from '../../../lib/todayLines';
 import type { UserPage } from '../../../types';
 import { typeV2 } from '../../../theme/v2';
 import { ProgressRing } from '../../activity/DayParts';
@@ -14,32 +13,12 @@ import { PillButton } from '../../v2/PillButton';
 import { ThreadRow } from '../../v2/ThreadRow';
 import { ProgressBar } from '../../ProgressBar';
 import { Tap } from '../../v2/Tap';
-import { formatPercentage, t } from '../../../i18n';
+import { t } from '../../../i18n';
 import { forwardIcon } from '../../../i18n/direction';
 
 export type { TodayStatus } from '../../../lib/todayLines';
-
-/** "17.9%": of the 604 pages, to one decimal ("0%", "100%" at the ends); «١٧٫٩٪» in Arabic. */
-export function formatPercent(fraction: number): string {
-  const percent = Math.round(fraction * 1000) / 10;
-  if (percent <= 0) return formatPercentage(0);
-  if (percent >= 100) return formatPercentage(100);
-  return formatPercentage(percent, 1);
-}
-
-/** How much is memorized: "17.9% of the Quran memorized", and each juz's share (the dots). */
-export function memorizedText(pages: UserPage[]) {
-  const stats = computeMemorizationStats(pages);
-  // A partly memorized page counts by its share of the page (MEM-2).
-  const fraction = stats.share / 604;
-  return {
-    body: t('home.today.memorized', { percent: formatPercent(fraction) }),
-    /** Of the 604 pages. */
-    fraction,
-    /** Each juz's memorized share, juz 1 first (the juz dots). */
-    juz: stats.juzFractions,
-  };
-}
+// How much is memorized, worked out with the rest of Home's today (lib/homeToday).
+export { formatPercent, memorizedText } from '../../../lib/homeToday';
 
 /**
  * How far the assignment lines and the memorized line grow with Dynamic Type:
@@ -91,6 +70,7 @@ export function TodayPost({
   ahead,
   onAhead,
   help,
+  lines: given,
 }: {
   name: string;
   initial: string;
@@ -136,13 +116,17 @@ export function TodayPost({
   onAhead?: () => void;
   /** Home's ? (HELP-1), at the right of the header, where ⋯ was. */
   help?: React.ReactNode;
+  /** The lines as Home worked them out (lib/homeToday), so Home draws exactly what the user-matrix test checks. */
+  lines?: TodayLines;
 }) {
   const { palette } = useTheme();
   // With pages memorized, a day with no pages is a rest day (HOME-9): never "Mark memorized pages".
-  const lines = todayLines(status, pages, done, carried, carriedLeft, partial, carriedInsights, {
-    memorized: memorized.fraction > 0,
-    next: ahead ?? null,
-  });
+  const lines =
+    given ??
+    todayLines(status, pages, done, carried, carriedLeft, partial, carriedInsights, {
+      memorized: memorized.fraction > 0,
+      next: ahead ?? null,
+    });
   const grace = streakGrace ?? null;
   // In grace the streak that can come back shows dimmed, with a ring for the missed pages (SESS-6).
   const meta = grace

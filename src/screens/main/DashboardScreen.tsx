@@ -42,7 +42,7 @@ import { ReadingSession, RevisionLog } from '../../types';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { useTabBarFootprint } from '../../navigation/TabBar';
 import { useRevoFootprint } from '../../lib/revo/presence';
-import { HEADER_MAX_SCALE, TodayPost, memorizedText } from '../../components/home/feed/TodayPost';
+import { HEADER_MAX_SCALE, TodayPost } from '../../components/home/feed/TodayPost';
 import { SessionPost } from '../../components/home/feed/SessionPost';
 import { KahfPost } from '../../components/home/feed/KahfPost';
 import { RecentSection } from '../../components/activity/ActivityItemRow';
@@ -67,14 +67,14 @@ import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { arabicV2, layoutV2 } from '../../theme/v2';
 import { avatarInitial } from '../../lib/displayName';
 import { prefetchPages } from '../../lib/pageCache';
-import { catchUpLine } from '../../lib/todayLines';
-import { applyCarryOver, leftoversFor, type Leftovers } from '../../lib/carryOver';
+import type { PartialPages } from '../../lib/todayLines';
+import { homeToday } from '../../lib/homeToday';
+import { applyCarryOver, type Leftovers } from '../../lib/carryOver';
 import { heldElsewhere, reviewPagesInOrder, takeBackCredit } from '../../lib/aheadCredit';
 import { primeSessionPlace } from '../../lib/sessionPlace';
 import { ownRevised } from '../../lib/activityItems';
-import { aheadLead, nextRevisionDayPlan } from '../../lib/aheadPlan';
 import type { HistoryItem } from '../../lib/streakFromItems';
-import { handLogsOf, loadActivityHistory, sameHistory, shareActivityHistory, withPendingHandLogs } from '../../lib/activityHistory';
+import { loadActivityHistory, sameHistory, shareActivityHistory, withPendingHandLogs } from '../../lib/activityHistory';
 import { accountDesignEnabled } from '../../lib/release/accountDesign';
 import { useAccountJourney, usePagesRevisedOnPhone } from '../../lib/accountJourney';
 import { latestMilestone } from '../../lib/badges';
@@ -84,19 +84,21 @@ import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { ProfilePicture } from '../../components/account/ProfilePicture';
 import { useAccountPhoto } from '../../lib/accountPicture';
 import { pendingEntries } from '../../lib/offline/outbox';
-import { todaySnapshot } from '../../lib/todaySnapshot';
 import { JumpSheet } from '../../components/home/JumpSheet';
 import { UndoToast } from '../../components/revision/UndoToast';
 import { HelpButton } from '../../components/help/HelpButton';
 import { HelpToast } from '../../components/help/HelpToast';
 import { describeStart, jumpTo, undoJump, type JumpTarget } from '../../lib/jump';
 import type { User } from '../../types';
-import { partlyMemorizedAyahs, revisablePages } from '../../lib/memorizedAyahs';
+import { revisablePages } from '../../lib/memorizedAyahs';
 import { t } from '../../i18n';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Dashboard'>;
 
 const COMPACT_SESSION_LIMIT = 3;
+
+const NO_LEFTOVERS: Leftovers = { pages: [], from: {}, days: [] };
+const NO_PARTIAL: PartialPages = new Map();
 
 /** Each side of Home's top bar: three icons. */
 const TOP_BAR_SIDE = 120;
@@ -250,13 +252,28 @@ export default function DashboardScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [history, user, pendingChanges],
   );
-  const snapshot = useMemo(
+  // Everything the Today post says, worked out in one place (lib/homeToday): the snapshot, the next revision day,
+  // the catch-up offer, the lines and what the button does. The user-matrix property test checks this same function.
+  const home = useMemo(
     () =>
       user && assignment
-        ? todaySnapshot({ user, pages, logs, day: revisionDay, assignment: assignment.pages, history: counted, now: Date.now() })
+        ? homeToday({
+            user,
+            pages,
+            logs,
+            quranData,
+            day: revisionDay,
+            date: revisionDate,
+            history: counted,
+            now: Date.now(),
+            quiet: homeV3,
+            assignment,
+          })
         : null,
-    [user, pages, logs, revisionDay, assignment, counted],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user, pages, logs, revisionDay, revisionDate, assignment, counted, homeV3],
   );
+  const snapshot = home?.snapshot ?? null;
   const todayStatus = { status: snapshot?.status ?? ('not_started' as const) };
 
   // The account's picture and latest badge on the Today post (ACCOUNT-7; the Account page's new look). Home reads the
@@ -272,27 +289,10 @@ export default function DashboardScreen() {
   const premiumNow = usePremium(user?.id, accountV2 && reciteLiveForAccount(user));
   const photoUrl = useAccountPhoto(firebaseUser, user?.id);
 
-  // Done today: the next revision day, which Home's quiet line opens (#168). It goes on past the cycle's
-  // end (AHEAD-3): a day that repeats today's pages opens as a new round, and one that begins the plan
-  // again reads "Next cycle starts at …".
-  // A rest day (no pages today, pages memorized; HOME-9) names it too, and its "Revise ahead" opens it.
-  const aheadNext = useMemo(() => {
-    if (!user || !assignment) return null;
-    const restDay = assignment.pages.length === 0 && revisablePages(pages).length > 0;
-    if (!restDay && (todayStatus.status !== 'completed' || assignment.pages.length === 0)) return null;
-    const plan = nextRevisionDayPlan(user, pages, revisionDay, new Set(assignment.pages), logs);
-    if (!plan || plan.pages.length === 0) return null;
-    return { plan, lead: aheadLead(user, pages, revisionDay, plan) };
-  }, [user, pages, logs, assignment, revisionDay, todayStatus.status]);
-
-  // Pages from the last few revision days that were never revised (a day with
-  // no session at all counts as missed), offered as "Add to today". Empty once
-  // they are in today's assignment.
-  const leftovers = useMemo<Leftovers>(() => {
-    if (!user || !assignment) return { pages: [], from: {}, days: [] };
-    // Pages logged by hand for a day aren't left over from it (ACT-15).
-    return leftoversFor(user, [...logs, ...handLogsOf(counted)], revisionDay, assignment.pages, revisablePages(pages));
-  }, [logs, counted, revisionDay, assignment, pages, user]);
+  // Done today, or a rest day (HOME-9): the next revision day, which Home's quiet line (or "Revise ahead") opens.
+  const aheadNext = home?.ahead ?? null;
+  // Pages left over from the last few revision days, offered as "Add to today" (CARRY-1).
+  const leftovers: Leftovers = home?.leftovers ?? NO_LEFTOVERS;
 
   // Today's pages that came from earlier days (they come first: "4 from yesterday first").
   const carriedToday = snapshot?.carried.length ?? 0;
@@ -323,7 +323,7 @@ export default function DashboardScreen() {
   // Also the pages today's sessions revised ahead, so "Done" counts the whole day.
   const donePagesToday = useMemo(() => snapshot?.done ?? new Set<number>(), [snapshot]);
   // Partly memorized pages are named by their memorized ayahs (MEM-4).
-  const partial = useMemo(() => partlyMemorizedAyahs(pages), [pages]);
+  const partial = home?.partial ?? NO_PARTIAL;
   // Carried pages still to revise: once today's own pages are done, the button goes on to them.
   const carriedLeft = snapshot?.carriedLeft ?? 0;
 
@@ -381,7 +381,7 @@ export default function DashboardScreen() {
   // phone already knows this Friday's answer.
   const showKahfCard = kahfState === 'done' || (kahfState === 'prompt' && (kahfLoaded || kahfKnown !== null));
 
-  if (!user || !assignment) {
+  if (!user || !assignment || !home) {
     return (
       <TopSafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -454,14 +454,14 @@ export default function DashboardScreen() {
     }
   };
 
+  // What the button does was worked out with its words (lib/homeToday), so the two can't disagree.
   const handleCtaPress = () => {
-    if (assignment.totalPages === 0 && aheadNext && revisablePages(pages).length > 0) {
+    const action = home.action;
+    if (!action) return;
+    if (action.kind === 'ahead') {
       // A rest day (HOME-9), revised ahead today or not: "Revise ahead" opens the next revision day.
-      navigation.navigate('ActiveRevision', { aheadDay: aheadNext.plan.day, ...(aheadNext.plan.round ? { round: true } : {}) });
-    } else if (todayStatus.status === 'completed' && carriedLeft > 0) {
-      // Today is done, and pages added from earlier days are left: the session holds them.
-      navigation.navigate('ActiveRevision');
-    } else if (todayStatus.status === 'completed') {
+      navigation.navigate('ActiveRevision', { aheadDay: action.day, ...(action.round ? { round: true } : {}) });
+    } else if (action.kind === 'review') {
       // The review is the day's done pages, the same set Home counts as Done:
       // today's first, then the pages revised ahead today (reviewPagesInOrder).
       const done = reviewPagesInOrder(logs, revisionDay, assignment.pages);
@@ -480,9 +480,10 @@ export default function DashboardScreen() {
       const log = todayLog ?? draft;
       // Every done page starts checked, the ones other sessions hold too (SESS-4).
       handleEditSession(log, done, heldElsewhere(logs, revisionDay, log));
-    } else if (assignment.totalPages === 0) {
+    } else if (action.kind === 'memorization') {
       navigation.navigate('Memorization', { edit: true });
     } else {
+      // Start or continue today's session; once today's own pages are done, it holds the carried pages left.
       navigation.navigate('ActiveRevision');
     }
   };
@@ -585,7 +586,7 @@ export default function DashboardScreen() {
   // (HOME-4). A running timer shows in the top bar.
   const recent = sessionLogs.slice(0, COMPACT_SESSION_LIMIT);
   // How much of the Quran is memorized: everyone sees it (no setting).
-  const memorized = memorizedText(pages);
+  const memorized = home.memorized;
 
   const salam = (
     <Text
@@ -665,7 +666,7 @@ export default function DashboardScreen() {
           onPrimary={handleCtaPress}
           onMemorization={() => navigation.navigate('Memorization', { edit: true })}
           onJump={() => setJumpOpen(true)}
-          catchUp={catchUpLine(leftovers, partial, { quiet: homeV3 })}
+          catchUp={home.catchUp}
           onCarryOver={handleCarryOver}
           carrying={carrying}
           quietCatchUp={homeV3}
@@ -677,6 +678,7 @@ export default function DashboardScreen() {
             navigation.navigate('ActiveRevision', { aheadDay: aheadNext.plan.day, ...(aheadNext.plan.round ? { round: true } : {}) })
           }
           help={<HelpButton screen="home" size={20} color={palette.secondary} maxFontSizeMultiplier={HEADER_MAX_SCALE} />}
+          lines={home.lines}
         />
 
         {showKahfCard && (
