@@ -19,11 +19,11 @@ describe('the start frame’s keep (RECITE-26)', () => {
     expect(checkQuery({ sura: 67, ayah: 1 }, null, { ...settings, keepSet: true })).toContain('keep=0');
   });
 
-  it('the store app, released: asks only when the user turned it on; a saved default never counts', () => {
+  it('the store app, released: asks from the start (on by default), and not once the user has turned it off', () => {
     mockDev = false;
     setTrainingTakesReleasedForTests(true);
-    expect(startFrameFor(562, 'check', { ...settings, keepSet: true }).keep).toBe(true);
-    expect(startFrameFor(562, 'check', settings).keep).toBe(false);
+    expect(startFrameFor(562, 'check', settings).keep).toBe(true);
+    expect(startFrameFor(562, 'check', { ...settings, keep: false, keepSet: false }).keep).toBe(true);
     expect(startFrameFor(562, 'check', { ...settings, keep: false, keepSet: true }).keep).toBe(false);
   });
 

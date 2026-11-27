@@ -70,18 +70,19 @@ describe('Help improve mistake detection (RECITE-26): the store app’s through 
     expect(keepsTakes({ keep: true, keepSet: true })).toBe(false);
   });
 
-  it('[RECITE-26] on: the store app offers it; a keep the phone saved without the user choosing reads as the store default', () => {
+  it('[RECITE-26] on: the store app offers it; a value the phone saved without the user choosing reads as the store default', () => {
     setTrainingTakesReleasedForTests(true);
     jest.spyOn(variant, 'isDevVariant').mockReturnValue(false);
     expect(trainingTakesOffered()).toBe(true);
+    expect(trainingSwitchOn({ keep: false, keepSet: false })).toBe(TRAINING_STORE_DEFAULT);
     expect(trainingSwitchOn({ keep: true, keepSet: false })).toBe(TRAINING_STORE_DEFAULT);
     expect(keepsTakes({ keep: true, keepSet: true })).toBe(true);
     expect(keepsTakes({ keep: false, keepSet: true })).toBe(false);
   });
 
-  it('ships off until Majd opens it, and starts off in the store app until he says otherwise (Nov 26 2026)', () => {
+  it('ships off until Majd opens it; once open, the store app’s switch starts on (Majd, Nov 26 2026: "start on")', () => {
     expect(TRAINING_TAKES_RELEASED).toBe(false);
-    expect(TRAINING_STORE_DEFAULT).toBe(false);
+    expect(TRAINING_STORE_DEFAULT).toBe(true);
   });
 });
 

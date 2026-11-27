@@ -415,7 +415,8 @@ until its part is set up.
 
 Majd, Nov 26 2026: "once we get a lot of users and use their recordings to better train our model and we truly cross that
 final bar then we can charge". The store app's "Help improve mistake detection" is built and switched off
-(`lib/release/trainingTakes`: `TRAINING_TAKES_RELEASED`, and `TRAINING_STORE_DEFAULT` for where it starts).
+(`lib/release/trainingTakes`: `TRAINING_TAKES_RELEASED`). Once released it starts on (`TRAINING_STORE_DEFAULT`; Majd,
+Nov 26 2026: "start on"), and the user can turn it off.
 
 **Where the takes live.** The same as Revisely Dev's, so the lab's tools work on both: production's default bucket
 (`revision-buddy-3a398.firebasestorage.app`), `recite-tests/<uid>/<take>.wav` (16 kHz mono PCM) and `<take>.json` (the
@@ -446,8 +447,8 @@ ADPCM the phone already sends (4:1) instead of WAV would cut storage about four 
    `recite-check-pair`, and give their service account `roles/storage.objectCreator` on that bucket.
 4. The lifecycle rule on `recite-tests/` (the period Majd picks).
 5. Majd: the privacy policy, App Store Connect's App Privacy (Audio Data's purposes) and Play's Data safety (see the PR).
-6. The release PR: `TRAINING_TAKES_RELEASED = true`, `TRAINING_STORE_DEFAULT` as Majd decides, RECITE-26 loses "(Revisely
-   Dev)", and its line moves from Revo's Dev guide to the main guide.
+6. The release PR: `TRAINING_TAKES_RELEASED = true` (the store default is already on), RECITE-26 loses "(Revisely Dev)",
+   and its line moves from Revo's Dev guide to the main guide.
 
 ## Native code for Revisely Dev only: `modules-dev/` (Recite on the phone, Nov 23 2026)
 

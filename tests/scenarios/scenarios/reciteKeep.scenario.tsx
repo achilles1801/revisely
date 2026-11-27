@@ -1,7 +1,7 @@
 // Help improve mistake detection (BEHAVIOUR.md RECITE-26; lib/reciteCheck/settings, Settings → Mushaf and Recite).
 // Revisely Dev keeps each take for the lab unless this is off. It sat on the Testing page, which only testers see, so the
 // friends Revisely Dev is shared with by link (Nov 22 2026) had no way to turn it off. The store app gets it with its
-// release switch (lib/release/trainingTakes), starting as TRAINING_STORE_DEFAULT says until the user sets it.
+// release switch (lib/release/trainingTakes), on from the start until the user turns it off (TRAINING_STORE_DEFAULT).
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
 import type { Booted, OpenApp } from '../harness/phone';
@@ -87,7 +87,7 @@ it('[RECITE-26] Revisely Dev, an account that is not a tester: Help improve mist
   }
 });
 
-it('[RECITE-26] the store app: no switch and no take kept before its release switch; once released, a keep the phone saved without the user choosing never counts, and the user’s own choice stays', async () => {
+it('[RECITE-26] the store app: no switch and no take kept before its release switch; once released it starts on, and turned off it stays off', async () => {
   setZone(ZONES.chicago);
   setNow('2026-11-26 18:00');
   mockDev = false;
@@ -122,25 +122,32 @@ it('[RECITE-26] the store app: no switch and no take kept before its release swi
     await app.close();
   }
 
-  // Released: the switch shows as the store default (off), not as the saved keep; turned on, it stays on.
+  // Released: the switch starts on (Majd, Nov 26 2026: "start on"), as the store default says; turned off, it stays off,
+  // and no take asks to be kept.
   released = true;
   app = await phone.open(settingsStack);
   try {
     const keep = await openKeep(app);
     const training = app.mods.require<Training>('src/lib/release/trainingTakes');
-    expect(training.TRAINING_STORE_DEFAULT).toBe(false);
-    expect(keep().props.value).toBe(false);
+    expect(training.TRAINING_STORE_DEFAULT).toBe(true);
+    expect(keep().props.value).toBe(true);
     await app.act(async () => {
-      app.mods.rtl.fireEvent(keep(), 'valueChange', true);
+      app.mods.rtl.fireEvent(keep(), 'valueChange', false);
     });
-    await app.until(() => keep().props.value === true, 'the switch on');
+    await app.until(() => keep().props.value === false, 'the switch off');
   } finally {
     await app.close();
   }
   app = await phone.open(settingsStack);
   try {
     const keep = await openKeep(app);
-    await app.until(() => keep().props.value === true, 'the switch still on');
+    await app.until(() => keep().props.value === false, 'the switch still off');
+    const s = app.mods.require<Settings>('src/lib/reciteCheck/settings');
+    const storage = app.mods.require<any>('@react-native-async-storage/async-storage');
+    const AsyncStorage = storage.default ?? storage;
+    const saved = s.parseReciteCheckSettings(await AsyncStorage.getItem(`@revisely_recite_check:v1:${app.app.user!.id}`));
+    expect(saved).toMatchObject({ keep: false, keepSet: true });
+    expect(s.keepsTakes(saved)).toBe(false);
   } finally {
     await app.close();
   }

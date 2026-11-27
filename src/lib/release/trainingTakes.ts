@@ -13,10 +13,10 @@ import { isDevVariant } from '../variant';
 export const TRAINING_TAKES_RELEASED = false;
 
 /**
- * Whether the switch starts on in the store app, for an account that has never set it on this phone: Majd's call (the
- * recommendation is off: people choose to help). A value the phone saved without the user choosing never counts.
+ * Whether the switch starts on in the store app, for an account that has never set it on this phone (Majd, Nov 26 2026:
+ * "start on"). The user can turn it off. A value the phone saved without the user choosing never counts.
  */
-export const TRAINING_STORE_DEFAULT = false;
+export const TRAINING_STORE_DEFAULT = true;
 
 let forTests: boolean | undefined;
 

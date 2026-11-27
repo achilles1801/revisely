@@ -873,9 +873,9 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   friends"), and the Testing page shows only to testers, so before this they had no way to turn it off. The store app
   shows it only once its release switch is on (`lib/release/trainingTakes`; Majd, Nov 26 2026: "once we get a lot of
   users and use their recordings to better train our model and we truly cross that final bar then we can charge"), and
-  there it starts as `TRAINING_STORE_DEFAULT` says until the user sets it: a value saved on the phone before, which the
-  user never chose, never counts. Until then the store app never asks for a take to be kept. Off, takes are no longer
-  kept. Deleting the account deletes the takes it kept.
+  there it starts on (`TRAINING_STORE_DEFAULT`; Majd, Nov 26 2026: "start on") until the user sets it: a value saved on
+  the phone before, which the user never chose, never counts. Until the release switch is on, the store app never asks
+  for a take to be kept. Off, takes are no longer kept. Deleting the account deletes the takes it kept.
 - **RECITE-27.** (Revisely Dev) A take needs at least one ayah recited, in every mode, on the server and on the phone.
   Less than that (the mic pressed for two seconds, nothing said) isn't a take: no summary, a short line saying to recite
   at least one ayah, nothing in Activity, Insights or Revo, no remembered marks and no saved audio. In Test me that place
