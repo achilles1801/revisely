@@ -155,20 +155,17 @@ export function aheadLead(
 }
 
 /**
- * The pages of one revision day still to revise, as a plan (Home's "starts at"
- * line opens it). Pages of that day already done (`logs`, see creditedOnDay)
- * are left out, so the session opens on the first page not yet done.
+ * One revision day as its session holds it (Home's "starts at" line, Keep going): all of its pages, in the schedule's
+ * order, the ones already done too (AHEAD-1). The session shows those checked and opens on the first not done
+ * (firstNotDone); it used to leave them out, so a page done before leaving vanished from the day (Nov 26 2026).
  */
-export function revisionDayPlan(
-  user: User,
-  pages: readonly UserPage[],
-  day: string,
-  logs: readonly RevisionLog[] = [],
-): RevisionDayPlan {
-  const memorized = revisablePages(pages);
-  const credited = creditIndex(logs).get(day);
-  const scheduled = getPagesForDay(user, parseDay(day), memorized);
-  return { day, pages: credited ? scheduled.filter((p) => !credited.has(p)) : [...scheduled] };
+export function revisionDayPlan(user: User, pages: readonly UserPage[], day: string): RevisionDayPlan {
+  return { day, pages: [...getPagesForDay(user, parseDay(day), revisablePages(pages))] };
+}
+
+/** The first of a day's pages not yet done (`done`); its first page when all are. */
+export function firstNotDone(dayPages: readonly number[], done: ReadonlySet<number>): number | undefined {
+  return dayPages.find((p) => !done.has(p)) ?? dayPages[0];
 }
 
 /**

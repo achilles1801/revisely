@@ -126,8 +126,10 @@ describe('a seven-day cycle, all revised ahead in one day', () => {
     expect(plain(home.title())).toMatch(/^Done/);
     // Next Monday goes on from its first page not done, still a new round.
     expect(plain(home.ahead())).toMatch(aheadAt('Mon 9 Nov', 3));
+    // The whole day, 1 and 2 checked, on 3 (AHEAD-1).
     const again = await home.openAhead();
-    expect(again.pages()).toEqual([3, 4, 5]);
+    expect(again.pages()).toEqual(dayPages(0));
+    expect(again.current()).toBe(3);
     expect(await again.isChecked()).toBe(false);
     await again.back();
     await app.close();
@@ -204,7 +206,9 @@ describe('every plan goes on into the next cycle', () => {
     // Thursday has 16 and 17 as its own: revised from Insights in front of Tuesday in this session, they count for
     // Thursday now, so it opens on the rest, with no new round (AHEAD-3; it used to reopen 16–20 unchecked, Nov 26 2026).
     await session.keepGoing();
-    expect(session.pages()).toEqual([18, 19, 20]);
+    // The whole of Thursday, 16 and 17 checked, on 18 (AHEAD-1).
+    expect(session.pages()).toEqual(pagesRange(16, 20));
+    expect(session.current()).toBe(18);
     expect(await session.isChecked()).toBe(false);
     await session.swipeThrough(3);
     expect(nextLine(app)).toMatch(/^Next cycle · .+ · 5 pages$/);

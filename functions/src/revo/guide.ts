@@ -81,7 +81,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'A revision session',
-    covers: ['SESS-1', 'SESS-3', 'SESS-4', 'SESS-5'],
+    covers: ['SESS-1', 'SESS-3', 'SESS-4', 'SESS-5', 'SESS-9'],
     routes: ['ActiveRevision', 'ActivityAll'],
     text: lines(
       '- Home → “Start revision” (or “Continue revision”). The session shows today’s pages in the plan’s order, as mushaf pages.',
@@ -123,7 +123,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['AHEAD-1', 'AHEAD-2', 'AHEAD-3', 'AHEAD-4', 'AHEAD-5', 'AHEAD-6'],
     routes: ['ActiveRevision'],
     text: lines(
-      '- Once today is done, Home shows a line like "Tomorrow starts at Al-Mulk"; tapping it opens the next day’s pages alone.',
+      '- Once today is done, Home shows a line like "Tomorrow starts at Al-Mulk"; tapping it opens that day alone, done pages checked.',
       '- On the end card, “Keep going” goes on to the next revision day’s pages not done yet, then the day after. It doesn’t stop at the end of the cycle: once the whole cycle is done, Keep going starts the next cycle from its first day (Home says "Next cycle starts at Al-Fatihah"), and goes on through it. Those pages count for the next cycle’s days. A day already done ahead is passed over.',
       '- A page revised ahead counts for the day it is planned on: that day then needs only the pages left, and is done when none are. Only pages actually revised (swiped or checked) count. Activity, Insights and Pages by strength show it (and a page caught up) on the day it was revised.',
     ),

@@ -70,6 +70,7 @@ import { prefetchPages } from '../../lib/pageCache';
 import { catchUpLine } from '../../lib/todayLines';
 import { applyCarryOver, leftoversFor, type Leftovers } from '../../lib/carryOver';
 import { heldElsewhere, reviewPagesInOrder, takeBackCredit } from '../../lib/aheadCredit';
+import { primeSessionPlace } from '../../lib/sessionPlace';
 import { ownRevised } from '../../lib/activityItems';
 import { aheadLead, nextRevisionDayPlan } from '../../lib/aheadPlan';
 import type { HistoryItem } from '../../lib/streakFromItems';
@@ -135,6 +136,11 @@ export default function DashboardScreen() {
   // A schedule that starts after today (an older version's "back a day" on a
   // schedule that started that day) leaves today with nothing: start it today.
   const repairingStartRef = useRef(false);
+  // Where today's session (or a day revised ahead) was left, read before it opens so it opens there at once (SESS-9).
+  useEffect(() => {
+    void primeSessionPlace(user?.id);
+  }, [user?.id]);
+
   useEffect(() => {
     if (!user || repairingStartRef.current) return;
     const repaired = scheduleStartingByToday(user, revisionDate);

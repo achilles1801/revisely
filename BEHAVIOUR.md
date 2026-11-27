@@ -126,6 +126,19 @@ How the tests are made: `tests/scenarios/README.md`.
   keeps its source day in the carry (`carryOver.from`). A session saves a catch-up page under the ahead credit of
   its own day, and out of its own pagesRevised.
 - **SESS-3.** Leaving the session (Back) saves what was marked. Nothing marked: nothing is saved.
+- **SESS-9.** A session opened again on its revision day opens on the page it was on, every page it checked still
+  checked, whichever way it was left and however it is opened again. On a page it was on that is already done (gone
+  back to look at one, or passed on the way), it opens on the day's first page still to revise instead. Ways out: Back, another tab, the app going to the
+  background (a call, the lock button), the phone ending the app and a cold start. Ways in: Home's button (Start or
+  Continue), its "starts at" line for a day revised ahead (AHEAD-1), Keep going reaching a day it was on before. The
+  same for a day of catch-up or added pages (SESS-7, CARRY-2), pages from Insights first (ACT-24), and with Recite, the
+  mic on, paused or its take finished: Recite's page turns are where the session is, and the pages it finished are
+  checked (RECITE-9). The page is kept on the phone, per account, for that revision day and the day shown; a page no
+  longer the day's (Jump to moved it) opens on the day's first page not done too. Checked pages are saved every few
+  seconds, on going to the background and on leaving. A day's review (SESS-4) opens on its first page: nothing in it is
+  in progress. (Majd, Nov 26 2026: "i went back and clicked revise ahead and it took me back to the first page as if i
+  never did anything with my place lost", then "make sure that bug is fixed everywhere in all scenarios not just revise
+  ahead btw".)
 - **SESS-4.** Home's "Done · N pages" counts the pages done that day, its own and the ones revised
   ahead in its sessions, and Review session opens exactly those (#199): the day's own pages first,
   in the day's order, then the pages revised ahead, the earliest later day first (Nov 5 2026).
@@ -157,9 +170,13 @@ How the tests are made: `tests/scenarios/README.md`.
 
 - **AHEAD-1.** Once today is done, Home offers the next revision day ("Tomorrow starts at …"), from its
   first page not done yet. Tapping it opens that day's pages alone, as if it were that day's session:
-  today's pages are not behind them (Nov 5 2026). The next day's pages already done are left out
-  (#198). After Keep daily amount filled today with leftovers (CARRY-2), the next day starts with
-  today's own pages.
+  today's pages are not behind them (Nov 5 2026). Like a day's own session, it holds all of that day's pages: the
+  ones already done (revised ahead before, a page Recite finished included) show checked, the bars and the count
+  say so ("1/8"), and it opens on the first page not done. Keep going opens a later day the same way. (Majd, Nov 26
+  2026: "i went back and clicked revise ahead and it took me back to the first page as if i never did anything with my
+  place lost". The day used to leave its done pages out (#198), so a page done before leaving vanished from it and the
+  count started again at 0.) A day whose pages are all done is passed over (AHEAD-4). After Keep daily amount filled
+  today with leftovers (CARRY-2), the next day starts with today's own pages.
 - **AHEAD-2.** A page revised ahead counts for the day it is scheduled on, not the day it was revised.
   That day then needs only the pages left, and is done when none are. Its session shows the page checked, and
   unchecking it there takes back its credit to the day, as in the day's review (SESS-4): the session that revised
