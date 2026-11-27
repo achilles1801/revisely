@@ -11,6 +11,7 @@ import { RevoMark } from '../../revo/RevoMark';
 import { arabicV2 } from '../../../theme/v2';
 import { t as tr } from '../../../i18n';
 import {
+  PHONE,
   SCREEN_AT,
   along,
   curve,
@@ -22,7 +23,7 @@ import {
   onStage,
   seg,
 } from '../../../lib/whatsNew/tour';
-import { Anim, Asked, Bar, Chips, Field, Glint, RevoHeader, Ripple, Say, Screen, Sheet, T, at, type Clock, type ScreenAt } from './parts';
+import { Anim, Asked, Bar, Chips, Field, Glint, RevoHeader, Ripple, Say, Screen, Sheet, T, at, stageAt, useStage, type Clock, type ScreenAt } from './parts';
 import { FOOT_Y, LINE_H, MushafScreen, PAGE_BOX, WordsIn } from './screens';
 
 /** A point of a screen's phone on the stage, wherever the screen and its camera are. */
@@ -190,7 +191,47 @@ const DOCK = [
   [28, QUOTES[1].top + 12, 2.0, 2.55],
   [28, QUOTES[2].top + 12, 2.35, 2.9],
 ] as const;
-const ORBIT = { cx: 201, cy: 345, rx: 170, ry: 250 };
+/**
+ * The books circle the screen while it stands back (ORBIT_SHRINK of its size), clear of it, and behind it: its body
+ * hides any of them that passes it, so none ever sits on its words (Majd, Nov 27 2026: the circles covered "From the
+ * tafsir" and Memory). Only a docking book comes in front, at the end of its flight, onto its quote's mark in the margin.
+ */
+const ORBIT = { cx: 201, cy: 345, rx: 172, ry: 300 };
+const ORBIT_SHRINK = 0.7;
+/** How far along its flight a docking book comes in front of the screen: by then it is in the margin, left of the words. */
+const FRONT_AT = [0.76, 0.86] as const;
+
+/** Where book `i` is on the stage at `now`: its centre, scale, opacity, and how far it has docked (0 circling, 1 landed). */
+function bookAt(now: number, i: number, place: (t: number) => ScreenAt): { x: number; y: number; s: number; o: number; k: number } {
+  'worklet';
+  const rise = easeOut(seg(now, 0.15, 1.1));
+  const a = Math.PI / 3 + now * 0.85 + (i * Math.PI) / 2;
+  let x = ORBIT.cx + ORBIT.rx * Math.sin(a) * rise;
+  let y = ORBIT.cy - ORBIT.ry * Math.cos(a) * rise;
+  const depth = (1 - Math.cos(a)) / 2;
+  let s = (0.82 + 0.3 * depth) * (0.4 + 0.6 * rise);
+  let o = Math.min(1, rise * 1.6) * (0.55 + 0.45 * depth);
+  let k = 0;
+  if (i < 3) {
+    const d = DOCK[i];
+    k = easeInOut(seg(now, d[2], d[3]));
+    if (k > 0) {
+      const f = place(now);
+      const tgt = pointOn(f, d[0], d[1]);
+      // Bowed out to the left of the screen, so the flight stays off its words until the mark.
+      const p = curve([x, y], [-50, tgt[1] - 30], tgt, k);
+      x = p[0];
+      y = p[1];
+      s = lerp(s, (24 / 52) * (f.scale ?? 1) * (f.zoom ?? 1), k);
+      o = k >= 1 ? 1 - seg(now, d[3], d[3] + 0.25) : Math.max(o, k);
+    }
+  } else {
+    const q = seg(now, 1.8, 2.4);
+    s *= 1 - 0.4 * q;
+    o *= 1 - q;
+  }
+  return { x, y, s, o, k };
+}
 
 function BookMark({ letter, size }: { letter: string; size: number }) {
   const { palette } = useTheme();
@@ -228,12 +269,40 @@ function Quote({ t, q, i }: { t: Clock; q: (typeof QUOTES)[number]; i: number })
 
 export function BooksSlide({ t }: { t: Clock }) {
   const { palette } = useTheme();
+  const stage = useStage();
   const place = (now: number): ScreenAt => {
     'worklet';
-    return resting(now, along(now, [3.0, 1, 3.55, 1.85, 4.95, 1.85, 5.55, 1]), 210, 640);
+    const f = resting(now, along(now, [3.0, 1, 3.55, 1.85, 4.95, 1.85, 5.55, 1]), 210, 640);
+    // Standing back while the books circle it, then up to its size as they dock (its centre kept).
+    const k = along(now, [1.3, ORBIT_SHRINK, 2.6, 1]);
+    const full = f.scale ?? SCREEN_AT.scale;
+    return { ...f, scale: full * k, top: (f.top ?? SCREEN_AT.top) + (PHONE.height * full * (1 - k)) / 2 };
   };
+  /**
+   * A book: behind the screen while it circles, in front for the end of its flight onto its mark. Its letter and name
+   * take the stage's scale into their one scale (scaled from the circle's middle), so they stay crisp.
+   */
+  const book = (b: (typeof BOOKS)[number], i: number, front: boolean) => (
+    <Anim key={b.name} t={t} box={styles.orbiter} style={(now) => {
+      'worklet';
+      const p = bookAt(now, i, place);
+      const ahead = seg(p.k, FRONT_AT[0], FRONT_AT[1]);
+      const k = stage ? stage.value : 1;
+      const [x, y] = stageAt(p.x - 26 * p.s, p.y - 26 * p.s, k);
+      return { opacity: p.o * (front ? ahead : 1 - ahead), transform: [{ translateX: x }, { translateY: y }, { scale: p.s * k }] };
+    }}>
+      <BookMark letter={b.letter} size={52} />
+      {front ? null : (
+        <T style={[styles.bookName, { color: palette.text }]} numberOfLines={1}>
+          {b.name[0].toUpperCase() + b.name.slice(1)}
+        </T>
+      )}
+    </Anim>
+  );
   return (
     <>
+      {/* The four books rise from behind the screen and circle it; three dock under the answer, al-Sa'di steps back. */}
+      {BOOKS.map((b, i) => book(b, i, false))}
       <Screen t={t} place={place}>
         <MushafScreen page={379} foot={false} />
         <Sheet top={96}>
@@ -304,42 +373,7 @@ export function BooksSlide({ t }: { t: Clock }) {
           </View>
         </Anim>
       </Screen>
-      {/* The four books rise out of the screen and circle it; three dock under the answer, al-Sa'di steps back. */}
-      {BOOKS.map((b, i) => (
-        <Anim key={b.name} t={t} box={styles.orbiter} style={(now) => {
-          'worklet';
-          const rise = easeOut(seg(now, 0.15, 1.1));
-          const a = Math.PI / 3 + now * 0.85 + (i * Math.PI) / 2;
-          let x = ORBIT.cx + ORBIT.rx * Math.sin(a) * rise;
-          let y = ORBIT.cy - ORBIT.ry * Math.cos(a) * rise;
-          const depth = (1 - Math.cos(a)) / 2;
-          let s = (0.82 + 0.3 * depth) * (0.4 + 0.6 * rise);
-          let o = Math.min(1, rise * 1.6) * (0.55 + 0.45 * depth);
-          if (i < 3) {
-            const d = DOCK[i];
-            const k = easeInOut(seg(now, d[2], d[3]));
-            if (k > 0) {
-              const f = place(now);
-              const tgt = pointOn(f, d[0], d[1]);
-              const p = curve([x, y], [lerp(x, tgt[0], 0.5) + 60, lerp(y, tgt[1], 0.5) - 40], tgt, k);
-              x = p[0];
-              y = p[1];
-              s = lerp(s, (24 / 52) * (f.scale ?? 1) * (f.zoom ?? 1), k);
-              o = k >= 1 ? 1 - seg(now, d[3], d[3] + 0.25) : Math.max(o, k);
-            }
-          } else {
-            const k = seg(now, 1.8, 2.4);
-            s *= 1 - 0.4 * k;
-            o *= 1 - k;
-          }
-          return { opacity: o, transform: [{ translateX: x - 26 }, { translateY: y - 26 }, { scale: s }] };
-        }}>
-          <BookMark letter={b.letter} size={52} />
-          <T style={[styles.bookName, { color: palette.text }]} numberOfLines={1}>
-            {b.name[0].toUpperCase() + b.name.slice(1)}
-          </T>
-        </Anim>
-      ))}
+      {BOOKS.slice(0, 3).map((b, i) => book(b, i, true))}
     </>
   );
 }
@@ -564,7 +598,7 @@ const styles = StyleSheet.create({
   quoteBody: { marginStart: 32, marginTop: 6 },
   gap6: { height: 6 },
   bookMark: { alignItems: 'center', justifyContent: 'center', borderWidth: 0.5 },
-  orbiter: { position: 'absolute', left: 0, top: 0, width: 52, alignItems: 'center' },
+  orbiter: { position: 'absolute', left: 0, top: 0, width: 52, alignItems: 'center', transformOrigin: '0 0' },
   bookName: { marginTop: 4, width: 110, textAlign: 'center', fontSize: 13, lineHeight: 18, fontWeight: '600' },
   card: { borderRadius: 14, padding: 12, borderWidth: StyleSheet.hairlineWidth, gap: 6 },
   rtl: { textAlign: 'right', writingDirection: 'rtl' },

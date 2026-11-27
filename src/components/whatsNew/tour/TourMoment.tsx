@@ -7,7 +7,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AccessibilityInfo, StyleSheet, Text, View } from 'react-native';
-import Animated, { Easing, cancelAnimation, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, cancelAnimation, runOnJS, useAnimatedStyle, useDerivedValue, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,7 +30,7 @@ import { AGAIN_AFTER_MS } from '../../../lib/whatsNew/revoMoment';
 import { t } from '../../../i18n';
 import { AskSlide, BooksSlide, ScheduleSlide } from './revoSlides';
 import { ActivitySlide, BadgesSlide, HomeSlide, RamadanSlide, ReciteUpSlide, SpotSlide } from './moreSlides';
-import type { Clock } from './parts';
+import { OnStage, StageScale, type Clock } from './parts';
 
 /** Al-Mulk's first page: the tour's page when the account has none due today. */
 export const TOUR_FALLBACK_PAGE = 562;
@@ -73,7 +73,8 @@ function markRamadanCardSeen(): void {
   AsyncStorage.setItem(RAMADAN_INTRO_KEY, '1').catch(() => undefined);
 }
 
-function Slide({ moment, clock, page, pageName }: { moment: TourMomentId; clock: Clock; page: number; pageName: string }) {
+/** A slide by its moment (exported for the tests). */
+export function Slide({ moment, clock, page, pageName }: { moment: TourMomentId; clock: Clock; page: number; pageName: string }) {
   switch (moment) {
     case 'ask':
       return <AskSlide t={clock} page={page} pageName={pageName} />;
@@ -179,10 +180,12 @@ export function TourMoment({
   const height = body?.height ?? 0;
   const playScale = body ? Math.min(width / STAGE.width, height / STAGE.height) : 0;
   const endScale = body ? Math.max(0.3, Math.min(width / STAGE.width, (height - wordsHeight - 12) / STAGE.height)) : 0;
+  // The stage only moves; its scale goes to each piece on it (StageScale): text drawn under two stacked scales blurs.
+  const stageScale = useDerivedValue(() => lerp(playScale, endScale, end.value));
   const stage = useAnimatedStyle(() => {
-    const s = lerp(playScale, endScale, end.value);
+    const s = stageScale.value;
     return {
-      transform: [{ translateX: (width - STAGE.width) / 2 }, { translateY: -(STAGE.height * (1 - s)) / 2 + lerp((height - STAGE.height * playScale) / 2, 0, end.value) }, { scale: s }],
+      transform: [{ translateX: (width - STAGE.width) / 2 }, { translateY: -(STAGE.height * (1 - s)) / 2 + lerp((height - STAGE.height * playScale) / 2, 0, end.value) }],
     };
   });
   const wordsIn = useAnimatedStyle(() => ({ opacity: end.value, transform: [{ translateY: (1 - end.value) * 16 }] }));
@@ -227,10 +230,14 @@ export function TourMoment({
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
           >
-            <Text style={[typeV2.meta, styles.example, { color: palette.secondary }]} allowFontScaling={false}>
-              {t('whatsNew.tour.example')}
-            </Text>
-            <Slide key={run} moment={moment} clock={clock} page={page} pageName={name} />
+            <StageScale.Provider value={stageScale}>
+              <OnStage>
+                <Text style={[typeV2.meta, styles.example, { color: palette.secondary }]} allowFontScaling={false}>
+                  {t('whatsNew.tour.example')}
+                </Text>
+              </OnStage>
+              <Slide key={run} moment={moment} clock={clock} page={page} pageName={name} />
+            </StageScale.Provider>
           </Animated.View>
         ) : null}
         <Animated.View

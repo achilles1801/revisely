@@ -3,7 +3,7 @@
 // the field). Everything here is a picture: drawn at a phone's 402 × 874, never touched, its text at a fixed size
 // (the card's words, under it, follow Dynamic Type). Animated on the UI thread from one clock per slide.
 
-import React from 'react';
+import React, { createContext, useContext } from 'react';
 import { StyleSheet, Text, View, type StyleProp, type TextProps, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
@@ -13,6 +13,8 @@ import { RevoMark } from '../../revo/RevoMark';
 import { PHONE, SCREEN_AT, STAGE, bump } from '../../../lib/whatsNew/tour';
 
 export type Clock = SharedValue<number>;
+/** A screen's corners (the phone's points). */
+const RADIUS = 48;
 type Style = ViewStyle & { opacity?: number };
 
 /** A place on the phone (or the stage): left, top, width, height. */
@@ -35,12 +37,34 @@ export function Anim({ t, style, box, children }: { t: Clock; style: (t: number)
   );
 }
 
+/**
+ * The stage's scale: the design box (STAGE) fitted to the room, eased smaller as the words come in (TourMoment). The
+ * stage itself is never scaled. iOS draws text crisp under one scale but blurred or jagged under two stacked ones (Majd,
+ * Nov 27 2026: "why's the quality horrendous"; on the simulator a line under 0.92 then 0.74 came out jagged, the same
+ * line under 0.68 alone crisp), so each piece takes the stage's scale into its own: a Screen into its single scale,
+ * everything else through OnStage.
+ */
+export const StageScale = createContext<SharedValue<number> | null>(null);
+
+/**
+ * Stage pieces outside a Screen (the climb's path, lights, lanterns): drawn in the stage's points, scaled with it about its
+ * middle. A piece with words that has a scale of its own takes the stage's into it instead (useStage, stageAt).
+ */
+export function OnStage({ children }: { children: React.ReactNode }) {
+  const scale = useContext(StageScale);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale ? scale.value : 1 }] }));
+  return (
+    <Animated.View pointerEvents="none" style={[styles.stageBox, style]}>
+      {children}
+    </Animated.View>
+  );
+}
+
 /** Where a screen stands on the stage, and where the camera is on it. */
 export interface ScreenAt {
   scale?: number;
   top?: number;
   dx?: number;
-  rot?: number;
   opacity?: number;
   /** The camera pushing in: `zoom` on the phone's point (ox, oy). */
   zoom?: number;
@@ -48,42 +72,70 @@ export interface ScreenAt {
   oy?: number;
 }
 
+/** The stage's scale, for a piece that carries words and so takes it into its own transform (instead of OnStage). */
+export function useStage(): SharedValue<number> | null {
+  return useContext(StageScale);
+}
+
+/** Where the stage's point (x, y) is drawn, the stage at `scale` about its middle. */
+export function stageAt(x: number, y: number, scale: number): [number, number] {
+  'worklet';
+  const cx = STAGE.width / 2;
+  const cy = STAGE.height / 2;
+  return [cx + (x - cx) * scale, cy + (y - cy) * scale];
+}
+
+/** Where a screen's top-left corner is on the (unscaled) stage, and its whole scale with the stage's. */
+function screenOnStage(f: ScreenAt, stage: number): { x: number; y: number; s: number } {
+  'worklet';
+  const s = f.scale ?? SCREEN_AT.scale;
+  const [x, y] = stageAt((STAGE.width - PHONE.width * s) / 2 + (f.dx ?? 0), f.top ?? SCREEN_AT.top, stage);
+  return { x, y, s: s * stage };
+}
+
 /**
  * A screen of the app floating on the stage: a phone's 402 × 874, rounded, scaled and placed by `place` (a worklet of
  * the slide's seconds), with the camera inside it. Its children draw in the phone's points.
+ *
+ * Its words are drawn crisp: whatever they show through (the stage's scale, the screen's, the camera's zoom) is one
+ * scale on one view. The camera pushes in by narrowing the window the screen is seen through (its size divided by the
+ * zoom) and scaling that window up by the zoom, so the screen itself only moves.
  */
 export function Screen({ t, place, children, ground }: { t: Clock; place: (t: number) => ScreenAt; children: React.ReactNode; ground?: string }) {
   const { palette, isDark } = useTheme();
-  const outer = useAnimatedStyle(() => {
+  const stage = useContext(StageScale);
+  const frame = useAnimatedStyle(() => {
     const f = place(t.value);
-    const s = f.scale ?? SCREEN_AT.scale;
-    const left = (STAGE.width - PHONE.width * s) / 2 + (f.dx ?? 0);
-    const top = f.top ?? SCREEN_AT.top;
+    const p = screenOnStage(f, stage ? stage.value : 1);
+    return { opacity: f.opacity ?? 1, transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.s }] };
+  });
+  const view = useAnimatedStyle(() => {
+    const f = place(t.value);
+    const p = screenOnStage(f, stage ? stage.value : 1);
+    const z = Math.max(1, f.zoom ?? 1);
     return {
       opacity: f.opacity ?? 1,
-      transform: [
-        { translateX: left + (PHONE.width * s) / 2 - PHONE.width / 2 },
-        { translateY: top + (PHONE.height * s) / 2 - PHONE.height / 2 },
-        { rotate: `${f.rot ?? 0}deg` },
-        { scale: s },
-      ],
+      width: PHONE.width / z,
+      height: PHONE.height / z,
+      borderRadius: RADIUS / z,
+      transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.s * z }],
     };
   });
   const camera = useAnimatedStyle(() => {
     const f = place(t.value);
-    const z = f.zoom ?? 1;
+    const z = Math.max(1, f.zoom ?? 1);
     const ox = f.ox ?? PHONE.width / 2;
     const oy = f.oy ?? PHONE.height / 2;
-    return {
-      transform: [{ translateX: (ox - PHONE.width / 2) * (1 - z) }, { translateY: (oy - PHONE.height / 2) * (1 - z) }, { scale: z }],
-    };
+    return { transform: [{ translateX: -ox * (1 - 1 / z) }, { translateY: -oy * (1 - 1 / z) }] };
   });
   return (
-    <Animated.View pointerEvents="none" style={[styles.phone, isDark ? { borderWidth: 1, borderColor: palette.outline } : [styles.lifted, { shadowColor: palette.shadow }], outer]}>
-      <View style={[styles.phoneClip, { backgroundColor: ground ?? palette.bg }]}>
-        <Animated.View style={[StyleSheet.absoluteFill, camera]}>{children}</Animated.View>
-      </View>
-    </Animated.View>
+    <>
+      {isDark ? null : <Animated.View pointerEvents="none" style={[styles.frame, styles.lifted, { backgroundColor: palette.bg, shadowColor: palette.shadow }, frame]} />}
+      <Animated.View pointerEvents="none" style={[styles.window, { backgroundColor: ground ?? palette.bg }, view]}>
+        <Animated.View style={[styles.phoneBox, camera]}>{children}</Animated.View>
+      </Animated.View>
+      {isDark ? <Animated.View pointerEvents="none" style={[styles.frame, { borderWidth: 1, borderColor: palette.outline }, frame]} /> : null}
+    </>
   );
 }
 
@@ -209,9 +261,12 @@ export function Bar({ title, end, back = true }: { title: string; end?: React.Re
 const styles = StyleSheet.create({
   abs: { position: 'absolute', left: 0, top: 0 },
   flex: { flex: 1 },
-  phone: { position: 'absolute', left: 0, top: 0, width: PHONE.width, height: PHONE.height, borderRadius: 48 },
+  stageBox: { position: 'absolute', left: 0, top: 0, width: STAGE.width, height: STAGE.height },
+  // Screens are placed from their top-left corner, so a scale never moves the corner.
+  frame: { position: 'absolute', left: 0, top: 0, width: PHONE.width, height: PHONE.height, borderRadius: RADIUS, transformOrigin: '0 0' },
+  window: { position: 'absolute', left: 0, top: 0, overflow: 'hidden', transformOrigin: '0 0' },
+  phoneBox: { position: 'absolute', left: 0, top: 0, width: PHONE.width, height: PHONE.height },
   lifted: { shadowOpacity: 0.16, shadowRadius: 30, shadowOffset: { width: 0, height: 22 }, elevation: 10 },
-  phoneClip: { flex: 1, borderRadius: 48, overflow: 'hidden' },
   sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16 },
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 6 },
   revoHead: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
