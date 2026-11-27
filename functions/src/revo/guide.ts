@@ -39,7 +39,7 @@ const lines = (...l: string[]) => l.join('\n');
 export const GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     title: 'Finding your way',
-    covers: ['NAME-1', 'NAME-2', 'REVO-25', 'REVO-41', 'TAB-2', 'HOME-1', 'HOME-3'],
+    covers: ['NAME-1', 'NAME-2', 'REVO-25', 'REVO-41', 'TAB-2', 'HOME-1', 'HOME-3', 'USER-1'],
     routes: ['Dashboard', 'ReadIndex', 'Activity', 'Settings'],
     text: lines(
       '- The tab bar: Home, Activity, Read (swipe between them). Insights is in Activity; tapping Activity again goes back to its start.',
