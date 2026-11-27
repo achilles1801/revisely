@@ -858,7 +858,8 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   color shades its like more pastel which is what we should aim for".)
 - **RECITE-20.** (Revisely Dev) A hidden page is an empty page, ready at once when it is hidden: a faint rule where each
   line's words are still hidden, the ayah markers whole, and each word shown (recited, peeked, or in an ayah shown whole)
-  in place in its own ink. Nothing over or under a marker shows while the word beside it on that side is hidden (a
+  in place in its own ink. Surah headers and the basmala are never covered: only the ayahs' words are hidden (Majd,
+  Nov 27 2026: "Keep them visible"). Nothing over or under a marker shows while the word beside it on that side is hidden (a
   sajdah's overline did beside page 379's ۲٤, Nov 22 2026), nor in the corners of its opening beside its round outline
   (a damma or a kaf's top reaching in; Majd, Nov 25 2026: "hidden view shows a lot of pieces of letters ... this also
   applies for the tracker and following along when hidden"). No piece of a hidden word shows beside a word shown, and none of a

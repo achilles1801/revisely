@@ -25,6 +25,8 @@ MushafEdition.reciteData): the originals (iOS, 2600 wide), w1080 and w1440 (Andr
      every word but one. A hidden word's ink that shows is a leak; a shown word's ink under a cover is a cut. A pixel shows
      when its centre is under no cover and its ink is visible, over INK (about 8% opacity), in every set: the light and
      dark themes tint the same alpha, and the smaller sets' faint fringe counts too.
+     A surah header's or the basmala's ink under any cover fails too: they stay visible, only the ayahs' words are
+     hidden (Majd, Nov 27 2026: "Keep them visible").
   3. --write: from the leaks and cuts the boxes alone leave (a straight edge can't part two words' ink there), writes
      src/data/hiddenInk.dat: each word's patches (covers over its leaking ink, drawn while it is hidden) and notches
      (holes over its covered ink, cut from the covers while it is shown), each holding that word's ink and no other's (any
@@ -40,7 +42,9 @@ MushafEdition.reciteData): the originals (iOS, 2600 wide), w1080 and w1440 (Andr
   HIDDEN_PLAN_OUT=/tmp/plans.json npx jest src/lib/recite/__tests__/hiddenInk.test.ts -t export
   /tmp/hp/bin/python scripts/check-hidden-page.py /tmp/mushaf --js-plans /tmp/plans.json   # the copy is the app's
   (--before: the plan as it was before Nov 26 2026, a unit open past a shown word's box and no patches or notches;
-  --pages 2,316 some pages; --dump FILE the leaks and cuts as JSON; the owners are kept in <images>/.owners/)
+  --pages 2,316 some pages; --dump FILE the leaks and cuts as JSON; the owners are kept in <images>/.owners/;
+  --write-headers rewrites src/lib/recite/__fixtures__/headerInk.json, where the headers' and basmala's ink is, which
+  hiddenInk.test keeps every cover clear of)
 
 Run it after the word boxes, the page lines, the marker rows, the plan or the images change; src/lib/recite/__tests__/
 hiddenInk.test.ts holds the plan's side on all 604 pages in CI. Memory: it goes page by page, a worker holding one
@@ -74,6 +78,7 @@ ROWS_FILE = ROOT / "src" / "data" / "markerRows.json"
 WORDS_FILE = ROOT / "src" / "data" / "quranWords.dat"
 WAQF_FILE = ROOT / "src" / "data" / "quranWaqf.json"
 INK_FILE = ROOT / "src" / "data" / "hiddenInk.dat"
+HEADERS_FILE = ROOT / "src" / "lib" / "recite" / "__fixtures__" / "headerInk.json"
 SETS = ["full", "w1080", "w1440"]
 # Ink that shows: over about 8% opacity (Majd, Nov 26 2026: "ensure that never happens again"; the orchestrator: no
 # hidden word's pixel at any opacity a person could see), on every set. Until Nov 27 the smaller sets counted only solid
@@ -557,7 +562,19 @@ def sweep(job):
     leak, cut = np.zeros(ys.size, bool), np.zeros(ys.size, bool)
     ids = np.array([w[0] for w in words])
     kw = dict(word_edge=opts["word_edge"], ink=ink)
-    leak |= ~covered(ys, xs, plan(lines, words, lambda w: False, **kw))
+    nothing = plan(lines, words, lambda w: False, **kw)
+    leak |= ~covered(ys, xs, nothing)
+    # Surah headers and the basmala stay visible (Majd, Nov 27 2026: "Keep them visible"): none of their ink under a cover
+    # nothing shown draws (every state's covers are those or parts of them), nor, near a line's rows, any state's.
+    hy, hx = np.nonzero(o == NOT_TEXT)
+    hyu, hxu = (hy + 0.5) / s, (hx + 0.5) / s
+    ho = np.argsort(hyu, kind="stable")
+    hys, hxs = hyu[ho], hxu[ho]
+    hcut = covered(hys, hxs, nothing)
+    hnear = np.zeros(hys.size, bool)
+    for l in lines:
+        hnear |= (hys >= l["top"] - 20) & (hys <= l["bot"] + 20)
+    hidx = np.nonzero(hnear)[0]
     states = [np.arange(n) < k for k in range(1, n + 1)] + [np.arange(n) >= k for k in range(n)]
     for k in range(n):
         one = np.zeros(n, bool)
@@ -565,7 +582,10 @@ def sweep(job):
         states += [one, ~one]
     for st in states:
         on = set(ids[st].tolist())
-        c = covered(ry, rx, plan(lines, words, lambda w: w in on, **kw))
+        cv = plan(lines, words, lambda w: w in on, **kw)
+        c = covered(ry, rx, cv)
+        if hidx.size:
+            hcut[hidx[covered(hys[hidx], hxs[hidx], cv)]] = True
         sh = st[rw]
         leak[ridx[~sh & ~c]] = True
         cut[ridx[sh & c & ~rsym]] = True  # a quarter sign covered beside its word is no cut: not a word
@@ -585,7 +605,8 @@ def sweep(job):
         return out
 
     res = dict(page=page, leaks=bits(leak), cuts=bits(cut), shared=shared_px, s=s,
-               not_text=int((o == NOT_TEXT).sum()))
+               not_text=int((o == NOT_TEXT).sum()), header_cut=int(hcut.sum()),
+               header_at=[round(float(hxs[hcut].min()), 2), round(float(hys[hcut].min()), 2)] if hcut.any() else None)
     if opts.get("pixels"):
         res["leak_px"] = [(int(o[yy[i], xx[i]]), float(x[i]), float(y[i])) for i in order[leak]]
         res["cut_px"] = [(int(o[yy[i], xx[i]]), float(x[i]), float(y[i])) for i in order[cut]]
@@ -704,6 +725,35 @@ def write_ink(all_rects, per):
     INK_FILE.write_text(json.dumps({"v": 1, "pages": pages}, separators=(",", ":")) + "\n")
 
 
+def header_rects(owns, page):
+    """Where a page's surah headers' and basmala's ink is, for hiddenInk.test (--write-headers): per run of rows holding it
+    (3 units apart parts two), its pixels' centres' bounds, the three sets together, outwards to a hundredth; flat."""
+    spans = []
+    for own in owns:
+        o = np.load(own / f"{page:03d}.npz")["owner"]
+        s = o.shape[1] / 1024
+        yy, xx = np.nonzero(o == NOT_TEXT)
+        if not yy.size:
+            continue
+        rows = np.zeros(o.shape[0], bool)
+        rows[yy] = True
+        lab, _ = ndimage.label(ndimage.binary_closing(rows, iterations=max(1, int(3 * s))))
+        for (sl,) in ndimage.find_objects(lab):
+            sel = (yy >= sl.start) & (yy < sl.stop)
+            if sel.any():
+                spans.append([(xx[sel].min() + 0.5) / s, (yy[sel].min() + 0.5) / s, (xx[sel].max() + 0.5) / s, (yy[sel].max() + 0.5) / s])
+    merged = []
+    for r in sorted(spans, key=lambda r: r[1]):
+        if merged and r[1] <= merged[-1][3] + 1:
+            m = merged[-1]
+            merged[-1] = [min(m[0], r[0]), min(m[1], r[1]), max(m[2], r[2]), max(m[3], r[3])]
+        else:
+            merged.append(r)
+    fl = lambda v: math.floor(v * 100 + 1e-6) / 100
+    ce = lambda v: math.ceil(v * 100 - 1e-6) / 100
+    return [v for m in merged for v in (fl(m[0]), fl(m[1]), ce(m[2]), ce(m[3]))]
+
+
 # --------------------------------------------------------------------------------------------------------------- main
 
 def arg(name, default=None):
@@ -739,6 +789,18 @@ def main():
         if missed:
             print(f"quarter signs not found before words {sorted(missed)[:20]} ({len(missed)} of {len(expected)})")
             sys.exit(1)
+    if "--write-headers" in sys.argv:
+        heads = json.loads(HEADERS_FILE.read_text()) if HEADERS_FILE.exists() else {}
+        for p in pages:
+            r = header_rects([owns[s] for s in SETS], p)
+            if r:
+                heads[str(p)] = r
+            else:
+                heads.pop(str(p), None)
+        heads = dict(sorted(heads.items(), key=lambda kv: int(kv[0])))
+        HEADERS_FILE.write_text(json.dumps(heads, separators=(",", ":")) + "\n")
+        print(f"wrote {HEADERS_FILE.relative_to(ROOT)}: {sum(len(v) // 4 for v in heads.values())} runs of a surah header's "
+              f"or the basmala's ink on {len(heads)} pages")
     before = "--before" in sys.argv
     ink = {} if before or "--write" in sys.argv else read_ink(INK_FILE, per)
     opts = dict(word_edge=1.0 if before else 0.0, pixels="--write" in sys.argv)
@@ -795,17 +857,21 @@ def main():
         print(f"{s}: {len(leaks)} bits of hidden words' ink show ({sum(b['px'] for _, b in leaks)} pixels, on "
               f"{len({p for p, _ in leaks})} pages); {len(cuts)} bits of shown words' ink covered ({sum(b['px'] for _, b in cuts)} "
               f"pixels, on {len({p for p, _ in cuts})} pages); {sum(r['shared'] for r in res)} pixels shared by two "
-              f"owners' edges; {sum(r['not_text'] for r in res)} pixels of surah headers and the basmala (never covered)")
+              f"owners' edges; {sum(r['not_text'] for r in res)} pixels of surah headers and the basmala, "
+              f"{sum(r['header_cut'] for r in res)} of them covered")
         for p, b in sorted(leaks, key=lambda t: -t[1]["px"])[:8]:
             print(f"  shows: page {p}, word {b['word']}, {b['px']} px at {b['box']}")
         for p, b in sorted(cuts, key=lambda t: -t[1]["px"])[:8]:
             print(f"  covered: page {p}, word {b['word']}, {b['px']} px at {b['box']}")
-        failed |= bool(leaks or cuts)
+        for r in [r for r in res if r["header_cut"]][:8]:
+            print(f"  covered: page {r['page']}, {r['header_cut']} px of a surah header or the basmala from {r['header_at']}")
+        failed |= bool(leaks or cuts) or any(r["header_cut"] for r in res)
     if arg("--dump"):
         Path(arg("--dump")).write_text(json.dumps({s: [{k: v for k, v in r.items() if not k.endswith("_px")} for r in results[s]] for s in SETS}))
     if failed:
         sys.exit(1)
-    print("no hidden word's ink shows and no shown word's ink is covered, in any reading state, on any page, in any set")
+    print("no hidden word's ink shows, no shown word's ink is covered and no surah header or basmala is covered, in any "
+          "reading state, on any page, in any set")
 
 
 if __name__ == "__main__":

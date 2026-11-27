@@ -185,6 +185,35 @@ describe('[RECITE-20] a hidden page, every page and every reading state', () => 
     }
   });
 
+  // Surah headers and the basmala stay visible on a hidden page: only the ayahs' words are hidden (Majd, Nov 27 2026: "Keep
+  // them visible"). Where their ink is on the page images: __fixtures__/headerInk.json (scripts/check-hidden-page.py
+  // --write-headers; per page, each run of it, the three sets' pixels together, flat x0, y0, x1, y1). Page 221's basmala
+  // reached a unit into line 9's cover rows until Nov 27 2026; page 2's ends 0.04 above line 3's.
+  it('no cover reaches a surah header or the basmala, in any reading state, on any page', () => {
+    const heads: Record<string, number[]> = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '__fixtures__', 'headerInk.json'), 'utf8'));
+    // Every surah's header is measured, on the page of its first ayah.
+    for (let s = 1; s <= 114; s++) {
+      const page = words.pageOf(words.verseFirstWord(s, 1));
+      expect({ s, page, measured: String(page) in heads }).toEqual({ s, page, measured: true });
+    }
+    const bad: string[] = [];
+    for (const [p, flat] of Object.entries(heads)) {
+      const page = Number(p);
+      const [from, to] = words.pageRange(page);
+      const rects: Rect[] = [];
+      for (let i = 0; i + 4 <= flat.length; i += 4) rects.push({ x0: flat[i], y0: flat[i + 1], x1: flat[i + 2], y1: flat[i + 3] });
+      for (const [state, shown] of states(from, to, lineStartsOf(words, from, to))) {
+        const plan = hiddenInkPlan(words, page, shown);
+        const all: Cover[] = [...plan.lines.flatMap((l: { covers: Cover[] }) => l.covers), ...plan.patches];
+        for (const r of rects) {
+          const into = all.find((c) => overlaps(c, r));
+          if (into) bad.push(`${page} ${state}: a cover at ${JSON.stringify(into)} reaches the header or basmala at ${JSON.stringify(r)}`);
+        }
+      }
+    }
+    expect(bad.slice(0, 10)).toEqual([]);
+  });
+
   it('the newest word’s following ink stays in its box and its line’s own rows', () => {
     for (const page of [2, 50, 316, 379, 592]) {
       const [from, to] = words.pageRange(page);
