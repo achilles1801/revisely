@@ -12,8 +12,8 @@ import { describeAyahs, pageNameOfAyah, spokenText } from '../../lib/passages';
 import { ayahKey } from '../../lib/ayahKeys';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { Mark, MarkInto } from '../../lib/reciteLive/contract';
-import { isUnclear, markGroup } from '../../lib/reciteLive/contract';
-import { markFill } from './markColours';
+import { isCorrected, isMistake, isUnclear } from '../../lib/reciteLive/contract';
+import { markFill, shownGroup } from './markColours';
 import { expectedPhrase, findingNote, intoLine, intoMarks, markTitle, recitedLabel, recitedPhrase, spokenIntoLine } from '../../lib/reciteLive/describe';
 import { Phrase, Row } from './MarkParts';
 import type { ScoreLevel } from '../../lib/reciteLive/score';
@@ -62,20 +62,22 @@ export function passageOf(words: QuranWords, from: number, to: number): string {
 export const removedLine = (n: number) => t('reciteLive.summary.removed', { count: n });
 
 /**
- * "1 wrong word, 1 wrong haraka, 1 wrong letter, 2 not clear, 1 tajweed note (Beta)": the mistakes by kind (a wrong haraka
- * or letter is a mistake, Majd, Nov 22 2026), then what never counts.
+ * "1 wrong word, 1 wrong haraka, 1 wrong letter, 1 corrected, 2 not clear, 1 tajweed note (Beta)": the mistakes by kind (a
+ * wrong haraka or letter is a mistake, Majd, Nov 22 2026), then what never counts: words corrected straight away
+ * (RECITE-33), Not clear, tajweed notes.
  */
 export function findingsLine(marks: Mark[]): string {
-  const n = (kinds: Mark['kind'][]) => marks.filter((m) => kinds.includes(m.kind) && !isUnclear(m)).length;
+  const n = (kinds: Mark['kind'][]) => marks.filter((m) => kinds.includes(m.kind) && !isUnclear(m) && !isCorrected(m)).length;
   const parts: string[] = [];
   const wrong = n(['word']);
   const skipped = n(['skipped']);
   // An extra word on the word reached for is a hesitation there; one past the end stays an extra word.
-  const hesitated = marks.filter((m) => onNextWord(m) && !isUnclear(m)).length;
+  const hesitated = marks.filter((m) => onNextWord(m) && !isUnclear(m) && !isCorrected(m)).length;
   const added = n(['added']) - hesitated;
   const harakat = n(['harakat']);
   const letters = n(['letter']);
   const tajweed = n(['tajweed']);
+  const corrected = marks.filter(isCorrected).length;
   const unclear = marks.filter(isUnclear).length;
   if (wrong) parts.push(t('reciteLive.summary.wrong', { count: wrong }));
   if (skipped) parts.push(t('reciteLive.summary.skipped', { count: skipped }));
@@ -83,6 +85,7 @@ export function findingsLine(marks: Mark[]): string {
   if (added) parts.push(t('reciteLive.summary.extra', { count: added }));
   if (harakat) parts.push(t('reciteLive.summary.harakat', { count: harakat }));
   if (letters) parts.push(t('reciteLive.summary.letters', { count: letters }));
+  if (corrected) parts.push(t('reciteLive.summary.corrected', { count: corrected }));
   if (unclear) parts.push(t('reciteLive.summary.unclear', { count: unclear }));
   if (tajweed) parts.push(t('reciteLive.summary.tajweed', { count: tajweed }));
   return parts.join(', ');
@@ -213,14 +216,14 @@ export function TakeSummarySheet({
       { text: t('common.delete'), style: 'destructive', onPress: onDelete },
     ]);
   const passage = words && from != null && to != null && to >= from ? passageOf(words, from, to) : '';
-  // "Not clear" marks never count (Majd, Nov 15 2026), so they come last.
-  const mistakes = marks.filter((m) => m.kind !== 'tajweed' && !isUnclear(m)).length;
+  // "Not clear" marks (Majd, Nov 15 2026) and words corrected straight away (RECITE-33) never count, so they come last.
+  const mistakes = marks.filter(isMistake).length;
   // A long take (2 pages or more) says its mistakes per page beside the count, where a % alone hides how many there
   // were (RECITE-24; Tarteel's "N /pg"; Majd, Nov 22 2026: "we should aim to keep it clean": the summary only, never the
   // bar).
   const perPage = check && words && from != null && to != null ? perPageLabel(mistakes, pagesReached(words, from, to)) : null;
   const mistakesNote = perPage ? t('reciteLive.mistakesPerPage', { mistakes: mistakesLabel(mistakes), perPage }) : mistakesLabel(mistakes);
-  const findings = [...marks.filter((m) => !isUnclear(m)), ...marks.filter(isUnclear)];
+  const findings = [...marks.filter((m) => !isUnclear(m) && !isCorrected(m)), ...marks.filter(isCorrected), ...marks.filter(isUnclear)];
   const peekedCount = peeked.reduce((n, p) => n + p.words.length, 0);
   // Something to recite again: a mistake (not a tajweed note), or a word peeked.
   const scoreColor = score?.level === 'good' ? palette.good : score?.level === 'warn' ? palette.warn : palette.onRedSubtle;
@@ -390,7 +393,7 @@ export function TakeSummarySheet({
               >
                 <View style={styles.rowText} testID="take-summary-finding-text">
                   <View style={styles.titleRow}>
-                    <View style={[styles.swatch, { backgroundColor: fill }]} testID={`take-summary-swatch-${markGroup(m)}`} />
+                    <View style={[styles.swatch, { backgroundColor: fill }]} testID={`take-summary-swatch-${shownGroup(m)}`} />
                     <Text style={[typeV2.name, styles.title, { color: palette.text }]} maxFontSizeMultiplier={CHROME_MAX} testID="take-summary-finding-title">
                       {t('reciteLive.summary.findingTitle', { title: markTitle(m), place })}
                     </Text>

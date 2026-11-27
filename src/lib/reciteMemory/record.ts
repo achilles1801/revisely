@@ -152,6 +152,8 @@ type StoredMark = {
   intoAyah?: number;
   intoEnding?: boolean;
   intoAlso?: number[];
+  /** Said wrong and corrected straight away (RECITE-33): kept, never counted or remembered. Only as true. */
+  corrected?: true;
 };
 
 /** At most this many other ayat of a slip into a similar ayah are kept. */
@@ -184,6 +186,7 @@ function storedMark(m: Mark): StoredMark {
     if (m.into.ending) out.intoEnding = true;
     if (m.into.also?.length) out.intoAlso = m.into.also.slice(0, MAX_INTO_ALSO).flat();
   }
+  if (m.corrected) out.corrected = true;
   return out;
 }
 
@@ -229,6 +232,7 @@ function markFromStored(raw: unknown): Mark | null {
   if (num(r.t0) != null && num(r.t1) != null) m.t = [r.t0 as number, r.t1 as number];
   const into = intoFromStored(r);
   if (into) m.into = into;
+  if (r.corrected === true) m.corrected = true;
   // Shown as a take's marks are: an extra word on the word it was reaching for, old records too (lib/reciteLive/markPlace).
   return placeMark(m);
 }

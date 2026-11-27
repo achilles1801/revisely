@@ -8,7 +8,7 @@ import { shiftDay } from '../journal';
 import { describeAyahs, surahName } from '../passages';
 import { daysSince } from '../recency';
 import type { QuranWords } from '../recite/quranWords';
-import { isUnclear, Mark } from '../reciteLive/contract';
+import { isCorrected, isUnclear, Mark } from '../reciteLive/contract';
 import { clearedBy } from '../reciteMemory/memory';
 import type { MemoryRecord, TakeRecord } from '../reciteMemory/record';
 import { liveTakes, mistakeKindOf, recitationInsights, WINDOW_DAYS, wordsOf } from '../reciteInsights/insights';
@@ -168,8 +168,9 @@ export function takeAttachment(records: readonly MemoryRecord[], take: TakeRecor
   const passage = takePassage(words, take);
   if (!passage) return null;
   const strict = take.level === 'strict';
-  // Words & harakat checks no tajweed: a stray note from it isn't sent.
-  const marks = [...take.marks].filter((m) => strict || m.kind !== 'tajweed').sort((a, b) => a.w - b.w);
+  // Words & harakat checks no tajweed: a stray note from it isn't sent. Nor is a word corrected straight away: it's no
+  // mistake (RECITE-33), and the server's check counts every word mark it's sent as one.
+  const marks = [...take.marks].filter((m) => (strict || m.kind !== 'tajweed') && !isCorrected(m)).sort((a, b) => a.w - b.w);
   const counted = {
     mistakes: marks.filter((m) => mistakeKindOf(m) !== null).length,
     unclear: marks.filter(isUnclear).length,

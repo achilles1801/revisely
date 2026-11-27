@@ -3,7 +3,7 @@
 // Not a mistake and Put back on a kept take.
 
 import type { QuranWords } from '../recite/quranWords';
-import { countsAsMistake, isUnclear, type Mark } from '../reciteLive/contract';
+import { isMistake, isUnclear, type Mark } from '../reciteLive/contract';
 import { formatAccuracy, pageAccuracy, scoreLevel, type ScoreLevel } from '../reciteLive/score';
 import { clearedBy } from './memory';
 import { comparableTakes, passageTakes, progressLine } from './progress';
@@ -58,7 +58,8 @@ const inOrder = (a: Mark, b: Mark) => a.w - b.w || KIND_ORDER[a.kind] - KIND_ORD
 /** What one mark adds to a take's counts: a mistake (Not clear never), a tajweed note, a Not clear. */
 function counts(m: Mark): { mistakes: number; tajweed: number; unclear: number } {
   const unclear = isUnclear(m);
-  return { mistakes: countsAsMistake(m) && !unclear ? 1 : 0, tajweed: m.kind === 'tajweed' ? 1 : 0, unclear: unclear ? 1 : 0 };
+  // A word corrected straight away counts in none of them (RECITE-33).
+  return { mistakes: isMistake(m) ? 1 : 0, tajweed: m.kind === 'tajweed' ? 1 : 0, unclear: unclear ? 1 : 0 };
 }
 
 /**

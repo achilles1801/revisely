@@ -966,6 +966,18 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   turns the switch off, and it stays as it was set, on this phone, for that account. A switch that was only ever at its
   old default (off) reads as on: every account starts with it on once from this change. Without Premium it stays off
   and locked, whatever is kept (PREM-1).
+- **RECITE-33.** (Revisely Dev) A word said wrong and corrected straight away (the reciter goes back and says it right)
+  is "Corrected", never a mistake (Majd, Nov 27 2026: "show as corrected i think"; on Nov 24 it still counted). The
+  checker says so by sending the mark again with `corrected` once it is sure the first saying was wrong (until then,
+  1–3 s, the mark shows as it came), or by taking the mark back as before. It is one mark, never two. It shows in a
+  colour of its own, a calm green, never red, amber or violet: on the page, in the bar (VoiceOver says "corrected") and
+  on its card, which reads "Corrected" with what was heard and expected and "You said another word here, then corrected
+  it. Not counted in the score.". It never counts: not in the score, the take's "N mistakes", Recite's memory (it isn't
+  remembered on the page), Insights' counts or Keeps slipping, nor the marks Revo is told. A word with a mistake too
+  shows the mistake. The summary lists it after the mistakes and before Not clear ("1 corrected", its row opening the
+  word on the page), and a take's line in Recited says it too. Not a mistake, Undo and Put back work on it as on any
+  mark. A checker that sends no count of corrected marks (the phone's engine for now) counts them in its mistakes, and
+  they are taken out, as Not clear is (RECITE-3); a mark without `corrected` is as before.
 
 What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd, Nov 16 2026).
 

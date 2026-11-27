@@ -14,7 +14,7 @@
 //   link has its own. Recite's memory keeps one record, with each link's checker take for the lab's labels.
 
 import type { QuranWords } from '../recite/quranWords';
-import { countsAsMistake, isUnclear, type FinalResult, type LiveScore, type Mark } from './contract';
+import { countsAsMistake, isCorrected, isMistake, isUnclear, type FinalResult, type LiveScore, type Mark } from './contract';
 import { furthestWord, settleUnfinished, type LiveState, type Removed } from './state';
 import { endsPhrase } from './phrase';
 import { SAMPLE_RATE } from '../recite/segmenter';
@@ -131,8 +131,11 @@ function judged(l: ChainLink): LiveState {
   const removed = Object.fromEntries(Object.entries(s.removed).filter(([, r]) => keep(r.mark)));
   let score = s.score;
   if (score) {
-    const dropped = past.filter((m) => countsAsMistake(m) && (score!.unclear == null || !isUnclear(m))).length;
+    const dropped = past.filter(
+      (m) => countsAsMistake(m) && (score!.unclear == null || !isUnclear(m)) && (score!.corrected == null || !isCorrected(m)),
+    ).length;
     const unclear = past.filter(isUnclear).length;
+    const corrected = past.filter(isCorrected).length;
     const reached = Math.max(0, score.reached - beyond);
     const mistakes = Math.max(0, score.mistakes - dropped);
     score = {
@@ -141,30 +144,35 @@ function judged(l: ChainLink): LiveState {
       mistakes,
       tajweed: Math.max(0, score.tajweed - past.filter((m) => m.kind === 'tajweed').length),
       ...(score.unclear != null ? { unclear: Math.max(0, score.unclear - unclear) } : {}),
+      ...(score.corrected != null ? { corrected: Math.max(0, score.corrected - corrected) } : {}),
       accuracy: reached > 0 ? Math.max(0, 1 - mistakes / reached) : 1,
     };
   }
   return { ...s, marks, removed, score };
 }
 
-/** A link's counts: mistakes without Not clear, from its score when it has one, else from its marks. */
-function tally(s: LiveState): { reached: number; mistakes: number; tajweed: number; unclear: number } | null {
+/** A link's counts: mistakes without Not clear or corrected marks, from its score when it has one, else from its marks. */
+function tally(s: LiveState): { reached: number; mistakes: number; tajweed: number; unclear: number; corrected: number } | null {
   const marks = Object.values(s.marks);
   const unclearMarks = marks.filter(isUnclear).length;
+  const correctedMarks = marks.filter(isCorrected).length;
   if (s.score) {
+    const notApart = (s.score.unclear != null ? 0 : unclearMarks) + (s.score.corrected != null ? 0 : correctedMarks);
     return {
       reached: s.score.reached,
-      mistakes: s.score.unclear != null ? s.score.mistakes : Math.max(0, s.score.mistakes - unclearMarks),
+      mistakes: Math.max(0, s.score.mistakes - notApart),
       tajweed: s.score.tajweed,
       unclear: s.score.unclear ?? unclearMarks,
+      corrected: s.score.corrected ?? correctedMarks,
     };
   }
   if (s.start == null) return null;
   return {
     reached: 0,
-    mistakes: marks.filter((m) => countsAsMistake(m) && !isUnclear(m)).length,
+    mistakes: marks.filter(isMistake).length,
     tajweed: marks.filter((m) => m.kind === 'tajweed').length,
     unclear: unclearMarks,
+    corrected: correctedMarks,
   };
 }
 
@@ -175,6 +183,7 @@ function chainScore(states: readonly LiveState[]): LiveScore | null {
   let mistakes = 0;
   let tajweed = 0;
   let unclear = 0;
+  let corrected = 0;
   for (const s of states) {
     const t = tally(s);
     if (!t) continue;
@@ -182,8 +191,9 @@ function chainScore(states: readonly LiveState[]): LiveScore | null {
     mistakes += t.mistakes;
     tajweed += t.tajweed;
     unclear += t.unclear;
+    corrected += t.corrected;
   }
-  return { reached, mistakes, tajweed, unclear, accuracy: reached > 0 ? Math.max(0, 1 - mistakes / reached) : 1 };
+  return { reached, mistakes, tajweed, unclear, ...(corrected ? { corrected } : {}), accuracy: reached > 0 ? Math.max(0, 1 - mistakes / reached) : 1 };
 }
 
 /**

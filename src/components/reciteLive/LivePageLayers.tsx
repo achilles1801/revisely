@@ -5,14 +5,14 @@ import type { Rect } from '../../lib/ayahBounds';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { WordFollow } from '../../lib/recite/hiddenPage';
 import type { Mark } from '../../lib/reciteLive/contract';
-import { markGroup, strongestByWord } from '../../lib/reciteLive/contract';
+import { strongestByWord } from '../../lib/reciteLive/contract';
 import { markTitle } from '../../lib/reciteLive/describe';
 import { ayahBand, cursorBox, markBox, markHighlight, offBox, wordBox } from '../../lib/reciteLive/geometry';
 import { followCues } from '../../lib/reciteLive/wash';
 import { t } from '../../i18n';
 import { HiddenInkLayer, shownOnHiddenPage, type InkWash } from './HiddenInkLayer';
 import { Wash } from './Wash';
-import { markFill, markFirm } from './markColours';
+import { markFill, markFirm, shownGroup } from './markColours';
 import type { PaletteV2 } from '../../theme/v2';
 
 const NO_REVEALED: ReadonlySet<string> = new Set();
@@ -22,7 +22,10 @@ function rectStyle(r: Rect, scale: number) {
 }
 
 /** The marks' colours (theme/v2: markWord, markWordFirm…), read through markFill and markFirm, which say which a mark takes. */
-export type MarkColours = Pick<PaletteV2, 'markWord' | 'markWordFirm' | 'markSlip' | 'markSlipFirm' | 'markTajweed' | 'markTajweedFirm'>;
+export type MarkColours = Pick<
+  PaletteV2,
+  'markWord' | 'markWordFirm' | 'markSlip' | 'markSlipFirm' | 'markTajweed' | 'markTajweedFirm' | 'markCorrected' | 'markCorrectedFirm'
+>;
 
 /**
  * Behind the page's ink, in its frame: what follows the reciter (lib/reciteLive/wash's followCues: with the page shown,
@@ -73,7 +76,7 @@ export function LiveUnderlay({
         <View testID="live-word-box" style={[styles.abs, styles.box, rectStyle(cursorBox(words, cues.box), scale), { backgroundColor: colors.box }]} />
       ) : null}
       {[...byWord.values()].map((m) => {
-        const group = markGroup(picked && picked.w === m.w ? picked : m);
+        const group = shownGroup(picked && picked.w === m.w ? picked : m);
         const firm = picked != null && picked.w === m.w;
         return (
           <Wash
@@ -143,7 +146,7 @@ export function LiveOverlay({
       // A shown word's wash is behind its ink (the underlay); over the covers only a word still hidden's, and none of
       // those during a take.
       if (words.pageOf(mark.w) !== page || shown(mark.w) || hidden.duringTake) continue;
-      const g = markGroup(mark);
+      const g = shownGroup(mark);
       const past = opacity != null;
       const id = past ? `cover-past-${g}` : `cover-highlight-${g}`;
       washes.push({ box: markHighlight(words, mark), colour: fill, opacity: picked ? undefined : opacity, testID: picked ? `${id}-picked` : id });
@@ -197,7 +200,7 @@ export function ShownWashes({
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`shown-washes-${page}`}>
       {marks.map(({ mark, fill, opacity, picked }) => {
         if (words.pageOf(mark.w) !== page) return null;
-        const g = markGroup(mark);
+        const g = shownGroup(mark);
         const id = opacity != null && !picked ? `past-highlight-${g}` : `live-highlight-${g}`;
         return <Wash key={mark.w} testID={picked ? `${id}-picked` : id} box={markHighlight(words, mark)} scale={scale} colour={fill} opacity={picked ? undefined : opacity} />;
       })}

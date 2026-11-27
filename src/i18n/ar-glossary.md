@@ -183,6 +183,7 @@ The English is the app's label (as in `src/i18n/en`), or the concept where there
 | wrong haraka (was "harakat slip") | خطأ في الحركات | خطأ تشكيل, in labels | A mistake like a wrong word (Majd, Nov 22 2026) |
 | wrong letter (was "letter slip") | خطأ في الحروف | | The same |
 | Not clear | غير واضح | | |
+| Corrected (a word said wrong, then right straight away) | مُصحَّحة (كلمة مُصحَّحة) | تصحيح, as the label | **(confirm)** Neither [TT] nor [QC] has a term for it (Nov 27 2026). The participle agrees with كلمة, as a mark is on a word. Never called a mistake (RECITE-33) |
 | tajweed note | ملاحظة تجويد | خطأ تجويد | It is never counted as a mistake |
 | Beta (tajweed, wherever it shows) | تجريبي, after the name: «… (تجريبي)» | بيتا | Majd, Nov 22 2026: tajweed is marketed as Beta |
 | Not a mistake / Put back / Undo | ليس خطأً / إعادة / تراجع | | Undo is تراجع [AP] |

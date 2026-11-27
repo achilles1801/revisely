@@ -81,6 +81,9 @@ export const reciteMemory = {
     unfinished: '{{mistakes}}, unfinished',
     unclear_one: '{{count}} not clear',
     unclear_other: '{{count}} not clear',
+    /** Words corrected straight away (RECITE-33): never counted. */
+    corrected_one: '{{count}} corrected',
+    corrected_other: '{{count}} corrected',
     hint: 'Shows it on the page, with its marks',
     listenBack: 'Listen back: {{passage}}',
     /** All activity's take row, for VoiceOver. */

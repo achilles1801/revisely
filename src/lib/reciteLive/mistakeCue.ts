@@ -13,7 +13,7 @@
 
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import { hapticOf } from '../../design/haptics';
-import { countsAsMistake, isUnclear, type Mark } from './contract';
+import { isMistake, type Mark } from './contract';
 import { logger } from '../logger';
 
 /** Two cues at least this far apart (ms). */
@@ -21,9 +21,9 @@ export const CUE_GAP_MS = 700;
 /** How loud the cue plays (0–1): heard over a reciter's own voice, never much in the microphone. */
 const CUE_VOLUME = 0.7;
 
-/** Whether a mark gets the cue: a mistake that counts, never Not clear or a tajweed note. */
-export function cuesMark(m: Pick<Mark, 'kind' | 'sure'>): boolean {
-  return countsAsMistake(m) && !isUnclear(m);
+/** Whether a mark gets the cue: a mistake that counts, never Not clear, a corrected word (RECITE-33) or a tajweed note. */
+export function cuesMark(m: Pick<Mark, 'kind' | 'sure' | 'corrected'>): boolean {
+  return isMistake(m);
 }
 
 export interface CueDeps {

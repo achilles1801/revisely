@@ -308,6 +308,8 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
         [p.markWord, p.markWordFirm],
         [p.markSlip, p.markSlipFirm],
         [p.markTajweed, p.markTajweedFirm],
+        // A word corrected straight away (RECITE-33): held to the same rules, though it is never a mistake.
+        [p.markCorrected, p.markCorrectedFirm],
       ] as const;
       for (const [fill, firm] of groups) {
         for (const ink of inks) {
@@ -325,6 +327,8 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
       expect(apart(word, tajweed)).toBeGreaterThanOrEqual(60);
       expect(apart(slip, tajweed)).toBeGreaterThanOrEqual(60);
       expect(contrast(word, slip)).toBeGreaterThanOrEqual(1.25);
+      // Corrected is never read as a mistake: its hue is well apart from red, amber and violet.
+      for (const mistake of [word, slip, tajweed]) expect(apart(p.markCorrected, mistake)).toBeGreaterThanOrEqual(60);
       // Pastel (Majd, Nov 21 2026: "I also like their color shades its like more pastel which is what we should aim for"):
       // soft, never strong (CIE L*a*b* chroma at most 36), light on a light page and muted on a dark one.
       const labOf = (hex: string) => {
@@ -339,7 +343,7 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
         ].map((t) => (t > 216 / 24389 ? Math.cbrt(t) : ((24389 / 27) * t + 16) / 116));
         return [116 * xyz[1] - 16, 500 * (xyz[0] - xyz[1]), 200 * (xyz[1] - xyz[2])];
       };
-      for (const fill of [word, slip, tajweed]) {
+      for (const fill of [word, slip, tajweed, p.markCorrected]) {
         const [l, a, b] = labOf(fill);
         expect(Math.hypot(a, b)).toBeLessThanOrEqual(36);
         if (isDark) expect(l).toBeLessThanOrEqual(45);
@@ -368,6 +372,8 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
         'markSlipFirm',
         'markTajweed',
         'markTajweedFirm',
+        'markCorrected',
+        'markCorrectedFirm',
       ] as const;
       for (const k of fixed) expect(p[k]).toBe(jade[k]);
       // The following green tells apart from red and amber by hue, and from the tajweed violet: from the status colours and
@@ -439,6 +445,8 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
           p.markSlipFirm,
           p.markTajweed,
           p.markTajweedFirm,
+          p.markCorrected,
+          p.markCorrectedFirm,
           // A peeked word's grey ink: the box on the word being recited is a fill behind the page's own ink, never ink, so
           // it can't be taken for one (and no grey can be both firmer than the band and 20 apart from it in light).
           ...(grey === p.highlightFirm ? [] : [veiled(page.peekVeil, page.pageTint ?? '#000000')]),
@@ -452,6 +460,18 @@ describe('v2 palette (white and black grounds, no accent tint)', () => {
           expect(deltaE(grey, other)).toBeGreaterThanOrEqual(20);
         }
       }
+      // A corrected word's green (RECITE-33) is apart from the peek veil's grey ink and the Ramadan theme's colours too.
+      const ramadan = ramadanV2(isDark, accent);
+      for (const green of [p.markCorrected, p.markCorrectedFirm])
+        for (const other of [
+          veiled(page.peekVeil, page.pageTint ?? '#000000'),
+          ramadan.gold,
+          ramadan.glass,
+          ramadan.flame,
+          ramadan.mote,
+          ...ramadan.bulbs,
+        ])
+          expect(deltaE(green, other)).toBeGreaterThanOrEqual(20);
       // Seen on the page behind the ink: apart from the paper, and the ink reads on it (checked above with the band).
       expect(contrast(p.highlight, page.pageBg)).toBeGreaterThan(1.3);
       expect(contrast(p.highlightSoft, page.pageBg)).toBeGreaterThan(1.1);

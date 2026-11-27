@@ -6,6 +6,7 @@ import { layoutV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import { getQuranWords, loadQuranWords, type QuranWords } from '../../lib/recite/quranWords';
 import { formatAccuracy, mistakesLabel, scoreLevel } from '../../lib/reciteLive/score';
+import { isCorrected } from '../../lib/reciteLive/contract';
 import { spotTestOutcome } from '../../lib/spotTests';
 import type { TakeRecord } from '../../lib/reciteMemory/record';
 import { takeClock, takeWhen } from '../../lib/reciteMemory/describe';
@@ -100,13 +101,15 @@ export function takeResult(take: TakeRecord): string {
   return take.unfinished ? t('reciteMemory.rows.unfinished', { mistakes: mistakesLabel(take.mistakes) }) : mistakesLabel(take.mistakes);
 }
 
-/** A take as its day lists it: "9:41 PM · 4 min · 1 mistake · 2 not clear · page hidden" (RMEM-5). */
+/** A take as its day lists it: "9:41 PM · 4 min · 1 mistake · 1 corrected · 2 not clear · page hidden" (RMEM-5, RECITE-33). */
 export function dayTakeLine(take: TakeRecord, cleared: number): string {
+  const corrected = take.marks.filter(isCorrected).length;
   return [
     clockTime(take.createdAt),
     take.spotTest ? spotTestOutcome(take.spotTest) : null,
     formatMinutesLong(Math.max(1, Math.round(take.secs / 60))),
     takeResult(take),
+    corrected > 0 ? t('reciteMemory.rows.corrected', { count: corrected }) : null,
     take.unclear > 0 ? t('reciteMemory.rows.unclear', { count: take.unclear }) : null,
     cleared > 0 ? t('reciteMemory.rows.cleared', { count: cleared }) : null,
     take.hidden ? t('reciteMemory.rows.pageHidden') : null,

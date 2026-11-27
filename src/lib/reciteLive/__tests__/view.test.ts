@@ -2,6 +2,7 @@ import { quranWords } from '../../recite/__fixtures__/quranWords';
 import { applyEvent, dismissMark, liveConnecting, LiveState, mistakeCount } from '../state';
 import type { Mark } from '../contract';
 import { barWords, hiddenFollow, nextHiddenWord, NOTHING_SHOWN, revealAyah, revealNextWord, scorePill, wordShown } from '../view';
+import { spokenBarWord } from '../../../components/reciteLive/ReciteBar';
 
 const words = quranWords();
 const A23 = words.verseFirstWord(27, 23);
@@ -65,6 +66,24 @@ describe('the words heard in the bar', () => {
       [6, 'current', ''],
     ]);
     expect(barWords(s, words, { check: false, startWord: A23 }).map((b) => b.w - A23)).toEqual([5, 6]);
+  });
+
+  it('Check: a word said wrong and corrected straight away is on its own colour, never shown as wrong [RECITE-33]', () => {
+    let s = at(liveConnecting(), A23 + 5);
+    s = applyEvent(s, { type: 'mark', mark: mark({ id: 'a', heard: 'وَأُوهِيَتْ', heardExact: false, sure: 'clear' }) });
+    expect(barWords(s, words, { check: true, startWord: A23 }).map((b) => [b.w - A23, b.tone, b.text])).toEqual([
+      [3, 'said', words.uthmani(A23 + 3)],
+      [4, 'wrong', 'وَأُوهِيَتْ'],
+    ]);
+    expect(mistakeCount(s)).toBe(1);
+    // The same mark again, corrected: the word as the page has it, on its own colour, and no mistake.
+    s = applyEvent(s, { type: 'mark', mark: mark({ id: 'a', heard: 'وَأُوهِيَتْ', heardExact: false, sure: 'clear', corrected: true }) });
+    expect(barWords(s, words, { check: true, startWord: A23 }).map((b) => [b.w - A23, b.tone, b.text])).toEqual([
+      [3, 'said', words.uthmani(A23 + 3)],
+      [4, 'corrected', words.uthmani(A23 + 4)],
+    ]);
+    expect(mistakeCount(s)).toBe(0);
+    expect(spokenBarWord({ text: 'وَأُوتِيَتْ', tone: 'corrected' })).toBe('وَأُوتِيَتْ, corrected,');
   });
 
   it('Check: a word with a slip (a haraka, a letter) is amber, a tajweed note violet, the current one too; Recite marks none', () => {
