@@ -1,7 +1,8 @@
 // The real Home for one account of each kind of user (tests/scenarios/USER-MATRIX.md; BEHAVIOUR.md USER-1). The
 // property test (properties/userMatrix.property.ts) checks Home's words over thousands of generated accounts; these
 // open the app itself, against the emulators, for the kinds of user it is easiest to forget: nothing memorized, a single
-// ayah, all 604 pages on the juz plan, a plan saved in another time zone, and someone back after weeks away.
+// ayah, all 604 pages on the juz plan, a plan saved in another time zone, and someone back after weeks away; and the
+// session Home's button opens for each, holding the pages Home names (USER-2).
 //
 // Majd, Nov 27 2026, after HOME-9: "can we have a session sweep through all different possible scenarios that could
 // arise from every type of user so we can make sure we take into account every single case and edge case so bugs like
@@ -64,6 +65,15 @@ describe('Home for every kind of user (USER-MATRIX.md)', () => {
     expect(home.memorized()).toMatch(/^0\.1% of the Quran memorized/);
     expect(home.today()).not.toContain('Mark memorized pages');
     expectWhole(home);
+    // The session holds that one page, and finishes on the end card; Home then says Done.
+    const session = await home.startSession();
+    expect(session.pages()).toEqual([1]);
+    await session.swipeThrough(1);
+    expect(session.endCard()).toMatch(/Revision complete/);
+    expect(session.endCard()).not.toMatch(/NaN|undefined|\{\{/);
+    await session.back();
+    await app.untilSynced();
+    await app.until(() => (home.title() ?? '').startsWith('Done · 1 page'), 'Home to say Done');
     await app.close();
   });
 
@@ -80,6 +90,10 @@ describe('Home for every kind of user (USER-MATRIX.md)', () => {
     expect(home.cta()).toBe('Start revision');
     expect(home.memorized()).toMatch(/^100% of the Quran memorized/);
     expectWhole(home);
+    // The session holds Juz 1, pages 1–21 in order, from its first.
+    const session = await home.startSession();
+    expect(session.pages()).toEqual(pagesRange(1, 21));
+    expect(session.current()).toBe(1);
     await app.close();
   });
 
@@ -105,6 +119,9 @@ describe('Home for every kind of user (USER-MATRIX.md)', () => {
     expect(home.today()).not.toContain('Mark memorized pages');
     await app.until(() => app.app.user?.customPlan?.cycleStartDate === '2026-11-02', 'the plan to start today');
     expectWhole(home);
+    // The session holds the plan's first day, as Home names it.
+    const session = await home.startSession();
+    expect(session.pages()).toEqual(pagesRange(1, 5));
     await app.close();
   });
 
@@ -132,6 +149,10 @@ describe('Home for every kind of user (USER-MATRIX.md)', () => {
     expect(plain(home.catchUp())).toMatch(/^Missed 3 days · /);
     await home.untilStreak(0);
     expectWhole(home);
+    // The session holds today's own pages alone (the missed ones wait for "Add to today"), from the first.
+    const today = await home.startSession();
+    expect(today.pages()).toEqual(pagesRange(1, 5));
+    expect(today.current()).toBe(1);
     await app.close();
   });
 });

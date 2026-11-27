@@ -28,6 +28,8 @@ import { buildWidgetSnapshot } from '../../../src/lib/widgets/snapshot';
 import { planRevisionReminders, type PlannedReminder } from '../../../src/lib/reminders/plan';
 import { buildRevoContext } from '../../../src/lib/revo/context';
 import { greetingExtrasFor, revoGreeting } from '../../../src/lib/revo/greeting';
+import { revoRamadan } from '../../../src/lib/revo/ramadan';
+import { ramadanDates } from '../../../src/lib/ramadanDates';
 import { t } from '../../../src/i18n';
 import type { HistoryItem } from '../../../src/lib/streakFromItems';
 import type { RevisionLog, User, UserPage } from '../../../src/types';
@@ -116,8 +118,8 @@ export const pastArb: fc.Arbitrary<Past> = fc.record({
 });
 
 /** Today. */
-export type Today = 'none' | 'part' | 'done' | 'done and ahead' | 'done ahead yesterday' | 'by hand';
-export const todayArb = fc.constantFrom<Today>('none', 'none', 'part', 'done', 'done and ahead', 'done ahead yesterday', 'by hand');
+export type Today = 'none' | 'part' | 'done' | 'done and ahead' | 'done ahead yesterday' | 'by hand' | 'on two phones';
+export const todayArb = fc.constantFrom<Today>('none', 'none', 'part', 'done', 'done and ahead', 'done ahead yesterday', 'by hand', 'on two phones');
 
 export type Case = {
   zone: string;
@@ -135,6 +137,10 @@ export type Case = {
   addLeftovers: boolean;
   insights: number[];
   historyLoaded: boolean;
+  /** The app: Revisely Dev (Home v3's quiet catch-up, reminders on the days after tomorrow, Revo's Dev context) or the store app. */
+  dev: boolean;
+  /** The Ramadan theme showing (Revisely Dev): Revo is told Ramadan so far during the month (THEME-8). */
+  ramadan: boolean;
 };
 
 export const caseArb: fc.Arbitrary<Case> = fc.record({
@@ -156,9 +162,13 @@ export const caseArb: fc.Arbitrary<Case> = fc.record({
   addLeftovers: fc.boolean(),
   insights: fc.uniqueArray(fc.integer({ min: 0, max: 603 }), { maxLength: 4 }),
   historyLoaded: fc.boolean(),
+  dev: fc.boolean(),
+  ramadan: fc.boolean(),
 });
 
 export interface Built {
+  dev: boolean;
+  ramadan: boolean;
   user: User;
   pages: UserPage[];
   logs: RevisionLog[];
@@ -257,6 +267,13 @@ export function build(c: Case): Built {
       // Yesterday's session revised today's pages ahead (AHEAD-2): no session today.
       if (todayPages.length > 0) logs.push(sessionOn(addDays(day, -1), [], [], { [day]: todayPages }));
       break;
+    case 'on two phones':
+      // Each phone revised part of today, offline, then both synced (SYNC-5): two sessions of the day, every page kept.
+      if (todayPages.length > 1) {
+        const half = Math.ceil(todayPages.length / 2);
+        logs.push(sessionOn(day, todayPages.slice(0, half), todayPages), sessionOn(day, todayPages.slice(half), todayPages));
+      }
+      break;
     case 'by hand':
       // Logged by hand in Activity (ACT-15): Activity's + → Revised elsewhere, counted for today.
       if (todayPages.length > 0) manual.push({ id: 'manual-1', day, countsFor: day, pages: todayPages, assigned: [], occurredAt: ms });
@@ -266,11 +283,12 @@ export function build(c: Case): Built {
   }
   // Pages logged by hand reach Home through the Activity items; with the items not loaded yet, Home has only the logs.
   const history = c.historyLoaded || manual.length > 0 ? manual : null;
-  return { user, pages, logs, history, now, day, date };
+  return { dev: c.dev, ramadan: c.ramadan, user, pages, logs, history, now, day, date };
 }
 
 function homeInput(b: Built) {
-  return { user: b.user, pages: b.pages, logs: b.logs, quranData: QURAN, day: b.day, date: b.date, history: b.history, now: b.now.getTime(), quiet: false };
+  // Home v3 (Revisely Dev, HOME-5): the catch-up is a quiet line under the button.
+  return { user: b.user, pages: b.pages, logs: b.logs, quranData: QURAN, day: b.day, date: b.date, history: b.history, now: b.now.getTime(), quiet: b.dev };
 }
 
 export function homeFor(b: Built): HomeToday {
@@ -407,7 +425,8 @@ export function checkReminders(b: Built, home: HomeToday): PlannedReminder[] {
     quranData: QURAN,
     place: null,
     settings: { method: 'NorthAmerica' } as never,
-    laterDays: 6,
+    // The days after tomorrow (REMIND-2): Revisely Dev's, until the store app's switch is on.
+    laterDays: b.dev ? 6 : 0,
   });
   for (const r of planned) {
     expectClean(r.title, `reminder ${r.id} (title)`);
@@ -432,7 +451,11 @@ export function checkReminders(b: Built, home: HomeToday): PlannedReminder[] {
 
 /** What Revo is told agrees with Home, and its greeting reads cleanly (lib/revo). */
 export function checkRevo(b: Built, home: HomeToday): void {
-  const ctx = buildRevoContext({ user: b.user, pages: b.pages, logs: b.logs, snapshot: home.snapshot, history: b.history, now: b.now });
+  // Ramadan so far, during the month with the theme showing (THEME-8, Revisely Dev); the store app never sends it.
+  const ramadan = b.ramadan ? revoRamadan(b.logs, [], ramadanDates(b.day), b.day) : null;
+  const ctx = buildRevoContext({ user: b.user, pages: b.pages, logs: b.logs, snapshot: home.snapshot, history: b.history, now: b.now, ramadan });
+  expect(ctx.app === 'dev').toBe(b.dev);
+  if (!b.dev) expect(ctx.ramadan).toBeUndefined();
   expect(ctx.today.plannedPages).toBe(home.assignment.pages.length);
   expect(ctx.today.done).toBe(home.snapshot.status === 'completed');
   expect(ctx.today.revisedPages).toBe(home.snapshot.pagesDone);

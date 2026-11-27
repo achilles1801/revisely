@@ -7,7 +7,7 @@
 import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
 import { allowNotifications, pendingNotifications, type Scheduled } from '../harness/notifications';
-import { ActivityDayView, Home, homeStack } from '../harness/screens';
+import { ActivityDayView, Home, Review, homeStack } from '../harness/screens';
 import { AddToDay } from '../harness/addToDay';
 import { setServerDoc } from '../harness/serverDocs';
 import { Phone, type OpenApp } from '../harness/phone';
@@ -160,8 +160,9 @@ describe('Home, the widget and the reminders agree about a day (USER-2)', () => 
     await app.close();
   });
 
-  // KNOWN BUG (BEHAVIOUR.md "Known bugs"): the session and its review read only the phone's sessions, not the pages
-  // logged by hand that Home counts (ACT-15). Found by the user-matrix sweep, Nov 27 2026.
+  // The session and its review read only the phone's sessions, not the pages logged by hand that Home counts (ACT-15):
+  // Continue opened on the first page, nothing checked, and Review session opened empty (the user-matrix sweep, Nov 27
+  // 2026). They count them now; whether one can be unchecked there is lib/handLogged's HAND_LOGGED_UNCHECK.
   async function loggedByHand(pages: number[]): Promise<{ app: OpenApp; home: Home }> {
     const phone = await account();
     setNow(`${TUESDAY} 07:00`);
@@ -179,24 +180,75 @@ describe('Home, the widget and the reminders agree about a day (USER-2)', () => 
     return { app, home };
   }
 
-  it.failing('KNOWN BUG: [SESS-9] [USER-2] 3 of Tuesday’s 5 pages logged by hand: Continue opens where Home says, the 4th page', async () => {
+  it('[SESS-9] [USER-2] 3 of Tuesday’s 5 pages logged by hand: Continue opens where Home says, the 4th page, with them checked and kept checked', async () => {
     const { app, home } = await loggedByHand([6, 7, 8]);
     await app.until(() => /3 of 5/.test(home.today()), 'Home to count the pages logged by hand');
     const session = await home.startSession();
     try {
-      // Home says "Continue at …" page 9; the session opens on page 6, nothing checked.
+      // Home says "Continue at …" page 9: the session opens there (it opened on page 6, nothing checked).
       expect(session.current()).toBe(9);
+      await session.goTo(6);
+      expect(await session.isChecked()).toBe(true);
+      // Logged by hand, it stays checked here (HAND_LOGGED_UNCHECK 'locked'): it comes off in Activity.
+      await session.uncheck();
+      expect(await session.isChecked()).toBe(true);
+      await session.back();
+      await app.untilSynced();
+      // The session took none of them into its own record (ACT-14).
+      expect(app.app.logs.filter((l) => l.date === TUESDAY).flatMap((l) => l.pagesRevised)).toEqual([]);
     } finally {
       await app.close();
     }
   });
 
-  it.failing('KNOWN BUG: [SESS-4] [USER-2] all of Tuesday logged by hand: Review session holds the 5 pages Home counts as Done', async () => {
+  it('[SESS-4] [USER-2] all of Tuesday logged by hand: Review session holds the 5 pages Home counts as Done, all checked', async () => {
     const { app, home } = await loggedByHand(pagesRange(6, 10));
     await app.until(() => (home.title() ?? '').startsWith('Done · 5 pages'), 'Home to say Tuesday is done');
     try {
-      // It opens with no pages.
+      // It opened with no pages.
       expect(await home.openReview()).toEqual(pagesRange(6, 10));
+      const review = new Review(app);
+      expect(Object.values(await review.checks()).every(Boolean)).toBe(true);
+      // Logged by hand, a page stays checked here (HAND_LOGGED_UNCHECK 'locked').
+      const { fireEvent } = app.mods.rtl;
+      await app.act(async () => {
+        fireEvent.press(app.screen.getByLabelText('Unmark current page'));
+      });
+      await app.idle(50);
+      expect(review.isChecked()).toBe(true);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('[USER-2] [SYNC-1] Tuesday logged by hand while offline: in the same launch, its reminders go but the congratulation', async () => {
+    allowNotifications();
+    const phone = await account();
+    setNow(`${TUESDAY} 07:00`);
+    // Home and the reminders' sync together, as App.tsx mounts them.
+    const app = await phone.open((mods) => {
+      const { RevisionRemindersSync } = mods.require<{ RevisionRemindersSync: () => null }>('src/components/RevisionRemindersSync');
+      return mods.React.createElement(mods.React.Fragment, null, homeStack(mods), mods.React.createElement(RevisionRemindersSync));
+    });
+    try {
+      const home = new Home(app);
+      await home.ready();
+      await app.until(() => remindersFor(TUESDAY).length === 3, 'Tuesday’s three reminders');
+      // Offline, Activity → Tuesday → + → Revised elsewhere: 6–10, waiting on the phone.
+      await phone.goOffline();
+      const { queueChange } = app.mods.require<typeof import('../../../src/lib/offline/queue')>('src/lib/offline/queue');
+      const { manualRevisionItem } = app.mods.require<typeof import('../../../src/lib/manualRevision')>('src/lib/manualRevision');
+      await app.act(async () => {
+        await queueChange({ kind: 'revision.add', item: manualRevisionItem({ uid: app.uid, day: TUESDAY, now: Date.now(), pages: pagesRange(6, 10), minutes: null }) });
+      });
+      // Home says Done, and the reminders follow at once, with no relaunch: they kept asking until the next launch.
+      await app.until(() => (home.title() ?? '').startsWith('Done · 5 pages'), 'Home to say Tuesday is done');
+      await app.until(() => remindersFor(TUESDAY).join() === 'congrat', 'Tuesday’s reminders to go but the congratulation');
+      // Back online, sent: still done.
+      await phone.goOnline();
+      await app.untilSynced();
+      await app.idle(1200);
+      expect(remindersFor(TUESDAY)).toEqual(['congrat']);
     } finally {
       await app.close();
     }

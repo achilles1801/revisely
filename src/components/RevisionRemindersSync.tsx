@@ -8,7 +8,7 @@ import { greetingName } from '../lib/displayName';
 import { getQuranData } from '../lib/quranData';
 import { logger } from '../lib/logger';
 import { LATER_DAYS, planRevisionReminders } from '../lib/reminders/plan';
-import { useActivityHistory, withPhoneSessions } from '../lib/activityHistory';
+import { useScreenHistory, withPhoneSessions } from '../lib/activityHistory';
 import { clearRevisionReminders, syncRevisionReminders } from '../lib/reminders/sync';
 import { remindersWhileAwayEnabled } from '../lib/release/remindersWhileAway';
 import { usePrayerPrefs } from '../lib/prayer/prefs';
@@ -24,7 +24,7 @@ import { prayerPlace, prayerSettings } from './prayer/usePrayerTimes';
  * Cleared when signed out, or when notifications are off or not allowed. Never while the account is still loading.
  */
 export function RevisionRemindersSync() {
-  const { user, pages, logs, loading, onboardingComplete } = useApp();
+  const { user, pages, logs, loading, onboardingComplete, pendingChanges } = useApp();
   const { firebaseUser, isLoading: authLoading } = useAuth();
   const prefs = usePrayerPrefs();
   const [foreground, setForeground] = useState(0);
@@ -48,7 +48,8 @@ export function RevisionRemindersSync() {
   const placeKey = JSON.stringify([place, settings]);
   const name = greetingName(ownUser?.name, firebaseUser?.displayName);
   // The history for the streak (C5), so a reminder's streak is the one Home shows.
-  const history = useActivityHistory(day, !signedOut && !!ownUser, logs.length);
+  // Read again when a session is saved or the outbox changes (a page logged by hand), with those still waiting (USER-2).
+  const history = useScreenHistory(ownUser?.id, day, !signedOut && !!ownUser, `${logs.length}:${pendingChanges}`);
 
   useEffect(() => {
     if (authLoading) return;

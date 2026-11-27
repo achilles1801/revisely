@@ -12,7 +12,14 @@ import { i18n } from '../../../src/i18n';
 import { restoreZone, runs } from './fixtures';
 import { build, caseArb, checkHome, checkReminders, checkRevo, checkWidget, describe_, homeFor } from './userMatrixCases';
 
-afterEach(() => restoreZone());
+// Revisely Dev or the store app, per generated account (lib/variant).
+jest.mock('../../../src/lib/variant', () => ({ ...jest.requireActual('../../../src/lib/variant'), isDevVariant: () => mockApp.dev }));
+const mockApp = { dev: false };
+
+afterEach(() => {
+  restoreZone();
+  mockApp.dev = false;
+});
 afterAll(async () => {
   await i18n.changeLanguage('en');
 });
@@ -23,6 +30,7 @@ describe('Every kind of user (USER-MATRIX.md)', () => {
   it('[HOME-9] [USER-1] Home never offers the new account\'s state while pages are memorized, and its button does what it says, for every kind of user', () => {
     fc.assert(
       fc.property(caseArb, (c) => {
+        mockApp.dev = c.dev;
         const b = build(c);
         const home = homeFor(b);
         try {
@@ -38,6 +46,7 @@ describe('Every kind of user (USER-MATRIX.md)', () => {
   it('[USER-2] Home, the widget, the reminders and Revo agree about today, and none shows a broken line', () => {
     fc.assert(
       fc.property(caseArb, (c) => {
+        mockApp.dev = c.dev;
         const b = build(c);
         const home = homeFor(b);
         try {
@@ -57,7 +66,8 @@ describe('Every kind of user (USER-MATRIX.md)', () => {
     try {
       fc.assert(
         fc.property(caseArb, (c) => {
-          const b = build(c);
+          mockApp.dev = c.dev;
+        const b = build(c);
           const home = homeFor(b);
           try {
             checkHome(home, 'Arabic');

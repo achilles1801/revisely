@@ -1,7 +1,7 @@
 // The Activity revision items of the last 400 days, for the streak (C5): the Dashboard, the
 // widget and the reminders read it through here. Until it loads, callers use the session logs.
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import * as firestoreService from '../services/firestoreService';
 import type { RevisionLog } from '../types';
 import { catchUpPagesOf } from './aheadCredit';
@@ -9,6 +9,7 @@ import { revisionItemId } from './revisionItems';
 import { dateToLocalISODay } from './schedulePlans';
 import type { HistoryItem } from './streakFromItems';
 import type { OutboxEntry } from './offline/ops';
+import { pendingEntries } from './offline/outbox';
 
 export const HISTORY_DAYS = 400;
 
@@ -120,6 +121,19 @@ export function useActivityHistory(day: string | null, enabled: boolean, key: un
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, day, key]);
   return history;
+}
+
+/**
+ * The Activity items as Home counts them, for the widget and the reminders (USER-2): read again whenever `key` changes
+ * (a session saved, the outbox changed: a page logged by hand queued or sent), with the pages logged by hand still
+ * waiting on the phone (offline, or not sent yet). Before (the user-matrix sweep, Nov 27 2026), both read the items only
+ * when the number of sessions changed and left the waiting ones out: today logged by hand in Activity stayed "5 pages
+ * left" on the widget, with its reminders still coming, until the next launch.
+ */
+export function useScreenHistory(uid: string | null | undefined, day: string | null, enabled: boolean, key: string): HistoryItem[] | null {
+  const own = useActivityHistory(day, enabled, key);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => withPendingHandLogs(own, uid ? pendingEntries(uid) : []), [own, uid, key]);
 }
 
 // The copy Home read last, shared: Revo builds its context from the same items Home's streak
