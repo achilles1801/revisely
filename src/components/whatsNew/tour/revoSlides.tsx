@@ -287,10 +287,11 @@ export function BooksSlide({ t }: { t: Clock }) {
             }
           />
         </Anim>
-        <Anim t={t} box={at(14, 520, 374)} style={(now) => {
+        {/* Over the header, so it never covers the page's words. */}
+        <Anim t={t} box={at(14, 16, 374)} style={(now) => {
           'worklet';
           const u = easeOut(seg(now, 6.95, 7.65));
-          return { opacity: seg(now, 6.95, 7.2), transform: [{ translateY: (1 - u) * -120 }, { scale: lerp(0.8, 1, u) }] };
+          return { opacity: seg(now, 6.95, 7.2), transform: [{ translateY: (1 - u) * 260 }, { scale: lerp(0.8, 1, u) }] };
         }}>
           <View style={[styles.card, { backgroundColor: palette.sheet, borderColor: palette.outline }]}>
             <View style={styles.quoteHead}>

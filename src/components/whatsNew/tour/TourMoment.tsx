@@ -210,7 +210,7 @@ export function TourMoment({
           ) : againReady && !straightToEnd ? (
             <Tap onPress={() => setRun((r) => r + 1)} accessibilityRole="button" hitSlop={12} testID="whats-new-tour-again" style={styles.again}>
               <Ionicons name="refresh" size={14} color={palette.secondary} />
-              <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+              <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.2} numberOfLines={1}>
                 {t('whatsNew.tour.again')}
               </Text>
             </Tap>
@@ -267,7 +267,7 @@ export function TourMoment({
 const styles = StyleSheet.create({
   screen: { flex: 1, paddingHorizontal: 16 },
   top: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
-  side: { width: 96 },
+  side: { width: 112 },
   right: { alignItems: 'flex-end' },
   center: { flex: 1, textAlign: 'center' },
   middle: { textAlign: 'center' },
