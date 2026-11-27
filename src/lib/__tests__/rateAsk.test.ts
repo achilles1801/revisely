@@ -73,8 +73,8 @@ describe('the review page', () => {
       'https://apps.apple.com/app/id6767990248?action=write-review',
     ]);
     expect(ratingUrls('android')).toEqual([
-      'market://details?id=com.revisionbuddy.app',
-      'https://play.google.com/store/apps/details?id=com.revisionbuddy.app',
+      'market://details?id=app.revisely',
+      'https://play.google.com/store/apps/details?id=app.revisely',
     ]);
   });
 

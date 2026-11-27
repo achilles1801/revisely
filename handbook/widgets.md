@@ -107,7 +107,7 @@ fingerprint doesn't move. No headless JavaScript: the widgets read the snapshot 
   (`cd android && ./gradlew :android-widgets:testDebugUnitTest` after `npx expo prebuild -p android`; not in
   CI); the bridge and the shared files in Jest (`widgetStorage`, `androidWidgets`).
 - **On an emulator** without signing in: a debug build has `DebugSnapshotReceiver` (`src/debug`, absent from
-  release builds): `adb shell am broadcast -n com.revisionbuddy.app/app.revisely.widgets.DebugSnapshotReceiver
+  release builds): `adb shell am broadcast -n <the app's package>/app.revisely.widgets.DebugSnapshotReceiver
   -a app.revisely.widgets.DEBUG_SNAPSHOT -f 32 --es b64 "$(base64 < snapshot.json)"`. Widgets are added from
   the launcher's picker (`adb shell input draganddrop` from a preview to the home screen works); `adb shell
   cmd uimode night yes` switches the theme; `adb shell dumpsys alarm | grep revisely` shows the alarm.

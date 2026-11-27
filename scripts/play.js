@@ -22,7 +22,8 @@
 const crypto = require('crypto');
 const fs = require('fs');
 
-const PACKAGE = 'com.revisionbuddy.app';
+// The store app's Play package (src/lib/storeIds.json, the value app.config.js builds it with).
+const PACKAGE = require('../src/lib/storeIds.json').playPackage;
 const API = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${PACKAGE}`;
 const SCOPE = 'https://www.googleapis.com/auth/androidpublisher';
 const TRACKS = ['internal', 'alpha', 'beta', 'production'];

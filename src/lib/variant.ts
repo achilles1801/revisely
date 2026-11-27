@@ -6,7 +6,10 @@
 // own `extra`, and the dev channel's updates are published with APP_VARIANT=dev. Functions, not
 // constants, so tests can switch variants.
 
+import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+
+import { PLAY_PACKAGE } from './storeIds';
 
 /** The store app's ids. The App Store lookup and the store's own release names use these. */
 export const STORE_BUNDLE_ID = 'com.revisionbuddy.app';
@@ -31,9 +34,14 @@ export function isDevVariant(): boolean {
   return extra().variant === 'dev';
 }
 
-/** This app's bundle id (iOS) and package (Android): the same string on both. */
+/**
+ * This app's own id: its bundle id on iPhone, its package on Android. Revisely Dev's is the same string on both; the
+ * store app's package is its own (PLAY_PACKAGE). Sentry's release names start with it, as the Android build's source
+ * map upload names them (`<applicationId>@<version>+<versionCode>`).
+ */
 export function appBundleId(): string {
-  return isDevVariant() ? DEV_BUNDLE_ID : STORE_BUNDLE_ID;
+  if (isDevVariant()) return DEV_BUNDLE_ID;
+  return Platform.OS === 'android' ? PLAY_PACKAGE : STORE_BUNDLE_ID;
 }
 
 /** The App Group the app shares with its widget extension (targets/widget). */

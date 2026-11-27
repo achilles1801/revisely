@@ -213,6 +213,6 @@ describe('Android', () => {
   it('opens Google Play', async () => {
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce(true);
     await openStore();
-    expect(open).toHaveBeenLastCalledWith('market://details?id=com.revisionbuddy.app');
+    expect(open).toHaveBeenLastCalledWith('market://details?id=app.revisely');
   });
 });

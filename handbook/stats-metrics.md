@@ -27,7 +27,7 @@ Moved from CLAUDE.md word for word on Nov 22 2026. CLAUDE.md keeps the rules eve
   `gs://pubsite_prod_…` URI). Invite a Google Cloud service account in Play Console → Users and
   permissions with "View app information and download bulk reports". Then fill in `play()` in
   revisely-internal's `stats/weekly.js` to read
-  `stats/installs/installs_com.revisionbuddy.app_YYYYMM_overview.csv`, with secrets `PLAY_REPORTS_BUCKET` and
+  `stats/installs/installs_<the store app's Play package, src/lib/storeIds.json>_YYYYMM_overview.csv` (the organization account's bucket), with secrets `PLAY_REPORTS_BUCKET` and
   `PLAY_REPORTS_SA_KEY`.
 
 ## Revisely Console (staff only: metrics, Open Door, audit log)

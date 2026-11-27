@@ -15,6 +15,7 @@ const {
   productionAlerts,
   dailyReport,
   platformOf,
+  shortRelease,
 } = require('../logic');
 
 const issue = {
@@ -363,6 +364,14 @@ describe('release health', () => {
     expect(md).toContain('| Android | 2 | 11 | 3 |');
     expect(md).toContain('### Production (App Store, Google Play)');
     expect(dailyReport(base)).not.toContain('By platform');
+  });
+});
+
+describe('shortRelease', () => {
+  it("drops the app id: the bundle id on iPhone, the store app's own Play package on Android", () => {
+    expect(shortRelease('com.revisionbuddy.app@1.0.5+40.u532abc0c')).toBe('1.0.5+40.u532abc0c');
+    expect(shortRelease('app.revisely@1.0.5+12.u532abc0c')).toBe('1.0.5+12.u532abc0c');
+    expect(shortRelease('com.revisionbuddy.app.dev@1.0.5+3')).toBe('1.0.5+3');
   });
 });
 

@@ -19,7 +19,7 @@ for step 2. This is the *upload* key. Google keeps the *app signing* key (Play A
 
 ## 2. Firebase: register the keys (5 minutes)
 Firebase Console → project **revision-buddy-3a398** → ⚙ **Project settings** → **Your apps** → the Android app
-`com.revisionbuddy.app` → **Add fingerprint**, once for each:
+with the store app's package (`src/lib/storeIds.json`) → **Add fingerprint**, once for each:
 - the upload key's SHA-1 and SHA-256 (step 1);
 - the debug key used by development builds: SHA-1 `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`,
   SHA-256 `FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C`
