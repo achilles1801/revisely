@@ -22,7 +22,7 @@ import { useRevisionDay } from '../../../hooks/useRevisionDay';
 import { generateDailyAssignment } from '../../../lib/algorithm';
 import { getQuranData } from '../../../lib/quranData';
 import { describePassage, plainText } from '../../../lib/passages';
-import { RAMADAN_INTRO_KEY } from '../../ramadan/RamadanIntro';
+import { RAMADAN_INTRO_KEY } from '../../ramadan/introKey';
 import { logger } from '../../../lib/logger';
 import type { TourMoment as TourMomentId } from '../../../lib/help/whatsNew';
 import { STAGE, TOUR_SECONDS, TOUR_SPEED, WORDS_IN, lerp } from '../../../lib/whatsNew/tour';

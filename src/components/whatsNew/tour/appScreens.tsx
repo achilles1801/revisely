@@ -10,7 +10,7 @@ import { useTheme } from '../../../context/ThemeContext';
 import { RevoMark } from '../../revo/RevoMark';
 import { BadgeMark } from '../../account/BadgeMark';
 import type { Milestone } from '../../../lib/badges';
-import { arabicV2, ramadanV2 } from '../../../theme/v2';
+import { EXAMPLE_PHOTO, arabicV2, ramadanV2 } from '../../../theme/v2';
 import { HomeGround } from '../../home/HomeGround';
 import { Crescent, Lantern } from '../../ramadan/art';
 import { T, at } from './parts';
@@ -44,14 +44,14 @@ export function ExamplePhoto({ size }: { size: number }) {
           <Circle cx={50} cy={50} r={50} />
         </ClipPath>
         <LinearGradient id="tourSky" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#F6C7A1" />
-          <Stop offset="1" stopColor="#F4A98A" />
+          <Stop offset="0" stopColor={EXAMPLE_PHOTO.sky[0]} />
+          <Stop offset="1" stopColor={EXAMPLE_PHOTO.sky[1]} />
         </LinearGradient>
       </Defs>
       <Rect x={0} y={0} width={100} height={100} fill="url(#tourSky)" clipPath="url(#tourPhoto)" />
-      <Circle cx={60} cy={42} r={13} fill="#FFF3E4" clipPath="url(#tourPhoto)" />
-      <Path d="M0 64 Q30 50 55 62 T100 58 L100 100 L0 100 Z" fill="#D9825F" clipPath="url(#tourPhoto)" />
-      <Path d="M0 76 Q35 66 62 76 T100 74 L100 100 L0 100 Z" fill="#B9603F" clipPath="url(#tourPhoto)" />
+      <Circle cx={60} cy={42} r={13} fill={EXAMPLE_PHOTO.sun} clipPath="url(#tourPhoto)" />
+      <Path d="M0 64 Q30 50 55 62 T100 58 L100 100 L0 100 Z" fill={EXAMPLE_PHOTO.hill} clipPath="url(#tourPhoto)" />
+      <Path d="M0 76 Q35 66 62 76 T100 74 L100 100 L0 100 Z" fill={EXAMPLE_PHOTO.hillDeep} clipPath="url(#tourPhoto)" />
     </Svg>
   );
 }

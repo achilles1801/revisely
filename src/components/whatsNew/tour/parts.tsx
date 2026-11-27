@@ -79,7 +79,7 @@ export function Screen({ t, place, children, ground }: { t: Clock; place: (t: nu
     };
   });
   return (
-    <Animated.View pointerEvents="none" style={[styles.phone, isDark ? { borderWidth: 1, borderColor: palette.outline } : styles.lifted, outer]}>
+    <Animated.View pointerEvents="none" style={[styles.phone, isDark ? { borderWidth: 1, borderColor: palette.outline } : [styles.lifted, { shadowColor: palette.shadow }], outer]}>
       <View style={[styles.phoneClip, { backgroundColor: ground ?? palette.bg }]}>
         <Animated.View style={[StyleSheet.absoluteFill, camera]}>{children}</Animated.View>
       </View>
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
   abs: { position: 'absolute', left: 0, top: 0 },
   flex: { flex: 1 },
   phone: { position: 'absolute', left: 0, top: 0, width: PHONE.width, height: PHONE.height, borderRadius: 48 },
-  lifted: { shadowColor: '#1E1650', shadowOpacity: 0.16, shadowRadius: 30, shadowOffset: { width: 0, height: 22 }, elevation: 10 },
+  lifted: { shadowOpacity: 0.16, shadowRadius: 30, shadowOffset: { width: 0, height: 22 }, elevation: 10 },
   phoneClip: { flex: 1, borderRadius: 48, overflow: 'hidden' },
   sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16 },
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 6 },

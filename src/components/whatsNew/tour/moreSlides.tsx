@@ -11,6 +11,7 @@ import { BadgeMark } from '../../account/BadgeMark';
 import { Crescent, Lantern, Moon } from '../../ramadan/art';
 import { badgeOf, MILESTONES, milestoneLabel, type Milestone } from '../../../lib/badges';
 import { arabicV2, BADGE_MATERIALS, ramadanV2 } from '../../../theme/v2';
+import { getReadPalette } from '../../../theme/readPalette';
 import { TAKE } from '../pictures';
 import { formatNumber } from '../../../i18n';
 import {
@@ -59,6 +60,8 @@ import {
 import { pointOn } from './revoSlides';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+/** A sparkle's white: silver's light (the badges' own material). */
+const SPARK = BADGE_MATERIALS.silver.light;
 
 function resting(t: number, zoom = 1, ox = 201, oy = 437): ScreenAt {
   'worklet';
@@ -199,13 +202,12 @@ const MARKS: [number, number][] = [
   [175, 396],
 ];
 const HOPS = [1.3, 1.44, 1.6, 1.79, 2.02, 2.3, 2.62];
-/** A dark ground (the spot card's edge: an outline in dark, a shadow in light). */
-const isDarkCard = (bg: string) => bg.toLowerCase() === '#000000';
 
 function HiddenPage() {
   const { palette, isDark } = useTheme();
+  const page = getReadPalette(isDark).pageBg;
   return (
-    <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? '#000' : '#FFF' }]}>
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: page }]}>
       <View style={[at(0, 62, 402, 48), styles.centerCol]}>
         <T style={[styles.name, { color: palette.text }]}>Al-Mulk</T>
         <T style={[styles.tiny, { color: palette.secondary }]}>Page 562 · Juz 29</T>
@@ -214,7 +216,7 @@ function HiddenPage() {
         <View key={i} style={[at(16, PAGE_BOX.top + i * LINE_H + LINE_H * 0.74, 370, 1), { backgroundColor: palette.secondary, opacity: 0.35 }]} />
       ))}
       {MARKS.map(([x, y], i) => (
-        <View key={i} style={[at(x - 11, y - 11, 22, 22), styles.marker, { borderColor: palette.secondary, backgroundColor: isDark ? '#000' : '#FFF' }]}>
+        <View key={i} style={[at(x - 11, y - 11, 22, 22), styles.marker, { borderColor: palette.secondary, backgroundColor: page }]}>
           <T style={[styles.tiny, { color: palette.secondary }]}>{i + 1}</T>
         </View>
       ))}
@@ -223,7 +225,7 @@ function HiddenPage() {
 }
 
 export function SpotSlide({ t }: { t: Clock }) {
-  const { palette } = useTheme();
+  const { palette, isDark } = useTheme();
   const place = (now: number): ScreenAt => {
     'worklet';
     return resting(now);
@@ -279,7 +281,7 @@ export function SpotSlide({ t }: { t: Clock }) {
           const u = easeOut(seg(now, 5.3, 5.85));
           return { opacity: u, transform: [{ translateY: (1 - u) * 60 }] };
         }}>
-          <View style={[styles.spotCard, { backgroundColor: palette.sheet }, isDarkCard(palette.bg) ? { borderWidth: StyleSheet.hairlineWidth, borderColor: palette.outline } : styles.shadow]}>
+          <View style={[styles.spotCard, { backgroundColor: palette.sheet }, isDark ? { borderWidth: StyleSheet.hairlineWidth, borderColor: palette.outline } : [styles.shadow, { shadowColor: palette.shadow }]]}>
             <View style={[styles.spotIcon, { backgroundColor: palette.accentSubtle }]}>
               <Ionicons name="shuffle-outline" size={20} color={palette.accentText} />
             </View>
@@ -451,10 +453,10 @@ export function HomeSlide({ t }: { t: Clock }) {
       }} />
       {/* One solid button: a light passes over it (HOME-5). */}
       <View style={[at(70, 200, 124, 33), styles.shine]}>
-        <Anim t={t} box={[at(0, -14, 26, 62), styles.beam]} style={(now) => {
+        <Anim t={t} box={[at(0, -14, 26, 62), { backgroundColor: palette.onPrimary }]} style={(now) => {
           'worklet';
           const s = seg(now, 5.2, 5.9);
-          return { opacity: s > 0 && s < 1 ? 1 : 0, transform: [{ translateX: -30 + s * 180 }, { rotate: '20deg' }] };
+          return { opacity: s > 0 && s < 1 ? 0.55 : 0, transform: [{ translateX: -30 + s * 180 }, { rotate: '20deg' }] };
         }} />
       </View>
     </Screen>
@@ -609,7 +611,7 @@ export function BadgesSlide({ t }: { t: Clock }) {
         }}>
           <BadgeMark milestone={100} size={32} />
         </Anim>
-        <Glint t={t} color="#FFFFFF" size={16} where={(now) => {
+        <Glint t={t} color={SPARK} size={16} where={(now) => {
           'worklet';
           return [ACCOUNT_BAR.left - 16, ACCOUNT_BAR.y - 18, seg(now, 3.3, 3.8)];
         }} />
@@ -668,7 +670,7 @@ export function BadgesSlide({ t }: { t: Clock }) {
         }}>
           <BadgeMark milestone={100} size={24} number={false} />
         </Anim>
-        <Glint t={t} color="#FFFFFF" size={16} where={(now) => {
+        <Glint t={t} color={SPARK} size={16} where={(now) => {
           'worklet';
           return [62, 154, seg(now, 8.12, 8.6)];
         }} />
@@ -910,12 +912,11 @@ const styles = StyleSheet.create({
   fillRight: { position: 'absolute', left: 0, top: 0, width: 402, height: 3 },
   start: { height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginTop: 16, marginBottom: 12 },
   miniRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, height: 39 },
-  shadow: { shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 12, shadowOffset: { width: 0, height: 8 }, elevation: 6 },
+  shadow: { shadowOpacity: 0.16, shadowRadius: 12, shadowOffset: { width: 0, height: 8 }, elevation: 6 },
   shine: { borderRadius: 17, overflow: 'hidden' },
   window: { overflow: 'hidden' },
   spotCard: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 16 },
   spotIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  beam: { backgroundColor: 'rgba(255,255,255,0.55)' },
   halo: { position: 'absolute', left: 0, top: 0 },
   bigBadge: { position: 'absolute', left: 34, top: 34 },
   ramadanHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 14 },

@@ -65,7 +65,7 @@ function VerseMenuSketch() {
   );
   const ic = (name: React.ComponentProps<typeof Ionicons>['name']) => <Ionicons name={name} size={19} color={palette.text} />;
   return (
-    <View style={[styles.menu, { backgroundColor: palette.sheet }, isDark ? { borderWidth: 1, borderColor: palette.outline } : styles.menuShadow]}>
+    <View style={[styles.menu, { backgroundColor: palette.sheet }, isDark ? { borderWidth: 1, borderColor: palette.outline } : [styles.menuShadow, { shadowColor: palette.shadow }]]}>
       {row(<RevoMark size={22} />, tr('verse.menu.askRevo'), tr('verse.menu.askRevoSubtitle'))}
       {row(ic('play'), tr('verse.menu.play'))}
       {row(ic('language-outline'), tr('verse.menu.translation'))}
@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
   say19: { fontSize: 19, lineHeight: 27, letterSpacing: -0.2 },
   chipsBox: { marginTop: 'auto' },
   menu: { borderRadius: 14, overflow: 'hidden' },
-  menuShadow: { shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
+  menuShadow: { shadowOpacity: 0.16, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 11 },
   menuIcon: { width: 24, alignItems: 'center' },
   menuText: { fontSize: 16, lineHeight: 21 },

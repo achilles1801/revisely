@@ -15,7 +15,7 @@ jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
 
 import { TourMoment } from '../tour/TourMoment';
 import { TOUR_MOMENTS, type TourMoment as TourMomentId } from '../../../lib/help/whatsNew';
-import { RAMADAN_INTRO_KEY } from '../../ramadan/RamadanIntro';
+import { RAMADAN_INTRO_KEY } from '../../ramadan/introKey';
 import { ThemeProvider } from '../../../context/ThemeContext';
 import { DesignProvider } from '../../../design/DesignContext';
 
