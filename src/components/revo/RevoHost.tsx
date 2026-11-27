@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Keyboard, Modal, Platform, View } from 'react-native';
+import { Animated, Keyboard, Modal, Platform, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -10,6 +10,7 @@ import { auth } from '../../lib/firebase';
 import { logger } from '../../lib/logger';
 import { navigationRef, navigateToActivityDay } from '../../navigation/navigationRef';
 import { useBottomGap, useTabBarHeight } from '../../navigation/TabBar';
+import { fade, front, useReveal, type Front } from '../../navigation/tabReveal';
 import { MINI_PLAYER_GAP, MINI_PLAYER_HEIGHT } from '../player/MiniPlayer';
 import { useMiniPlayer } from '../../lib/nowPlaying';
 import { refreshRevoRelease } from '../../lib/revo/release';
@@ -51,11 +52,15 @@ const reviewSeenKey = (uid: string) => `@revo_review_seen:${uid}`;
 /** How many times today's greeting has opened from each place, and in which state (lib/revo/greeting nextPlaceOpens). */
 const greetingOpensKey = (uid: string) => `@revo_greeting_opens:${uid}`;
 
-/** The focused route's name, following navigation. */
-function useRouteName(): string | null {
-  const [name, setName] = useState<string | null>(null);
+/** The focused route (its name and key), following navigation. */
+function useFrontRoute(): Front | null {
+  const [at, setAt] = useState<Front | null>(null);
   useEffect(() => {
-    const read = () => setName(navigationRef.isReady() ? (navigationRef.getCurrentRoute()?.name ?? null) : null);
+    const read = () => {
+      const r = navigationRef.isReady() ? navigationRef.getCurrentRoute() : undefined;
+      // The same route keeps the same object, so a state change elsewhere renders nothing here.
+      setAt((prev) => (!r ? null : prev && prev.key === r.key && prev.name === r.name ? prev : { name: r.name, key: r.key }));
+    };
     read();
     const unsub = navigationRef.addListener('state', read);
     const id = setInterval(() => {
@@ -69,7 +74,7 @@ function useRouteName(): string | null {
       clearInterval(id);
     };
   }, []);
-  return name;
+  return at;
 }
 
 function useKeyboardUp(): boolean {
@@ -113,11 +118,17 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
     return () => setRevoPresent(false);
   }, []);
   const backend = revoBackend();
-  const route = useRouteName();
+  // The screen in front, or the one a back swipe is bringing back, from its first moment (navigation/tabReveal, TAB-3):
+  // the button is there with it, fading in as the swipe reveals it, not after the swipe has ended.
+  const stackAt = useFrontRoute();
+  const reveal = useReveal();
+  const route = front(stackAt, reveal)?.name ?? null;
+  const fading = fade(stackAt, reveal, (name) => REVO_BUTTON_ROUTES.has(name));
   const keyboard = useKeyboardUp();
   const tabBar = useTabBarHeight();
   const bottomGap = useBottomGap();
-  const { visible: miniPlayer } = useMiniPlayer();
+  // The mini player's room while a recitation goes on: it shows on every screen the button does (TAB-3).
+  const { active: miniPlayer } = useMiniPlayer();
   const { day, build, sources } = useRevoContext();
 
   const [settings, setSettings] = useState<RevoSettings | null>(null);
@@ -435,7 +446,9 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
   return (
     <>
       {buttonShown && buttonSide ? (
-        <RevoButton bottom={bottom} dot={reviewWaiting} onPress={() => show()} side={buttonSide} onSide={setButtonSide} />
+        <Animated.View pointerEvents={fading ? 'none' : 'box-none'} style={[StyleSheet.absoluteFill, fading ? { opacity: fading } : null]}>
+          <RevoButton bottom={bottom} dot={reviewWaiting} onPress={() => show()} side={buttonSide} onSide={setButtonSide} />
+        </Animated.View>
       ) : null}
       <Modal
         visible={intro}

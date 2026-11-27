@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Animated, StyleSheet, View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getFocusedRouteNameFromRoute, NavigatorScreenParams } from '@react-navigation/native';
 import DashboardScreen from '../screens/main/DashboardScreen';
@@ -42,6 +42,8 @@ import type { PagerTabBarProps } from './PagerTabs';
 import { MiniPlayer, MINI_PLAYER_GAP } from '../components/player/MiniPlayer';
 import { getRecitation } from '../lib/recitation';
 import { openReaderAt } from './openReader';
+import { fade, front, revealListeners, useReveal, type Front } from './tabReveal';
+import { revealScreenLayout } from './RevealLayout';
 import { createPagerTabNavigator } from './PagerTabs';
 import { insightsTab, mainTabRoutes, swipeableTabCount } from './tabPages';
 import { SmartTrackingPreviewScreen } from '../screens/preview/SmartTrackingPreviewScreen';
@@ -147,6 +149,31 @@ const e2eScreenListeners =
     ? (require('../lib/e2e/screens') as typeof import('../lib/e2e/screens')).screenListeners
     : undefined;
 
+type ListenerArgs = Parameters<typeof revealListeners>[0] & { route: { key: string; name: string } };
+type TransitionEvent = { data?: { closing?: boolean } };
+
+/**
+ * Every stack's screen listeners: a back swipe revealing the screen beneath (navigation/tabReveal, TAB-3), and in E2E
+ * builds each screen's focus and transitions.
+ */
+function stackListeners(args: ListenerArgs) {
+  const reveal = revealListeners(args);
+  if (!e2eScreenListeners) return reveal;
+  const e2e = e2eScreenListeners(args);
+  return {
+    ...e2e,
+    transitionStart: (e: TransitionEvent) => {
+      e2e.transitionStart(e);
+      reveal.transitionStart(e);
+    },
+    transitionEnd: (e: TransitionEvent) => {
+      e2e.transitionEnd(e);
+      reveal.transitionEnd(e);
+    },
+    gestureCancel: reveal.gestureCancel,
+  };
+}
+
 // Routes (within any tab's stack) where the tab bar is hidden. These screens
 // are full screen or render their own bottom-edge chrome.
 const HIDE_TAB_BAR_ON = new Set([
@@ -195,7 +222,7 @@ function sharedScreens() {
 
 function HomeStackNavigator() {
   return (
-    <HomeStack.Navigator screenListeners={e2eScreenListeners} screenOptions={STACK_OPTIONS}>
+    <HomeStack.Navigator screenListeners={stackListeners} screenLayout={revealScreenLayout} screenOptions={STACK_OPTIONS}>
       <HomeStack.Screen name="Dashboard" component={DashboardScreen} />
       {sharedScreens()}
     </HomeStack.Navigator>
@@ -209,7 +236,7 @@ function HomeStackNavigator() {
  */
 function ActivityStackNavigator() {
   return (
-    <HomeStack.Navigator screenListeners={e2eScreenListeners} screenOptions={STACK_OPTIONS}>
+    <HomeStack.Navigator screenListeners={stackListeners} screenLayout={revealScreenLayout} screenOptions={STACK_OPTIONS}>
       <HomeStack.Screen name="Activity" component={ActivityScreen} />
       {sharedScreens()}
     </HomeStack.Navigator>
@@ -219,7 +246,8 @@ function ActivityStackNavigator() {
 function ReadStackNavigator() {
   return (
     <ReadStack.Navigator
-      screenListeners={e2eScreenListeners}
+      screenListeners={stackListeners}
+      screenLayout={revealScreenLayout}
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: 'transparent' },
@@ -238,13 +266,57 @@ function ReadStackNavigator() {
  * The mini player above the tab bar, while a recitation goes on somewhere the
  * user isn't looking; › opens the reader at the verse.
  */
-function MiniPlayerAboveTabs({ navigation }: { navigation: PagerTabBarProps['navigation'] }) {
+function MiniPlayerAboveTabs({ navigation, revealing }: { navigation: PagerTabBarProps['navigation']; revealing: boolean }) {
   const bottom = useTabBarHeight() + MINI_PLAYER_GAP;
   return (
     <MiniPlayer
       bottom={bottom}
+      revealing={revealing}
       onOpen={(verse) => openReaderAt(navigation, verse)}
     />
+  );
+}
+
+const showsTabBar = (name: string) => !HIDE_TAB_BAR_ON.has(name);
+
+/** A tab's front screen, as navigation's state has it (its stack's top; the screen it opens on before it has a state). */
+function tabFront(tabRoute: PagerTabBarProps['state']['routes'][number]): Front | null {
+  const name = getFocusedRouteNameFromRoute(tabRoute);
+  if (!name) return null;
+  const stack = tabRoute.state;
+  const top = stack ? stack.routes[stack.index ?? stack.routes.length - 1] : undefined;
+  return { name, key: (top && top.name === name ? top.key : undefined) ?? '' };
+}
+
+/**
+ * The tab bar and the mini player above it. Hidden on full-screen "deep" screens: they own the bottom edge (Done
+ * buttons, save bars) and would otherwise collide with the bar, and the reader and the session show the recitation in
+ * their own player bar. Back on the screen beneath from the first moment it shows: as a back swipe starts, fading in with
+ * that screen as the swipe reveals it, before navigation's state has caught up (navigation/tabReveal, TAB-3).
+ */
+function TabBarArea({
+  bar,
+  showInsightsTab,
+  onInsightsTabPress,
+}: {
+  bar: PagerTabBarProps;
+  showInsightsTab: boolean;
+  onInsightsTabPress?: () => void;
+}) {
+  const reveal = useReveal();
+  const stack = tabFront(bar.state.routes[bar.state.index]);
+  const at = front(stack, reveal);
+  if (at && !showsTabBar(at.name)) return null;
+  const fading = fade(stack, reveal, showsTabBar);
+  return (
+    <Animated.View
+      pointerEvents={fading ? 'none' : 'box-none'}
+      style={[StyleSheet.absoluteFill, fading ? { opacity: fading } : null]}
+      testID="tab-bar-area"
+    >
+      <MiniPlayerAboveTabs navigation={bar.navigation} revealing={at !== stack} />
+      <TabBar {...bar} showInsightsTab={showInsightsTab} onInsightsTabPress={onInsightsTabPress} />
+    </Animated.View>
   );
 }
 
@@ -273,25 +345,9 @@ export function MainNavigator() {
     <ReadingTimerProvider>
       <View style={{ flex: 1 }}>
         <Tab.Navigator
-          tabBar={(props) => {
-            // Hide the tab bar on full-screen "deep" screens: they own the
-            // bottom edge (Done buttons, save bars) and would otherwise
-            // collide with the bar. The mini player goes with it (the reader
-            // and the session show the recitation in their own player bar).
-            const tabRoute = props.state.routes[props.state.index];
-            const focused = getFocusedRouteNameFromRoute(tabRoute);
-            if (focused && HIDE_TAB_BAR_ON.has(focused)) return null;
-            return (
-              <>
-                <MiniPlayerAboveTabs navigation={props.navigation} />
-                <TabBar
-                  {...props}
-                  showInsightsTab={showInsightsTab}
-                  onInsightsTabPress={glowInsightsTab ? openPreview : undefined}
-                />
-              </>
-            );
-          }}
+          tabBar={(props) => (
+            <TabBarArea bar={props} showInsightsTab={showInsightsTab} onInsightsTabPress={glowInsightsTab ? openPreview : undefined} />
+          )}
           swipeableCount={swipeableTabCount(smartTrackingEnabled, insightsInActivity)}
           // Before Smart Tracking is set up, Insights is in the bar but not a
           // page: a swipe past Read opens its preview, as a tap on it does.

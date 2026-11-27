@@ -18,15 +18,8 @@ export function useRevoAvailable(user: Pick<User, 'previewTester'> | null | unde
   return revoAvailable(user, useRevoRelease());
 }
 
-/**
- * The screens the button shows on (REVO-25): Home and Activity's (a section's own page and the full calendar too, ACT-35), and Edit schedule (Majd, Nov 25 2026: "yes the revo
- * there is nice"). Never the Read tab, its list or the reader (Majd, Nov 8 2026: "no revo in the mushaf tab at all"),
- * a session, another editor or Settings.
- */
-export const REVO_BUTTON_ROUTES = new Set(['Dashboard', 'Activity', 'ActivityDay', 'ActivityAll', 'PagesByStrength', 'ActivitySection', 'ActivityMonth', 'PlanEdit']); // i18n-ignore (route names)
-
-/** Of those, the screens with no tab bar (or mini player) beneath: the button sits just above the screen's bottom edge. */
-export const REVO_BUTTON_NO_TAB_BAR = new Set(['PlanEdit']); // i18n-ignore (route names)
+// The screens the button shows on, and those without a tab bar: lib/revo/presence, where useRevoFootprint reads them.
+export { REVO_BUTTON_ROUTES, REVO_BUTTON_NO_TAB_BAR } from './presence';
 
 /**
  * When Revo is back after the day's questions: the next revision day's start. "after Fajr, at

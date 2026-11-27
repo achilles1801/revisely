@@ -604,6 +604,7 @@ export default function DashboardScreen() {
       <ScrollView
         ref={scrollRef}
         style={styles.scrollView}
+        // Its room at the bottom is the tab bar's, the mini player's and Revo's on Home, whatever is in front (TAB-3).
         contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: tabFootprint + layoutV2.rowPad, flexGrow: homeV3 ? 1 : undefined }}
         refreshControl={
           // Transparent: an opaque pull area cut Home's glow off in a hard line.

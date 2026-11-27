@@ -49,9 +49,11 @@ export function useTabBarHeight() {
  * of scrollable content.
  */
 export function useTabBarFootprint() {
-  const { visible } = useMiniPlayer();
+  // The mini player's room while a recitation goes on, which is when it shows over this screen: not whether it shows
+  // now. The reader playing it hides it while in front, and the screen beneath kept moving as it came and went (TAB-3).
+  const { active } = useMiniPlayer();
   // Revo's button is the screens' own to clear (lib/revo/presence useRevoFootprint).
-  return useTabBarHeight() + (visible ? MINI_PLAYER_HEIGHT + MINI_PLAYER_GAP : 0);
+  return useTabBarHeight() + (active ? MINI_PLAYER_HEIGHT + MINI_PLAYER_GAP : 0);
 }
 
 function isHidden(tabBarStyle: unknown): boolean {

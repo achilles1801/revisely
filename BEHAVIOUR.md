@@ -442,6 +442,16 @@ current basic sounds". October 2026's version was removed for the voices it offe
   days a sideways swipe steps the month or week; anywhere else on Activity it moves between tabs. Settings' "Activity",
   Revo's Activity and Insights buttons and a day's links from elsewhere (the timer, Recite, Revo's Day in review) open it
   in its tab.
+- **TAB-3.** Coming back from any screen pushed over a tab shows the screen beneath exactly as it was, at once (Majd,
+  Nov 26 2026: "whenever I click revise ahead and it takes me to the page and then swipe back, you can see that the
+  formatting of the verse of the day gets thrown off ... this should never happen in any possible scenario"). Its
+  layout never moves: the room it leaves at the bottom for the tab bar, the mini player and Revo's button is the room
+  they take on that screen, whatever is in front of it. The tab bar, the mini player above it and Revo's button are
+  there from the first moment the screen beneath shows: as the back swipe starts, fading in as it goes, or at once with
+  Back. A back swipe let go halfway leaves the pushed screen as it was, without them. It holds for every screen that
+  hides the tab bar (a session, today's or ahead, the reader, Edit schedule and a day's edit, Memorized, search, Listen
+  back) and for every one that hides Revo's button (Settings and its pages). (Before: Home lost Revo's room while the
+  pushed screen was in front, and the tab bar and Revo came back only after the swipe ended, so today's ayah jumped up.)
 - **HOME-1.** Home's top bar is the timer chip while a timer runs (on the left) and Settings (on the right), nothing else
   (Majd, Nov 23 2026: "i say we remove the qibla button/icon completely. that way opening the prayer sheet stays and the
   qibla is next to it on the sheet if users wanna use it and it also makes the home page way cleaner"). The Prayer sheet

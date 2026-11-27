@@ -116,13 +116,27 @@ describe('the mini player', () => {
 });
 
 describe('room for it', () => {
-  it('screens leave room for the mini player above the tab bar while it shows', () => {
+  it('[TAB-3] screens leave room for the mini player above the tab bar while a recitation goes on, even under the reader playing it', () => {
     const { result } = renderHook(() => ({ footprint: useTabBarFootprint(), bar: useTabBarHeight() }));
     expect(result.current.footprint).toBe(result.current.bar);
     emit(playing);
     expect(result.current.footprint).toBe(result.current.bar + MINI_PLAYER_HEIGHT + MINI_PLAYER_GAP);
+    // The reader in front shows it in its own bar; the screen beneath keeps the room it will show in, so it doesn't
+    // move as the reader goes (before, the room went and came back, and the screen jumped).
     act(() => setPresenting('reader', true));
+    expect(result.current.footprint).toBe(result.current.bar + MINI_PLAYER_HEIGHT + MINI_PLAYER_GAP);
+    emit({ status: 'idle', verse: null });
     expect(result.current.footprint).toBe(result.current.bar);
+  });
+
+  it('[TAB-3] a back swipe from the reader playing it shows the mini player with the screen coming back', async () => {
+    emit(playing);
+    act(() => setPresenting('reader', true));
+    const { rerender } = render(wrap(<MiniPlayer bottom={100} onOpen={jest.fn()} />));
+    await act(async () => {});
+    expect(screen.queryByTestId('mini-player')).toBeNull();
+    rerender(wrap(<MiniPlayer bottom={100} onOpen={jest.fn()} revealing />));
+    expect(screen.queryByTestId('mini-player')).not.toBeNull();
   });
 
   it('› opens the reader in the Read tab at the verse’s page', () => {

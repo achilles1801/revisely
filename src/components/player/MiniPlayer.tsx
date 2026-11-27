@@ -20,10 +20,14 @@ export const MINI_PLAYER_GAP = 8;
  * Just above the tab bar; nothing else (no speed, options or timer: those are
  * in the reader).
  */
-export function MiniPlayer({ bottom, onOpen }: { bottom: number; onOpen: (verse: VerseKey) => void }) {
+/**
+ * `revealing`: a back swipe is bringing a tab's screen back from over a reader or a session that still presents the
+ * recitation; it shows for the screen coming back, as it will once the swipe ends (TAB-3).
+ */
+export function MiniPlayer({ bottom, onOpen, revealing = false }: { bottom: number; onOpen: (verse: VerseKey) => void; revealing?: boolean }) {
   const { palette, isDark } = useTheme();
-  const { state, visible } = useMiniPlayer();
-  if (!visible || !state.verse) return null;
+  const { state, visible, active } = useMiniPlayer();
+  if (!(revealing ? active : visible) || !state.verse) return null;
 
   const recitation = getRecitation();
   const verse = state.verse;
