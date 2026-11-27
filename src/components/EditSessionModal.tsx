@@ -40,6 +40,11 @@ interface EditSessionModalProps {
    * them checked like its own, and never copies them into this log (SESS-4, AHEAD-6).
    */
   held?: readonly number[];
+  /**
+   * Of the held pages, those that stay checked here: pages logged by hand while lib/handLogged's HAND_LOGGED_UNCHECK
+   * is 'locked' (they come off in Activity, ACT-14).
+   */
+  locked?: readonly number[];
   /** `released`: the held pages unchecked here, whose credit to the day the caller takes back (takeBackCredit). */
   onSave: (updatedLog: RevisionLog, released: number[]) => void;
   onDelete: () => void;
@@ -59,6 +64,7 @@ export function EditSessionModal({
   quranData,
   sessionPages,
   held = NONE,
+  locked = NONE,
   onSave,
   onDelete,
 }: EditSessionModalProps) {
@@ -124,6 +130,7 @@ export function EditSessionModal({
 
   const isCurrentRevised = revisedPages.has(currentPageNumber);
   const toggleCurrent = () => {
+    if (locked.includes(currentPageNumber) && revisedPages.has(currentPageNumber)) return;
     haptics.selection();
     setRevisedPages((prev) => {
       const next = new Set(prev);

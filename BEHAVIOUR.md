@@ -1954,7 +1954,10 @@ by hand, carried pages, the Fajr boundary, every zone, Arabic) and checks these 
   empty title). A later day already revised ahead gets no reminder asking for it, and a page done ahead is never named as
   one still to revise. The widget counts what finishes the day: its own pages, or on a day with none of its own, all of
   them. Activity's Revised elsewhere (and its page picker) offers a day's pages as Home has them, a partly memorized
-  page among them (MEM-4). (Found by the sweep, Nov 27 2026: the reminders and the widget counted only the day's own
+  page among them (MEM-4). Pages logged by hand for today count in the session and the review Home opens as on Home:
+  Continue opens after them with them checked, and Review session holds them; they are never copied into the session's
+  own record (ACT-14), and, until Majd decides otherwise (`HAND_LOGGED_UNCHECK`), they stay checked there and come off
+  in Activity. (Found by the sweep, Nov 27 2026: the reminders and the widget counted only the day's own
   sessions, so a day revised ahead or logged by hand still had "Good morning, today is …" coming, and the widget showed
   it not done; a day of pages from Insights never read as done on the widget; and with ayahs of a page memorized,
   Revised elsewhere worked the day out without that page, so it offered other pages than Home's.)
@@ -2174,14 +2177,13 @@ of this deal. those users can have premium for life".
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an
 ordinary test in the fix's PR.
 
-| Rule | What happens | Test |
-| --- | --- | --- |
-| SESS-4, SESS-9, USER-2 | Pages logged by hand for today (Activity's + → Revised elsewhere, ACT-15) count on Home, but not in the session or the review it opens. With 3 of 5 logged, Home says "Continue at Al-Baqarah, 3rd page · 3 of 5" and Continue opens on the first page with nothing checked; with all 5, Home says "Done · 5 pages" and Review session opens with no pages. The session and review read only the phone's sessions (`ActiveRevisionScreen`'s done pages, `reviewPagesInOrder`). Fixing it needs a decision on what unchecking a hand-logged page there does (ACT-14: a session never takes hand-added pages with it). Found by the user-matrix sweep, Nov 27 2026. | `scenarios/screensAgree.scenario.tsx` |
+None open.
 
 Fixed in November 2026 (the tests that pinned them are ordinary tests now):
 
 | Rule | What happened | Fix |
 | --- | --- | --- |
+| SESS-4, SESS-9, USER-2 | Pages logged by hand for today (ACT-15) counted on Home but not in the session or review it opened: Continue opened on the first page with nothing checked, and Review session opened empty. | The session and the review count them (`src/lib/handLogged.ts`); they stay checked there while `HAND_LOGGED_UNCHECK` is 'locked'. |
 | DAY-2, DAY-8 | Near the date line (Kiritimati, Samoa, Tonga; Fiji around October and November) "today's Fajr" was another day's, so after Fajr it was still yesterday, or a day was skipped. | `dayTimes` (`src/lib/prayer/times.ts`) takes the prayers whose Dhuhr falls on the day, and builds a day adhan skips from the days either side. |
 | DAY-8 | With a saved place far from the phone's zone, `getNextRevisionDayStart` named a time when the day doesn't turn (widget days listed twice, reminders ending early). | It returns the first midnight or Fajr at which the revision day changes (`src/lib/fajrBoundary.ts`). |
 | DAY-2 | With Turkey's method (Diyanet) near the Arctic Circle, for about a week either side of the June solstice, the Prayer sheet showed Fajr a minute or two after Sunrise (Tromsø, north-west Iceland). The method shows sunrise 7 minutes early, and a seventh of a night that short is less than that. | A method's earlier sunrise stops a minute after Fajr, which stays as adhan gives it; every time is to the minute (adhan's rounding kept milliseconds) (`timesOf`, `src/lib/prayer/times.ts`). |

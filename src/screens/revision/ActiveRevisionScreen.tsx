@@ -57,6 +57,10 @@ import { generateDailyAssignment, getCurrentRevisionDay } from '../../lib/algori
 import { catchUpDayOf, duePagesOf, insightsExtrasOf, insightsPagesOn } from '../../lib/carryOver';
 import { revisablePages } from '../../lib/memorizedAyahs';
 import { creditedOnDay, doneOnDay, sessionCredit, takeBackCredit } from '../../lib/aheadCredit';
+import { handLogsOf, useSharedActivityHistory, withPendingHandLogs } from '../../lib/activityHistory';
+import { canUncheck, handLoggedOn, takeBackHandLogged } from '../../lib/handLogged';
+import { pendingEntries } from '../../lib/offline/outbox';
+import { queueChange } from '../../lib/offline/queue';
 import { aheadDayLabel, firstNotDone, nextRevisionDayPlan, revisionDayPlan, startsCycle, type RevisionDayPlan } from '../../lib/aheadPlan';
 import { primeSessionPlace, saveSessionPlace, sessionPlaceFor } from '../../lib/sessionPlace';
 import { describePageRange, describePassage, surahName, surahsOfPages } from '../../lib/passages';
@@ -188,12 +192,27 @@ function ActiveRevisionScreenBody() {
   // session), or revised in today's sessions for another day: a catch-up page is credited to the
   // day it was missed (SESS-7), and is still done here. (Counting today's credit alone reopened
   // the session on the catch-up pages, unchecked, while Home said to continue after them.)
+  // Pages logged by hand for today count too, as on Home (ACT-15, USER-2): the Activity items Home read, with those still
+  // waiting on the phone. Without them, Continue opened on the first page with nothing checked while Home said to
+  // continue after them (the user-matrix sweep, Nov 27 2026).
+  const sharedHistory = useSharedActivityHistory(user?.id, sessionDay ?? '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const counted = useMemo(() => withPendingHandLogs(sharedHistory, user ? pendingEntries(user.id) : []), [sharedHistory, user]);
+  const countedRef = useRef(counted);
+  countedRef.current = counted;
   const alreadyRevisedToday = useMemo(() => {
     // A new round doesn't hold today's pages (its own may be the same pages, still to revise again).
     if (!assignment || !sessionDay || round) return new Set<number>();
-    const done = doneOnDay(logs, sessionDay);
+    const done = doneOnDay(counted ? [...logs, ...handLogsOf(counted)] : logs, sessionDay);
     return new Set(assignment.pages.filter((p) => done.has(p)));
-  }, [logs, assignment, sessionDay, round]);
+  }, [logs, counted, assignment, sessionDay, round]);
+  // Of them, the ones logged by hand: whether they can be unchecked here is lib/handLogged's HAND_LOGGED_UNCHECK.
+  const handLogged = useMemo(
+    () => new Set(assignment && sessionDay && !round ? handLoggedOn(counted, sessionDay, assignment.pages) : []),
+    [counted, assignment, sessionDay, round],
+  );
+  const handLoggedRef = useRef(handLogged);
+  handLoggedRef.current = handLogged;
 
   const ratingsFromTodaysLogs = useMemo(() => {
     const map = new Map<number, number>();
@@ -504,6 +523,11 @@ function ActiveRevisionScreenBody() {
       for (const [day, list] of byDay) {
         for (const changed of takeBackCredit(logsRef.current, day, list, todaysLog?.id ?? revisionDay)) await updateLog(changed);
       }
+      // A page logged by hand, unchecked (only when HAND_LOGGED_UNCHECK is 'remove'): it comes off its entry.
+      const handOut = unrevised.filter((p) => handLoggedRef.current.has(p));
+      if (handOut.length > 0 && user) {
+        for (const op of takeBackHandLogged(countedRef.current, revisionDay, handOut, user.id)) await queueChange(op);
+      }
       unrevised.forEach((p) => silentlySavedRef.current.delete(p));
     }
   }, [user, assignment, sessionDay, completedPages, pages, localRatings, pageDays, updatePages, addLog, updateLog, heldAsRevised, round]);
@@ -586,6 +610,8 @@ function ActiveRevisionScreenBody() {
   );
 
   const unmarkRevised = useCallback((pageNumber: number) => {
+    // A page logged by hand stays checked unless HAND_LOGGED_UNCHECK says unchecking takes it off its entry.
+    if (!canUncheck(pageNumber, handLoggedRef.current)) return;
     setCompletedPages((prev) => {
       if (!prev.has(pageNumber)) return prev;
       const next = new Set(prev);
@@ -889,7 +915,7 @@ function ActiveRevisionScreenBody() {
   // Mark all: the day on screen (today's, or the later day the session is on).
   const handleMarkAllComplete = () => setCompletedPages((prev) => new Set([...prev, ...viewerPages]));
   const handleMarkAllIncomplete = () =>
-    setCompletedPages((prev) => new Set([...prev].filter((p) => !viewerPages.includes(p))));
+    setCompletedPages((prev) => new Set([...prev].filter((p) => !viewerPages.includes(p) || !canUncheck(p, handLogged))));
   const handleTogglePage = (pageNumber: number) => {
     if (completedPages.has(pageNumber)) unmarkRevised(pageNumber);
     else markRevised(pageNumber);

@@ -74,7 +74,8 @@ import { heldElsewhere, reviewPagesInOrder, takeBackCredit } from '../../lib/ahe
 import { primeSessionPlace } from '../../lib/sessionPlace';
 import { ownRevised } from '../../lib/activityItems';
 import type { HistoryItem } from '../../lib/streakFromItems';
-import { loadActivityHistory, sameHistory, shareActivityHistory, withPendingHandLogs } from '../../lib/activityHistory';
+import { handLogsOf, loadActivityHistory, sameHistory, shareActivityHistory, withPendingHandLogs } from '../../lib/activityHistory';
+import { canUncheck, handLoggedOn, takeBackHandLogged } from '../../lib/handLogged';
 import { accountDesignEnabled } from '../../lib/release/accountDesign';
 import { useAccountJourney, usePagesRevisedOnPhone } from '../../lib/accountJourney';
 import { latestMilestone } from '../../lib/badges';
@@ -191,6 +192,8 @@ export default function DashboardScreen() {
   const [selectedSessionPages, setSelectedSessionPages] = useState<number[]>([]);
   // The review's pages done for its day that other sessions hold (SESS-4): checked there, kept where they are.
   const [selectedHeld, setSelectedHeld] = useState<number[]>([]);
+  // Of them, the pages logged by hand that stay checked there (lib/handLogged HAND_LOGGED_UNCHECK).
+  const [selectedLocked, setSelectedLocked] = useState<number[]>([]);
   const { refreshing, onRefresh } = usePullToRefresh(loadData);
 
   const quranData = getQuranData();
@@ -403,7 +406,7 @@ export default function DashboardScreen() {
     );
   }
 
-  const handleEditSession = (log: RevisionLog, reviewPages?: number[], held: number[] = []) => {
+  const handleEditSession = (log: RevisionLog, reviewPages?: number[], held: number[] = [], locked: number[] = []) => {
     // Prefer the day's actual assignedPages so the edit modal shows the
     // whole session, not just what the user marked. Fall back to
     // revised+skipped for legacy logs without the assignedPages field.
@@ -415,6 +418,7 @@ export default function DashboardScreen() {
     setSelectedLog(log);
     setSelectedSessionPages(sessionPages);
     setSelectedHeld(held);
+    setSelectedLocked(locked);
     setShowEditModal(true);
   };
 
@@ -423,12 +427,16 @@ export default function DashboardScreen() {
     setSelectedLog(null);
     setSelectedSessionPages([]);
     setSelectedHeld([]);
+    setSelectedLocked([]);
   };
 
   const handleSaveSession = async (updatedLog: RevisionLog, released: number[]) => {
     // Pages another session holds that were unchecked: their credit to the day is taken back there (SESS-4);
     // that session keeps its revision of them (AHEAD-6).
     for (const changed of takeBackCredit(logs, updatedLog.date, released, updatedLog.id)) await updateLog(changed);
+    // A page logged by hand, unchecked (only when HAND_LOGGED_UNCHECK is 'remove'): it comes off its entry.
+    const handOut = handLoggedOn(counted, updatedLog.date, released);
+    if (handOut.length > 0 && user) for (const op of takeBackHandLogged(counted, updatedLog.date, handOut, user.id)) await queueChange(op);
     if (updatedLog.id) {
       await updateLog(updatedLog);
     } else if (updatedLog.pagesRevised.length > 0 || updatedLog.weaknessUpdates.length > 0) {
@@ -463,8 +471,10 @@ export default function DashboardScreen() {
       navigation.navigate('ActiveRevision', { aheadDay: action.day, ...(action.round ? { round: true } : {}) });
     } else if (action.kind === 'review') {
       // The review is the day's done pages, the same set Home counts as Done:
-      // today's first, then the pages revised ahead today (reviewPagesInOrder).
-      const done = reviewPagesInOrder(logs, revisionDay, assignment.pages);
+      // today's first, then the pages revised ahead today (reviewPagesInOrder), with those logged by hand (ACT-15, USER-2:
+      // it opened empty on a day logged by hand).
+      const withHand = [...logs, ...handLogsOf(counted)];
+      const done = reviewPagesInOrder(withHand, revisionDay, assignment.pages);
       const todayLog = logs.find((log) => log.date === revisionDay);
       // Done only by pages revised ahead from an earlier session: no session of
       // today yet, so the review opens as a new one, holding none of them itself.
@@ -478,8 +488,9 @@ export default function DashboardScreen() {
         durationMinutes: 0,
       };
       const log = todayLog ?? draft;
-      // Every done page starts checked, the ones other sessions hold too (SESS-4).
-      handleEditSession(log, done, heldElsewhere(logs, revisionDay, log));
+      // Every done page starts checked, the ones other sessions hold too (SESS-4), and those logged by hand.
+      const hand = handLoggedOn(counted, revisionDay, done);
+      handleEditSession(log, done, heldElsewhere(withHand, revisionDay, log), hand.filter((p) => !canUncheck(p, new Set(hand))));
     } else if (action.kind === 'memorization') {
       navigation.navigate('Memorization', { edit: true });
     } else {
@@ -575,6 +586,7 @@ export default function DashboardScreen() {
       quranData={quranData}
       sessionPages={selectedSessionPages}
       held={selectedHeld}
+      locked={selectedLocked}
       onSave={handleSaveSession}
       onDelete={handleDeleteSession}
     />
