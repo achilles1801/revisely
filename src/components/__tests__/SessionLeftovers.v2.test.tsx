@@ -126,8 +126,11 @@ describe('editing a session in the new design', () => {
     expect(flat(screen.getByText('Juz 1 · Hizb 1').props.style)).toMatchObject({ fontSize: 13, color: read.textSecondary });
     expect(flat(screen.getByTestId('edit-session-page').props.style).color).toBe(read.textPrimary);
 
+    // The check says what it does (SESS-4; Majd, Nov 26 2026: "say revised").
+    expect(screen.getByText('Revised')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Unmark current page'));
     expect(screen.queryByTestId('round-button-active')).toBeNull();
+    expect(screen.getByText('Revised')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Close and save'));
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ pagesRevised: [], pagesSkipped: [1, 2] }), []);
     expect(onClose).toHaveBeenCalled();

@@ -43,6 +43,7 @@ export const revision: NonNullable<ArStrings['revision']> = {
     deleteBody: 'لا يمكن التراجع عن ذلك.',
     closeAndSave: 'الإغلاق والحفظ',
     unmarkCurrent: 'إلغاء تحديد الصفحة الحالية',
+    revised: 'تمت مراجعتها',
     markCurrent: 'تحديد الصفحة الحالية كمُراجَعة',
     menu: 'قائمة الجلسة',
     rate: 'تقييم قوة حفظ هذه الصفحة',

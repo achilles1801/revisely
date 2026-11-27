@@ -38,6 +38,8 @@ export const revision = {
     closeAndSave: 'Close and save',
     unmarkCurrent: 'Unmark current page',
     markCurrent: 'Mark current page as revised',
+    /** Beside the review's check (SESS-4; Majd, Nov 26 2026: "say revised"). */
+    revised: 'Revised',
     menu: 'Session menu',
     rate: 'Rate strength for this page',
     delete: 'Delete session',
