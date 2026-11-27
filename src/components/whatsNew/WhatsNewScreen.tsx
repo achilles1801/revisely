@@ -302,7 +302,6 @@ export function WhatsNewScreen({
               words={<CardText text={card.text ?? ''} style={[typeV2.body, styles.center, styles.text, { color: palette.secondary }]} />}
               last={last}
               closable={mode === 'replay'}
-              firstName={greetingName(user?.name, auth.currentUser?.displayName ?? null).split(' ')[0]}
               onNext={advance}
               onClose={onClose}
             />

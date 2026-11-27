@@ -1,5 +1,5 @@
 // The tour's pieces (What's new 1.0.6, lib/whatsNew/tour): a screen of the app floating on the stage with a camera over
-// it, a finger's touch, a glint, and the bits of the app's screens the slides draw (a sheet, Revo's header, a bubble,
+// it (no finger on it: Majd, Nov 26 2026, what's tapped answers by itself), a glint, and the bits of the app's screens the slides draw (a sheet, Revo's header, a bubble,
 // the field). Everything here is a picture: drawn at a phone's 402 × 874, never touched, its text at a fixed size
 // (the card's words, under it, follow Dynamic Type). Animated on the UI thread from one clock per slide.
 
@@ -10,7 +10,7 @@ import Svg, { Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
 import { RevoMark } from '../../revo/RevoMark';
-import { PHONE, SCREEN_AT, STAGE, bump, easeOut } from '../../../lib/whatsNew/tour';
+import { PHONE, SCREEN_AT, STAGE, bump } from '../../../lib/whatsNew/tour';
 
 export type Clock = SharedValue<number>;
 type Style = ViewStyle & { opacity?: number };
@@ -83,28 +83,6 @@ export function Screen({ t, place, children, ground }: { t: Clock; place: (t: nu
       <View style={[styles.phoneClip, { backgroundColor: ground ?? palette.bg }]}>
         <Animated.View style={[StyleSheet.absoluteFill, camera]}>{children}</Animated.View>
       </View>
-    </Animated.View>
-  );
-}
-
-/** A finger's touch at (x, y) over its life `u` (0 to 1): in, held, out. A hold draws its ring round (`hold`, 0 to 1). */
-export function Touch({ t, where }: { t: Clock; where: (t: number) => [number, number, number, number?] }) {
-  const { palette } = useTheme();
-  const style = useAnimatedStyle(() => {
-    const [x, y, u] = where(t.value);
-    const shown = u > 0 && u < 1;
-    const a = !shown ? 0 : u < 0.2 ? u / 0.2 : u > 0.75 ? (1 - u) / 0.25 : 1;
-    return { opacity: a, transform: [{ translateX: x - 27 }, { translateY: y - 27 }, { scale: 0.8 + 0.2 * easeOut(Math.min(1, u * 3)) }] };
-  });
-  const arc = useAnimatedStyle(() => {
-    const [, , , hold] = where(t.value);
-    return { opacity: hold == null ? 0 : 1, transform: [{ rotate: `${-90 + 360 * (hold ?? 0)}deg` }] };
-  });
-  return (
-    <Animated.View pointerEvents="none" style={[styles.touch, style]}>
-      <View style={[styles.touchRing, { borderColor: palette.text, opacity: 0.18 }]} />
-      <Animated.View style={[styles.touchArc, { borderTopColor: palette.primary }, arc]} />
-      <View style={[styles.touchDot, { borderColor: palette.text, backgroundColor: palette.text }]} />
     </Animated.View>
   );
 }
@@ -234,10 +212,6 @@ const styles = StyleSheet.create({
   phone: { position: 'absolute', left: 0, top: 0, width: PHONE.width, height: PHONE.height, borderRadius: 48 },
   lifted: { shadowColor: '#1E1650', shadowOpacity: 0.16, shadowRadius: 30, shadowOffset: { width: 0, height: 22 }, elevation: 10 },
   phoneClip: { flex: 1, borderRadius: 48, overflow: 'hidden' },
-  touch: { position: 'absolute', left: 0, top: 0, width: 54, height: 54 },
-  touchRing: { position: 'absolute', left: 0, top: 0, width: 54, height: 54, borderRadius: 27, borderWidth: 1.5 },
-  touchArc: { position: 'absolute', left: 0, top: 0, width: 54, height: 54, borderRadius: 27, borderWidth: 3, borderColor: 'transparent' },
-  touchDot: { position: 'absolute', left: 10, top: 10, width: 34, height: 34, borderRadius: 17, borderWidth: 2, opacity: 0.3 },
   sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16 },
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 6 },
   revoHead: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },

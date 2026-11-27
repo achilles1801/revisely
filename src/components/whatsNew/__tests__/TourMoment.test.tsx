@@ -24,7 +24,7 @@ async function show(moment: TourMomentId, last = false) {
   render(
     <DesignProvider initial={{}}>
       <ThemeProvider>
-        <TourMoment moment={moment} step={2} total={9} title="A slide" words={null} last={last} closable={false} firstName="Maryam" onNext={onNext} />
+        <TourMoment moment={moment} step={2} total={9} title="A slide" words={null} last={last} closable={false} onNext={onNext} />
       </ThemeProvider>
     </DesignProvider>,
   );

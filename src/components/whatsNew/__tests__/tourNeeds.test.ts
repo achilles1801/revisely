@@ -39,7 +39,7 @@ describe("the tour's slides and their features", () => {
     const shown = cardsFor(NEXT_RELEASE!, (n) => needOpen(n, { previewTester: false }, 'testers')).map((c) => c.id);
     expect(shown).not.toContain('ask');
     expect(shown).not.toContain('books');
-    expect(shown).not.toContain('revo');
+    expect(shown).not.toContain('schedule');
     expect(shown).toContain('ramadan');
   });
 });

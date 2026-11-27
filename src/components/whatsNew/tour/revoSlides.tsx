@@ -1,7 +1,7 @@
 // The tour's Revo slides (What's new 1.0.6, lib/whatsNew/tour): 1. Ask about any page (REVO-45), on the account's own
 // next page; 2. In the books' own words (REVO-44), an example on An-Naml 23–35 with the books' real words (the approved
-// tafsir mocks); 3. Revo by your side: the greeting's tafsir (REVO-46), a schedule drafted (REVO-43), a take talked
-// through (REVO-25) and Revo's own mic (REVO-42). Pictures, never touched.
+// tafsir mocks); 3. Just say what you want: the whole schedule built by Revo from a few words (REVO-43), said with its
+// own mic (REVO-42). Pictures, never touched.
 
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -13,7 +13,6 @@ import { t as tr } from '../../../i18n';
 import {
   SCREEN_AT,
   along,
-  bump,
   curve,
   easeIn,
   easeInOut,
@@ -23,9 +22,8 @@ import {
   onStage,
   seg,
 } from '../../../lib/whatsNew/tour';
-import { Anim, Asked, Bar, Chips, Field, Glint, RevoHeader, Ripple, Say, Screen, Sheet, T, Touch, at, type Clock, type ScreenAt } from './parts';
+import { Anim, Asked, Bar, Chips, Field, Glint, RevoHeader, Ripple, Say, Screen, Sheet, T, at, type Clock, type ScreenAt } from './parts';
 import { FOOT_Y, LINE_H, MushafScreen, PAGE_BOX, WordsIn } from './screens';
-import { HomeSketch, TakeSummary } from './appScreens';
 
 /** A point of a screen's phone on the stage, wherever the screen and its camera are. */
 export function pointOn(f: ScreenAt, x: number, y: number): [number, number] {
@@ -153,16 +151,6 @@ export function AskSlide({ t, page, pageName }: { t: Clock; page: number; pageNa
           return [88, MENU_TOP + 12, seg(now, 7.2, 7.9)];
         }} />
       </Screen>
-      <Touch t={t} where={(now) => {
-        'worklet';
-        const p = pointOn(place(now), 370, FOOT_Y);
-        return [p[0], p[1], seg(now, 2.5, 3.1)];
-      }} />
-      <Touch t={t} where={(now) => {
-        'worklet';
-        const p = pointOn(place(now), 300, heldY + LINE_H / 2);
-        return [p[0], p[1], seg(now, 6.25, 7.4), easeInOut(seg(now, 6.3, 6.85))];
-      }} />
     </>
   );
 }
@@ -351,23 +339,25 @@ export function BooksSlide({ t }: { t: Clock }) {
           </T>
         </Anim>
       ))}
-      <Touch t={t} where={(now) => {
-        'worklet';
-        const p = pointOn(place(now), 220, QUOTES[1].top + 60);
-        return [p[0], p[1], seg(now, 4.75, 5.3)];
-      }} />
     </>
   );
 }
 
 // ------------------------------------------------------------------ 3. Revo, by your side (REVO-46, REVO-43, REVO-25, REVO-42)
-function EditScheduleSketch() {
+/** Edit schedule: as it was, or filled in from Revo's draft (not saved until Save, REVO-43). */
+function EditScheduleSketch({ filled = false }: { filled?: boolean }) {
   const { palette } = useTheme();
-  const rows = [
-    ['Today · Juz 28', 'Al-Mujadila to Al-Hashr · 10 pages'],
-    ['Fri · Juz 28', 'Al-Hashr to Al-Jumu‘ah'],
-    ['Sat · Juz 29', 'Al-Mulk to Al-Qalam'],
-  ];
+  const rows = filled
+    ? [
+        ['Today · Juz 28', 'Al-Mujadila · 6 pages'],
+        ['Fri · Rest day', 'Fridays off'],
+        ['Sat · Juz 28', 'Al-Mujadila to Al-Hashr'],
+      ]
+    : [
+        ['Today · Juz 28', 'Al-Mujadila to Al-Hashr · 10 pages'],
+        ['Fri · Juz 28', 'Al-Hashr to Al-Jumu‘ah'],
+        ['Sat · Juz 29', 'Al-Mulk to Al-Qalam'],
+      ];
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.bg }]}>
       <Bar
@@ -379,8 +369,8 @@ function EditScheduleSketch() {
         }
       />
       <View style={at(16, 114, 370)}>
-        <T style={[styles.title22, { color: palette.text }]}>10 pages a day</T>
-        <T style={[styles.meta, { color: palette.secondary }]}>Every page comes round every 11 days</T>
+        <T style={[styles.title22, { color: palette.text }]}>{filled ? '6 pages a day' : '10 pages a day'}</T>
+        <T style={[styles.meta, { color: palette.secondary }]}>{`Every page comes round every ${filled ? 21 : 11} days`}</T>
       </View>
       {rows.map(([a, b], i) => (
         <View key={a} style={[at(0, 176 + i * 62, 402, 62), styles.listRow, { borderBottomColor: palette.separator }]}>
@@ -418,7 +408,7 @@ function DraftCard({ t }: { t: Clock }) {
           <T style={[styles.meta, styles.flex, styles.struck, { color: palette.secondary }]}>{old}</T>
           <Anim t={t} style={(n) => {
             'worklet';
-            const u = easeOut(seg(n, 3.95 + i * 0.28, 4.4 + i * 0.28));
+            const u = easeOut(seg(n, 4.15 + i * 0.3, 4.6 + i * 0.3));
             return { opacity: u, transform: [{ translateY: (1 - u) * 12 }] };
           }}>
             <T style={[styles.name14, { color: palette.text }]}>{now}</T>
@@ -437,110 +427,113 @@ function DraftCard({ t }: { t: Clock }) {
   );
 }
 
-export function RevoSideSlide({ t, firstName, nextName }: { t: Clock; firstName: string; nextName: string }) {
+const ASKED = 'I can only do 6 pages a day, and Fridays are busy';
+
+/** Revo's field while its own mic listens (REVO-42): the words as they're heard, and the stop button. */
+function ListeningField({ t, from, to }: { t: Clock; from: number; to: number }) {
   const { palette } = useTheme();
-  const greeting = `Salaam ${firstName}. ${tr('revo.tafsir.nextOffer', { place: nextName })}`;
-  const home = (now: number): ScreenAt => {
+  return (
+    <View style={styles.fieldRow}>
+      <View style={[styles.plus, { backgroundColor: palette.fill }]}>
+        <Ionicons name="add" size={22} color={palette.text} />
+      </View>
+      <View style={[styles.listening, { borderColor: palette.outline, backgroundColor: palette.fill }]}>
+        <View style={styles.flex}>
+          <Anim t={t} box={styles.listeningHint} style={(now) => {
+            'worklet';
+            return { opacity: 1 - seg(now, from, from + 0.15) };
+          }}>
+            <T style={[styles.body16, { color: palette.secondary }]}>Listening…</T>
+          </Anim>
+          <WordsIn t={t} text={ASKED} from={from} to={to} style={[styles.body16, { color: palette.text }]} />
+        </View>
+        <View style={[styles.stopButton, { backgroundColor: palette.primary }]}>
+          <View style={[styles.stopSquare, { backgroundColor: palette.onPrimary }]} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+export function ScheduleSlide({ t }: { t: Clock }) {
+  const { palette } = useTheme();
+  const place = (now: number): ScreenAt => {
     'worklet';
-    const e = resting(now);
-    const sp = easeInOut(seg(now, 2.0, 2.6));
-    const gone = seg(now, 3.0, 3.4);
-    return { ...e, scale: lerp(e.scale ?? SCREEN_AT.scale, 0.62, sp), top: lerp(e.top ?? SCREEN_AT.top, 60, sp), dx: lerp(0, -46, sp), rot: -2 * sp, opacity: (e.opacity ?? 1) * lerp(1, 0.45, sp) * (1 - gone) };
-  };
-  const edit = (now: number): ScreenAt => {
-    'worklet';
-    const inn = easeOut(seg(now, 2.1, 2.7));
-    const grow = easeInOut(seg(now, 3.0, 3.5));
-    const swap = easeInOut(seg(now, 5.2, 5.75));
-    return {
-      scale: lerp(0.62, SCREEN_AT.scale, grow),
-      top: lerp(60, SCREEN_AT.top, grow),
-      dx: lerp(lerp(420, 60, inn), 0, grow) - 440 * swap,
-      rot: lerp(2, 0, grow),
-      opacity: now < 2.1 ? 0 : 1 - swap,
-    };
-  };
-  const take = (now: number): ScreenAt => {
-    'worklet';
-    const swap = easeInOut(seg(now, 5.2, 5.75));
-    return { dx: lerp(440, 0, swap), opacity: now < 5.2 ? 0 : 1 };
+    return resting(now);
   };
   return (
-    <>
-      {/* From Home, Revo's greeting offers the tafsir of the next page, word by word. */}
-      <Screen t={t} place={home}>
-        <HomeSketch v3 />
-        <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
+    <Screen t={t} place={place}>
+      <EditScheduleSketch />
+      {/* Checked in Edit schedule at the end: the whole week filled in, ready to save. */}
+      <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
+        'worklet';
+        return { opacity: easeInOut(seg(now, 5.8, 6.2)) };
+      }}>
+        <EditScheduleSketch filled />
+      </Anim>
+      {/* Revo's sheet over Edit schedule: tell it how much and when; its own mic hears the words. */}
+      <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
+        'worklet';
+        const up = easeOut(seg(now, 0.75, 1.3));
+        return { opacity: now < 3.2 ? seg(now, 0.75, 0.9) : 1 - seg(now, 3.2, 3.45), transform: [{ translateY: (1 - up) * 560 }] };
+      }}>
+        <Sheet top={330}>
+          <RevoHeader />
+          <View style={styles.sayBox}>
+            <T style={[styles.say19, { color: palette.text }]}>Tell me how much you can revise and when, and I’ll build the whole schedule.</T>
+          </View>
+          <View style={styles.flex} />
+          <ListeningField t={t} from={1.6} to={2.9} />
+        </Sheet>
+      </Anim>
+      {[0, 1, 2].map((k) => (
+        <Ripple key={k} t={t} color={palette.primary} r={16} where={(now) => {
           'worklet';
-          const u = easeOut(seg(now, 0.6, 1.15));
-          return { opacity: seg(now, 0.6, 0.75), transform: [{ translateY: (1 - u) * 480 }] };
-        }}>
-          <Sheet top={400}>
-            <RevoHeader />
-            <View style={styles.sayBox}>
-              <WordsIn t={t} text={greeting} from={1.1} to={2.0} style={[styles.say17, { color: palette.text }]} />
-            </View>
-            <View style={styles.chipsBox}>
-              <Chips items={[tr('revo.tafsir.nextChip'), 'Continue revising']} />
-            </View>
-            <Field placeholder={tr('revo.composer.placeholder')} />
-          </Sheet>
-        </Anim>
-      </Screen>
-      {/* The R lifts out and flies to Edit schedule: a new schedule, drafted for a check before anything changes. */}
-      <Screen t={t} place={edit}>
-        <EditScheduleSketch />
-        <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
-          'worklet';
-          const u = easeOut(seg(now, 3.15, 3.7));
-          return { opacity: seg(now, 3.15, 3.3), transform: [{ translateY: (1 - u) * 600 }] };
-        }}>
-          <Sheet top={150}>
-            <RevoHeader />
-            <Asked>I can only do 6 pages, and Fridays are busy</Asked>
+          return [361, 806, seg(now, 1.45 + k * 0.45, 2.35 + k * 0.45)];
+        }} />
+      ))}
+      {/* Sent: Revo builds the whole schedule, and the new figures roll in. */}
+      <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
+        'worklet';
+        const down = easeIn(seg(now, 5.7, 6.15));
+        return { opacity: seg(now, 3.15, 3.4) * (1 - down), transform: [{ translateY: down * 520 }] };
+      }}>
+        <Sheet top={150}>
+          <RevoHeader />
+          <Asked>{ASKED}</Asked>
+          <Anim t={t} box={styles.dots} style={(now) => {
+            'worklet';
+            return { opacity: now < 3.5 ? 1 : 1 - seg(now, 3.5, 3.6) };
+          }}>
+            {[1, 0.6, 0.3].map((o) => (
+              <View key={o} style={[styles.dot, { backgroundColor: palette.secondary, opacity: o }]} />
+            ))}
+          </Anim>
+          <Anim t={t} style={(now) => {
+            'worklet';
+            const u = easeOut(seg(now, 3.55, 4.0));
+            return { opacity: u, transform: [{ translateY: (1 - u) * 14 }] };
+          }}>
             <Say>Then 6 pages a day with Fridays off: each page comes round every 21 days instead of 11.</Say>
             <DraftCard t={t} />
-            <View style={styles.flex} />
-            <Field placeholder={tr('revo.composer.placeholder')} />
-          </Sheet>
-        </Anim>
-      </Screen>
-      {/* A take's summary: Ask Revo about this take, out loud with Revo's own mic. */}
-      <Screen t={t} place={take}>
-        <TakeSummary />
-        <Anim t={t} box={at(0, 874 - 110, 402, 110)} style={(now) => {
-          'worklet';
-          const u = easeOut(seg(now, 6.45, 6.85));
-          return { opacity: seg(now, 6.45, 6.6), transform: [{ translateY: (1 - u) * 110 }] };
-        }}>
-          <View style={[styles.fieldSheet, { backgroundColor: palette.sheet, borderTopColor: palette.separator }]}>
-            <Field placeholder={tr('revo.composer.placeholder')} />
-          </View>
-        </Anim>
-        {[0, 1, 2].map((k) => (
-          <Ripple key={k} t={t} color={palette.primary} r={18} where={(now) => {
-            'worklet';
-            return [355, 874 - 110 + 34, seg(now, 6.85 + k * 0.3, 7.6 + k * 0.3)];
-          }} />
-        ))}
-      </Screen>
-      <Anim t={t} box={styles.flyer} style={(now) => {
-        'worklet';
-        const k = easeInOut(seg(now, 2.25, 3.55));
-        const a = pointOn(home(now), 34, 425);
-        const b = pointOn(edit(now), 34, 172);
-        const p = curve(a, [lerp(a[0], b[0], 0.5), Math.min(a[1], b[1]) - 150], b, k);
-        const shown = now > 2.25 && now < 3.75;
-        return { opacity: shown ? 1 - seg(now, 3.5, 3.75) : 0, transform: [{ translateX: p[0] - 18 }, { translateY: p[1] - 18 }, { scale: 0.62 + 0.5 * bump(k) + 0.12 * k }] };
-      }}>
-        <RevoMark size={36} />
+          </Anim>
+          <View style={styles.flex} />
+          <Field placeholder={tr('revo.composer.placeholder')} />
+        </Sheet>
       </Anim>
-      <Touch t={t} where={(now) => {
+      <Glint t={t} color={palette.primary} size={20} where={(now) => {
         'worklet';
-        const p = pointOn(take(now), 200, 752);
-        return [p[0], p[1], seg(now, 5.95, 6.5)];
+        return [150, 536, seg(now, 5.1, 5.6)];
       }} />
-    </>
+      <Glint t={t} color={palette.primary} size={18} where={(now) => {
+        'worklet';
+        return [150, 128, seg(now, 6.25, 6.8)];
+      }} />
+      <Glint t={t} color={palette.primary} size={16} where={(now) => {
+        'worklet';
+        return [360, 84, seg(now, 6.5, 7.1)];
+      }} />
+    </Screen>
   );
 }
 
@@ -550,7 +543,6 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
   sayBox: { marginTop: 14 },
   say19: { fontSize: 19, lineHeight: 27, letterSpacing: -0.2 },
-  say17: { fontSize: 17, lineHeight: 24, letterSpacing: -0.2 },
   chipsBox: { marginTop: 'auto' },
   menu: { borderRadius: 14, overflow: 'hidden' },
   menuShadow: { shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
@@ -587,6 +579,13 @@ const styles = StyleSheet.create({
   draftButtons: { flexDirection: 'row', gap: 8, marginTop: 12 },
   pill: { height: 36, paddingHorizontal: 16, borderRadius: 18, justifyContent: 'center' },
   outlinePill: { borderWidth: 1 },
-  fieldSheet: { flex: 1, paddingHorizontal: 16, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  flyer: { position: 'absolute', left: 0, top: 0 },
+  fieldRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, marginBottom: 40 },
+  plus: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  listening: { flex: 1, minHeight: 58, borderRadius: 22, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingStart: 16, paddingEnd: 6, paddingVertical: 6 },
+  listeningHint: { position: 'absolute', left: 0, top: 0 },
+  body16: { fontSize: 16, lineHeight: 22 },
+  stopButton: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  stopSquare: { width: 11, height: 11, borderRadius: 2 },
+  dots: { flexDirection: 'row', gap: 5, marginTop: 18 },
+  dot: { width: 7, height: 7, borderRadius: 4 },
 });

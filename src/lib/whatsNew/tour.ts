@@ -8,12 +8,20 @@
 // thread from useAnimatedStyle, one clock (seconds) per slide, only transform and opacity.
 
 import type { TourMoment } from '../help/whatsNew';
+import { MOMENT_SPEED } from './revoMoment';
 
-/** How long each slide plays before its words (seconds; about 70 s if each plays to its end). */
+/**
+ * The tour's pace: Revo's introduction's (Majd, Nov 26 2026: "it should be same speed as the original revo introduction
+ * video"), the ¾ he chose for it (MOMENT_SPEED). A slide's beats are written in its own seconds; the phone plays them
+ * at this speed, so a slide of 8 takes about 10.7 s.
+ */
+export const TOUR_SPEED = MOMENT_SPEED;
+
+/** How long each slide plays before its words, in its own seconds (the phone's: divided by TOUR_SPEED). */
 export const TOUR_SECONDS: Readonly<Record<TourMoment, number>> = {
   ask: 8.0,
   books: 8.0,
-  revoSide: 7.5,
+  schedule: 7.5,
   reciteUp: 7.0,
   spot: 7.5,
   activityTab: 6.5,
@@ -131,7 +139,7 @@ export function climbCount(tier: number, u: number): number {
   return v >= 10000 ? Math.round(v / 50) * 50 : Math.round(v);
 }
 
-/** Total length of a tour of `moments`, each played to its end with its words (seconds). */
+/** Total length on the phone of a tour of `moments`, each played to its end, with its words coming in (seconds). */
 export function tourLength(moments: readonly TourMoment[]): number {
-  return moments.reduce((sum, m) => sum + TOUR_SECONDS[m] + WORDS_IN, 0);
+  return moments.reduce((sum, m) => sum + TOUR_SECONDS[m] / TOUR_SPEED + WORDS_IN, 0);
 }

@@ -10,9 +10,10 @@ import { useTheme } from '../../../context/ThemeContext';
 import { RevoMark } from '../../revo/RevoMark';
 import { BadgeMark } from '../../account/BadgeMark';
 import type { Milestone } from '../../../lib/badges';
-import { arabicV2 } from '../../../theme/v2';
+import { arabicV2, ramadanV2 } from '../../../theme/v2';
+import { HomeGround } from '../../home/HomeGround';
+import { Crescent, Lantern } from '../../ramadan/art';
 import { T, at } from './parts';
-import { MushafScreen } from './screens';
 
 export const TAB_Y = 790;
 export const TAB_X = { home: 75, activity: 201, read: 327 } as const;
@@ -132,14 +133,75 @@ export function AddToTodayButton() {
   );
 }
 
-/** Home: the Today post, then (as it was) Add to today, Today's journal and Recent sessions; now today alone (HOME-4/5). */
-export function HomeSketch({ v3, photo = false }: { v3: boolean; photo?: boolean }) {
-  const { palette } = useTheme();
+/** The ayah at Home's foot (HOME-7): one a day; Al-Qamar 54:17 here, in Saheeh International's words. */
+export function HomeAyah() {
+  const { palette, isDark } = useTheme();
+  const gold = ramadanV2(isDark, palette.accent).gold;
+  return (
+    <View style={styles.ayah}>
+      <View style={styles.ornament}>
+        <View style={[styles.rule, { backgroundColor: gold }]} />
+        <View style={[styles.diamond, { backgroundColor: gold }]} />
+        <View style={[styles.rule, { backgroundColor: gold }]} />
+      </View>
+      <T style={[arabicV2(21), styles.centerText, { color: palette.text, opacity: 0.85 }]}>
+        وَلَقَدْ يَسَّرْنَا ٱلْقُرْءَانَ لِلذِّكْرِ فَهَلْ مِن مُّدَّكِرٍ
+      </T>
+      <T style={[styles.meta, styles.centerText, { color: palette.secondary, marginTop: 4 }]}>
+        And We have certainly made the Qur’an easy for remembrance, so is there any who will remember?
+      </T>
+      <T style={[styles.meta, styles.centerText, { color: palette.secondary, marginTop: 6, opacity: 0.8 }]}>Al-Qamar 54:17</T>
+    </View>
+  );
+}
+
+/** Home's decorations in Ramadan (THEME-1): lanterns under the status bar, the crescent, the light falling, the bulbs over the tab bar. */
+function HomeDecor() {
+  const { palette, isDark } = useTheme();
+  const tokens = ramadanV2(isDark, palette.accent);
+  return (
+    <>
+      <View style={[at(0, 56, 402, 2), styles.wire, { backgroundColor: tokens.wire }]} />
+      {[22, 56, 90].map((x, i) => (
+        <View key={x} style={[at(x - 8, 56, 16, 50), styles.center]}>
+          <View style={{ width: 1, height: 10 + (i % 2) * 6, backgroundColor: tokens.wire }} />
+          <Lantern height={30} tokens={tokens} />
+        </View>
+      ))}
+      {[
+        [40, 470, 3],
+        [300, 410, 2],
+        [210, 520, 2.5],
+        [120, 600, 2],
+        [350, 560, 3],
+      ].map(([x, y, r], i) => (
+        <View key={i} style={[at(x, y, r, r), { borderRadius: r, backgroundColor: tokens.mote, opacity: tokens.moteOpacity }]} />
+      ))}
+      {Array.from({ length: 13 }, (_, i) => (
+        <View key={i} style={[at(10 + i * 30.5, TAB_Y - 6 + (i % 2) * 3, 6, 6), { borderRadius: 3, backgroundColor: tokens.bulbs[i % 3] }]} />
+      ))}
+    </>
+  );
+}
+
+/**
+ * Home: the Today post, then (as it was) Add to today, Today's journal and Recent sessions; now today alone (HOME-4/5).
+ * `clean`: as it is now by default, its glow carried down with an ayah at its foot (HOME-6, HOME-7) and, in Ramadan, its
+ * decorations; `foot` draws the ayah (a slide moves it in).
+ */
+export function HomeSketch({ v3, photo = false, clean = false, foot }: { v3: boolean; photo?: boolean; clean?: boolean; foot?: React.ReactNode }) {
+  const { palette, isDark } = useTheme();
   const name = photo ? 'Maryam' : 'Yusuf';
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.bg }]}>
+      {clean ? <HomeGround background="ayah" ramadan bottom={874 - TAB_Y} /> : null}
+      {clean ? <HomeDecor /> : null}
+      {clean ? <View style={at(32, 556, 338)}>{foot ?? <HomeAyah />}</View> : null}
       <View style={[at(0, 62, 402, 44), styles.homeTop]}>
-        <T style={[arabicV2(22), { color: palette.text }]}>السلام عليكم</T>
+        <View style={styles.salam}>
+          <T style={[arabicV2(22), { color: palette.text }]}>السلام عليكم</T>
+          {clean ? <Crescent size={17} tokens={ramadanV2(isDark, palette.accent)} /> : null}
+        </View>
         <View style={at(358, 9)}>
           <Ionicons name="settings-outline" size={26} color={palette.text} />
         </View>
@@ -184,54 +246,6 @@ export function HomeSketch({ v3, photo = false }: { v3: boolean; photo?: boolean
         <RevoMark size={44} />
       </View>
       <TabBar active="home" />
-    </View>
-  );
-}
-
-/** A take's summary (Your recitation), its last row Ask Revo about this take (REVO-25), over the page it was on. */
-export function TakeSummary() {
-  const { palette } = useTheme();
-  const rows: [string, string, string][] = [
-    ['Wrong word', palette.red, 'وَأُوتِيَتْ'],
-    ['Wrong haraka', palette.warn, 'شَىْءٍ'],
-    ['Not clear', palette.warn, 'ٱلَّذِى'],
-    ['Wrong word', palette.red, 'أَصَدَقْتَ'],
-  ];
-  return (
-    <View style={StyleSheet.absoluteFill}>
-      <MushafScreen page={379} foot={false} />
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.overlay }]} />
-      <View style={[at(0, 336, 402, 538), styles.summary, { backgroundColor: palette.sheet }]}>
-        <View style={[styles.handle, { backgroundColor: palette.handle }]} />
-        <T style={[styles.sheetTitle, { color: palette.text }]}>Your recitation</T>
-        <View style={styles.scoreRow}>
-          <T style={[styles.score, { color: palette.text }]}>96%</T>
-          <View>
-            <T style={[styles.name, { color: palette.text }]}>An-Naml, 3rd page</T>
-            <T style={[styles.meta, { color: palette.secondary }]}>1:42 · 3 mistakes</T>
-          </View>
-        </View>
-        {rows.map(([label, colour, word], i) => (
-          <View key={i} style={styles.markRow}>
-            <View style={[styles.markDot, { backgroundColor: colour }]} />
-            <T style={[styles.body, styles.flex, { color: palette.text }]}>{label}</T>
-            <T style={[arabicV2(17), { color: palette.text }]}>{word}</T>
-          </View>
-        ))}
-        <View style={[styles.askRow, { borderTopColor: palette.separator }]}>
-          <RevoMark size={28} />
-          <T style={[styles.body, styles.flex, { color: palette.text }]}>Ask Revo about this take</T>
-          <Ionicons name="chevron-forward" size={16} color={palette.secondary} />
-        </View>
-        <View style={styles.summaryButtons}>
-          <View style={[styles.half, styles.outline, { borderColor: palette.outline }]}>
-            <T style={[styles.button, { color: palette.text }]}>Recite again</T>
-          </View>
-          <View style={[styles.half, { backgroundColor: palette.primary }]}>
-            <T style={[styles.button, { color: palette.onPrimary }]}>Done</T>
-          </View>
-        </View>
-      </View>
     </View>
   );
 }
@@ -487,13 +501,18 @@ const styles = StyleSheet.create({
   meta: { fontSize: 13, lineHeight: 18 },
   button: { fontSize: 15, lineHeight: 20, fontWeight: '600' },
   barTitle: { fontSize: 17, lineHeight: 22, fontWeight: '600' },
-  sheetTitle: { fontSize: 18, lineHeight: 24, fontWeight: '600', textAlign: 'center', marginBottom: 10 },
   title22: { fontSize: 22, lineHeight: 28, fontWeight: '700' },
   figure: { fontSize: 22, lineHeight: 28, fontWeight: '700', fontVariant: ['tabular-nums'] },
   tabBar: { borderTopWidth: StyleSheet.hairlineWidth },
   tab: { alignItems: 'center' },
   tabDot: { width: 5, height: 5, borderRadius: 3, marginTop: 4 },
   homeTop: { alignItems: 'center', justifyContent: 'center' },
+  salam: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  ayah: { alignItems: 'center' },
+  ornament: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+  rule: { width: 26, height: 1, opacity: 0.7 },
+  diamond: { width: 6, height: 6, transform: [{ rotate: '45deg' }] },
+  wire: { opacity: 0.6 },
   letter: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   markBox: { width: 44, height: 44 },
   markBadge: { position: 'absolute', right: -4, bottom: -4 },
@@ -503,15 +522,6 @@ const styles = StyleSheet.create({
   recentHead: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10 },
   session: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
   check: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  summary: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16 },
-  handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 12 },
-  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 6 },
-  score: { fontSize: 40, lineHeight: 46, fontWeight: '800', letterSpacing: -1 },
-  markRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9 },
-  markDot: { width: 9, height: 9, borderRadius: 5 },
-  askRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, marginTop: 4 },
-  summaryButtons: { flexDirection: 'row', gap: 10, marginTop: 6 },
-  half: { flex: 1, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   accountTop: { alignItems: 'center', justifyContent: 'center' },
   picture: { borderRadius: 48, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   bigLetter: { fontSize: 40, lineHeight: 46, fontWeight: '600' },

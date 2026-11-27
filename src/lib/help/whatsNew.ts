@@ -50,7 +50,7 @@ export type WhatsNewPicture = 'activity' | 'elsewhere' | 'ayah' | 'marks' | 'aga
 export type WhatsNewMoment = 'revo' | 'recite' | TourMoment;
 
 /** The tour's slides (1.0.6; Majd, Nov 26 2026: one "ultimate" What's new), in the order they play. */
-export const TOUR_MOMENTS = ['ask', 'books', 'revoSide', 'reciteUp', 'spot', 'activityTab', 'homeToday', 'badges', 'ramadan'] as const;
+export const TOUR_MOMENTS = ['ask', 'books', 'schedule', 'reciteUp', 'spot', 'activityTab', 'homeToday', 'badges', 'ramadan'] as const;
 export type TourMoment = (typeof TOUR_MOMENTS)[number];
 export const isTourMoment = (m: WhatsNewMoment | undefined): m is TourMoment => (TOUR_MOMENTS as readonly string[]).includes(m ?? '');
 
@@ -289,13 +289,15 @@ export const NEXT_RELEASE: WhatsNewRelease | null = {
       needs: 'tafsir',
     },
     {
-      id: 'revo',
-      title: 'Revo, by your side',
+      // Majd, Nov 26 2026: "i want the users to take away the fact that they shouldn't feel lost or overwhelmed or confused
+      // about making a schedule and that revo can help them do the whole thing they just say what they want".
+      id: 'schedule',
+      title: 'Just say what you want',
       text:
-        'It drafts a schedule for you to check before anything changes, offers the tafsir of your next page, and talks ' +
-        'through any take. Tap [[mic]] to ask out loud.',
-      moment: 'revoSide',
-      covers: ['REVO-43', 'REVO-46', 'REVO-25', 'REVO-42'],
+        'No need to work out a schedule yourself. Tell Revo how much you can do and when, typing or with [[mic]], and it ' +
+        'builds the whole thing for you to check.',
+      moment: 'schedule',
+      covers: ['REVO-43', 'REVO-42'],
       needs: 'revoDev',
     },
     {
@@ -307,11 +309,12 @@ export const NEXT_RELEASE: WhatsNewRelease | null = {
       needs: 'recitePage',
     },
     {
+      // Majd, Nov 26 2026: the feature is spot testing, not the word Hasbuk.
       id: 'spot',
-      title: 'A spot test, then Hasbuk',
+      title: 'Spot test yourself',
       text:
-        'Hold [[mic]] and pick {{Test me}}: one ayah at random from what you’ve memorized, then carry on until Hasbuk. ' +
-        'Each test is kept in Activity.',
+        'Hold [[mic]] and pick {{Test me}}: an ayah at random from what you’ve memorized. Recite on from there, and every ' +
+        'test is kept in Activity.',
       moment: 'spot',
       covers: ['RECITE-8', 'ACT-34', 'RMEM-5'],
       needs: 'spotTests',
@@ -325,21 +328,25 @@ export const NEXT_RELEASE: WhatsNewRelease | null = {
       needs: 'activityTab',
     },
     {
+      // Majd, Nov 26 2026: market the new, clean Home, and show its background with the ayah (and Ramadan's decorations)
+      // without saying they're Ramadan's.
       id: 'home',
-      title: 'Home is today',
+      title: 'A calmer Home',
       text:
-        'Past sessions and notes are in Activity, Edit schedule is in Settings → Revision, and {{Change}} on today’s line ' +
-        'opens Jump to.',
+        'Just today: where you start, one button to begin, and an ayah to carry with you. Past sessions and notes now ' +
+        'live in Activity.',
       moment: 'homeToday',
-      covers: ['HOME-3', 'HOME-4', 'HOME-5', 'SET-1'],
+      covers: ['HOME-4', 'HOME-5', 'HOME-6', 'HOME-7'],
       needs: 'homeToday',
     },
     {
+      // Majd, Nov 26 2026: "the main take away is users feel inclined to come back and keep revising pages so they can
+      // unlock new badges".
       id: 'badges',
-      title: 'From Bronze to Emerald',
+      title: 'Unlock your next badge',
       text:
-        'Every page you revise counts toward the next badge, in six tiers. Your photo and latest badge are on Account and ' +
-        'on Home.',
+        'Every page you revise brings your next badge closer, through six tiers from Bronze to Emerald. Come back each ' +
+        'day and watch them unlock.',
       moment: 'badges',
       covers: ['ACCOUNT-4', 'ACCOUNT-5', 'ACCOUNT-7', 'ACCOUNT-8'],
       needs: 'account',

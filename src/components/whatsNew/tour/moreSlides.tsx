@@ -1,6 +1,5 @@
 // The tour's other slides (What's new 1.0.6, lib/whatsNew/tour): 4. Recite keeps up (RECITE-30, RECITE-2, RECITE-31);
-// 5. A spot test, then Hasbuk (RECITE-8, ACT-34); 6. Activity, in one place (ACT-35); 7. Home is today (HOME-3/4/5,
-// SET-1); 8. From Bronze to Emerald (ACCOUNT-4 to 8); 9. Ready for Ramadan (THEME-2 to 8). Pictures, never touched.
+// 5. Spot test yourself (RECITE-8, ACT-34); 6. Activity, in one place (ACT-35); 7. A calmer Home (HOME-4 to 7); 8. Unlock your next badge (ACCOUNT-4 to 8); 9. Ready for Ramadan (THEME-2 to 8). Pictures, never touched.
 
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -29,7 +28,7 @@ import {
   lerp,
   seg,
 } from '../../../lib/whatsNew/tour';
-import { Anim, Glint, RevoHeader, Ripple, Screen, Sheet, T, Touch, at, type Clock, type ScreenAt } from './parts';
+import { Anim, Glint, RevoHeader, Ripple, Screen, Sheet, T, at, type Clock, type ScreenAt } from './parts';
 import { LINE_H, MushafScreen, PAGE_BOX, WordsIn } from './screens';
 import {
   ACCOUNT_BAR,
@@ -40,6 +39,7 @@ import {
   ActivityWeek,
   AddToTodayButton,
   ExamplePhoto,
+  HomeAyah,
   HomeSketch,
   INSIGHT_ROWS,
   InsightRow,
@@ -199,7 +199,8 @@ const MARKS: [number, number][] = [
   [175, 396],
 ];
 const HOPS = [1.3, 1.44, 1.6, 1.79, 2.02, 2.3, 2.62];
-const CONFETTI = 40;
+/** A dark ground (the spot card's edge: an outline in dark, a shadow in light). */
+const isDarkCard = (bg: string) => bg.toLowerCase() === '#000000';
 
 function HiddenPage() {
   const { palette, isDark } = useTheme();
@@ -227,16 +228,6 @@ export function SpotSlide({ t }: { t: Clock }) {
     'worklet';
     return resting(now);
   };
-  const bits = useMemo(
-    () =>
-      Array.from({ length: CONFETTI }, (_, i) => {
-        const a = (i / CONFETTI) * Math.PI * 2 + (i % 3) * 0.4;
-        const v = 160 + ((i * 53) % 260);
-        return { vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.85 - 160, r: ((i * 97) % 720) - 360, w: 4 + (i % 5), h: 2.5 + (i % 3) };
-      }),
-    [],
-  );
-  const colours = [palette.primary, palette.accentText, palette.outline, palette.secondary, ramadanV2(false).gold];
   const words = TAKE.lines.flat().map((x) => x.text);
   return (
     <>
@@ -282,32 +273,24 @@ export function SpotSlide({ t }: { t: Clock }) {
             <T style={[styles.meta, styles.centerText, { color: palette.secondary }]}>Test settings</T>
           </Sheet>
         </Anim>
-        {/* Hasbuk: حسبك fills the middle, with confetti. */}
-        <Anim t={t} box={[StyleSheet.absoluteFill, { backgroundColor: palette.bg }]} style={(now) => {
+        {/* Kept in Activity: the test lands as its own entry (ACT-34). */}
+        <Anim t={t} box={at(16, 694, 370)} style={(now) => {
           'worklet';
-          return { opacity: 0.86 * easeInOut(seg(now, 5.05, 5.35)) };
-        }} />
-        <Anim t={t} box={[at(0, 330, 402, 200), styles.centerCol]} style={(now) => {
-          'worklet';
-          const u = seg(now, 5.15, 5.65);
-          return { opacity: Math.min(1, u * 2), transform: [{ scale: lerp(0.55, 1, easeBack(u)) }] };
+          const u = easeOut(seg(now, 5.3, 5.85));
+          return { opacity: u, transform: [{ translateY: (1 - u) * 60 }] };
         }}>
-          <T style={[arabicV2(92), { color: palette.accentText }]}>حسبك</T>
+          <View style={[styles.spotCard, { backgroundColor: palette.sheet }, isDarkCard(palette.bg) ? { borderWidth: StyleSheet.hairlineWidth, borderColor: palette.outline } : styles.shadow]}>
+            <View style={[styles.spotIcon, { backgroundColor: palette.accentSubtle }]}>
+              <Ionicons name="shuffle-outline" size={20} color={palette.accentText} />
+            </View>
+            <View style={styles.flex}>
+              <T style={[styles.name, { color: palette.text }]}>Spot test</T>
+              <T style={[styles.meta, { color: palette.secondary }]}>Al-Mulk, 1st page · No mistakes</T>
+            </View>
+            <Ionicons name="checkmark-circle" size={26} color={palette.accentText} />
+          </View>
         </Anim>
-        {bits.map((b, i) => (
-          <Anim key={i} t={t} box={[at(0, 0, b.w, b.h), { backgroundColor: colours[i % colours.length], borderRadius: 1 }]} style={(now) => {
-            'worklet';
-            const c = now - 5.25;
-            if (c <= 0) return { opacity: 0 };
-            return { opacity: 1 - seg(c, 1.2, 2.0), transform: [{ translateX: 201 + b.vx * c }, { translateY: 430 + b.vy * c + 260 * c * c }, { rotate: `${b.r * c}deg` }] };
-          }} />
-        ))}
       </Screen>
-      <Touch t={t} where={(now) => {
-        'worklet';
-        const p = pointOn(place(now), 201, 718);
-        return [p[0], p[1], seg(now, 0.55, 1.05)];
-      }} />
     </>
   );
 }
@@ -383,23 +366,8 @@ export function ActivitySlide({ t }: { t: Clock }) {
   );
 }
 
-// ------------------------------------------------------------------ 7. Home is today (HOME-3, HOME-4, HOME-5, SET-1)
-function MenuRow({ icon, label, first }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; first: boolean }) {
-  const { palette, isDark } = useTheme();
-  return (
-    <View
-      style={[
-        styles.miniRow,
-        { backgroundColor: palette.sheet, borderTopLeftRadius: first ? 14 : 0, borderTopRightRadius: first ? 14 : 0, borderBottomLeftRadius: first ? 0 : 14, borderBottomRightRadius: first ? 0 : 14 },
-        isDark ? { borderWidth: 1, borderColor: palette.outline } : styles.shadow,
-      ]}
-    >
-      <Ionicons name={icon} size={18} color={palette.text} />
-      <T style={[styles.menuText, { color: palette.text }]}>{label}</T>
-    </View>
-  );
-}
-
+// ------------------------------------------------------------------ 7. A calmer Home (HOME-4, HOME-5, HOME-6, HOME-7)
+/** Majd, Nov 26 2026: market the clean Home, with its glow, the ayah at its foot and Ramadan's decorations, unnamed. */
 export function HomeSlide({ t }: { t: Clock }) {
   const { palette } = useTheme();
   const place = (now: number): ScreenAt => {
@@ -411,93 +379,81 @@ export function HomeSlide({ t }: { t: Clock }) {
     const k = easeInOut(seg(now, start, start + 0.85));
     const dx = TAB_X.activity - (x + w / 2);
     const dy = TAB_Y + 23 - (y + h / 2);
-    const lift = easeOut(seg(now, 1.2, 1.45));
+    const lift = easeOut(seg(now, 1.0, 1.25));
     return {
-      opacity: now < 1.2 || k >= 1 ? 0 : 1,
+      opacity: now < 1.0 || k >= 1 ? 0 : 1,
       transform: k <= 0 ? [{ scale: 1 + 0.03 * lift }] : [{ translateX: dx * k + Math.sin(Math.PI * k) * bow }, { translateY: dy * k }, { scale: lerp(1, 0.06, easeIn(k)) }],
     };
+  };
+  const reveal = (now: number) => {
+    'worklet';
+    return easeInOut(seg(now, 2.7, 3.7));
   };
   return (
     <Screen t={t} place={place}>
       <HomeSketch v3={false} />
-      {/* Recent sessions and the journal lift out and fly into Activity, which bounces to take them. */}
+      {/* What isn't today lifts out: past sessions and the journal go to Activity, Add to today melts away. */}
       <Anim t={t} box={[at(0, 372, 402, 336), { backgroundColor: palette.bg }]} style={(now) => {
         'worklet';
-        return { opacity: now > 1.2 && now < 3.2 ? 1 : 0 };
+        return { opacity: now > 1.0 ? 1 : 0 };
       }} />
       <Anim t={t} box={at(RECENT_AT.left, RECENT_AT.top, RECENT_AT.width)} style={(now) => {
         'worklet';
-        return flyTo(now, 1.45, RECENT_AT.left, RECENT_AT.top, RECENT_AT.width, RECENT_AT.height, -40);
+        return flyTo(now, 1.25, RECENT_AT.left, RECENT_AT.top, RECENT_AT.width, RECENT_AT.height, -40);
       }}>
         <RecentSessions placed={false} />
       </Anim>
       <Anim t={t} box={at(JOURNAL_AT.left, JOURNAL_AT.top, JOURNAL_AT.width)} style={(now) => {
         'worklet';
-        return flyTo(now, 1.6, JOURNAL_AT.left, JOURNAL_AT.top, JOURNAL_AT.width, JOURNAL_AT.height, 24);
+        return flyTo(now, 1.4, JOURNAL_AT.left, JOURNAL_AT.top, JOURNAL_AT.width, JOURNAL_AT.height, 24);
       }}>
         <JournalRow placed={false} />
       </Anim>
-      <Ripple t={t} color={palette.primary} r={24} width={1.5} where={(now) => {
-        'worklet';
-        return [TAB_X.activity, TAB_Y + 23, seg(now, 2.35, 2.85)];
-      }} />
-      <Anim t={t} box={[at(TAB_X.activity - 20, TAB_Y + 10, 40, 40), styles.centerCol, { backgroundColor: palette.bg }]} style={(now) => {
-        'worklet';
-        const k = seg(now, 2.35, 2.8);
-        return { opacity: k > 0 && k < 1 ? 1 : 0, transform: [{ scale: 1 + 0.3 * bump(k) }] };
-      }}>
-        <Ionicons name="pulse" size={26} color={palette.accentText} />
-      </Anim>
-      {/* Home now: today alone, one solid button. */}
-      <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
-        'worklet';
-        return { opacity: easeInOut(seg(now, 2.85, 3.15)) };
-      }}>
-        <HomeSketch v3 />
-      </Anim>
-      {/* The old menu's rows go home: Jump to into "Change" (HOME-3), Edit schedule up into Settings (SET-1). */}
-      {(
-        [
-          ['navigate-outline', 'Jump to…', 218, 158, 3.55],
-          ['calendar-outline', 'Edit schedule', 373, 86, 3.72],
-        ] as const
-      ).map(([icon, label, tx, ty, a], i) => (
-        <React.Fragment key={label}>
-          <Anim t={t} box={at(150, 270 + 39 * i, 190, 39)} style={(now) => {
-            'worklet';
-            const mIn = easeOut(seg(now, 3.05, 3.35));
-            const k = easeInOut(seg(now, a, a + 0.6));
-            const dx = tx - (150 + 95);
-            const dy = ty - (270 + 39 * i + 19.5);
-            return {
-              opacity: k >= 1 ? 0 : mIn * (1 - seg(k, 0.75, 1)),
-              transform: [{ translateX: dx * k }, { translateY: dy * k + (1 - mIn) * 10 }, { scale: lerp(1, 0.22, easeIn(k)) * (0.92 + 0.08 * mIn) }],
-            };
-          }}>
-            <MenuRow icon={icon} label={label} first={i === 0} />
-          </Anim>
-          <Glint t={t} color={palette.primary} where={(now) => {
-            'worklet';
-            return [tx, ty, seg(now, a + 0.5, a + 1.0)];
-          }} />
-        </React.Fragment>
-      ))}
-      {/* Add to today melts into the grey line (HOME-5); a light passes over Start revision. */}
       <Anim t={t} box={at(68, 226)} style={(now) => {
         'worklet';
-        const k = easeInOut(seg(now, 4.55, 5.2));
-        return { opacity: now > 4.5 && k < 1 ? 0.95 * (1 - k) : 0, transform: [{ translateX: k * 43 }, { translateY: k * 12 }, { scaleX: 1 - 0.6 * k }, { scaleY: 1 - 0.75 * k }] };
+        const k = easeInOut(seg(now, 1.6, 2.3));
+        return { opacity: now > 1.0 && k < 1 ? 1 - k : 0, transform: [{ scaleX: 1 - 0.3 * k }, { scaleY: 1 - 0.7 * k }] };
       }}>
         <AddToTodayButton />
       </Anim>
+      <Ripple t={t} color={palette.primary} r={24} width={1.5} where={(now) => {
+        'worklet';
+        return [TAB_X.activity, TAB_Y + 23, seg(now, 2.15, 2.65)];
+      }} />
+      {/* The calmer Home washes in from the top, its glow carried down. */}
+      <Anim t={t} box={[StyleSheet.absoluteFill, styles.window]} style={(now) => {
+        'worklet';
+        return { opacity: now < 2.7 ? 0 : 1, transform: [{ translateY: -(1 - reveal(now)) * 874 }] };
+      }}>
+        <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
+          'worklet';
+          return { transform: [{ translateY: (1 - reveal(now)) * 874 }] };
+        }}>
+          <HomeSketch
+            v3
+            clean
+            foot={
+              // An ayah at its foot, one a day (HOME-7).
+              <Anim t={t} style={(now) => {
+                'worklet';
+                const a = easeOut(seg(now, 3.9, 4.8));
+                return { opacity: a, transform: [{ translateY: (1 - a) * 18 }] };
+              }}>
+                <HomeAyah />
+              </Anim>
+            }
+          />
+        </Anim>
+      </Anim>
       <Glint t={t} color={palette.primary} size={18} where={(now) => {
         'worklet';
-        return [271, 255, seg(now, 5.0, 5.5)];
+        return [201, 562, seg(now, 4.5, 5.1)];
       }} />
+      {/* One solid button: a light passes over it (HOME-5). */}
       <View style={[at(70, 200, 124, 33), styles.shine]}>
         <Anim t={t} box={[at(0, -14, 26, 62), styles.beam]} style={(now) => {
           'worklet';
-          const s = seg(now, 5.25, 5.95);
+          const s = seg(now, 5.2, 5.9);
           return { opacity: s > 0 && s < 1 ? 1 : 0, transform: [{ translateX: -30 + s * 180 }, { rotate: '20deg' }] };
         }} />
       </View>
@@ -505,7 +461,7 @@ export function HomeSlide({ t }: { t: Clock }) {
   );
 }
 
-// ------------------------------------------------------------------ 8. From Bronze to Emerald (ACCOUNT-4 to ACCOUNT-8)
+// ------------------------------------------------------------------ 8. Unlock your next badge (ACCOUNT-4 to ACCOUNT-8)
 const STEPS = [0, 1, 2, 3, 4, 5].map((i) => [78 + i * 49.2, 600 - i * 96] as const);
 const TIER_TOPS = CLIMB_TOPS as readonly Milestone[];
 const RING_C = 2 * Math.PI * 51;
@@ -717,11 +673,6 @@ export function BadgesSlide({ t }: { t: Clock }) {
           return [62, 154, seg(now, 8.12, 8.6)];
         }} />
       </Screen>
-      <Touch t={t} where={(now) => {
-        'worklet';
-        const p = pointOn(account(now), ACCOUNT_PICTURE.x, ACCOUNT_PICTURE.y);
-        return [p[0], p[1], seg(now, 0.55, 1.15)];
-      }} />
     </>
   );
 }
@@ -961,6 +912,9 @@ const styles = StyleSheet.create({
   miniRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, height: 39 },
   shadow: { shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 12, shadowOffset: { width: 0, height: 8 }, elevation: 6 },
   shine: { borderRadius: 17, overflow: 'hidden' },
+  window: { overflow: 'hidden' },
+  spotCard: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 16 },
+  spotIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   beam: { backgroundColor: 'rgba(255,255,255,0.55)' },
   halo: { position: 'absolute', left: 0, top: 0 },
   bigBadge: { position: 'absolute', left: 34, top: 34 },

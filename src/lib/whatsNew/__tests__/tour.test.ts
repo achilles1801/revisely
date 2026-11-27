@@ -6,6 +6,7 @@ import {
   SCREEN_AT,
   STAGE,
   TOUR_SECONDS,
+  TOUR_SPEED,
   along,
   bump,
   climbCount,
@@ -17,13 +18,15 @@ import {
   seg,
   tourLength,
 } from '../tour';
+import { MOMENT_SPEED } from '../revoMoment';
 
 describe("the tour's clock", () => {
-  it('every slide has a length, and the whole film is about 70 s with its words', () => {
+  it("every slide has a length, played at Revo's introduction's pace: the film is about a minute and a half", () => {
     for (const m of TOUR_MOMENTS) expect(TOUR_SECONDS[m]).toBeGreaterThan(5);
+    expect(TOUR_SPEED).toBe(MOMENT_SPEED);
     const total = tourLength(TOUR_MOMENTS);
-    expect(total).toBeGreaterThan(65);
-    expect(total).toBeLessThan(85);
+    expect(total).toBeGreaterThan(85);
+    expect(total).toBeLessThan(110);
   });
 
   it('seg, the easings and bump stay within 0 to 1 and land on their ends', () => {

@@ -25,17 +25,17 @@ import { describePassage, plainText } from '../../../lib/passages';
 import { RAMADAN_INTRO_KEY } from '../../ramadan/RamadanIntro';
 import { logger } from '../../../lib/logger';
 import type { TourMoment as TourMomentId } from '../../../lib/help/whatsNew';
-import { STAGE, TOUR_SECONDS, WORDS_IN, lerp } from '../../../lib/whatsNew/tour';
+import { STAGE, TOUR_SECONDS, TOUR_SPEED, WORDS_IN, lerp } from '../../../lib/whatsNew/tour';
 import { AGAIN_AFTER_MS } from '../../../lib/whatsNew/revoMoment';
 import { t } from '../../../i18n';
-import { AskSlide, BooksSlide, RevoSideSlide } from './revoSlides';
+import { AskSlide, BooksSlide, ScheduleSlide } from './revoSlides';
 import { ActivitySlide, BadgesSlide, HomeSlide, RamadanSlide, ReciteUpSlide, SpotSlide } from './moreSlides';
 import type { Clock } from './parts';
 
 /** Al-Mulk's first page: the tour's page when the account has none due today. */
 export const TOUR_FALLBACK_PAGE = 562;
 
-/** The account's next page to revise today (slide 1 is about it; Revo's greeting offers its tafsir on slide 3). */
+/** The account's next page to revise today: slide 1 is about it. */
 export function useTourPage(): { page: number; name: string } {
   const { user, pages } = useApp();
   const { date } = useRevisionDay(user);
@@ -73,14 +73,14 @@ function markRamadanCardSeen(): void {
   AsyncStorage.setItem(RAMADAN_INTRO_KEY, '1').catch(() => undefined);
 }
 
-function Slide({ moment, clock, page, pageName, firstName }: { moment: TourMomentId; clock: Clock; page: number; pageName: string; firstName: string }) {
+function Slide({ moment, clock, page, pageName }: { moment: TourMomentId; clock: Clock; page: number; pageName: string }) {
   switch (moment) {
     case 'ask':
       return <AskSlide t={clock} page={page} pageName={pageName} />;
     case 'books':
       return <BooksSlide t={clock} />;
-    case 'revoSide':
-      return <RevoSideSlide t={clock} firstName={firstName} nextName={pageName} />;
+    case 'schedule':
+      return <ScheduleSlide t={clock} />;
     case 'reciteUp':
       return <ReciteUpSlide t={clock} />;
     case 'spot':
@@ -104,7 +104,6 @@ export function TourMoment({
   words,
   last,
   closable,
-  firstName,
   onNext,
   onClose,
 }: {
@@ -118,8 +117,6 @@ export function TourMoment({
   last: boolean;
   /** A ✕ (the replay in Settings). */
   closable: boolean;
-  /** The account's first name, for Revo's greeting on slide 3: it stays on the phone. */
-  firstName: string;
   onNext: () => void;
   onClose?: () => void;
 }) {
@@ -150,7 +147,8 @@ export function TourMoment({
     setEnded(false);
     end.value = 0;
     clock.value = 0;
-    clock.value = withTiming(seconds, { duration: seconds * 1000, easing: Easing.linear }, (finished) => {
+    // The slide's own seconds, played at Revo's introduction's pace (TOUR_SPEED).
+    clock.value = withTiming(seconds, { duration: (seconds * 1000) / TOUR_SPEED, easing: Easing.linear }, (finished) => {
       if (finished) runOnJS(setEnded)(true);
     });
     return () => cancelAnimation(clock);
@@ -232,7 +230,7 @@ export function TourMoment({
             <Text style={[typeV2.meta, styles.example, { color: palette.secondary }]} allowFontScaling={false}>
               {t('whatsNew.tour.example')}
             </Text>
-            <Slide key={run} moment={moment} clock={clock} page={page} pageName={name} firstName={firstName} />
+            <Slide key={run} moment={moment} clock={clock} page={page} pageName={name} />
           </Animated.View>
         ) : null}
         <Animated.View

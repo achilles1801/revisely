@@ -67,10 +67,8 @@
   "1.0.6/books": {
     "REVO-44": "ae2603bef58d1e11"
   },
-  "1.0.6/revo": {
+  "1.0.6/schedule": {
     "REVO-43": "8754c1b0ee7c7f6d",
-    "REVO-46": "3c44f109bc122939",
-    "REVO-25": "d1d79c8fec388c88",
     "REVO-42": "2059a677a7cd54a4"
   },
   "1.0.6/recite": {
@@ -87,10 +85,10 @@
     "ACT-35": "b5f6a2c60631d3b4"
   },
   "1.0.6/home": {
-    "HOME-3": "060cf6a45f7ec70e",
     "HOME-4": "dbc21650e36f7c97",
     "HOME-5": "d99ff89d61f095df",
-    "SET-1": "7c9e48ea5ece9d2d"
+    "HOME-6": "9f328fbc05b55707",
+    "HOME-7": "a47b2e898da34b7e"
   },
   "1.0.6/badges": {
     "ACCOUNT-4": "c614707f6c66b6aa",
