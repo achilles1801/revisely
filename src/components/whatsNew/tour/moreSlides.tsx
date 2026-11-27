@@ -4,15 +4,14 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { runOnJS, useAnimatedProps, useAnimatedReaction } from 'react-native-reanimated';
-import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
 import { BadgeMark } from '../../account/BadgeMark';
 import { Crescent, Lantern, Moon } from '../../ramadan/art';
 import { badgeOf, MILESTONES, milestoneLabel, type Milestone } from '../../../lib/badges';
-import { arabicV2, BADGE_MATERIALS, ramadanV2 } from '../../../theme/v2';
+import { BADGE_MATERIALS, ramadanV2 } from '../../../theme/v2';
 import { getReadPalette } from '../../../theme/readPalette';
-import { TAKE } from '../pictures';
 import { formatNumber } from '../../../i18n';
 import {
   CLIMB_TOPS,
@@ -30,7 +29,7 @@ import {
   seg,
 } from '../../../lib/whatsNew/tour';
 import { Anim, Glint, OnStage, RevoHeader, Ripple, Screen, Sheet, T, at, stageAt, useStage, type Clock, type ScreenAt } from './parts';
-import { LINE_H, MushafScreen, PAGE_BOX, WordsIn } from './screens';
+import { MushafScreen, lineOn, linesOn, wordX } from './screens';
 import {
   ACCOUNT_BAR,
   ACCOUNT_PICTURE,
@@ -40,6 +39,7 @@ import {
   ActivityWeek,
   AddToTodayButton,
   ExamplePhoto,
+  HOME_LANTERNS,
   HomeAyah,
   HomeSketch,
   INSIGHT_ROWS,
@@ -54,7 +54,9 @@ import {
   ROW_H,
   RecentSessions,
   TAB_X,
+  TAB_BULBS,
   TAB_Y,
+  TODAY_BADGE,
   WEEK_ROW,
 } from './appScreens';
 import { pointOn } from './revoSlides';
@@ -99,29 +101,50 @@ function TakeBar({ top, sub, score, line }: { top?: string; sub?: string; score:
 }
 
 // ------------------------------------------------------------------ 4. Recite keeps up (RECITE-30, RECITE-2, RECITE-31)
-const LAST_LINE = PAGE_BOX.top + 14 * LINE_H;
-/** The page's last line, word by word from the right (rough places: a picture, not the page's word boxes). */
-const STEPS_X = [330, 272, 214, 160, 104, 50];
+/** Al-Mulk 12, the last line of page 562: its words right to left (the page's word boxes, bounds space). */
+const LAST_WORDS = [
+  [934, 983],
+  [846.8, 934.1],
+  [721.6, 842.8],
+  [613.6, 717.2],
+  [488.4, 608.9],
+  [408.4, 483.2],
+  [291.4, 408.4],
+  [211.1, 291.5],
+  [141.8, 211.1],
+].map(([a, b]) => wordX(a, b));
+/** When the grey box reaches each word: a hesitation before the fifth, which is marked (RECITE-2), then on to the end. */
+const REACH = [0.4, 0.7, 1.0, 1.3, 2.0, 2.25, 2.5, 2.75, 2.95];
+const STUMBLE = 4;
+/** Page 563's first word (Al-Mulk 13), where the next page waits. */
+const NEXT_WORD = wordX(861.4, 968.8);
 
 export function ReciteUpSlide({ t }: { t: Clock }) {
   const { palette } = useTheme();
+  const last = useMemo(() => lineOn(562, 15), []);
+  const first = useMemo(() => lineOn(563, 1), []);
   const place = (now: number): ScreenAt => {
     'worklet';
-    return resting(now, along(now, [1.55, 1, 2.2, 1.4, 2.75, 1.4, 3.1, 1]), 200, 726);
+    return resting(now);
   };
-  const box = (now: number) => {
+  /** The grey box on the word being said: its left and width. */
+  const box = (now: number): [number, number] => {
     'worklet';
-    if (now < 1.9) {
-      const v = seg(now, 0.25, 1.65) * 3;
-      const i = Math.min(2, Math.floor(v));
-      return lerp(STEPS_X[i], STEPS_X[i + 1], easeBack(Math.min(1, (v - i) * 2.2)));
-    }
-    return lerp(STEPS_X[3], STEPS_X[5], easeBack(seg(now, 1.9, 2.15)));
+    let k = 0;
+    while (k + 1 < REACH.length && now >= REACH[k + 1]) k++;
+    const a = LAST_WORDS[k];
+    if (k + 1 >= REACH.length) return [a[0], a[1] - a[0]];
+    const b = LAST_WORDS[k + 1];
+    const u = easeBack(seg(now, REACH[k + 1] - 0.18, REACH[k + 1]));
+    const x0 = lerp(a[0], b[0], u);
+    const x1 = lerp(a[1], b[1], u);
+    return [x0, x1 - x0];
   };
+  const s = LAST_WORDS[STUMBLE];
   return (
     <>
       <Screen t={t} place={place}>
-        {/* Following the page's last ayah: the soft band on the line, the grey box from word to word. */}
+        {/* Following the page's last ayah: the soft band on its line, the grey box from word to word. */}
         <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
           'worklet';
           return { opacity: now < 3.12 ? 1 : 0 };
@@ -130,13 +153,14 @@ export function ReciteUpSlide({ t }: { t: Clock }) {
             page={562}
             under={
               <>
-                <View style={[at(6, LAST_LINE, 390, LINE_H), { backgroundColor: palette.highlightSoft, borderRadius: 8 }]} />
-                <Anim t={t} box={[at(0, LAST_LINE + 2, 54, LINE_H - 4), { backgroundColor: palette.highlight, borderRadius: 7 }]} style={(now) => {
+                <View style={[at(last.left - 8, last.top - 4, last.width + 16, last.height + 8), { backgroundColor: palette.highlightSoft, borderRadius: 8 }]} />
+                <Anim t={t} box={[at(0, last.top - 2, 10, last.height + 4), { backgroundColor: palette.highlight, borderRadius: 7 }]} style={(now) => {
                   'worklet';
-                  return { transform: [{ translateX: box(now) }] };
+                  const [x, w] = box(now);
+                  return { opacity: seg(now, 0.25, 0.4), left: x - 2, width: w + 4 };
                 }} />
                 {/* A stumble: marked on the word reached for (RECITE-2). */}
-                <Anim t={t} box={[at(STEPS_X[4], LAST_LINE + 2, 54, LINE_H - 4), { backgroundColor: palette.red, borderRadius: 7 }]} style={(now) => {
+                <Anim t={t} box={[at(s[0] - 2, last.top - 2, s[1] - s[0] + 4, last.height + 4), { backgroundColor: palette.red, borderRadius: 7 }]} style={(now) => {
                   'worklet';
                   const u = seg(now, 1.85, 2.25);
                   return { opacity: Math.min(1, u * 3) * 0.28, transform: [{ translateY: (1 - easeOut(u)) * -14 }, { scale: lerp(1.35, 1, easeBack(u)) }] };
@@ -144,7 +168,13 @@ export function ReciteUpSlide({ t }: { t: Clock }) {
               </>
             }
           />
-          <TakeBar top="No mistakes" sub="1:12 · Al-Mulk, 1st page" score="100%" />
+          {/* One bar's words cross into the other's (the bar's fill is see-through, so the first goes as the second comes). */}
+          <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
+            'worklet';
+            return { opacity: 1 - easeInOut(seg(now, 2.05, 2.35)) };
+          }}>
+            <TakeBar top="No mistakes" sub="1:12 · Al-Mulk, 1st page" score="100%" />
+          </Anim>
           <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
             'worklet';
             return { opacity: easeInOut(seg(now, 2.05, 2.35)) };
@@ -168,14 +198,19 @@ export function ReciteUpSlide({ t }: { t: Clock }) {
           <MushafScreen
             page={563}
             under={
-              <Anim t={t} box={[at(330, PAGE_BOX.top + 2, 60, LINE_H - 4), { backgroundColor: palette.highlight, borderRadius: 7 }]} style={(now) => {
+              <Anim t={t} box={[at(NEXT_WORD[0] - 3, first.top - 2, NEXT_WORD[1] - NEXT_WORD[0] + 6, first.height + 4), { backgroundColor: palette.highlight, borderRadius: 7 }]} style={(now) => {
                 'worklet';
                 const br = seg(now, 4.0, 7.0);
-                return { opacity: seg(now, 4.0, 4.3), transform: [{ scale: 1 + 0.12 * Math.pow(Math.sin(br * Math.PI * 2.5), 2) }] };
+                return { opacity: seg(now, 4.0, 4.3), transform: [{ scale: 1 + 0.08 * Math.pow(Math.sin(br * Math.PI * 2.5), 2) }] };
               }} />
             }
           />
-          <TakeBar top="1 mistake" sub="1:19 · Al-Mulk, 2nd page" score="98%" />
+          <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
+            'worklet';
+            return { opacity: 1 - easeInOut(seg(now, 4.25, 4.6)) };
+          }}>
+            <TakeBar top="1 mistake" sub="1:19 · Al-Mulk, 2nd page" score="98%" />
+          </Anim>
           {/* Amber explains itself, once (RECITE-31). */}
           <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
             'worklet';
@@ -189,78 +224,120 @@ export function ReciteUpSlide({ t }: { t: Clock }) {
   );
 }
 
-// ------------------------------------------------------------------ 5. A spot test, then Hasbuk (RECITE-8, ACT-34)
-/** Ayah markers on the hidden page (rough places), the light hopping between them and stopping on the last. */
-const MARKS: [number, number][] = [
-  [276, 190],
-  [311, 600],
-  [69, 313],
-  [244, 520],
-  [261, 273],
-  [205, 479],
-  [144, 353],
-  [175, 396],
-];
+// ------------------------------------------------------------------ 5. A spot test (RECITE-8, ACT-34)
+/**
+ * Page 562 hidden as Recite hides it (RECITE-20): each line covered in the page's own colour with a rule under it, its
+ * ayah markers and the surah's header left open. A light hops between the markers, slowing like a wheel, and stops on
+ * Al-Mulk 1's: the test starts at the next ayah, whose words show as they're said.
+ */
+const HOP_PATH = [8, 4, 10, 2, 11, 5, 3, 0];
 const HOPS = [1.3, 1.44, 1.6, 1.79, 2.02, 2.3, 2.62];
+/** Al-Mulk 2's words, in the order said: the end of line 3, then line 4 (bounds space). */
+const TEST_WORDS: [number, number, number][] = [
+  [3, 135.1, 212.5],
+  [3, 62.3, 133.9],
+  ...[
+    [870, 977.1],
+    [757.8, 869.6],
+    [645.9, 757.8],
+    [562.8, 642.3],
+    [467.1, 562.8],
+    [395, 467.1],
+    [327.3, 395],
+    [241.8, 327.3],
+    [136.8, 241.8],
+  ].map(([a, b]) => [4, a, b] as [number, number, number]),
+];
+const SAY_FROM = 2.85;
+const SAY_STEP = 0.19;
 
-function HiddenPage() {
-  const { palette, isDark } = useTheme();
-  const page = getReadPalette(isDark).pageBg;
-  return (
-    <View style={[StyleSheet.absoluteFill, { backgroundColor: page }]}>
-      <View style={[at(0, 62, 402, 48), styles.centerCol]}>
-        <T style={[styles.name, { color: palette.text }]}>Al-Mulk</T>
-        <T style={[styles.tiny, { color: palette.secondary }]}>Page 562 · Juz 29</T>
-      </View>
-      {Array.from({ length: 15 }, (_, i) => (
-        <View key={i} style={[at(16, PAGE_BOX.top + i * LINE_H + LINE_H * 0.74, 370, 1), { backgroundColor: palette.secondary, opacity: 0.35 }]} />
-      ))}
-      {MARKS.map(([x, y], i) => (
-        <View key={i} style={[at(x - 11, y - 11, 22, 22), styles.marker, { borderColor: palette.secondary, backgroundColor: page }]}>
-          <T style={[styles.tiny, { color: palette.secondary }]}>{i + 1}</T>
-        </View>
-      ))}
-    </View>
-  );
+/** A line's covers: its text with the markers taken out (the phone's points). */
+function coverSpans(left: number, right: number, markers: [number, number][]): [number, number][] {
+  const out: [number, number][] = [];
+  let x = left;
+  for (const [a, b] of [...markers].sort((m, n) => m[0] - n[0])) {
+    if (a > x) out.push([x, a]);
+    x = Math.max(x, b);
+  }
+  if (right > x) out.push([x, right]);
+  return out;
 }
 
 export function SpotSlide({ t }: { t: Clock }) {
   const { palette, isDark } = useTheme();
+  const pageBg = getReadPalette(isDark).pageBg;
   const place = (now: number): ScreenAt => {
     'worklet';
     return resting(now);
   };
-  const words = TAKE.lines.flat().map((x) => x.text);
+  const lines = useMemo(() => linesOn(562), []);
+  const marks = useMemo(() => lines.flatMap((l) => l.markers.map(([a, b]) => [(a + b) / 2, l.top + l.height / 2, b - a] as [number, number, number])), [lines]);
+  const path = HOP_PATH.map((i) => marks[Math.min(i, marks.length - 1)]);
+  /** Each word said: where its line's cover ends once it shows (the phone's points), and when. */
+  const said = TEST_WORDS.map(([line, a], i) => ({ line, edge: wordX(a, a)[0], at: SAY_FROM + i * SAY_STEP }));
+  const last = lines[lines.length - 1];
   return (
     <>
       <Screen t={t} place={place}>
-        <HiddenPage />
-        {/* The light hops between ayah markers, slowing like a wheel, and stops. */}
-        <Anim t={t} box={[at(-22, -22, 44, 44), { borderRadius: 22, backgroundColor: palette.highlight }]} style={(now) => {
-          'worklet';
-          let k = 0;
-          while (k < HOPS.length - 1 && now > HOPS[k + 1]) k++;
-          const next = k + 1 < HOPS.length ? HOPS[k + 1] : HOPS[k] + 0.3;
-          const f = easeInOut(Math.min(1, Math.max(0, (now - HOPS[k]) / (next - HOPS[k]) / 0.7)));
-          const a = MARKS[Math.min(k, MARKS.length - 1)];
-          const b = MARKS[Math.min(k + 1, MARKS.length - 1)];
-          const x = now < HOPS[0] ? MARKS[0][0] : k >= HOPS.length - 1 ? MARKS[MARKS.length - 1][0] : lerp(a[0], b[0], f);
-          const y = now < HOPS[0] ? MARKS[0][1] : k >= HOPS.length - 1 ? MARKS[MARKS.length - 1][1] : lerp(a[1], b[1], f);
-          const o = now < 1.25 ? 0 : now < 2.9 ? Math.min(1, (now - 1.25) * 6) : 1 - seg(now, 2.9, 3.1);
-          return { opacity: o * 0.9, transform: [{ translateX: x }, { translateY: y }, { scale: now > 2.62 ? 1 + 0.25 * bump(seg(now, 2.62, 2.95)) : 1 }] };
-        }} />
-        {/* That ayah shows: its words appear as they're said, and the line under the header fills from the right. */}
-        <View style={at(24, 405, 354)}>
-          <WordsIn t={t} text={words.join(' ')} from={2.8} to={4.9} rtl style={[arabicV2(19), { color: palette.text }]} />
-        </View>
+        <MushafScreen
+          page={562}
+          foot={false}
+          under={
+            <Anim t={t} box={[at(-20, -20, 40, 40), { borderRadius: 20, backgroundColor: palette.highlight }]} style={(now) => {
+              'worklet';
+              let k = 0;
+              while (k < HOPS.length - 1 && now > HOPS[k + 1]) k++;
+              const next = k + 1 < HOPS.length ? HOPS[k + 1] : HOPS[k] + 0.3;
+              const f = easeInOut(Math.min(1, Math.max(0, (now - HOPS[k]) / (next - HOPS[k]) / 0.7)));
+              const a = path[Math.min(k, path.length - 1)];
+              const b = path[Math.min(k + 1, path.length - 1)];
+              const end = path[path.length - 1];
+              const x = now < HOPS[0] ? path[0][0] : k >= HOPS.length - 1 ? end[0] : lerp(a[0], b[0], f);
+              const y = now < HOPS[0] ? path[0][1] : k >= HOPS.length - 1 ? end[1] : lerp(a[1], b[1], f);
+              const o = now < 1.25 ? 0 : Math.min(1, (now - 1.25) * 6) * (1 - 0.6 * seg(now, 3.2, 3.8));
+              const pulse = now > 2.62 ? 0.2 * bump(seg(now, 2.62, 2.95)) : 0;
+              return { opacity: o, transform: [{ translateX: x }, { translateY: y }, { scale: (end[2] + 6) / 40 + pulse }] };
+            }} />
+          }
+        />
+        {/* The covers: whole lines in the page's colour, the markers open; Al-Mulk 2's open word by word. */}
+        {lines.map((l) =>
+          coverSpans(l.left - 2, l.left + l.width + 2, l.markers).map(([x0, x1]) => {
+            const mine = said.filter((w) => w.line === l.line && w.edge > x0 && w.edge < x1 + 1);
+            const box = [at(x0, l.coverTop, x1 - x0, l.coverBottom - l.coverTop), { backgroundColor: pageBg, transformOrigin: 'left' as const }];
+            if (mine.length === 0) return <View key={`${l.line}-${x0}`} style={box} />;
+            return (
+              <Anim key={`${l.line}-${x0}`} t={t} box={box} style={(now) => {
+                'worklet';
+                let edge = x1;
+                for (const w of mine) edge = lerp(edge, Math.min(edge, w.edge), easeOut(seg(now, w.at, w.at + 0.16)));
+                return { transform: [{ scaleX: Math.max(0.001, (edge - x0) / (x1 - x0)) }] };
+              }} />
+            );
+          }),
+        )}
+        {/* Over and under each marker: covered, as Recite does (its own rows alone are open). */}
+        {lines.flatMap((l) =>
+          l.markers.flatMap(([a, b], m) => {
+            const [r0, r1] = l.markerRows[m];
+            return [
+              <View key={`m-${l.line}-${m}-a`} style={[at(a, l.coverTop, b - a, Math.max(0, r0 - l.coverTop)), { backgroundColor: pageBg }]} />,
+              <View key={`m-${l.line}-${m}-b`} style={[at(a, r1, b - a, Math.max(0, l.coverBottom - r1)), { backgroundColor: pageBg }]} />,
+            ];
+          }),
+        )}
+        {lines.map((l) => (
+          <View key={`rule-${l.line}`} style={[at(l.left, l.coverBottom - 1, l.width, StyleSheet.hairlineWidth), { backgroundColor: palette.secondary, opacity: 0.35 }]} />
+        ))}
+        {/* The line under the header fills from the right as the ayah is said. */}
         <View style={[at(0, 110, 402, 3), { backgroundColor: palette.separator }]}>
           <Anim t={t} box={[styles.fillRight, { backgroundColor: palette.primary }]} style={(now) => {
             'worklet';
-            const u = easeInOut(seg(now, 2.75, 5.05));
-            return { opacity: now > 2.7 ? 1 : 0, transform: [{ translateX: 201 * (1 - u) }, { scaleX: Math.max(0.001, u) }] };
+            const u = easeInOut(seg(now, SAY_FROM - 0.1, SAY_FROM + TEST_WORDS.length * SAY_STEP));
+            return { opacity: now > SAY_FROM - 0.15 ? 1 : 0, transform: [{ translateX: 201 * (1 - u) }, { scaleX: Math.max(0.001, u) }] };
           }} />
         </View>
-        {/* Test me: one page, from everything memorized. */}
+        {/* Test me: one ayah at random, from everything memorized. */}
         <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
           'worklet';
           const u = easeIn(seg(now, 1.0, 1.25));
@@ -275,8 +352,8 @@ export function SpotSlide({ t }: { t: Clock }) {
             <T style={[styles.meta, styles.centerText, { color: palette.secondary }]}>Test settings</T>
           </Sheet>
         </Anim>
-        {/* Kept in Activity: the test lands as its own entry (ACT-34). */}
-        <Anim t={t} box={at(16, 694, 370)} style={(now) => {
+        {/* Kept in Activity: the test lands as its own entry (ACT-34), under the page, clear of its words. */}
+        <Anim t={t} box={at(16, Math.round(last.coverBottom + 14), 370)} style={(now) => {
           'worklet';
           const u = easeOut(seg(now, 5.3, 5.85));
           return { opacity: u, transform: [{ translateY: (1 - u) * 60 }] };
@@ -299,6 +376,9 @@ export function SpotSlide({ t }: { t: Clock }) {
 
 // ------------------------------------------------------------------ 6. Activity, in one place (ACT-35)
 const NEW_WEEK_Y = 176 + ROW_H;
+/** The picked day, a clear gap under the week's dates (Majd, Nov 27 2026: "the spacing is all off"), and Insights' rows. */
+const DAY_TOP = 176 + 2 * ROW_H + 16;
+const ROWS_TOP = DAY_TOP + 222;
 
 export function ActivitySlide({ t }: { t: Clock }) {
   const { palette } = useTheme();
@@ -340,14 +420,14 @@ export function ActivitySlide({ t }: { t: Clock }) {
       }}>
         <ActivityWeek />
       </Anim>
-      <Anim t={t} box={at(0, 262, 402)} style={(now) => {
+      <Anim t={t} box={at(0, DAY_TOP, 402)} style={(now) => {
         'worklet';
         const u = easeOut(seg(now, 2.65, 3.1));
         return { opacity: u, transform: [{ translateY: (1 - u) * 34 }] };
       }}>
         <ActivityDay />
       </Anim>
-      <Anim t={t} box={at(16, 448, 370)} style={(now) => {
+      <Anim t={t} box={at(16, ROWS_TOP - 30, 370)} style={(now) => {
         'worklet';
         const u = easeOut(seg(now, 3.45, 3.9));
         return { opacity: u, transform: [{ translateY: (1 - u) * 18 }] };
@@ -355,7 +435,7 @@ export function ActivitySlide({ t }: { t: Clock }) {
         <T style={[styles.eyebrow, { color: palette.secondary }]}>Your revision</T>
       </Anim>
       {INSIGHT_ROWS.map((row, i) => (
-        <Anim key={row[0]} t={t} box={at(0, 476 + i * 62, 402)} style={(now) => {
+        <Anim key={row[0]} t={t} box={at(0, ROWS_TOP + i * 62, 402)} style={(now) => {
           'worklet';
           const a = 3.61 + i * 0.16;
           const u = easeOut(seg(now, a, a + 0.45));
@@ -540,7 +620,8 @@ export function BadgesSlide({ t }: { t: Clock }) {
   const home = (now: number): ScreenAt => {
     'worklet';
     const g = easeOut(seg(now, 7.25, 7.7));
-    return { scale: lerp(0.66, SCREEN_AT.scale, g), top: lerp(80, SCREEN_AT.top, g), opacity: easeOut(seg(now, 7.25, 7.6)), zoom: along(now, [7.4, 1, 7.95, 1.9]), ox: 0, oy: 150 };
+    // The whole of Home, never a crop of it (Majd, Nov 27 2026: a zoom cut its words off at the screen's edge).
+    return { scale: lerp(0.66, SCREEN_AT.scale, g), top: lerp(80, SCREEN_AT.top, g), opacity: easeOut(seg(now, 7.25, 7.6)) };
   };
   const climbAt = (now: number): [number, number, number] => {
     'worklet';
@@ -555,7 +636,7 @@ export function BadgesSlide({ t }: { t: Clock }) {
     const land = easeInOut(seg(now, 7.45, 8.15));
     if (now > 7.45) {
       const f = home(now);
-      const tg = pointOn(f, 56, 162);
+      const tg = pointOn(f, TODAY_BADGE.x, TODAY_BADGE.y);
       const p = curve([x, y], [x + 120, Math.min(y, tg[1]) - 40], tg, land);
       x = p[0];
       y = p[1];
@@ -638,7 +719,8 @@ export function BadgesSlide({ t }: { t: Clock }) {
             }}>
               <BadgeMark milestone={TIER_TOPS[i]} size={40} />
             </Anim>
-            <View style={[at(i < 3 ? x + 34 : x - 34 - 160, y - 19, 160), i < 3 ? null : styles.endCol]}>
+            {/* Clear of the climbing badge (92 across, with its halo), so it never sits on a tier's words. */}
+            <View style={[at(i < 3 ? x + 58 : x - 58 - 160, y - 19, 160), i < 3 ? null : styles.endCol]}>
               <T style={[styles.name, { color: palette.text }]}>{badgeOf(TIER_TOPS[i]).tier[0].toUpperCase() + badgeOf(TIER_TOPS[i]).tier.slice(1)}</T>
               <T style={[styles.meta, { color: palette.secondary }]}>{`${milestoneLabel(MILESTONES[2 * i])} · ${milestoneLabel(TIER_TOPS[i])} pages`}</T>
             </View>
@@ -671,91 +753,195 @@ export function BadgesSlide({ t }: { t: Clock }) {
       {/* The latest badge flies down to Home and clicks into the corner of the picture. */}
       <Screen t={t} place={home}>
         <HomeSketch v3 photo />
-        <Anim t={t} box={[at(44, 150, 24, 24), { borderRadius: 12 }]} style={(now) => {
+        <Ripple t={t} color={palette.accentText} r={16} where={(now) => {
           'worklet';
-          const k = seg(now, 8.1, 8.5);
-          return { opacity: k > 0 && k < 1 ? 1 : 0, transform: [{ scale: 1 + 0.7 * bump(k) }] };
-        }}>
-          <BadgeMark milestone={100} size={24} number={false} />
-        </Anim>
-        <Glint t={t} color={SPARK} size={16} where={(now) => {
+          return [TODAY_BADGE.x, TODAY_BADGE.y, seg(now, 8.1, 8.75)];
+        }} />
+        <Glint t={t} color={SPARK} size={18} where={(now) => {
           'worklet';
-          return [62, 154, seg(now, 8.12, 8.6)];
+          return [TODAY_BADGE.x + 9, TODAY_BADGE.y - 9, seg(now, 8.12, 8.6)];
         }} />
       </Screen>
     </>
   );
 }
 
-// ------------------------------------------------------------------ 9. Ready for Ramadan (THEME-2 to THEME-8)
-const BULBS = 15;
-const LANTERNS = [
-  { x: 24, size: 0.95, rope: 44 },
-  { x: 372, size: 1.1, rope: 86 },
-  { x: 344, size: 0.7, rope: 26 },
-];
-const MOTES = 22;
+// ------------------------------------------------------------------ 9. Ready for Ramadan (THEME-1, THEME-5 to THEME-8)
+/**
+ * One day in Ramadan, all on the phone (Majd, Nov 27 2026: "the ramadan slide doesn't even make sense like ur zooming into
+ * a random moon then all of a sudden showing ur revision is complete"): Home dresses itself for the month; Revo greets
+ * with Ramadan's suggestions; the revision's end card has gold light for confetti and the day of Ramadan; Activity, with
+ * its lanterns, lights today's moon.
+ */
+const MONTH_DAYS = 30;
+const TODAY = 12;
+const MOTES = 18;
+/** Revo's button on Home (HomeSketch) and Start revision's middle, for the taps. */
+const REVO_AT = { x: 340, y: 728, size: 44 } as const;
+const START_AT = [130, 216] as const;
+const RAMADAN_ROW_TOP = DAY_TOP + 186;
 
-function RamadanActivity({ month }: { month: boolean }) {
+/** A lantern hanging from the top bar's wire, dropping in at `at` and swinging to rest (or still, with `at` null). */
+function HangingLantern({ t, x, i, at: start }: { t: Clock; x: number; i: number; at: number }) {
   const { palette, isDark } = useTheme();
   const tokens = ramadanV2(isDark, palette.accent);
+  const rope = 10 + (i % 2) * 6;
   return (
-    <View style={StyleSheet.absoluteFill}>
-      <ActivityWeek />
-      <View style={[at(0, 270, 402, 140), { backgroundColor: palette.bg }]}>
-        <View style={styles.ramadanHead}>
-          <Crescent size={18} tokens={tokens} />
-          <T style={[styles.name, { color: palette.text }]}>Ramadan · Day 12</T>
-          <View style={styles.flex} />
-          <T style={[styles.meta, { color: palette.secondary }]}>12 of 12 days</T>
-        </View>
-        <View style={styles.moons}>
-          {Array.from({ length: month ? 15 : 12 }, (_, i) => (
-            <Moon key={i} size={20} day={i + 1} state={i < 12 ? 'lit' : 'ahead'} tokens={tokens} missed={palette.red} ahead={palette.track} />
-          ))}
-        </View>
-      </View>
-    </View>
+    <Anim t={t} box={[at(x - 8, 56, 16, rope + 34), styles.lantern]} style={(now) => {
+      'worklet';
+      const d0 = start + i * 0.12;
+      const dk = easeOut(seg(now, d0, d0 + 0.55));
+      const tau = Math.max(0, now - d0 - 0.45);
+      const amp = 9 * (i % 2 ? 1 : -1);
+      const ang = now < d0 + 0.45 ? amp * 0.4 : amp * Math.exp(-1.6 * tau) * Math.sin(5.2 * tau + 1.2) + 1.2 * Math.sin(1.3 * now + i);
+      return { opacity: dk > 0 ? 1 : 0, transform: [{ translateY: (1 - dk) * -110 }, { rotate: `${ang}deg` }] };
+    }}>
+      <View style={[styles.rope, { height: rope, backgroundColor: tokens.wire }]} />
+      <Lantern height={30} tokens={tokens} />
+    </Anim>
   );
 }
 
+/** Light falling softly over a screen from `from` (THEME-1), between `top` and `bottom`. */
+function FallingLight({ t, from, until = 99, top, bottom }: { t: Clock; from: number; until?: number; top: number; bottom: number }) {
+  const { palette, isDark } = useTheme();
+  const tokens = ramadanV2(isDark, palette.accent);
+  const motes = useMemo(
+    () => Array.from({ length: MOTES }, (_, i) => ({ x: 14 + ((i * 71) % 374), y: (i * 137) % (bottom - top), v: 24 + ((i * 13) % 30), s: 2 + (i % 3), w: i * 0.7 })),
+    [top, bottom],
+  );
+  return (
+    <>
+      {motes.map((m, i) => (
+        <Anim key={i} t={t} box={[at(0, 0, m.s, m.s), { borderRadius: m.s, backgroundColor: tokens.mote }]} style={(now) => {
+          'worklet';
+          const y = top + ((m.y + m.v * now) % (bottom - top));
+          const o = now < from || now > until ? 0 : seg(now, from, from + 0.5) * (1 - seg(now, until - 0.3, until)) * tokens.moteOpacity;
+          return { opacity: o, transform: [{ translateX: m.x + Math.sin(now + m.w) * 6 }, { translateY: y }] };
+        }} />
+      ))}
+    </>
+  );
+}
+
+/** Revo, opened from Home in Ramadan (THEME-8): its greeting and Ramadan's suggestions. */
 function RamadanRevo() {
   const { palette } = useTheme();
   return (
-    <View style={StyleSheet.absoluteFill}>
-      <ActivityWeek />
-      <Sheet top={300}>
-        <RevoHeader />
-        <View style={styles.sayGap}>
-          <T style={[styles.say, { color: palette.text }]}>
-            Ramadan Kareem, Maryam. Day 12, and you’ve revised every day so far. Today’s 20 pages start at Al-Mujadila.
-          </T>
+    <Sheet top={330}>
+      <RevoHeader />
+      <View style={styles.sayGap}>
+        <T style={[styles.say, { color: palette.text }]}>
+          Ramadan Kareem, Maryam. Day 12, and you’ve revised every day so far. Today’s 20 pages start at Al-Mulk.
+        </T>
+      </View>
+      <View style={styles.chipsCol}>
+        {['Plan a khatmah by Eid', 'What should I revise for taraweeh?', 'How’s my Ramadan going?'].map((c) => (
+          <View key={c} style={[styles.chip, { borderColor: palette.outline }]}>
+            <T style={[styles.button, { color: palette.text }]} numberOfLines={1}>
+              {c}
+            </T>
+          </View>
+        ))}
+      </View>
+    </Sheet>
+  );
+}
+
+/** A revision's end card in Ramadan (THEME-7): gold light falling and a pair of lanterns at each top corner. */
+function RamadanEndCard({ t }: { t: Clock }) {
+  const { palette, isDark } = useTheme();
+  const tokens = ramadanV2(isDark, palette.accent);
+  return (
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.bg }]}>
+      {[
+        [34, 70],
+        [66, 40],
+        [336, 40],
+        [368, 70],
+      ].map(([x, rope], i) => (
+        <View key={i} style={[at(x - 10, 0, 20, rope + 40), styles.centerCol]}>
+          <View style={[styles.rope, { height: rope, backgroundColor: tokens.wire }]} />
+          <Lantern height={38} tokens={tokens} />
         </View>
-        <View style={styles.chipsBottom}>
-          {['Plan a khatmah by Eid', 'What should I revise for taraweeh?'].map((c) => (
-            <View key={c} style={[styles.chip, { borderColor: palette.outline }]}>
-              <T style={[styles.button, { color: palette.text }]} numberOfLines={1}>
-                {c}
-              </T>
-            </View>
-          ))}
+      ))}
+      <FallingLight t={t} from={4.8} top={120} bottom={780} />
+      <View style={[StyleSheet.absoluteFill, styles.centerCol, { justifyContent: 'center' }]}>
+        <View style={[styles.doneRing, { borderColor: palette.accentText }]}>
+          <Ionicons name="checkmark" size={30} color={palette.accentText} />
         </View>
-      </Sheet>
+        <T style={[styles.title22, { color: palette.text, marginTop: 16 }]}>Revision complete</T>
+        <T style={[styles.body, { color: palette.secondary }]}>Al-Mulk to Al-Mursalat</T>
+        <T style={[styles.meta, { color: palette.secondary }]}>20 pages revised today</T>
+        <View style={styles.dayLine}>
+          <Crescent size={14} tokens={tokens} />
+          <T style={[styles.name13, { color: tokens.gold }]}>Day 12 of Ramadan</T>
+        </View>
+      </View>
     </View>
   );
 }
 
-function RamadanEndCard() {
-  const { palette } = useTheme();
+/** The one Activity tab in Ramadan (THEME-5, THEME-6): its lanterns, the day, and the month's row with a moon a day. */
+function RamadanActivity({ t }: { t: Clock }) {
+  const { palette, isDark } = useTheme();
+  const tokens = ramadanV2(isDark, palette.accent);
+  const moon = (d: number, state: 'lit' | 'ahead') => <Moon size={18} day={d} state={state} tokens={tokens} missed={palette.red} ahead={palette.track} />;
   return (
-    <View style={[StyleSheet.absoluteFill, styles.centerCol, { backgroundColor: palette.bg, justifyContent: 'center' }]}>
-      <View style={[styles.doneRing, { borderColor: palette.accentText }]}>
-        <Ionicons name="checkmark" size={30} color={palette.accentText} />
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.bg }]}>
+      {/* Light falls softly behind this week (THEME-5): under its words. */}
+      <FallingLight t={t} from={6.1} top={110} bottom={280} />
+      <ActivityWeek bare />
+      {HOME_LANTERNS.map((x, i) => (
+        <View key={x} style={[at(x - 8, 56, 16, 50), styles.centerCol]}>
+          <View style={[styles.rope, { height: 10 + (i % 2) * 6, backgroundColor: tokens.wire }]} />
+          <Lantern height={30} tokens={tokens} />
+        </View>
+      ))}
+      {TAB_BULBS.map(([x, y], i) => (
+        <View key={i} style={[at(x, y, 6, 6), { borderRadius: 3, backgroundColor: tokens.bulbs[i % 3] }]} />
+      ))}
+      <View style={at(0, DAY_TOP, 402)}>
+        <ActivityDay />
       </View>
-      <T style={[styles.title22, { color: palette.text, marginTop: 16 }]}>Revision complete</T>
-      <T style={[styles.body, { color: palette.secondary }]}>Al-Mujadila to At-Tahrim</T>
-      <T style={[styles.meta, { color: palette.secondary }]}>20 pages revised today</T>
-      <T style={[styles.meta, { color: palette.secondary, marginTop: 6 }]}>Day 12 of Ramadan</T>
+      <View style={at(16, RAMADAN_ROW_TOP, 370)}>
+        <View style={styles.ramadanHead}>
+          <Crescent size={16} tokens={tokens} />
+          <T style={[styles.name, { color: palette.text }]}>Day 12 of Ramadan</T>
+          <View style={styles.flex} />
+          <T style={[styles.meta, { color: palette.secondary }]}>12 of 12 days</T>
+        </View>
+        <T style={[styles.meta, { color: palette.secondary }]}>Every day so far</T>
+        {[0, 1].map((row) => (
+          <View key={row} style={styles.moons}>
+            {Array.from({ length: MONTH_DAYS / 2 }, (_, k) => {
+              const d = row * (MONTH_DAYS / 2) + k + 1;
+              if (d !== TODAY) return <View key={d}>{moon(d, d < TODAY ? 'lit' : 'ahead')}</View>;
+              // Today's moon, lit as the day's revision lands.
+              return (
+                <View key={d}>
+                  {moon(d, 'ahead')}
+                  <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
+                    'worklet';
+                    const u = seg(now, 6.85, 7.25);
+                    return { opacity: u, transform: [{ scale: 1 + 0.5 * bump(u) }] };
+                  }}>
+                    {moon(d, 'lit')}
+                  </Anim>
+                </View>
+              );
+            })}
+          </View>
+        ))}
+      </View>
+      <View style={at(16, RAMADAN_ROW_TOP + 120, 370)}>
+        <T style={[styles.eyebrow, { color: palette.secondary }]}>Your revision</T>
+      </View>
+      {INSIGHT_ROWS.slice(0, 2).map((row, i) => (
+        <View key={row[0]} style={at(0, RAMADAN_ROW_TOP + 148 + i * 62, 402)}>
+          <InsightRow row={row} />
+        </View>
+      ))}
     </View>
   );
 }
@@ -765,135 +951,102 @@ export function RamadanSlide({ t }: { t: Clock }) {
   const tokens = ramadanV2(isDark, palette.accent);
   const place = (now: number): ScreenAt => {
     'worklet';
-    const e = resting(now, along(now, [2.9, 1, 3.6, 1.3, 4.35, 1.3, 4.9, 1]), 201, 330);
-    const dim = easeInOut(seg(now, 0.25, 1.0));
-    const lift = easeInOut(seg(now, 1.2, 1.7));
-    const o = now < 0.7 ? (e.opacity ?? 1) : now < 1.2 ? lerp(1, 0.18, dim) : lerp(0.18, 1, lift);
-    return { ...e, opacity: o, top: (e.top ?? SCREEN_AT.top) + 40 * lift };
+    return resting(now);
   };
-  const motes = useMemo(
-    () => Array.from({ length: MOTES }, (_, i) => ({ x: 8 + ((i * 71) % 386), y: (i * 137) % 600, v: 30 + ((i * 13) % 40), s: 2 + (i % 3), w: i * 0.7 })),
-    [],
-  );
+  // Today's moon on the Activity tab (its place in the month's rows), for its glint.
+  const moonX = 16 + ((TODAY - 1) % (MONTH_DAYS / 2)) * (18 + (370 - (MONTH_DAYS / 2) * 18) / (MONTH_DAYS / 2 - 1)) + 9;
+  const moonY = RAMADAN_ROW_TOP + 20 + 18 + 10 + 9;
   return (
-    <>
-      <OnStage>
-      {/* Dusk: the screen dims, a warm light comes down from the top. */}
+    <Screen t={t} place={place}>
+      {/* Home, then dressed for the month: the crescent by the greeting, lanterns, the tab bar's lights, falling light. */}
+      <HomeSketch
+        v3
+        clean
+        photo
+        decor={false}
+        greetingEnd={
+          <Anim t={t} style={(now) => {
+            'worklet';
+            const u = easeOut(seg(now, 0.8, 1.2));
+            return { opacity: u, transform: [{ scale: lerp(0.4, 1, easeBack(u)) }] };
+          }}>
+            <Crescent size={17} tokens={tokens} />
+          </Anim>
+        }
+      />
+      <Glint t={t} color={tokens.gold} size={14} where={(now) => {
+        'worklet';
+        return [262, 76, seg(now, 1.0, 1.5)];
+      }} />
+      <Anim t={t} box={[at(0, 56, 402, 2), { backgroundColor: tokens.wire }]} style={(now) => {
+        'worklet';
+        return { opacity: 0.6 * easeOut(seg(now, 0.9, 1.2)) };
+      }} />
+      {HOME_LANTERNS.map((x, i) => (
+        <HangingLantern key={x} t={t} x={x} i={i} at={1.0} />
+      ))}
+      {TAB_BULBS.map(([x, y], i) => (
+        <Anim key={i} t={t} box={[at(x - 5, y - 5, 16, 16), styles.centerCol, { justifyContent: 'center' }]} style={(now) => {
+          'worklet';
+          const lit = seg(now, 1.35 + i * 0.07, 1.42 + i * 0.07);
+          return { opacity: lit };
+        }}>
+          <View style={[styles.bulbHalo, { backgroundColor: tokens.bulbs[i % 3] }]} />
+          <View style={[styles.bulb, { backgroundColor: tokens.bulbs[i % 3] }]} />
+        </Anim>
+      ))}
+      <FallingLight t={t} from={1.6} until={4.7} top={110} bottom={780} />
+      {/* Revo's button takes its crescent; a tap, and it greets the month with Ramadan's suggestions (THEME-8). */}
+      <Anim t={t} box={at(REVO_AT.x - 4, REVO_AT.y - 5, 15, 15)} style={(now) => {
+        'worklet';
+        const u = easeOut(seg(now, 2.1, 2.45));
+        return { opacity: u, transform: [{ scale: lerp(0.4, 1, easeBack(u)) }] };
+      }}>
+        <Crescent size={15} tokens={tokens} />
+      </Anim>
+      <Ripple t={t} color={palette.primary} r={30} where={(now) => {
+        'worklet';
+        return [REVO_AT.x + REVO_AT.size / 2, REVO_AT.y + REVO_AT.size / 2, seg(now, 2.55, 3.0)];
+      }} />
       <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
         'worklet';
-        return { opacity: easeInOut(seg(now, 0.3, 1.1)) };
+        const up = easeOut(seg(now, 2.8, 3.25));
+        const down = easeIn(seg(now, 4.15, 4.45));
+        return { opacity: now < 2.8 ? 0 : 1 - down, transform: [{ translateY: (1 - up) * 560 + down * 560 }] };
       }}>
-        <Svg width={402} height={690}>
-          <Defs>
-            <LinearGradient id="tourDusk" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={tokens.gold} stopOpacity={isDark ? 0.2 : 0.16} />
-              <Stop offset="0.38" stopColor={tokens.gold} stopOpacity={0.05} />
-              <Stop offset="0.7" stopColor={tokens.gold} stopOpacity={0} />
-            </LinearGradient>
-          </Defs>
-          <Rect x={0} y={0} width={402} height={690} fill="url(#tourDusk)" />
-        </Svg>
+        <RamadanRevo />
       </Anim>
-      </OnStage>
-      <Screen t={t} place={place}>
-        <HomeSketch v3 />
-        <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
+      {[0, 1, 2].map((k) => (
+        <Glint key={k} t={t} color={tokens.gold} size={[12, 9, 11][k]} where={(now) => {
           'worklet';
-          return { opacity: easeInOut(seg(now, 1.2, 1.55)) };
-        }}>
-          <RamadanActivity month={false} />
-        </Anim>
-        {/* A moon for each day of the month. */}
-        <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
-          'worklet';
-          return { opacity: easeInOut(seg(now, 2.85, 3.15)) };
-        }}>
-          <RamadanActivity month />
-        </Anim>
-        {[0, 1, 2, 3].map((k) => (
-          <Glint key={k} t={t} color={tokens.gold} size={14} where={(now) => {
-            'worklet';
-            return [40 + k * 90, 318, seg(now, 3.3 + k * 0.22, 3.9 + k * 0.22)];
-          }} />
-        ))}
-        {/* Revo in Ramadan. */}
-        <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
-          'worklet';
-          const u = easeOut(seg(now, 4.4, 4.85));
-          return { opacity: u, transform: [{ translateY: (1 - u) * 40 }] };
-        }}>
-          <RamadanRevo />
-        </Anim>
-        {[0, 1, 2].map((k) => (
-          <Glint key={k} t={t} color={tokens.gold} size={[12, 9, 11][k]} where={(now) => {
-            'worklet';
-            const on = now > 4.85 && now < 6.1;
-            return [[70, 90, 108][k], [352, 344, 354][k], on ? ((now - 4.85) * 1.2 + k * 0.3) % 1 : 0];
-          }} />
-        ))}
-        {/* A session's end in Ramadan: gold light falls where the confetti was. */}
-        <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
-          'worklet';
-          return { opacity: easeInOut(seg(now, 6.0, 6.35)) };
-        }}>
-          <RamadanEndCard />
-        </Anim>
-      </Screen>
-      <OnStage>
-      {/* The crescent rises, then takes its corner. */}
-      <Anim t={t} box={at(0, 0, 70, 70)} style={(now) => {
-        'worklet';
-        const cr = easeOut(seg(now, 0.35, 1.2));
-        const mv = easeInOut(seg(now, 1.25, 1.9));
-        return { opacity: cr * 0.95, transform: [{ translateX: lerp(201, 360, mv) - 35 }, { translateY: lerp(lerp(420, 360, cr), 70, mv) - 35 }, { scale: lerp(1, 30 / 70, mv) }] };
-      }}>
-        <Crescent size={70} tokens={tokens} />
-      </Anim>
-      {/* String lights light across the top, one by one. */}
-      <Svg width={402} height={60} style={styles.lights}>
-        <Path d="M0,4 Q100.5,40 201,4 T402,4" fill="none" stroke={tokens.wire} strokeWidth={1} />
-      </Svg>
-      {Array.from({ length: BULBS }, (_, i) => {
-        const tt = (i + 0.5) / BULBS;
-        const u = (tt * 2) % 1;
-        const x = tt * 402;
-        const y = 4 + 36 * 2 * u * (1 - u) + 4;
-        return (
-          <Anim key={i} t={t} box={[at(x - 8, y - 8 + 6, 16, 16), styles.centerCol, { justifyContent: 'center' }]} style={(now) => {
-            'worklet';
-            const lit = seg(now, 1.4 + tt * 1.05, 1.45 + tt * 1.05);
-            return { opacity: seg(now, 1.3, 1.5) * (0.18 + 0.82 * lit) };
-          }}>
-            <View style={[styles.bulbHalo, { backgroundColor: tokens.bulbs[i % 3] }]} />
-            <View style={[styles.bulb, { backgroundColor: tokens.bulbs[i % 3] }]} />
-          </Anim>
-        );
-      })}
-      {/* Three lanterns drop and swing to rest. */}
-      {LANTERNS.map((l, i) => (
-        <Anim key={i} t={t} box={[at(l.x - 20 * l.size, 0, 40 * l.size, (l.rope + 62) * l.size), styles.lantern]} style={(now) => {
-          'worklet';
-          const d0 = 1.5 + i * 0.12;
-          const dk = easeOut(seg(now, d0, d0 + 0.6));
-          const tau = Math.max(0, now - d0 - 0.5);
-          const amp = 10 * (i % 2 ? 1 : -1) * (1 - 0.2 * i);
-          const ang = (now < d0 + 0.5 ? amp * 0.4 : amp * Math.exp(-1.5 * tau) * Math.sin(5.2 * tau + 1.2)) + 1.6 * Math.sin(1.3 * now + i);
-          return { opacity: dk > 0 ? 1 : 0, transform: [{ translateY: (1 - dk) * -190 }, { rotate: `${ang}deg` }] };
-        }}>
-          <View style={[styles.rope, { height: l.rope * l.size, backgroundColor: tokens.wire }]} />
-          <Lantern height={48 * l.size * 1.3} tokens={tokens} />
-        </Anim>
-      ))}
-      {/* Falling light. */}
-      {motes.map((m, i) => (
-        <Anim key={i} t={t} box={[at(0, 0, m.s, m.s), { borderRadius: m.s, backgroundColor: tokens.mote }]} style={(now) => {
-          'worklet';
-          const y = 90 + ((m.y + m.v * now) % 560);
-          return { opacity: now < 6.0 ? 0 : seg(now, 6.0, 6.5) * tokens.moteOpacity, transform: [{ translateX: m.x + Math.sin(now + m.w) * 6 }, { translateY: y }] };
+          const on = now > 3.3 && now < 4.1;
+          return [[60, 84, 104][k], [372, 362, 376][k], on ? ((now - 3.3) * 1.25 + k * 0.3) % 1 : 0];
         }} />
       ))}
-      </OnStage>
-    </>
+      {/* Start revision; at its end, gold light where the confetti was, and the day of Ramadan (THEME-7). */}
+      <Ripple t={t} color={palette.onPrimary} r={26} where={(now) => {
+        'worklet';
+        return [START_AT[0], START_AT[1], seg(now, 4.5, 4.95)];
+      }} />
+      <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
+        'worklet';
+        return { opacity: easeInOut(seg(now, 4.75, 5.05)) * (1 - easeInOut(seg(now, 6.0, 6.3))) };
+      }}>
+        <RamadanEndCard t={t} />
+      </Anim>
+      {/* Activity, with its lanterns: today's moon lights (THEME-5, THEME-6). */}
+      <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
+        'worklet';
+        const u = easeInOut(seg(now, 6.0, 6.35));
+        return { opacity: u, transform: [{ translateX: (1 - u) * 60 }] };
+      }}>
+        <RamadanActivity t={t} />
+      </Anim>
+      <Glint t={t} color={tokens.gold} size={18} where={(now) => {
+        'worklet';
+        return [moonX + 8, moonY - 10, seg(now, 7.0, 7.6)];
+      }} />
+    </Screen>
   );
 }
 
@@ -931,12 +1084,12 @@ const styles = StyleSheet.create({
   spotIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   halo: { position: 'absolute', left: 0, top: 0 },
   bigBadge: { position: 'absolute', left: 34, top: 34 },
-  ramadanHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 14 },
-  moons: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 16, paddingTop: 12 },
-  chipsBottom: { flexDirection: 'row', gap: 8, marginTop: 'auto', marginBottom: 60 },
+  ramadanHead: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 20 },
+  moons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
+  chipsCol: { gap: 8, alignItems: 'flex-start', marginTop: 'auto', marginBottom: 48 },
+  dayLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
   chip: { borderWidth: 1, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 8 },
   doneRing: { width: 64, height: 64, borderRadius: 32, borderWidth: 2.5, alignItems: 'center', justifyContent: 'center' },
-  lights: { position: 'absolute', left: 0, top: 6 },
   bulb: { position: 'absolute', width: 6.4, height: 6.4, borderRadius: 3.2 },
   bulbHalo: { position: 'absolute', width: 16, height: 16, borderRadius: 8, opacity: 0.16 },
   lantern: { alignItems: 'center', transformOrigin: 'top' },

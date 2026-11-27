@@ -3,7 +3,7 @@
 // tafsir mocks); 3. Just say what you want: the whole schedule built by Revo from a few words (REVO-43), said with its
 // own mic (REVO-42). Pictures, never touched.
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
@@ -24,7 +24,7 @@ import {
   seg,
 } from '../../../lib/whatsNew/tour';
 import { Anim, Asked, Bar, Chips, Field, Glint, RevoHeader, Ripple, Say, Screen, Sheet, T, at, stageAt, useStage, type Clock, type ScreenAt } from './parts';
-import { FOOT_Y, LINE_H, MushafScreen, PAGE_BOX, WordsIn } from './screens';
+import { FOOT_Y, LINE_H, MushafScreen, PAGE_BOX, WordsIn, ayahOn, linesOn } from './screens';
 
 /** A point of a screen's phone on the stage, wherever the screen and its camera are. */
 export function pointOn(f: ScreenAt, x: number, y: number): [number, number] {
@@ -50,8 +50,11 @@ function PageChip({ label }: { label: string }) {
 }
 
 // ------------------------------------------------------------------ 1. Ask about any page (REVO-45, REVO-44)
-const HELD_LINE = 7;
-const MENU_TOP = PAGE_BOX.top + (HELD_LINE + 1) * LINE_H + 10;
+/** The line a finger holds: the page's middle line, where it really is on the page. */
+function heldLine(page: number) {
+  const lines = linesOn(page);
+  return lines[Math.min(lines.length - 1, Math.floor(lines.length / 2))];
+}
 
 function VerseMenuSketch() {
   const { palette, isDark } = useTheme();
@@ -82,14 +85,15 @@ export function AskSlide({ t, page, pageName }: { t: Clock; page: number; pageNa
     'worklet';
     return resting(now, along(now, [1.2, 1, 2.25, 2.05, 2.7, 2.05, 3.4, 1]), 390, 830);
   };
-  const heldY = PAGE_BOX.top + HELD_LINE * LINE_H;
+  const held = useMemo(() => heldLine(page), [page]);
+  const menuTop = Math.round(held.top + held.height + 14);
   return (
     <>
       <Screen t={t} place={place}>
         <MushafScreen
           page={page}
           under={
-            <Anim t={t} box={[at(10, heldY + 1, 382, LINE_H - 2), { backgroundColor: palette.highlight, borderRadius: 8 }]} style={(now) => {
+            <Anim t={t} box={[at(held.left - 6, held.top - 3, held.width + 12, held.height + 6), { backgroundColor: palette.highlight, borderRadius: 8 }]} style={(now) => {
               'worklet';
               return { opacity: easeOut(seg(now, 6.45, 6.85)), transform: [{ scaleX: lerp(0.2, 1, easeOut(seg(now, 6.45, 6.95))) }] };
             }} />
@@ -140,7 +144,7 @@ export function AskSlide({ t, page, pageName }: { t: Clock; page: number; pageNa
           </Sheet>
         </Anim>
         {/* A finger holds an ayah: its grey spreads, and Ask Revo leads the menu. */}
-        <Anim t={t} box={at(69, MENU_TOP, 264)} style={(now) => {
+        <Anim t={t} box={at(69, menuTop, 264)} style={(now) => {
           'worklet';
           const u = easeOut(seg(now, 6.85, 7.2));
           return { opacity: u, transform: [{ scale: lerp(0.9, 1, u) }] };
@@ -149,7 +153,7 @@ export function AskSlide({ t, page, pageName }: { t: Clock; page: number; pageNa
         </Anim>
         <Glint t={t} color={palette.primary} size={16} where={(now) => {
           'worklet';
-          return [88, MENU_TOP + 12, seg(now, 7.2, 7.9)];
+          return [88, menuTop + 12, seg(now, 7.2, 7.9)];
         }} />
       </Screen>
     </>
@@ -245,7 +249,7 @@ function BookMark({ letter, size }: { letter: string; size: number }) {
 function Quote({ t, q, i }: { t: Clock; q: (typeof QUOTES)[number]; i: number }) {
   const { palette } = useTheme();
   const [, , d0, d1] = DOCK[i];
-  // Ibn Kathir's words write themselves under the camera; the others arrive as their book docks.
+  // Ibn Kathir's words write themselves after the others; the others arrive as their book docks.
   const writes = i === 1 ? ([3.45, 4.25, 4.3, 4.9] as const) : ([d1 - 0.05, d1 + 0.45, d1 + 0.3, d1 + 0.8] as const);
   return (
     <View style={at(16, q.top, 370)}>
@@ -270,9 +274,13 @@ function Quote({ t, q, i }: { t: Clock; q: (typeof QUOTES)[number]; i: number })
 export function BooksSlide({ t }: { t: Clock }) {
   const { palette } = useTheme();
   const stage = useStage();
+  // An-Naml 35 on page 379 (its last line), and the quote's card under it.
+  const ayah35 = useMemo(() => ayahOn(379, 27, 35), []);
+  const cardTop = Math.round(Math.max(...ayah35.map((b) => b.top + b.height)) + 16);
   const place = (now: number): ScreenAt => {
     'worklet';
-    const f = resting(now, along(now, [3.0, 1, 3.55, 1.85, 4.95, 1.85, 5.55, 1]), 210, 640);
+    // No camera push: at 1.85 it cut the quotes' words off at both edges of the screen (Majd, Nov 27 2026).
+    const f = resting(now);
     // Standing back while the books circle it, then up to its size as they dock (its centre kept).
     const k = along(now, [1.3, ORBIT_SHRINK, 2.6, 1]);
     const full = f.scale ?? SCREEN_AT.scale;
@@ -340,7 +348,7 @@ export function BooksSlide({ t }: { t: Clock }) {
             </T>
           </Sheet>
         </Anim>
-        {/* Back to the mushaf: An-Naml 35 in grey, and the quote settles beside it. */}
+        {/* Back to the mushaf: An-Naml 35 in grey on its own line, and the quote settles under the page, off its words. */}
         <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
           'worklet';
           const u = easeOut(seg(now, 6.25, 6.75));
@@ -348,19 +356,19 @@ export function BooksSlide({ t }: { t: Clock }) {
         }}>
           <MushafScreen
             page={379}
-            under={
-              <Anim t={t} box={[at(8, PAGE_BOX.top + 14 * LINE_H, 386, LINE_H), { backgroundColor: palette.highlight, borderRadius: 8 }]} style={(now) => {
+            foot={false}
+            under={ayah35.map((b, i) => (
+              <Anim key={i} t={t} box={[at(b.left - 6, b.top - 3, b.width + 12, b.height + 6), { backgroundColor: palette.highlight, borderRadius: 8 }]} style={(now) => {
                 'worklet';
                 return { opacity: easeInOut(seg(now, 6.85, 7.3)) };
               }} />
-            }
+            ))}
           />
         </Anim>
-        {/* Over the header, so it never covers the page's words. */}
-        <Anim t={t} box={at(14, 16, 374)} style={(now) => {
+        <Anim t={t} box={at(14, cardTop, 374)} style={(now) => {
           'worklet';
           const u = easeOut(seg(now, 6.95, 7.65));
-          return { opacity: seg(now, 6.95, 7.2), transform: [{ translateY: (1 - u) * 260 }, { scale: lerp(0.8, 1, u) }] };
+          return { opacity: seg(now, 6.95, 7.2), transform: [{ translateY: (1 - u) * 90 }] };
         }}>
           <View style={[styles.card, { backgroundColor: palette.sheet, borderColor: palette.outline }]}>
             <View style={styles.quoteHead}>
@@ -369,7 +377,7 @@ export function BooksSlide({ t }: { t: Clock }) {
               <View style={styles.flex} />
               <T style={[styles.meta, { color: palette.secondary }]}>An-Naml 35</T>
             </View>
-            <T style={[arabicV2(15), styles.rtl, { color: palette.text }]}>{QUOTES[1].arabic}</T>
+            <T style={[arabicV2(15), styles.rtl, { color: palette.text }]} numberOfLines={1}>{QUOTES[1].arabic}</T>
           </View>
         </Anim>
       </Screen>

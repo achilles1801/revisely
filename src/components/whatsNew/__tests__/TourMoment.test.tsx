@@ -15,11 +15,12 @@ jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
 
 import { Slide, TourMoment } from '../tour/TourMoment';
 import { StageScale } from '../tour/parts';
+import { lineOn } from '../tour/screens';
 import { TOUR_SECONDS } from '../../../lib/whatsNew/tour';
 import { useSharedValue } from 'react-native-reanimated';
 import { TOUR_MOMENTS, type TourMoment as TourMomentId } from '../../../lib/help/whatsNew';
 import { RAMADAN_INTRO_KEY } from '../../ramadan/introKey';
-import { ThemeProvider } from '../../../context/ThemeContext';
+import { ThemeProvider, useTheme } from '../../../context/ThemeContext';
 import { DesignProvider } from '../../../design/DesignContext';
 
 const onNext = jest.fn();
@@ -100,6 +101,45 @@ describe('<TourMoment />', () => {
     expect(words.length).toBeGreaterThan(3);
     const stacked = words.map((n) => ({ text: String(n.props.children).slice(0, 30), scales: scalesAbove(n) })).filter((w) => w.scales.length > 1);
     expect(stacked).toEqual([]);
+  });
+
+  // Majd, Nov 27 2026: a grey bar under the page's last line, a stray box over a word. The slides guessed a line as a
+  // fifteenth of the page's box; a mark now sits on the page's own line (src/data/pageLines.json).
+  it.each([
+    ['books', TOUR_SECONDS.books, 'highlight', 379, 15],
+    ['reciteUp', 2.3, 'highlightSoft', 562, 15],
+  ] as const)('the %s slide marks the page’s own line', async (moment, at, colour, page, line) => {
+    let palette: Record<string, unknown> = {};
+    function At() {
+      palette = useTheme().palette as unknown as Record<string, unknown>;
+      const clock = useSharedValue(at);
+      const stage = useSharedValue(0.87);
+      return (
+        <StageScale.Provider value={stage}>
+          <Slide moment={moment} clock={clock} page={562} pageName="Al-Mulk, 1st page" />
+        </StageScale.Provider>
+      );
+    }
+    render(
+      <DesignProvider initial={{}}>
+        <ThemeProvider>
+          <At />
+        </ThemeProvider>
+      </DesignProvider>,
+    );
+    await act(async () => {});
+    type Mark = { backgroundColor?: string; top?: number; height?: number };
+    const marks = (screen.UNSAFE_root.findAll((n: { type: unknown }) => n.type === 'View') as unknown as Node[])
+      .filter((n) => shown(n) > 0.01)
+      .map((n) => (StyleSheet.flatten(n.props.style as never) ?? {}) as Mark)
+      .filter((st) => st.backgroundColor === palette[colour] && st.top != null && st.height != null);
+    expect(marks.length).toBeGreaterThan(0);
+    const band = lineOn(page, line);
+    for (const m of marks) {
+      const middle = m!.top! + m!.height! / 2;
+      expect(middle).toBeGreaterThan(band.top);
+      expect(middle).toBeLessThan(band.top + band.height);
+    }
   });
 
   it.each([...TOUR_MOMENTS])('the %s slide plays, and Skip jumps it to its words and Next', async (moment) => {
