@@ -8,8 +8,9 @@
 // midnight) with the app closed. The app rewrites it whenever anything changes.
 
 import { generateDailyAssignment } from '../algorithm';
-import { catchUpIndex, caughtUpOnDay, creditedOnDay, creditIndex, needDone, needDoneCount } from '../aheadCredit';
-import { duePagesOf, planDuePages } from '../carryOver';
+import { catchUpIndex, creditIndex } from '../aheadCredit';
+import { planDuePages } from '../carryOver';
+import { dayProgress } from '../todaySnapshot';
 import { aliveStreak, completedDays } from '../streak';
 import { streakReadingFromItems, type HistoryItem } from '../streakFromItems';
 import { CalcSettings, dayTimes } from '../prayer/times';
@@ -215,15 +216,20 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
       max: 2,
     });
 
-    // As Home: done once every page of the day is revised, today or ahead.
-    const credited = creditedOnDay(input.logs, day);
-    const caughtUp = caughtUpOnDay(input.logs, day);
-    // The pages that finish the day (SESS-7): its own; or the carried pages, when Keep daily
-    // amount filled the day with them (they still count for the days they were missed).
-    const own = duePagesOf(assignment.pages, user, day, memorized);
-    const total = own.length;
-    const doneHere = needDoneCount(own, credited, caughtUp);
-    const completed = needDone(own, credited, caughtUp);
+    // As Home counts it (USER-2, lib/todaySnapshot dayProgress): done once the pages that finish the day are, revised
+    // that day, ahead, caught up or logged by hand. Those pages are its own; or the carried pages, when Keep daily amount
+    // filled the day with them (SESS-7); or, on a day with none of its own (pages from Insights on an off day), all of it.
+    const progress = dayProgress({
+      user,
+      pages: input.pages,
+      logs: input.logs,
+      day,
+      assignment: assignment.pages,
+      history: input.history ?? null,
+    });
+    const total = progress.finishing.length;
+    const completed = progress.status === 'completed';
+    const doneHere = progress.finishingDone;
 
     days.push({
       day,
