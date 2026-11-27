@@ -160,6 +160,10 @@ describe('[RECITE-20] a hidden page, every page and every reading state', () => 
     { why: 'the wasla over ٱلأعلى, its tip', page: 316, ref: [20, 68, 6], at: [911.557, 354.658] },
     // Its edge reaches half a unit past its box, into أَنتَ's: a patch while ٱلْأَعْلَىٰ is hidden, a notch once it is shown.
     { why: 'the wasla’s edge, inside أنت’s box', page: 316, ref: [20, 68, 6], at: [912.345, 356.234] },
+    // On Android's smaller images the scaling spreads that edge a pixel further, faint (alpha 58 of 255 on w1440, 94 on
+    // w1080): over about 8% opacity it counts too (Nov 27 2026).
+    { why: 'the wasla’s faint fringe on w1440', page: 316, ref: [20, 68, 6], at: [912.711, 355.911] },
+    { why: 'the wasla’s faint fringe on w1080', page: 316, ref: [20, 68, 6], at: [912.593, 356.03] },
     // The hamza under إِلَىٰ's alif (40:43) reaches 5.8 units past its box, under مَرَدَّنَآ: no straight edge parts them,
     // so it is a patch while إِلَىٰ is hidden and a notch while it is shown (src/data/hiddenInk.dat).
     { why: 'the hamza under إلى, inside مردنا’s box', page: 472, ref: [40, 43, 16], at: [806.4, 517.317] },

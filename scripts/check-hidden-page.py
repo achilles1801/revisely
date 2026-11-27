@@ -17,14 +17,14 @@ MushafEdition.reciteData): the originals (iOS, 2600 wide), w1080 and w1440 (Andr
      box holds most of it (a dot or a haraka by its middle), unless it reaches REACH units into each of two words' boxes
      (two words touching: split at their boxes' edge, as check-word-boxes.py splits them); a crumb of a few pixels goes
      with the stroke it broke from. So a stroke's edge past its own box is still its word's (the wasla over ٱلأعلى on page
-     316 reaches half a unit into أنت's box). On a smaller set each solid pixel takes the owner most common
-     among the originals' ink under it; one holding two owners' ink (their edges meet in that pixel) is a shared edge,
-     counted, never failed: no cover can split it at that size.
+     316 reaches half a unit into أنت's box). On a smaller set each visible pixel takes the owner most common among the
+     originals' ink under it (a faint fringe past the ink, the nearest ink's); one holding two owners' ink (their edges
+     meet in that pixel) is a shared edge, counted, never failed: no cover can split it at that size.
   2. Lays the plan's covers (a copy of hiddenInkPlan, below; --js-plans checks it against the app's own) over the page in
      every reading state: nothing shown; from the page's start to each word; from each word to its end; each word alone;
      every word but one. A hidden word's ink that shows is a leak; a shown word's ink under a cover is a cut. A pixel shows
-     when its centre is under no cover and its ink is visible: any ink on the originals (alpha over INK; the light and
-     dark themes tint the same alpha), solid ink on the smaller sets (scaling down spreads a faint fringe).
+     when its centre is under no cover and its ink is visible, over INK (about 8% opacity), in every set: the light and
+     dark themes tint the same alpha, and the smaller sets' faint fringe counts too.
   3. --write: from the leaks and cuts the boxes alone leave (a straight edge can't part two words' ink there), writes
      src/data/hiddenInk.dat: each word's patches (covers over its leaking ink, drawn while it is hidden) and notches
      (holes over its covered ink, cut from the covers while it is shown), each holding that word's ink and no other's (any
@@ -34,7 +34,8 @@ MushafEdition.reciteData): the originals (iOS, 2600 wide), w1080 and w1440 (Andr
   mkdir -p /tmp/mushaf && cd /tmp/mushaf && for s in full w1080 w1440; do mkdir -p $s; p=; [ $s != full ] && p=$s/; \\
     seq -f "%03g" 1 604 | xargs -P 16 -I{} curl -sf -o $s/{}.png \\
     https://storage.googleapis.com/revision-buddy-3a398.firebasestorage.app/mushaf/$p{}.png; done; cd -
-  /tmp/hp/bin/python scripts/check-hidden-page.py /tmp/mushaf             # check (about 10 minutes; --workers N, default 4)
+  ~/revisely-mistake-lab/.venv/bin/python ~/revisely-mistake-lab/tools/memguard.py --limit-gb 2 -- \
+    /tmp/hp/bin/python scripts/check-hidden-page.py /tmp/mushaf             # check (page by page, 2 workers)
   /tmp/hp/bin/python scripts/check-hidden-page.py /tmp/mushaf --write     # rewrite src/data/hiddenInk.dat, then check
   HIDDEN_PLAN_OUT=/tmp/plans.json npx jest src/lib/recite/__tests__/hiddenInk.test.ts -t export
   /tmp/hp/bin/python scripts/check-hidden-page.py /tmp/mushaf --js-plans /tmp/plans.json   # the copy is the app's
@@ -42,7 +43,9 @@ MushafEdition.reciteData): the originals (iOS, 2600 wide), w1080 and w1440 (Andr
   --pages 2,316 some pages; --dump FILE the leaks and cuts as JSON; the owners are kept in <images>/.owners/)
 
 Run it after the word boxes, the page lines, the marker rows, the plan or the images change; src/lib/recite/__tests__/
-hiddenInk.test.ts holds the plan's side on all 604 pages in CI.
+hiddenInk.test.ts holds the plan's side on all 604 pages in CI. Memory: it goes page by page, a worker holding one
+page (about 400 MB at the originals' size); keep --workers at 2 (the default) under the guard's 2 GB, with nothing
+else heavy beside it (the Mac ran short of memory on Nov 26 2026).
 
 Nov 26 2026, every reading state on all 604 pages:
   before (a unit past a shown word's box, no patches or notches): originals 24,906 bits of hidden words' ink showing
@@ -72,8 +75,11 @@ WORDS_FILE = ROOT / "src" / "data" / "quranWords.dat"
 WAQF_FILE = ROOT / "src" / "data" / "quranWaqf.json"
 INK_FILE = ROOT / "src" / "data" / "hiddenInk.dat"
 SETS = ["full", "w1080", "w1440"]
-INK = 24
-SOLID = 96
+# Ink that shows: over about 8% opacity (Majd, Nov 26 2026: "ensure that never happens again"; the orchestrator: no
+# hidden word's pixel at any opacity a person could see), on every set. Until Nov 27 the smaller sets counted only solid
+# ink (over 96), as check-page-markers.py and check-word-boxes.py do, which left their faint fringe uncounted.
+INK = 20
+VISIBLE = INK
 # A piece this far (units) from every line's cover rows, beside no missing line slot, is still a line's (a long tail).
 FAR = 30
 # Ink further than this (units) inside its word's box and its line's cover rows is covered whatever is beside it.
@@ -177,10 +183,10 @@ def owners_full(job):
             if score < 0.8:
                 weak.append((page, l["line"], round(score, 3)))
             g = math.ceil(1.2 * s)
-            th, tw = tt["area"].shape
-            region = np.zeros((H + 2 * g, W + 2 * g), bool)
-            region[py:py + th + 2 * g, px:px + tw + 2 * g] = ndimage.binary_dilation(np.pad(tt["area"], g), iterations=g)
-            mine |= region[g:H + g, g:W + g]
+            area = ndimage.binary_dilation(np.pad(tt["area"], g), iterations=g)
+            y0, x0 = py - g, px - g
+            ya, xa, yb, xb = max(0, y0), max(0, x0), min(H, y0 + area.shape[0]), min(W, x0 + area.shape[1])
+            mine[ya:yb, xa:xb] |= area[ya - y0:yb - y0, xa - x0:xb - x0]
             if (m1 - m0) > 1.3 * (bot - top):
                 mine[max(0, int(top * s)):int(math.ceil(bot * s)), max(0, int(m0 * s)):int(math.ceil(m1 * s))] = True
     word_ink = ink & ~mine
@@ -303,18 +309,28 @@ def owners_full(job):
     # is far bigger (about 100 pixels).
     sizes = np.bincount(lab.ravel(), minlength=n + 1)
     crumb = (sizes <= CRUMB_PX) & (np.arange(n + 1) > 0)
-    if crumb[1:].any():
-        big = ink & ~crumb[lab]
+    reach = int(math.ceil(CRUMB_REACH * s)) + 1
+    for k in np.nonzero(crumb)[0]:
+        ys, xs = objs[k - 1]
+        wy = slice(max(0, ys.start - reach), min(H, ys.stop + reach))
+        wx = slice(max(0, xs.start - reach), min(W, xs.stop + reach))
+        lw = lab[wy, wx]
+        big = ink[wy, wx] & ~crumb[lw]
+        if not big.any():
+            continue
         dist, (iy, ix) = ndimage.distance_transform_edt(~big, return_indices=True)
-        cy, cx = np.nonzero(crumb[lab] & (dist <= CRUMB_REACH * s))
-        owner[cy, cx] = owner[iy[cy, cx], ix[cy, cx]]
-        symmask[cy, cx] = symmask[iy[cy, cx], ix[cy, cx]]
+        cy, cx = np.nonzero((lw == k) & (dist <= CRUMB_REACH * s))
+        ow, sm = owner[wy, wx], symmask[wy, wx]
+        ow[cy, cx] = ow[iy[cy, cx], ix[cy, cx]]
+        sm[cy, cx] = sm[iy[cy, cx], ix[cy, cx]]
     np.savez_compressed(out / f"{page:03d}.npz", owner=owner, sym=symmask)
     return page, found, weak
 
 
 def owners_like(job):
-    """A smaller set: each solid pixel's owner from the originals' ink under it; a pixel holding two owners' is shared."""
+    """A smaller set: each visible pixel's owner from the originals' ink under it (each original pixel counted in the
+    pixel its centre is in), the most of it; one holding two owners' ink is shared. A pixel with none under it (a fringe
+    the scaling spread past the ink) takes the nearest original ink's owner."""
     images, orig, out, page = job
     a = np.asarray(Image.open(images / f"{page:03d}.png").convert("RGBA"))[:, :, 3]
     z = np.load(orig / f"{page:03d}.npz")
@@ -322,24 +338,45 @@ def owners_like(job):
     H, W = a.shape
     OH, OW = o.shape
     k = OW / W
-    _, (iy, ix) = ndimage.distance_transform_edt(o == NONE, return_indices=True)
-    owner = np.full(a.shape, NONE, np.int32)
-    symm = np.zeros(a.shape, bool)
-    shared = np.zeros(a.shape, bool)
-    for y, x in zip(*np.nonzero(a > SOLID)):
-        fy = slice(int(y * k), min(OH, int((y + 1) * k) + 1))
-        fx = slice(int(x * k), min(OW, int((x + 1) * k) + 1))
-        blk = o[fy, fx]
-        v = blk[blk != NONE]
-        if v.size:
-            vals, cnt = np.unique(v, return_counts=True)
-            owner[y, x] = vals[np.argmax(cnt)]
-            shared[y, x] = vals.size > 1
-            symm[y, x] = bool((sym[fy, fx] & (blk == owner[y, x])).any())
-        else:
-            cy, cx = min(OH - 1, int((y + 0.5) * k)), min(OW - 1, int((x + 0.5) * k))
-            owner[y, x] = o[iy[cy, cx], ix[cy, cx]]
-            symm[y, x] = sym[iy[cy, cx], ix[cy, cx]]
+    oy, ox = np.nonzero(o != NONE)
+    pid = np.minimum(H - 1, ((oy + 0.5) / k).astype(np.int64)) * W + np.minimum(W - 1, ((ox + 0.5) / k).astype(np.int64))
+    ow = o[oy, ox].astype(np.int64) + 10
+    keys, cnt = np.unique(pid * 100000 + ow, return_counts=True)
+    kp, kw = keys // 100000, keys % 100000 - 10
+    order = np.lexsort((-cnt, kp))
+    first = np.unique(kp[order], return_index=True)[1]
+    major_pid, major_w = kp[order][first], kw[order][first]
+    n_owners = np.unique(kp, return_counts=True)[1]
+    sym_keys = np.unique(pid[sym[oy, ox]] * 100000 + ow[sym[oy, ox]])
+    del oy, ox, pid, ow
+    owner = np.full(H * W, NONE, np.int32)
+    shared = np.zeros(H * W, bool)
+    symm = np.zeros(H * W, bool)
+    owner[major_pid] = major_w
+    shared[major_pid] = n_owners > 1
+    symm[major_pid] = np.isin(major_pid * 100000 + major_w + 10, sym_keys)
+    owner, shared, symm = owner.reshape(H, W), shared.reshape(H, W), symm.reshape(H, W)
+    visible = a > VISIBLE
+    owner[~visible], shared[~visible], symm[~visible] = NONE, False, False
+    # The fringe: the nearest original ink's owner, spread a few original pixels out from the ink.
+    fy, fx = np.nonzero(visible & (owner == NONE))
+    if fy.size:
+        filled, fsym = o.copy(), sym.copy()
+        for _ in range(int(math.ceil(2 * k)) + 2):
+            empty = filled == NONE
+            if not empty.any():
+                break
+            for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)):
+                src = np.full_like(filled, NONE)
+                ssym = np.zeros_like(fsym)
+                ys_, yd = (slice(0, OH - dy), slice(dy, OH)) if dy >= 0 else (slice(-dy, OH), slice(0, OH + dy))
+                xs_, xd = (slice(0, OW - dx), slice(dx, OW)) if dx >= 0 else (slice(-dx, OW), slice(0, OW + dx))
+                src[yd, xd], ssym[yd, xd] = filled[ys_, xs_], fsym[ys_, xs_]
+                m = empty & (src != NONE) & (filled == NONE)
+                filled[m], fsym[m] = src[m], ssym[m]
+        cy = np.minimum(OH - 1, ((fy + 0.5) * k).astype(np.int64))
+        cx = np.minimum(OW - 1, ((fx + 0.5) * k).astype(np.int64))
+        owner[fy, fx], symm[fy, fx] = filled[cy, cx], fsym[cy, cx]
     np.savez_compressed(out / f"{page:03d}.npz", owner=owner, sym=symm, shared=shared)
     return page
 
@@ -557,6 +594,14 @@ def sweep(job):
 
 # -------------------------------------------------------------------------------------------- patches and notches
 
+def page_rects(job):
+    """One page, for --write: its leaking and cut pixels in each set (no patches or notches yet), then its rects."""
+    sweeps, owns, page, words = job
+    results = [sweep(j) for j in sweeps]
+    r, u = rects_for(page, results, owns, None)
+    return page, r, u
+
+
 def rects_for(page, results, owns, per):
     """A page's patches and notches from its leaking and cut pixels in every set, each rect holding no other owner's ink
     centre (any set): the pixels' box with room, else row by row, else pixel by pixel."""
@@ -565,10 +610,11 @@ def rects_for(page, results, owns, per):
     for r, own in zip(results, owns):
         if r is None:
             continue
+        h = 0.5 / r["s"]  # half a pixel of this set
         for w, x, y in r.get("leak_px", []):
-            pts.setdefault((w, "patch"), []).append((x, y))
+            pts.setdefault((w, "patch"), []).append((x, y, h))
         for w, x, y in r.get("cut_px", []):
-            pts.setdefault((w, "notch"), []).append((x, y))
+            pts.setdefault((w, "notch"), []).append((x, y, h))
         o = np.load(own / f"{page:03d}.npz")["owner"]
         s = o.shape[1] / 1024
         oy, ox = np.nonzero(o != NONE)
@@ -586,7 +632,8 @@ def rects_for(page, results, owns, per):
 
     rects, unresolved = [], []
     for (w, kind), p in pts.items():
-        q = np.array(sorted(set(p)))
+        q3 = np.array(sorted(set(p)))
+        q, half = q3[:, :2], q3[:, 2]
         # Clusters: points within 1.2 units of each other.
         lab = -np.ones(len(q), int)
         c = 0
@@ -602,7 +649,9 @@ def rects_for(page, results, owns, per):
             c += 1
         for ci in range(c):
             cq = q[lab == ci]
-            for m in (0.15, 0.05, 0.0):
+            # Whole pixels first (a smaller set's pixel is about a unit wide: a cover over its centre alone may round
+            # to nothing on a phone), then less room.
+            for m in (float(half[lab == ci].max()), 0.15, 0.05, 0.0):
                 r = (cq[:, 0].min() - m, cq[:, 1].min() - m, cq[:, 0].max() + m, cq[:, 1].max() + m)
                 if not clash(w, *r):
                     rects.append((w, kind) + r)
@@ -663,7 +712,7 @@ def arg(name, default=None):
 
 def main():
     root = Path(sys.argv[1])
-    workers = int(arg("--workers", 4))
+    workers = int(arg("--workers", 2))
     pages = [int(v) for v in arg("--pages").split(",")] if arg("--pages") else list(range(1, 605))
     lines, rows, per, quarters = load()
     cache = root / ".owners"
@@ -714,16 +763,16 @@ def main():
             sys.exit(1)
         print(f"the copy of the plan matches the app's ({len(pages)} pages, 4 states each)")
     results = {}
-    with ProcessPoolExecutor(max_workers=workers) as ex:
-        for s in SETS:
-            results[s] = list(ex.map(sweep, [(owns[s], p, lines[str(p)], rows.get(str(p), []), per[p], ink.get(str(p), []), opts) for p in pages]))
     if "--write" in sys.argv:
+        # Page by page in the workers (the pixels of every page at once ran past 2 GB): each page's three sweeps and
+        # its rects, only the rects kept.
         all_rects, unresolved = {}, []
-        for i, p in enumerate(pages):
-            r, u = rects_for(p, [results[s][i] for s in SETS], [owns[s] for s in SETS], per)
-            if r:
-                all_rects[p] = r
-            unresolved += u
+        with ProcessPoolExecutor(max_workers=workers) as ex:
+            jobs = [([(owns[s], p, lines[str(p)], rows.get(str(p), []), per[p], [], opts) for s in SETS], [owns[s] for s in SETS], p, per[p]) for p in pages]
+            for p, r, u in ex.map(page_rects, jobs):
+                if r:
+                    all_rects[p] = r
+                unresolved += u
         if unresolved:
             print(f"{len(unresolved)} points no rect can hold alone:", unresolved[:10])
             sys.exit(1)
@@ -732,11 +781,12 @@ def main():
         print(f"wrote {INK_FILE.relative_to(ROOT)}: {n} rects on {len(all_rects)} pages "
               f"({sum(1 for v in all_rects.values() for r in v if r[1] == 'patch')} patches, "
               f"{sum(1 for v in all_rects.values() for r in v if r[1] == 'notch')} notches); checking again")
+        del all_rects
         ink = read_ink(INK_FILE, per)
         opts["pixels"] = False
-        with ProcessPoolExecutor(max_workers=workers) as ex:
-            for s in SETS:
-                results[s] = list(ex.map(sweep, [(owns[s], p, lines[str(p)], rows.get(str(p), []), per[p], ink.get(str(p), []), opts) for p in pages]))
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        for s in SETS:
+            results[s] = list(ex.map(sweep, [(owns[s], p, lines[str(p)], rows.get(str(p), []), per[p], ink.get(str(p), []), opts) for p in pages]))
     failed = False
     for s in SETS:
         res = results[s]

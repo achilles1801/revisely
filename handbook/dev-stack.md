@@ -382,7 +382,12 @@ until its part is set up.
       `quranWords.dat` (656 KB), read with it by `loadQuranWords`, so it isn't in every update's bundle.
     - `hiddenInk.test` holds the plan's side in CI on all 604 pages (a hidden word's box and patches covered, a shown
       word's box and notches open, markers whole) and pins ink measured on the images (the wasla on 316, a hamza on 472).
-    - Run the script (`--write`) after the word boxes, the page lines, the marker rows, the plan or the images change.
+    - Ink counts from about 8% opacity in every set (`INK` 20), the Android sets' faint fringe too (Nov 27 2026, to
+      Majd's "ensure that never happens again": no hidden word's pixel at any opacity a person could see); those sets
+      once counted solid ink only, as the marker and word-box scripts still do. A pixel holding two words' edges at once is counted and not failed: no cover splits it.
+    - Run the script (`--write`) after the word boxes, the page lines, the marker rows, the plan or the images change,
+      under the lab's memory guard (`memguard.py --limit-gb 2`, 2 workers, nothing heavy beside it: the Mac ran short of
+      memory on Nov 26 2026).
   - **A voice search with one result opens the reader at the ayah, nothing listening** (SEARCH-4; Majd, Nov 17 2026:
     "it takes me to the mushaf with the verse highlighted without it still recording then clicking back shows me that
     one search result"). It replaced Nov 15's "opens the reader reciting".
