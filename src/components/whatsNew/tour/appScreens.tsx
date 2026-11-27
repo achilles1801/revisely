@@ -69,12 +69,16 @@ function TodayMark({ photo }: { photo: boolean }) {
   return (
     <View style={styles.markBox}>
       <ExamplePhoto size={44} />
-      <View style={styles.markBadge}>
+      {/* On a ring of the page's colour at the picture's corner, as Home draws it (ProfilePicture). */}
+      <View style={[styles.markBadge, { backgroundColor: palette.bg }]}>
         <BadgeMark milestone={100} size={18} number={false} />
       </View>
     </View>
   );
 }
+
+/** Where the Today post's badge sits (the centre of the picture's corner), for the badge landing there. */
+export const TODAY_BADGE = { x: 14 + 44 + 4 - 10.5, y: 120 + 44 + 4 - 10.5 } as const;
 
 /** Home's old Today's journal row (now in Activity, HOME-4). */
 export const JOURNAL_AT = { left: 0, top: 378, width: 402, height: 40 } as const;
@@ -155,6 +159,10 @@ export function HomeAyah() {
   );
 }
 
+/** Where Home hangs its lanterns (the top bar's empty side) and its tab bar's lights (THEME-1). */
+export const HOME_LANTERNS = [22, 56, 90] as const;
+export const TAB_BULBS = Array.from({ length: 13 }, (_, i) => [10 + i * 30.5, TAB_Y - 6 + (i % 2) * 3] as const);
+
 /** Home's decorations in Ramadan (THEME-1): lanterns under the status bar, the crescent, the light falling, the bulbs over the tab bar. */
 function HomeDecor() {
   const { palette, isDark } = useTheme();
@@ -162,7 +170,7 @@ function HomeDecor() {
   return (
     <>
       <View style={[at(0, 56, 402, 2), styles.wire, { backgroundColor: tokens.wire }]} />
-      {[22, 56, 90].map((x, i) => (
+      {HOME_LANTERNS.map((x, i) => (
         <View key={x} style={[at(x - 8, 56, 16, 50), styles.center]}>
           <View style={{ width: 1, height: 10 + (i % 2) * 6, backgroundColor: tokens.wire }} />
           <Lantern height={30} tokens={tokens} />
@@ -177,8 +185,8 @@ function HomeDecor() {
       ].map(([x, y, r], i) => (
         <View key={i} style={[at(x, y, r, r), { borderRadius: r, backgroundColor: tokens.mote, opacity: tokens.moteOpacity }]} />
       ))}
-      {Array.from({ length: 13 }, (_, i) => (
-        <View key={i} style={[at(10 + i * 30.5, TAB_Y - 6 + (i % 2) * 3, 6, 6), { borderRadius: 3, backgroundColor: tokens.bulbs[i % 3] }]} />
+      {TAB_BULBS.map(([x, y], i) => (
+        <View key={i} style={[at(x, y, 6, 6), { borderRadius: 3, backgroundColor: tokens.bulbs[i % 3] }]} />
       ))}
     </>
   );
@@ -189,18 +197,34 @@ function HomeDecor() {
  * `clean`: as it is now by default, its glow carried down with an ayah at its foot (HOME-6, HOME-7) and, in Ramadan, its
  * decorations; `foot` draws the ayah (a slide moves it in).
  */
-export function HomeSketch({ v3, photo = false, clean = false, foot }: { v3: boolean; photo?: boolean; clean?: boolean; foot?: React.ReactNode }) {
+export function HomeSketch({
+  v3,
+  photo = false,
+  clean = false,
+  decor = true,
+  greetingEnd,
+  foot,
+}: {
+  v3: boolean;
+  photo?: boolean;
+  clean?: boolean;
+  /** With `clean`: Ramadan's decorations (off for a slide that brings them in itself). */
+  decor?: boolean;
+  /** Drawn after the greeting in place of its crescent (a slide's own, moving). */
+  greetingEnd?: React.ReactNode;
+  foot?: React.ReactNode;
+}) {
   const { palette, isDark } = useTheme();
   const name = photo ? 'Maryam' : 'Yusuf';
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.bg }]}>
       {clean ? <HomeGround background="ayah" ramadan bottom={874 - TAB_Y} /> : null}
-      {clean ? <HomeDecor /> : null}
+      {clean && decor ? <HomeDecor /> : null}
       {clean ? <View style={at(32, 556, 338)}>{foot ?? <HomeAyah />}</View> : null}
       <View style={[at(0, 62, 402, 44), styles.homeTop]}>
         <View style={styles.salam}>
           <T style={[arabicV2(22), { color: palette.text }]}>السلام عليكم</T>
-          {clean ? <Crescent size={17} tokens={ramadanV2(isDark, palette.accent)} /> : null}
+          {greetingEnd ?? (clean && decor ? <Crescent size={17} tokens={ramadanV2(isDark, palette.accent)} /> : null)}
         </View>
         <View style={at(358, 9)}>
           <Ionicons name="settings-outline" size={26} color={palette.text} />
@@ -403,10 +427,10 @@ export function OverviewInsights() {
 }
 
 /** The one Activity tab's top (ACT-35): this week and its days. */
-export function ActivityWeek() {
+export function ActivityWeek({ bare = false }: { bare?: boolean }) {
   const { palette } = useTheme();
   return (
-    <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.bg }]}>
+    <View style={[StyleSheet.absoluteFill, !bare && { backgroundColor: palette.bg }]}>
       <View style={[at(0, 62, 402, 44), styles.activityTop]}>
         <T style={[styles.barTitle, { color: palette.text }]}>Activity</T>
         <View style={[at(318, 10), styles.icons]}>
@@ -515,7 +539,7 @@ const styles = StyleSheet.create({
   wire: { opacity: 0.6 },
   letter: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   markBox: { width: 44, height: 44 },
-  markBadge: { position: 'absolute', right: -4, bottom: -4 },
+  markBadge: { position: 'absolute', right: -4, bottom: -4, padding: 1.5, borderRadius: 11 },
   solid: { height: 33, paddingHorizontal: 16, borderRadius: 17, justifyContent: 'center' },
   outline: { borderWidth: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   journal: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
@@ -541,8 +565,8 @@ const styles = StyleSheet.create({
   dayCell: { flex: 1, alignItems: 'center' },
   day: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   dayText: { fontSize: 14, lineHeight: 18, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  dayCard: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 12 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingTop: 12 },
+  dayCard: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 14 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingTop: 16 },
   smallChip: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
   insight: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
 });

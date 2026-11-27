@@ -141,30 +141,35 @@ export function Screen({ t, place, children, ground }: { t: Clock; place: (t: nu
 
 const STAR = 'M0,-10 C1,-2 2,-1 10,0 C2,1 1,2 0,10 C-1,2 -2,1 -10,0 C-2,-1 -1,-2 0,-10Z';
 
-/** A four-point sparkle passing over something, over its life `u`. */
+/**
+ * A four-point sparkle passing over something, over its life `u`. It grows by its size, not a scale of its own, so it
+ * stays sharp inside a screen that is itself scaled (two scales stacked draw it soft: the Nov 27 2026 blur).
+ */
 export function Glint({ t, where, color, size = 22 }: { t: Clock; where: (t: number) => [number, number, number]; color: string; size?: number }) {
   const style = useAnimatedStyle(() => {
     const [x, y, u] = where(t.value);
     const k = bump(u);
-    return { opacity: k, transform: [{ translateX: x - size / 2 }, { translateY: y - size / 2 }, { scale: 0.3 + 0.7 * k }, { rotate: `${u * 90}deg` }] };
+    const d = size * (0.3 + 0.7 * k);
+    return { opacity: k, left: x - d / 2, top: y - d / 2, width: d, height: d, transform: [{ rotate: `${u * 90}deg` }] };
   });
   return (
-    <Animated.View pointerEvents="none" style={[styles.abs, { width: size, height: size }, style]}>
-      <Svg width={size} height={size} viewBox="-10 -10 20 20">
+    <Animated.View pointerEvents="none" style={[styles.abs, style]}>
+      <Svg width="100%" height="100%" viewBox="-10 -10 20 20">
         <Path d={STAR} fill={color} />
       </Svg>
     </Animated.View>
   );
 }
 
-/** A ring going out from (x, y): `u` its life. */
+/** A ring going out from (x, y): `u` its life. It grows by its size, not a scale (as Glint), so its line stays sharp. */
 export function Ripple({ t, where, color, r = 20, width = 2 }: { t: Clock; where: (t: number) => [number, number, number]; color: string; r?: number; width?: number }) {
   const style = useAnimatedStyle(() => {
     const [x, y, u] = where(t.value);
     const shown = u > 0 && u < 1;
-    return { opacity: shown ? (1 - u) * 0.8 : 0, transform: [{ translateX: x - r }, { translateY: y - r }, { scale: 0.6 + 1.4 * u }] };
+    const R = r * (0.6 + 1.4 * Math.min(1, Math.max(0, u)));
+    return { opacity: shown ? (1 - u) * 0.8 : 0, left: x - R, top: y - R, width: 2 * R, height: 2 * R, borderRadius: R };
   });
-  return <Animated.View pointerEvents="none" style={[styles.abs, { width: 2 * r, height: 2 * r, borderRadius: r, borderWidth: width, borderColor: color }, style]} />;
+  return <Animated.View pointerEvents="none" style={[styles.abs, { borderWidth: width, borderColor: color }, style]} />;
 }
 
 // ------------------------------------------------------------------ the app's bits, drawn
