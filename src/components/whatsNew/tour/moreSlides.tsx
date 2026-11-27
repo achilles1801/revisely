@@ -57,6 +57,7 @@ import {
   TAB_BULBS,
   TAB_Y,
   TODAY_BADGE,
+  TodayBadge,
   WEEK_ROW,
 } from './appScreens';
 import { pointOn } from './revoSlides';
@@ -227,11 +228,15 @@ export function ReciteUpSlide({ t }: { t: Clock }) {
 // ------------------------------------------------------------------ 5. A spot test (RECITE-8, ACT-34)
 /**
  * Page 562 hidden as Recite hides it (RECITE-20): each line covered in the page's own colour with a rule under it, its
- * ayah markers and the surah's header left open. A light hops between the markers, slowing like a wheel, and stops on
+ * ayah markers and the surah's header left open. A light jumps from marker to marker, slowing like a wheel, and stops on
  * Al-Mulk 1's: the test starts at the next ayah, whose words show as they're said.
  */
 const HOP_PATH = [8, 4, 10, 2, 11, 5, 3, 0];
+/** When each jump starts (one fewer than the markers it visits); each takes most of the gap to the next, the last 0.34 s. */
 const HOPS = [1.3, 1.44, 1.6, 1.79, 2.02, 2.3, 2.62];
+const LAST_HOP = 0.34;
+/** The light: a ring with a see-through grey wash, over the covers, so the marker's number shows through it. */
+const LIGHT = 46;
 /** Al-Mulk 2's words, in the order said: the end of line 3, then line 4 (bounds space). */
 const TEST_WORDS: [number, number, number][] = [
   [3, 135.1, 212.5],
@@ -248,7 +253,7 @@ const TEST_WORDS: [number, number, number][] = [
     [136.8, 241.8],
   ].map(([a, b]) => [4, a, b] as [number, number, number]),
 ];
-const SAY_FROM = 2.85;
+const SAY_FROM = 3.2;
 const SAY_STEP = 0.19;
 
 /** A line's covers: its text with the markers taken out (the phone's points). */
@@ -279,27 +284,7 @@ export function SpotSlide({ t }: { t: Clock }) {
   return (
     <>
       <Screen t={t} place={place}>
-        <MushafScreen
-          page={562}
-          foot={false}
-          under={
-            <Anim t={t} box={[at(-20, -20, 40, 40), { borderRadius: 20, backgroundColor: palette.highlight }]} style={(now) => {
-              'worklet';
-              let k = 0;
-              while (k < HOPS.length - 1 && now > HOPS[k + 1]) k++;
-              const next = k + 1 < HOPS.length ? HOPS[k + 1] : HOPS[k] + 0.3;
-              const f = easeInOut(Math.min(1, Math.max(0, (now - HOPS[k]) / (next - HOPS[k]) / 0.7)));
-              const a = path[Math.min(k, path.length - 1)];
-              const b = path[Math.min(k + 1, path.length - 1)];
-              const end = path[path.length - 1];
-              const x = now < HOPS[0] ? path[0][0] : k >= HOPS.length - 1 ? end[0] : lerp(a[0], b[0], f);
-              const y = now < HOPS[0] ? path[0][1] : k >= HOPS.length - 1 ? end[1] : lerp(a[1], b[1], f);
-              const o = now < 1.25 ? 0 : Math.min(1, (now - 1.25) * 6) * (1 - 0.6 * seg(now, 3.2, 3.8));
-              const pulse = now > 2.62 ? 0.2 * bump(seg(now, 2.62, 2.95)) : 0;
-              return { opacity: o, transform: [{ translateX: x }, { translateY: y }, { scale: (end[2] + 6) / 40 + pulse }] };
-            }} />
-          }
-        />
+        <MushafScreen page={562} foot={false} />
         {/* The covers: whole lines in the page's colour, the markers open; Al-Mulk 2's open word by word. */}
         {lines.map((l) =>
           coverSpans(l.left - 2, l.left + l.width + 2, l.markers).map(([x0, x1]) => {
@@ -329,6 +314,34 @@ export function SpotSlide({ t }: { t: Clock }) {
         {lines.map((l) => (
           <View key={`rule-${l.line}`} style={[at(l.left, l.coverBottom - 1, l.width, StyleSheet.hairlineWidth), { backgroundColor: palette.secondary, opacity: 0.35 }]} />
         ))}
+        {/*
+          The light jumps from marker to marker (an arc each time), slowing like a wheel, and lands on Al-Mulk 1's with a
+          pulse. Over the covers, so it's always seen (Majd, Nov 27 2026: drawn under the page it was hidden, "u can barely
+          see it"); its wash is see-through, so the marker shows through. It grows by its size, never a scale (sharp).
+        */}
+        <Anim t={t} box={[styles.light, { borderColor: palette.secondary }]} style={(now) => {
+          'worklet';
+          let k = -1;
+          while (k + 1 < HOPS.length && now >= HOPS[k + 1]) k++;
+          let x = path[0][0];
+          let y = path[0][1];
+          let lift = 0;
+          if (k >= 0) {
+            const dur = k + 1 < HOPS.length ? (HOPS[k + 1] - HOPS[k]) * 0.75 : LAST_HOP;
+            const f = easeInOut(Math.min(1, (now - HOPS[k]) / dur));
+            const a = path[k];
+            const b = path[k + 1];
+            x = lerp(a[0], b[0], f);
+            y = lerp(a[1], b[1], f);
+            lift = Math.sin(Math.PI * f) * Math.min(26, 10 + Math.hypot(b[0] - a[0], b[1] - a[1]) * 0.08);
+          }
+          const landed = HOPS[HOPS.length - 1] + LAST_HOP;
+          const d = LIGHT + 12 * bump(seg(now, landed, landed + 0.35));
+          const o = now < 1.25 ? 0 : Math.min(1, (now - 1.25) * 6) * (1 - 0.55 * seg(now, SAY_FROM + 0.2, SAY_FROM + 0.8));
+          return { opacity: o, left: x - d / 2, top: y - lift - d / 2, width: d, height: d, borderRadius: d / 2 };
+        }}>
+          <View style={[styles.lightWash, { backgroundColor: palette.text }]} />
+        </Anim>
         {/* The line under the header fills from the right as the ayah is said. */}
         <View style={[at(0, 110, 402, 3), { backgroundColor: palette.separator }]}>
           <Anim t={t} box={[styles.fillRight, { backgroundColor: palette.primary }]} style={(now) => {
@@ -355,7 +368,7 @@ export function SpotSlide({ t }: { t: Clock }) {
         {/* Kept in Activity: the test lands as its own entry (ACT-34), under the page, clear of its words. */}
         <Anim t={t} box={at(16, Math.round(last.coverBottom + 14), 370)} style={(now) => {
           'worklet';
-          const u = easeOut(seg(now, 5.3, 5.85));
+          const u = easeOut(seg(now, 5.5, 6.05));
           return { opacity: u, transform: [{ translateY: (1 - u) * 60 }] };
         }}>
           <View style={[styles.spotCard, { backgroundColor: palette.sheet }, isDark ? { borderWidth: StyleSheet.hairlineWidth, borderColor: palette.outline } : [styles.shadow, { shadowColor: palette.shadow }]]}>
@@ -546,6 +559,8 @@ export function HomeSlide({ t }: { t: Clock }) {
 // ------------------------------------------------------------------ 8. Unlock your next badge (ACCOUNT-4 to ACCOUNT-8)
 const STEPS = [0, 1, 2, 3, 4, 5].map((i) => [78 + i * 49.2, 600 - i * 96] as const);
 const TIER_TOPS = CLIMB_TOPS as readonly Milestone[];
+/** When the climbing badge lands on Maryam's picture on Home (the end of its flight in climbAt). */
+const LANDED = 8.15;
 const RING_C = 2 * Math.PI * 51;
 
 function CountLine({ t }: { t: Clock }) {
@@ -750,16 +765,26 @@ export function BadgesSlide({ t }: { t: Clock }) {
         }} />
       ))}
       </OnStage>
-      {/* The latest badge flies down to Home and clicks into the corner of the picture. */}
+      {/*
+        The latest badge flies down to Home and clicks into the corner of Maryam's picture: her Silver gives way to Emerald
+        (Majd, Nov 27 2026: "it should update maryams badge to emerald").
+      */}
       <Screen t={t} place={home}>
         <HomeSketch v3 photo />
+        <Anim t={t} box={at(TODAY_BADGE.x - 10.5, TODAY_BADGE.y - 10.5, 21, 21)} style={(now) => {
+          'worklet';
+          const k = seg(now, LANDED - 0.03, LANDED + 0.4);
+          return { opacity: now > LANDED - 0.03 ? 1 : 0, transform: [{ scale: lerp(2.1, 1, easeBack(k)) }] };
+        }}>
+          <TodayBadge milestone={TIER_TOPS[TIER_TOPS.length - 1]} placed={false} />
+        </Anim>
         <Ripple t={t} color={palette.accentText} r={16} where={(now) => {
           'worklet';
-          return [TODAY_BADGE.x, TODAY_BADGE.y, seg(now, 8.1, 8.75)];
+          return [TODAY_BADGE.x, TODAY_BADGE.y, seg(now, LANDED, LANDED + 0.65)];
         }} />
         <Glint t={t} color={SPARK} size={18} where={(now) => {
           'worklet';
-          return [TODAY_BADGE.x + 9, TODAY_BADGE.y - 9, seg(now, 8.12, 8.6)];
+          return [TODAY_BADGE.x + 9, TODAY_BADGE.y - 9, seg(now, LANDED + 0.02, LANDED + 0.5)];
         }} />
       </Screen>
     </>
@@ -1075,6 +1100,8 @@ const styles = StyleSheet.create({
   stop: { width: 12, height: 12, borderRadius: 2 },
   marker: { borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   fillRight: { position: 'absolute', left: 0, top: 0, width: 402, height: 3 },
+  light: { position: 'absolute', left: 0, top: 0, borderWidth: 2.5, overflow: 'hidden' },
+  lightWash: { ...StyleSheet.absoluteFillObject, opacity: 0.26 },
   start: { height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginTop: 16, marginBottom: 12 },
   miniRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, height: 39 },
   shadow: { shadowOpacity: 0.16, shadowRadius: 12, shadowOffset: { width: 0, height: 8 }, elevation: 6 },

@@ -57,7 +57,7 @@ export function ExamplePhoto({ size }: { size: number }) {
 }
 
 /** The Today post's mark: the first letter, or the example photo with its latest badge (ACCOUNT-7). */
-function TodayMark({ photo }: { photo: boolean }) {
+function TodayMark({ photo, badge }: { photo: boolean; badge: Milestone | null }) {
   const { palette } = useTheme();
   if (!photo) {
     return (
@@ -70,9 +70,20 @@ function TodayMark({ photo }: { photo: boolean }) {
     <View style={styles.markBox}>
       <ExamplePhoto size={44} />
       {/* On a ring of the page's colour at the picture's corner, as Home draws it (ProfilePicture). */}
-      <View style={[styles.markBadge, { backgroundColor: palette.bg }]}>
-        <BadgeMark milestone={100} size={18} number={false} />
-      </View>
+      {badge ? <TodayBadge milestone={badge} /> : null}
+    </View>
+  );
+}
+
+/**
+ * The latest badge at the Today post picture's corner, on a ring of the page's colour (ProfilePicture). `placed`: at the
+ * corner of the picture it sits in; else where its parent puts it (a 21-point box centred on TODAY_BADGE).
+ */
+export function TodayBadge({ milestone, placed = true }: { milestone: Milestone; placed?: boolean }) {
+  const { palette } = useTheme();
+  return (
+    <View style={[placed ? styles.markBadge : styles.markBadgeFree, { backgroundColor: palette.bg }]}>
+      <BadgeMark milestone={milestone} size={18} number={false} />
     </View>
   );
 }
@@ -203,6 +214,7 @@ export function HomeSketch({
   clean = false,
   decor = true,
   greetingEnd,
+  badge = 100,
   foot,
 }: {
   v3: boolean;
@@ -212,6 +224,8 @@ export function HomeSketch({
   decor?: boolean;
   /** Drawn after the greeting in place of its crescent (a slide's own, moving). */
   greetingEnd?: React.ReactNode;
+  /** With `photo`: the latest badge at the picture's corner (Silver I unless a slide says), or none. */
+  badge?: Milestone | null;
   foot?: React.ReactNode;
 }) {
   const { palette, isDark } = useTheme();
@@ -231,7 +245,7 @@ export function HomeSketch({
         </View>
       </View>
       <View style={at(14, 120)}>
-        <TodayMark photo={photo} />
+        <TodayMark photo={photo} badge={badge} />
       </View>
       <View style={at(68, 122, 320)}>
         <T style={[styles.meta, { color: palette.secondary }]}>
@@ -540,6 +554,7 @@ const styles = StyleSheet.create({
   letter: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   markBox: { width: 44, height: 44 },
   markBadge: { position: 'absolute', right: -4, bottom: -4, padding: 1.5, borderRadius: 11 },
+  markBadgeFree: { padding: 1.5, borderRadius: 11 },
   solid: { height: 33, paddingHorizontal: 16, borderRadius: 17, justifyContent: 'center' },
   outline: { borderWidth: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   journal: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },

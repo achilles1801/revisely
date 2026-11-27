@@ -15,7 +15,9 @@ jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
 
 import { Slide, TourMoment } from '../tour/TourMoment';
 import { StageScale } from '../tour/parts';
-import { lineOn } from '../tour/screens';
+import { lineOn, linesOn } from '../tour/screens';
+import { BadgeMark } from '../../account/BadgeMark';
+import { getReadPalette } from '../../../theme/readPalette';
 import { TOUR_SECONDS } from '../../../lib/whatsNew/tour';
 import { useSharedValue } from 'react-native-reanimated';
 import { TOUR_MOMENTS, type TourMoment as TourMomentId } from '../../../lib/help/whatsNew';
@@ -140,6 +142,62 @@ describe('<TourMoment />', () => {
       expect(middle).toBeGreaterThan(band.top);
       expect(middle).toBeLessThan(band.top + band.height);
     }
+  });
+
+  /** Renders `moment` frozen at `at` seconds, on a stage drawn smaller than its design, and hands back the palette. */
+  async function frozen(moment: TourMomentId, at: number): Promise<Record<string, unknown>> {
+    let palette: Record<string, unknown> = {};
+    function At() {
+      palette = useTheme().palette as unknown as Record<string, unknown>;
+      const clock = useSharedValue(at);
+      const stage = useSharedValue(0.87);
+      return (
+        <StageScale.Provider value={stage}>
+          <Slide moment={moment} clock={clock} page={562} pageName="Al-Mulk, 1st page" />
+        </StageScale.Provider>
+      );
+    }
+    render(
+      <DesignProvider initial={{}}>
+        <ThemeProvider>
+          <At />
+        </ThemeProvider>
+      </DesignProvider>,
+    );
+    await act(async () => {});
+    return palette;
+  }
+
+  // Majd, Nov 27 2026: "the verse number jumping thing is off/broken u can barely see it". Drawn under the page's
+  // image, the covers hid the light; it is drawn over them, and its last jump lands on Al-Mulk 1's marker.
+  it('the spot test’s light is over the hidden page’s covers and lands on Al-Mulk 1’s marker', async () => {
+    const palette = await frozen('spot', 3.0);
+    const views = screen.UNSAFE_root.findAll((n: { type: unknown }) => n.type === 'View') as unknown as Node[];
+    const styleOf = (n: Node) => (StyleSheet.flatten(n.props.style as never) ?? {}) as Record<string, number | string | undefined>;
+    const light = views.findIndex((n) => styleOf(n).borderColor === palette.secondary && styleOf(n).borderWidth === 2.5);
+    expect(light).toBeGreaterThan(-1);
+    const pageBg = getReadPalette(false).pageBg;
+    // The covers: boxes in the page's colour no taller than a line (the sheet and the card share the colour in light).
+    const isCover = (n: Node) => {
+      const st = styleOf(n);
+      return st.backgroundColor === pageBg && typeof st.top === 'number' && typeof st.height === 'number' && st.height < 50;
+    };
+    const lastCover = views.map((n, i) => (isCover(n) ? i : -1)).reduce((a, b) => Math.max(a, b), -1);
+    expect(lastCover).toBeGreaterThan(0);
+    expect(light).toBeGreaterThan(lastCover);
+    const st = styleOf(views[light]) as { left: number; top: number; width: number; height: number };
+    const line3 = linesOn(562)[0];
+    const [a, b] = line3.markers[0];
+    expect(Math.abs(st.left + st.width / 2 - (a + b) / 2)).toBeLessThan(1);
+    expect(Math.abs(st.top + st.height / 2 - (line3.top + line3.height / 2))).toBeLessThan(1);
+  });
+
+  // Majd, Nov 27 2026: "the badge becoming emerald in the account slide never happens, it should update maryams badge
+  // to emerald". The climb ends on Emerald, and Maryam's picture on Home ends with it.
+  it('the badges slide ends with Maryam’s picture wearing Emerald', async () => {
+    await frozen('badges', TOUR_SECONDS.badges);
+    const marks = (screen.UNSAFE_getAllByType(BadgeMark) as unknown as Node[]).filter((n) => shown(n) > 0.01 && n.props.number === false);
+    expect(marks.some((n) => n.props.milestone === 100000)).toBe(true);
   });
 
   it.each([...TOUR_MOMENTS])('the %s slide plays, and Skip jumps it to its words and Next', async (moment) => {
