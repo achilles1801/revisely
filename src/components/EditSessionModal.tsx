@@ -187,6 +187,7 @@ export function EditSessionModal({
               onPress={toggleCurrent}
               palette={read}
               active={isCurrentRevised}
+              text={t('revision.edit.revised')}
             />
             <RoundButton icon="ellipsis-horizontal" label={t('revision.edit.menu')} onPress={() => setMenuOpen(true)} palette={read} />
           </View>

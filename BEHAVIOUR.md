@@ -134,7 +134,9 @@ How the tests are made: `tests/scenarios/README.md`.
   back its credit to the day: Home no longer counts it Done, and the session that revised it keeps the revision
   (AHEAD-6). Checking it again before closing keeps it. A page revised in another session is never copied into
   the day's own session, so it is never revised twice or saved as skipped. A day done only by pages revised
-  ahead (no session of its own) opens its review the same way; closing it with nothing unchecked saves nothing.
+  ahead (no session of its own) opens its review the same way; closing it with nothing unchecked saves nothing. The ✓
+  at the top says "Revised" beside it, filled while the page shown counts for the day (Majd, Nov 26 2026: "say
+  revised").
   (Majd, Nov 26 2026: "seems the default rn is they're all unchecked and checking/unchecking isn't rly doing
   anything": the ✓ read only the day's own session, so pages revised ahead the night before showed unchecked and
   toggling them changed nothing.)
