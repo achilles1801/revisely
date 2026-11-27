@@ -381,10 +381,16 @@ export function checkWidget(b: Built, home: HomeToday): void {
   expect(today.done).toBeLessThanOrEqual(today.total);
   if (today.completed) expect(today.done).toBe(today.total);
   else if (today.total > 0) expect(today.done).toBeLessThan(today.total);
-  // A day with pages is named.
+  // A day with pages is named; a rest day as Home names it (HOME-9): "Rest day", then where the next day starts.
   if (home.assignment.pages.length > 0) {
     expect(today.title).not.toBe('');
     expect(today.where).not.toBe('');
+  } else if (home.lines.rest && home.lines.detail.kind === 'text') {
+    expect({ title: today.title, where: today.where, short: today.short }).toEqual({ title: home.lines.title.text, where: home.lines.detail.text, short: home.lines.title.text });
+  }
+  for (const d of widget.days) {
+    expectClean(d.title, `the widget's ${d.day} (title)`);
+    expectClean(d.where, `the widget's ${d.day} (where)`);
   }
   for (const d of widget.days) expect(d.done).toBeGreaterThanOrEqual(0);
 }

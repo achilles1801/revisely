@@ -85,7 +85,7 @@ is checked on Home, the widget, the reminders and Revo at once (USER-1, USER-2),
 
 ## What the sweep found (Nov 27 2026)
 
-All five were cases where one screen disagreed with Home or with the account. Each is a rule now, and its fix landed
+All six were cases where one screen disagreed with Home or with the account. Each is a rule now, and its fix landed
 with a scenario that fails without it.
 
 | Rule | What happened | Fix |
@@ -94,6 +94,7 @@ with a scenario that fails without it.
 | USER-2 | A day revised ahead the evening before read "Done" on Home, while the reminders still planned "Good morning, today is …" for it: they counted only pages its own sessions revised. | The reminders read `dayProgress` (`src/lib/todaySnapshot.ts`), as Home does. |
 | USER-2 | Pages logged by hand in Activity (ACT-15) finished the day on Home, but not on the widget, and the reminders kept asking. | The widget and the reminders read `dayProgress`. |
 | USER-2 | A rest day given pages from Insights was never done on the widget: it counted only the day's own pages, and there were none. | `dayProgress` counts all of such a day's pages, as Home does. |
+| USER-2 | A rest day showed an empty title on the widget. | It writes "Rest day" and where the next revision day starts, Home's words (`restDayWords`, `src/lib/widgets/snapshot.ts`). |
 | USER-2 | With ayahs of a page memorized (MEM-4), Activity's Revised elsewhere worked the day out from whole pages only, so it offered other pages than Home's today (2–6 where Home had 1–5). | The sheets and the day view read `revisablePages`, as Home does. |
 
 Home itself held up: over thousands of generated accounts per run, HOME-9 doesn't come back (and with its fix undone,
@@ -107,14 +108,15 @@ the property finds it at once, through a plan that starts tomorrow as well as a 
 2. **The screens weren't checked against each other.** Home and Revo shared `todaySnapshot`; the reminders and the
    widget each counted a day their own way. **Now:** all four read `dayProgress`, and UM checks they agree.
 3. **A day with no pages** (rest days, every day resting, a plan not started) was tested on Home alone, for one day.
-   **Now:** UM generates them. The widget still has no words for a rest day: it shows an empty title and "0 pages
-   left". Saying "Rest day" there needs the widgets' native code (Swift and Kotlin), so it waits for a native release.
+   **Now:** UM generates them, and the widget names a rest day as Home does ("Rest day", then where the next day
+   starts). Its status line still reads "0 pages left": that line is the widgets' native code (Swift and Kotlin), and its
+   fix waits for the next native release.
 4. **Extremes of memorized:** 1 page, ayahs only, all 604 had little. **Now:** UM and UT.
 5. **Back after weeks away** was tested for the schedule (SCHED-5) but not for what Home says. **Now:** UT.
 6. **Arabic** was tested by strings and layout, never by what Home says for an account. **Now:** UM renders Home's lines
    in Arabic too.
 
-Still unchecked (for later): the widgets' native drawing (Swift, Kotlin) and the rest-day words there; the What's new
+Still unchecked (for later): the widgets' native drawing (Swift, Kotlin), and their rest-day status line; the What's new
 tour per user type; Activity's day card for a rest day in every plan; two phones on a rest day; travel across the date
 line on a custom plan; the session screen and the end card for each user type (only Home's lines are generated).
 

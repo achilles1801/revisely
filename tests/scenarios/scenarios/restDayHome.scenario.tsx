@@ -7,7 +7,7 @@ import { newAccount, pagesRange, saveCustomPlan } from '../harness/account';
 import { Home, homeStack } from '../harness/screens';
 import { Phone } from '../harness/phone';
 
-it('[HOME-9] on a rest day of the plan, Home says "Rest day" and where tomorrow starts, and "Revise ahead" opens it; never "Mark memorized pages"', async () => {
+it('[HOME-9] [USER-2] on a rest day of the plan, Home says "Rest day" and where tomorrow starts, and "Revise ahead" opens it; never "Mark memorized pages"', async () => {
   setZone(ZONES.chicago);
   setNow('2026-11-27 11:58');
   const phone = new Phone();
@@ -29,6 +29,24 @@ it('[HOME-9] on a rest day of the plan, Home says "Rest day" and where tomorrow 
   expect(home.cta()).toBe('Revise ahead');
   // Said once: no quiet "Tomorrow starts at" line under the button as well.
   expect(home.ahead()).toBeNull();
+
+  // The widget names the day as Home does (USER-2): it showed an empty title and "0 pages left".
+  const { buildWidgetSnapshot } = app.mods.require<typeof import('../../../src/lib/widgets/snapshot')>('src/lib/widgets/snapshot');
+  const { getQuranData } = app.mods.require<typeof import('../../../src/lib/quranData')>('src/lib/quranData');
+  const a = app.app;
+  const widget = buildWidgetSnapshot({
+    signedIn: true,
+    user: a.user,
+    onboardingComplete: a.onboardingComplete,
+    pages: a.pages,
+    logs: a.logs,
+    quranData: getQuranData(),
+    accent: 'indigo',
+    now: new Date(),
+  });
+  expect(widget.days[0]).toMatchObject({ day: '2026-11-27', title: 'Rest day', short: 'Rest day', total: 0, completed: false });
+  expect(widget.days[0].where).toBe(home.detail());
+  expect(widget.days[1]).toMatchObject({ day: '2026-11-28', total: 5 });
 
   const session = await home.startSession();
   await session.ready();

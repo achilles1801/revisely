@@ -1950,7 +1950,8 @@ by hand, carried pages, the Fajr boundary, every zone, Arabic) and checks these 
   left. A day is done as Home counts it (SESS-2, SESS-7): its own pages revised that day, revised ahead the day before
   (AHEAD-2), or logged by hand (ACT-15); on a day with none of its own (pages from Insights on a rest day), all of its
   pages. Once Home says Done, the widget shows it done and no reminder asks for that day (only the congratulation,
-  REMIND-1). A later day already revised ahead gets no reminder asking for it, and a page done ahead is never named as
+  REMIND-1). A rest day reads on the widget as on Home: "Rest day", then where the next revision day starts (it had an
+  empty title). A later day already revised ahead gets no reminder asking for it, and a page done ahead is never named as
   one still to revise. The widget counts what finishes the day: its own pages, or on a day with none of its own, all of
   them. Activity's Revised elsewhere (and its page picker) offers a day's pages as Home has them, a partly memorized
   page among them (MEM-4). (Found by the sweep, Nov 27 2026: the reminders and the widget counted only the day's own
