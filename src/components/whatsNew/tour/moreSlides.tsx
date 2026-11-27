@@ -29,7 +29,7 @@ import {
   lerp,
   seg,
 } from '../../../lib/whatsNew/tour';
-import { Anim, Glint, RevoHeader, Ripple, Screen, Sheet, T, at, type Clock, type ScreenAt } from './parts';
+import { Anim, Glint, OnStage, RevoHeader, Ripple, Screen, Sheet, T, at, stageAt, useStage, type Clock, type ScreenAt } from './parts';
 import { LINE_H, MushafScreen, PAGE_BOX, WordsIn } from './screens';
 import {
   ACCOUNT_BAR,
@@ -530,6 +530,7 @@ function BigBadge({ t }: { t: Clock }) {
 
 export function BadgesSlide({ t }: { t: Clock }) {
   const { palette } = useTheme();
+  const stage = useStage();
   const account = (now: number): ScreenAt => {
     'worklet';
     const e = resting(now);
@@ -616,6 +617,7 @@ export function BadgesSlide({ t }: { t: Clock }) {
           return [ACCOUNT_BAR.left - 16, ACCOUNT_BAR.y - 18, seg(now, 3.3, 3.8)];
         }} />
       </Screen>
+      <OnStage>
       {/* The climb: the badge rises up the six tiers, changing shape and metal at each, the count rolling with it. */}
       <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
         'worklet';
@@ -644,13 +646,18 @@ export function BadgesSlide({ t }: { t: Clock }) {
         ))}
         <CountLine t={t} />
       </Anim>
+      </OnStage>
+      {/* The badge with its number: the stage's scale goes into its own, so its number stays crisp. */}
       <Anim t={t} box={at(0, 0, 160, 160)} style={(now) => {
         'worklet';
-        const [x, y, s] = climbAt(now);
-        return { opacity: now < 4.0 ? 0 : now < 8.2 ? Math.min(1, (now - 4.0) * 4) : 1 - seg(now, 8.2, 8.35), transform: [{ translateX: x - 80 }, { translateY: y - 80 }, { scale: s }] };
+        const [x0, y0, s] = climbAt(now);
+        const k = stage ? stage.value : 1;
+        const [x, y] = stageAt(x0, y0, k);
+        return { opacity: now < 4.0 ? 0 : now < 8.2 ? Math.min(1, (now - 4.0) * 4) : 1 - seg(now, 8.2, 8.35), transform: [{ translateX: x - 80 }, { translateY: y - 80 }, { scale: s * k }] };
       }}>
         <BigBadge t={t} />
       </Anim>
+      <OnStage>
       {[0, 1, 2, 3, 4].map((k) => (
         <Glint key={k} t={t} color={BADGE_MATERIALS.gold.deep} size={[14, 12, 10, 12, 9][k]} where={(now) => {
           'worklet';
@@ -660,6 +667,7 @@ export function BadgesSlide({ t }: { t: Clock }) {
           return [x0 + d[0], y0 + d[1], on ? (((now - 6.95) * 1.3 + k * 0.19) % 1) : 0];
         }} />
       ))}
+      </OnStage>
       {/* The latest badge flies down to Home and clicks into the corner of the picture. */}
       <Screen t={t} place={home}>
         <HomeSketch v3 photo />
@@ -769,6 +777,7 @@ export function RamadanSlide({ t }: { t: Clock }) {
   );
   return (
     <>
+      <OnStage>
       {/* Dusk: the screen dims, a warm light comes down from the top. */}
       <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
         'worklet';
@@ -785,6 +794,7 @@ export function RamadanSlide({ t }: { t: Clock }) {
           <Rect x={0} y={0} width={402} height={690} fill="url(#tourDusk)" />
         </Svg>
       </Anim>
+      </OnStage>
       <Screen t={t} place={place}>
         <HomeSketch v3 />
         <Anim t={t} box={StyleSheet.absoluteFill} style={(now) => {
@@ -829,6 +839,7 @@ export function RamadanSlide({ t }: { t: Clock }) {
           <RamadanEndCard />
         </Anim>
       </Screen>
+      <OnStage>
       {/* The crescent rises, then takes its corner. */}
       <Anim t={t} box={at(0, 0, 70, 70)} style={(now) => {
         'worklet';
@@ -881,6 +892,7 @@ export function RamadanSlide({ t }: { t: Clock }) {
           return { opacity: now < 6.0 ? 0 : seg(now, 6.0, 6.5) * tokens.moteOpacity, transform: [{ translateX: m.x + Math.sin(now + m.w) * 6 }, { translateY: y }] };
         }} />
       ))}
+      </OnStage>
     </>
   );
 }

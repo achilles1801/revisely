@@ -3,7 +3,7 @@
 // theme's own card (THEME-7).
 
 import React from 'react';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, StyleSheet, Text } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -13,7 +13,10 @@ jest.mock('../../../design/motion', () => ({ ...jest.requireActual('../../../des
 const mockApp = { user: { id: 'u1', previewTester: true, name: 'Maryam' }, pages: [] };
 jest.mock('../../../context/AppContext', () => ({ useApp: () => mockApp }));
 
-import { TourMoment } from '../tour/TourMoment';
+import { Slide, TourMoment } from '../tour/TourMoment';
+import { StageScale } from '../tour/parts';
+import { TOUR_SECONDS } from '../../../lib/whatsNew/tour';
+import { useSharedValue } from 'react-native-reanimated';
 import { TOUR_MOMENTS, type TourMoment as TourMomentId } from '../../../lib/help/whatsNew';
 import { RAMADAN_INTRO_KEY } from '../../ramadan/introKey';
 import { ThemeProvider } from '../../../context/ThemeContext';
@@ -38,7 +41,67 @@ beforeEach(async () => {
   jest.spyOn(AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(false);
 });
 
+/** A rendered element as the testing library returns it (as jest/scrollable.ts reads it). */
+interface Node {
+  type: unknown;
+  props: Record<string, unknown>;
+  parent: Node | null;
+}
+
+/** How visible a host view is: its opacity times every host ancestor's. */
+function shown(node: Node): number {
+  let o = 1;
+  for (let n: Node | null = node; n; n = n.parent) {
+    if (typeof n.type !== 'string') continue;
+    const flat = StyleSheet.flatten(n.props.style as never) as { opacity?: number } | undefined;
+    o *= flat?.opacity ?? 1;
+  }
+  return o;
+}
+
+/** The scales a host view is drawn through, its own and every host ancestor's (a scale of 1 is none). */
+function scalesAbove(node: Node): number[] {
+  const out: number[] = [];
+  for (let n: Node | null = node; n; n = n.parent) {
+    if (typeof n.type !== 'string') continue;
+    const flat = StyleSheet.flatten(n.props.style as never) as { transform?: object[] } | undefined;
+    for (const op of flat?.transform ?? []) {
+      const scale = (op as { scale?: number }).scale;
+      if (scale != null && Math.abs(scale - 1) > 1e-6) out.push(scale);
+    }
+  }
+  return out;
+}
+
 describe('<TourMoment />', () => {
+  // iOS draws text crisp under one scale and blurred or jagged under two stacked ones (Majd, Nov 27 2026: "why's the
+  // quality horrendous"): the stage's scale stacked on the example screen's. Every slide's words, at its end, are drawn
+  // through one scale at most, on a stage drawn smaller than its design (as on a phone).
+  it.each([...TOUR_MOMENTS])('the %s slide ends with every word under one scale at most', async (moment) => {
+    function AtEnd() {
+      const clock = useSharedValue(TOUR_SECONDS[moment]);
+      const stage = useSharedValue(0.87);
+      return (
+        <StageScale.Provider value={stage}>
+          <Slide moment={moment} clock={clock} page={562} pageName="Al-Mulk, 1st page" />
+        </StageScale.Provider>
+      );
+    }
+    render(
+      <DesignProvider initial={{}}>
+        <ThemeProvider>
+          <AtEnd />
+        </ThemeProvider>
+      </DesignProvider>,
+    );
+    await act(async () => {});
+    // The words left showing (what has flown off or faded is gone).
+    const words = (screen.UNSAFE_getAllByType(Text) as unknown as Node[]).filter((n) => shown(n) > 0.01);
+    expect(words.length).toBeGreaterThan(3);
+    const stacked = words.map((n) => ({ text: String(n.props.children).slice(0, 30), scales: scalesAbove(n) })).filter((w) => w.scales.length > 1);
+    expect(stacked).toEqual([]);
+  });
+
   it.each([...TOUR_MOMENTS])('the %s slide plays, and Skip jumps it to its words and Next', async (moment) => {
     await show(moment);
     expect(screen.getByTestId(`whats-new-tour-${moment}`)).toBeTruthy();
