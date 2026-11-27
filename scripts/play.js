@@ -17,13 +17,16 @@
 // uploads. Closed testing and production changes go to Google for review when committed.
 //
 // Key: PLAY_KEY_PATH (a service account JSON key file) or PLAY_SERVICE_ACCOUNT_JSON (its contents).
+// App: PLAY_PACKAGE (default: the store app's package, src/lib/storeIds.json).
 // Moving builds between testing tracks needs "Release apps to testing tracks"; production needs
 // "Release to production, exclude devices, and use Play App Signing" on that account.
 const crypto = require('crypto');
 const fs = require('fs');
 
-// The store app's Play package (src/lib/storeIds.json, the value app.config.js builds it with).
-const PACKAGE = require('../src/lib/storeIds.json').playPackage;
+// The store app's Play package by default (src/lib/storeIds.json, the value app.config.js builds it with). PLAY_PACKAGE
+// reaches another app the key can see: com.revisionbuddy.app (the personal account's first listing, unpublished once the
+// new one is live) or com.revisionbuddy.app.dev (Revisely Dev).
+const PACKAGE = process.env.PLAY_PACKAGE || require('../src/lib/storeIds.json').playPackage;
 const API = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${PACKAGE}`;
 const SCOPE = 'https://www.googleapis.com/auth/androidpublisher';
 const TRACKS = ['internal', 'alpha', 'beta', 'production'];
