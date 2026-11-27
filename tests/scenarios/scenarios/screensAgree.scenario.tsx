@@ -220,4 +220,37 @@ describe('Home, the widget and the reminders agree about a day (USER-2)', () => 
       await app.close();
     }
   });
+
+  it('[USER-2] [SYNC-1] Tuesday logged by hand while offline: in the same launch, its reminders go but the congratulation', async () => {
+    allowNotifications();
+    const phone = await account();
+    setNow(`${TUESDAY} 07:00`);
+    // Home and the reminders' sync together, as App.tsx mounts them.
+    const app = await phone.open((mods) => {
+      const { RevisionRemindersSync } = mods.require<{ RevisionRemindersSync: () => null }>('src/components/RevisionRemindersSync');
+      return mods.React.createElement(mods.React.Fragment, null, homeStack(mods), mods.React.createElement(RevisionRemindersSync));
+    });
+    try {
+      const home = new Home(app);
+      await home.ready();
+      await app.until(() => remindersFor(TUESDAY).length === 3, 'Tuesday’s three reminders');
+      // Offline, Activity → Tuesday → + → Revised elsewhere: 6–10, waiting on the phone.
+      await phone.goOffline();
+      const { queueChange } = app.mods.require<typeof import('../../../src/lib/offline/queue')>('src/lib/offline/queue');
+      const { manualRevisionItem } = app.mods.require<typeof import('../../../src/lib/manualRevision')>('src/lib/manualRevision');
+      await app.act(async () => {
+        await queueChange({ kind: 'revision.add', item: manualRevisionItem({ uid: app.uid, day: TUESDAY, now: Date.now(), pages: pagesRange(6, 10), minutes: null }) });
+      });
+      // Home says Done, and the reminders follow at once, with no relaunch: they kept asking until the next launch.
+      await app.until(() => (home.title() ?? '').startsWith('Done · 5 pages'), 'Home to say Tuesday is done');
+      await app.until(() => remindersFor(TUESDAY).join() === 'congrat', 'Tuesday’s reminders to go but the congratulation');
+      // Back online, sent: still done.
+      await phone.goOnline();
+      await app.untilSynced();
+      await app.idle(1200);
+      expect(remindersFor(TUESDAY)).toEqual(['congrat']);
+    } finally {
+      await app.close();
+    }
+  });
 });

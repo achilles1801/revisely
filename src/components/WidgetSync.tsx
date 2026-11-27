@@ -6,9 +6,7 @@ import { useDesign } from '../design/DesignContext';
 import { useRevisionDay } from '../hooks/useRevisionDay';
 import { getQuranData } from '../lib/quranData';
 import { buildWidgetSnapshot } from '../lib/widgets/snapshot';
-import type { HistoryItem } from '../lib/streakFromItems';
-import { historyOf, withPhoneSessions } from '../lib/activityHistory';
-import * as firestoreService from '../services/firestoreService';
+import { useScreenHistory, withPhoneSessions } from '../lib/activityHistory';
 import { writeWidgetSnapshot } from '../lib/widgets/storage';
 import { lastKnownPosition } from '../lib/widgets/position';
 import type { Coords } from '../lib/widgets/qibla';
@@ -32,7 +30,7 @@ import { useWhatsNewShowing } from '../lib/whatsNew/state';
  * account's Fajr location.
  */
 export function WidgetSync() {
-  const { user, pages, logs, loading, onboardingComplete } = useApp();
+  const { user, pages, logs, loading, onboardingComplete, pendingChanges } = useApp();
   const { firebaseUser, isLoading: authLoading } = useAuth();
   const { accent } = useDesign();
   // Re-renders at the day boundary while the app is open.
@@ -67,24 +65,9 @@ export function WidgetSync() {
   const prayerFrom = prayerTimesEnabled(ownUser) ? prayerPlace(ownUser, prayerPrefs) : null;
   const prayerKey = prayerFrom ? JSON.stringify([prayerFrom, prayerSettings(ownUser, prayerPrefs)]) : '';
 
-  // The Activity items' history for the streak (C5), 400 days back; the logs until it loads.
-  const [history, setHistory] = useState<HistoryItem[] | null>(null);
-  useEffect(() => {
-    if (!signedIn || !ownUser || !day) return;
-    let cancelled = false;
-    const [y, m, d] = day.split('-').map(Number);
-    const from = new Date(y, m - 1, d - 400);
-    const iso = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`;
-    firestoreService
-      .getActivityItemsBetween(iso, day)
-      .then((r) => {
-        if (!cancelled) setHistory(historyOf(r.revisions));
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [signedIn, ownUser, day, logs.length]);
+  // The Activity items' history for the streak (C5) and the days' pages logged by hand (ACT-15), 400 days back; the logs
+  // until it loads. Read again when a session is saved or the outbox changes, with those still waiting (USER-2).
+  const history = useScreenHistory(ownUser?.id, day, signedIn && !!ownUser, `${logs.length}:${pendingChanges}`);
 
   useEffect(() => {
     if (authLoading || (signedIn && (loading || !ownUser))) return;

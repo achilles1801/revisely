@@ -56,9 +56,9 @@ is checked on Home, the widget, the reminders and Revo at once (USER-1, USER-2),
 | --- | --- | --- | --- | --- | --- | --- |
 | New account, nothing memorized | S ONBOARD-3, UT, UM | n/a | S | S REMIND-4, UM | UM (noPlan) | UM |
 | 1 page memorized | UM | — | — | UM | UM | UM |
-| Part of a page (ayahs only) | S MEM-4, UT, UM | S MEM-4 | S MEM-1, UT (Revised elsewhere) | UM | P MEM-4, UM | P MEM-1, UM |
+| Part of a page (ayahs only) | S MEM-4, UT, UM | S MEM-4, UT (session and end card) | S MEM-1, UT (Revised elsewhere) | UM | P MEM-4, UM | P MEM-1, UM |
 | One juz / scattered / a run / most | S many, UM | S many | S many | S REMIND-1, UM | U, UM | P REVO, UM |
-| All 604, or all but a few ayahs | S, UT, UM | S AHEAD-3 | — | UM | UM | UM |
+| All 604, or all but a few ayahs | S, UT, UM | S AHEAD-3, UT (session) | — | UM | UM | UM |
 | Pages plan, forward / reverse | S SCHED-1, -4; P; UM | S, P | S | S, UM | U, UM | P, UM |
 | Juz plan | S SCHED-2, SESS-5; P; UT; UM | S | S | U, UM | U, UM | UM |
 | Custom with rest days | S HOME-9, UM | — | — | UM | UM (wording needs native) | UM |
@@ -70,22 +70,22 @@ is checked on Home, the widget, the reminders and Revo at once (USER-1, USER-2),
 | From Insights (a rest day given pages too) | S ACT-24, UM | S | S | UM | UM | UM |
 | Today done | S SESS-2, -4, UM | S AHEAD-1 | S | S REMIND-1, UM | U, UM | S REVO, UM |
 | Done ahead the day before | S AHEAD-2, SA, UM | S | S DAY-9 | SA, UM | SA, UM | UM |
-| Revised by hand in Activity | S ACT-15, SA, UM | SA (KNOWN BUG) | S ACT-15 | SA, UM | SA, UM | UM |
+| Revised by hand in Activity | S ACT-15, SA, UM | SA | S ACT-15 | SA, UM | SA, UM | UM |
 | Yesterday missed (grace) | S SESS-6, P, UM | S | S | UM | U, UM | S REVO, UM |
-| Back after weeks away | S SCHED-5, UT, UM | — | — | S REMIND-2, UM | UM | UM |
+| Back after weeks away | S SCHED-5, UT, UM | UT (session) | — | S REMIND-2, UM | UM | UM |
 | Fajr boundary, before Fajr | S DAY-2, P, UM | S DAY-4 | S DAY-9 | U, UM | U, UM | U, UM |
 | DST days, every zone | P DAY-6, -8, UM | P | — | U, UM | U, UM | UM |
 | Smart Tracking on | S, UM | — | S | — | — | P, UM |
-| Offline, outbox | S SYNC-1..5 | S | S ACT-13 | — | — | — |
-| Two phones | S SYNC-3, -5 | — | — | — | — | — |
+| Offline, outbox | S SYNC-1..5 | S | S ACT-13 | SA (hand-logged, offline) | same hook as the reminders | — |
+| Two phones | S SYNC-3, -5, UM | — | — | UM | UM | UM |
 | Cold start before Auth | S HOME-8 | — | S ACT-36 | — | — | — |
-| Store app vs Revisely Dev | S (each where it differs) | — | S ACT-35 | S REMIND-2, -5 | — | S REVO |
+| Store app vs Revisely Dev | S (each where it differs), UM | — | S ACT-35 | S REMIND-2, -5, UM | UM | S REVO, UM |
 | Arabic (RTL) | U, P LANG-1, -2, UM (Home's lines) | — | — | — | — | — |
-| Ramadan theme | S THEME-1..7 | — | S THEME-5, -6 | — | — | S THEME-8 |
+| Ramadan theme | S THEME-1..7 | — | S THEME-5, -6 | — | — | S THEME-8, UM |
 
 ## What the sweep found (Nov 27 2026)
 
-All six were cases where one screen disagreed with Home or with the account. Each is a rule now, and its fix landed
+All nine were cases where one screen disagreed with Home or with the account. Each is a rule now, and its fix landed
 with a scenario that fails without it.
 
 | Rule | What happened | Fix |
@@ -95,11 +95,13 @@ with a scenario that fails without it.
 | USER-2 | Pages logged by hand in Activity (ACT-15) finished the day on Home, but not on the widget, and the reminders kept asking. | The widget and the reminders read `dayProgress`. |
 | USER-2 | A rest day given pages from Insights was never done on the widget: it counted only the day's own pages, and there were none. | `dayProgress` counts all of such a day's pages, as Home does. |
 | USER-2 | A rest day showed an empty title on the widget. | It writes "Rest day" and where the next revision day starts, Home's words (`restDayWords`, `src/lib/widgets/snapshot.ts`). |
+| SESS-4, SESS-9, USER-2 | Pages logged by hand for today counted on Home but not in the session or review it opened: Continue opened on the first page with nothing checked, Review session opened empty. | The session and the review count them (`src/lib/handLogged.ts`). |
+| USER-2 | The widget and the reminders read the Activity items only when the number of sessions changed, and left out pages logged by hand still waiting on the phone: today logged by hand (offline or not) stayed "5 pages left", reminders still coming, until the next launch. | Both read `useScreenHistory` (`src/lib/activityHistory.ts`): again on every outbox change, with what is waiting. |
+| USER-1 | What's new's first slide named a partly memorized page by the whole page ("Al-Ikhlas to An-Nas" with only An-Nas memorized). | It names it as Home does, by its memorized ayahs. |
 | USER-2 | With ayahs of a page memorized (MEM-4), Activity's Revised elsewhere worked the day out from whole pages only, so it offered other pages than Home's today (2–6 where Home had 1–5). | The sheets and the day view read `revisablePages`, as Home does. |
 
-Still open (a `KNOWN BUG` test pins it, waiting on Majd's decision): pages logged by hand for today count on Home but
-not in the session or review it opens. With 3 of 5 logged, Continue opens on the first page with nothing checked; with
-all 5, Review session opens empty. The question is what unchecking a hand-logged page there should do.
+Waiting on Majd: what unchecking a page logged by hand does in the session and the review. Until he answers it stays
+checked there; either answer is one switch (`HAND_LOGGED_UNCHECK`, `src/lib/handLogged.ts`).
 
 Home itself held up: over thousands of generated accounts per run, HOME-9 doesn't come back (and with its fix undone,
 the property finds it at once, through a plan that starts tomorrow as well as a rest day).
@@ -120,9 +122,13 @@ the property finds it at once, through a plan that starts tomorrow as well as a 
 6. **Arabic** was tested by strings and layout, never by what Home says for an account. **Now:** UM renders Home's lines
    in Arabic too.
 
-Still unchecked (for later): the widgets' native drawing (Swift, Kotlin), and their rest-day status line; the What's new
-tour per user type; Activity's day card for a rest day in every plan; two phones on a rest day; travel across the date
-line on a custom plan; the session screen and the end card for each user type (only Home's lines are generated).
+Checked by reading, nothing found: Activity's day card and day view on a rest day (they show only what was done that
+day, never a plan to contradict); the tour's other slides (example data, the same for everyone).
+
+Still unchecked (for later): the widgets' native drawing (Swift, Kotlin) and their rest-day status line (#1056, held for
+the next store native release); the widget's write is native, so scenarios check its data, not what it draws; travel
+across the date line on a custom plan; the session and end card are generated in scenarios for five kinds of user, not
+in the property test.
 
 ## The rules every screen keeps (checked by the property test)
 

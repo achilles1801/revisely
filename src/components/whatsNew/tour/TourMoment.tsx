@@ -21,7 +21,8 @@ import { Stepper } from '../../Stepper';
 import { useRevisionDay } from '../../../hooks/useRevisionDay';
 import { generateDailyAssignment } from '../../../lib/algorithm';
 import { getQuranData } from '../../../lib/quranData';
-import { describePassage, plainText } from '../../../lib/passages';
+import { describePagesToRevise, plainText } from '../../../lib/passages';
+import { partlyMemorizedAyahs } from '../../../lib/memorizedAyahs';
 import { RAMADAN_INTRO_KEY } from '../../ramadan/introKey';
 import { logger } from '../../../lib/logger';
 import type { TourMoment as TourMomentId } from '../../../lib/help/whatsNew';
@@ -46,7 +47,8 @@ export function useTourPage(): { page: number; name: string } {
     } catch (err) {
       logger.warn("What's new: no page for the tour", err);
     }
-    return { page, name: plainText(describePassage([page])) };
+    // A partly memorized page by its memorized ayahs (MEM-4): only An-Nas memorized is "An-Nas", not its whole page.
+    return { page, name: plainText(describePagesToRevise([page], partlyMemorizedAyahs(pages))) };
   }, [user, pages, date]);
 }
 

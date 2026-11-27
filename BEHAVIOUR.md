@@ -1945,7 +1945,9 @@ by hand, carried pages, the Fajr boundary, every zone, Arabic) and checks these 
   button opens what it names: Start or Continue a day with pages, Revise ahead a later day with pages, Review session a
   day that is done; a rest day with no next day has none. "N of total" shows only while part of the day is done. The
   memorized line never rounds something memorized down to 0% nor anything short of all of it up to 100%: a few ayahs
-  read "0.1%", all but a few "99.9%". (Found by the sweep: one ayah memorized read "0% of the Quran memorized".)
+  read "0.1%", all but a few "99.9%". What's new's first slide names the account's page as Home does, a partly memorized
+  page by its memorized ayahs (MEM-4). (Found by the sweep: one ayah memorized read "0% of the Quran memorized"; only
+  An-Nas memorized read "Al-Ikhlas to An-Nas" in the tour.)
 - **USER-2.** Home, the widget, the reminders and Revo agree about a day: whether it is done and which of its pages are
   left. A day is done as Home counts it (SESS-2, SESS-7): its own pages revised that day, revised ahead the day before
   (AHEAD-2), or logged by hand (ACT-15); on a day with none of its own (pages from Insights on a rest day), all of its
@@ -1955,7 +1957,8 @@ by hand, carried pages, the Fajr boundary, every zone, Arabic) and checks these 
   one still to revise. The widget counts what finishes the day: its own pages, or on a day with none of its own, all of
   them. Activity's Revised elsewhere (and its page picker) offers a day's pages as Home has them, a partly memorized
   page among them (MEM-4). Pages logged by hand for today count in the session and the review Home opens as on Home:
-  Continue opens after them with them checked, and Review session holds them; they are never copied into the session's
+  Continue opens after them with them checked, and Review session holds them. The widget and the reminders count them at
+  once, offline too (those still waiting on the phone), as Home does; they are never copied into the session's
   own record (ACT-14), and, until Majd decides otherwise (`HAND_LOGGED_UNCHECK`), they stay checked there and come off
   in Activity. (Found by the sweep, Nov 27 2026: the reminders and the widget counted only the day's own
   sessions, so a day revised ahead or logged by hand still had "Good morning, today is …" coming, and the widget showed
