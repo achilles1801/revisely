@@ -7,7 +7,7 @@
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "21f5426746eb8c830173038cb5e6f8ad3420c455cc0c4f8bba55b101cc848009",
+    "systemSha256": "dc23148d39f2c5c8be7520f2aab168cfb2aa5691248d2196e4d020e3cb443d5e",
     "outputSchemaSha256": "ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e"
   },
   "status": 200,

@@ -385,6 +385,11 @@ until its part is set up.
     - Ink counts from about 8% opacity in every set (`INK` 20), the Android sets' faint fringe too (Nov 27 2026, to
       Majd's "ensure that never happens again": no hidden word's pixel at any opacity a person could see); those sets
       once counted solid ink only, as the marker and word-box scripts still do. A pixel holding two words' edges at once is counted and not failed: no cover splits it.
+    - Surah headers and the basmala stay visible (Majd, Nov 27 2026: "Keep them visible"): the script fails on any of
+      their ink under a cover too. Page 221's basmala reached a unit into the next line's cover rows (line 9's top moved
+      from 876 to 877 in `pageLines.json`; its words' ink starts below). `--write-headers` writes where their ink is
+      (`src/lib/recite/__fixtures__/headerInk.json`, each run of it, the three sets together), and `hiddenInk.test`
+      keeps every cover clear of it on every page in CI; rewrite it when the images or the page lines change.
     - Run the script (`--write`) after the word boxes, the page lines, the marker rows, the plan or the images change,
       under the lab's memory guard (`memguard.py --limit-gb 2`, 2 workers, nothing heavy beside it: the Mac ran short of
       memory on Nov 26 2026).
