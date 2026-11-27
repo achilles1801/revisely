@@ -70,7 +70,7 @@ is checked on Home, the widget, the reminders and Revo at once (USER-1, USER-2),
 | From Insights (a rest day given pages too) | S ACT-24, UM | S | S | UM | UM | UM |
 | Today done | S SESS-2, -4, UM | S AHEAD-1 | S | S REMIND-1, UM | U, UM | S REVO, UM |
 | Done ahead the day before | S AHEAD-2, SA, UM | S | S DAY-9 | SA, UM | SA, UM | UM |
-| Revised by hand in Activity | S ACT-15, SA, UM | — | S ACT-15 | SA, UM | SA, UM | UM |
+| Revised by hand in Activity | S ACT-15, SA, UM | SA (KNOWN BUG) | S ACT-15 | SA, UM | SA, UM | UM |
 | Yesterday missed (grace) | S SESS-6, P, UM | S | S | UM | U, UM | S REVO, UM |
 | Back after weeks away | S SCHED-5, UT, UM | — | — | S REMIND-2, UM | UM | UM |
 | Fajr boundary, before Fajr | S DAY-2, P, UM | S DAY-4 | S DAY-9 | U, UM | U, UM | U, UM |
@@ -96,6 +96,10 @@ with a scenario that fails without it.
 | USER-2 | A rest day given pages from Insights was never done on the widget: it counted only the day's own pages, and there were none. | `dayProgress` counts all of such a day's pages, as Home does. |
 | USER-2 | A rest day showed an empty title on the widget. | It writes "Rest day" and where the next revision day starts, Home's words (`restDayWords`, `src/lib/widgets/snapshot.ts`). |
 | USER-2 | With ayahs of a page memorized (MEM-4), Activity's Revised elsewhere worked the day out from whole pages only, so it offered other pages than Home's today (2–6 where Home had 1–5). | The sheets and the day view read `revisablePages`, as Home does. |
+
+Still open (a `KNOWN BUG` test pins it, waiting on Majd's decision): pages logged by hand for today count on Home but
+not in the session or review it opens. With 3 of 5 logged, Continue opens on the first page with nothing checked; with
+all 5, Review session opens empty. The question is what unchecking a hand-logged page there should do.
 
 Home itself held up: over thousands of generated accounts per run, HOME-9 doesn't come back (and with its fix undone,
 the property finds it at once, through a plan that starts tomorrow as well as a rest day).

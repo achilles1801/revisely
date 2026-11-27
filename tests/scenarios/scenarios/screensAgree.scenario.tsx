@@ -159,4 +159,46 @@ describe('Home, the widget and the reminders agree about a day (USER-2)', () => 
     expect(add.offered()).toEqual(pagesRange(1, 5));
     await app.close();
   });
+
+  // KNOWN BUG (BEHAVIOUR.md "Known bugs"): the session and its review read only the phone's sessions, not the pages
+  // logged by hand that Home counts (ACT-15). Found by the user-matrix sweep, Nov 27 2026.
+  async function loggedByHand(pages: number[]): Promise<{ app: OpenApp; home: Home }> {
+    const phone = await account();
+    setNow(`${TUESDAY} 07:00`);
+    const setup = await phone.open(homeStack);
+    const { queueChange } = setup.mods.require<typeof import('../../../src/lib/offline/queue')>('src/lib/offline/queue');
+    const { manualRevisionItem } = setup.mods.require<typeof import('../../../src/lib/manualRevision')>('src/lib/manualRevision');
+    await setup.act(async () => {
+      await queueChange({ kind: 'revision.add', item: manualRevisionItem({ uid: setup.uid, day: TUESDAY, now: Date.now(), pages, minutes: null }) });
+    });
+    await setup.untilSynced();
+    await setup.close();
+    const app = await phone.open(homeStack);
+    const home = new Home(app);
+    await home.ready();
+    return { app, home };
+  }
+
+  it.failing('KNOWN BUG: [SESS-9] [USER-2] 3 of Tuesday’s 5 pages logged by hand: Continue opens where Home says, the 4th page', async () => {
+    const { app, home } = await loggedByHand([6, 7, 8]);
+    await app.until(() => /3 of 5/.test(home.today()), 'Home to count the pages logged by hand');
+    const session = await home.startSession();
+    try {
+      // Home says "Continue at …" page 9; the session opens on page 6, nothing checked.
+      expect(session.current()).toBe(9);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it.failing('KNOWN BUG: [SESS-4] [USER-2] all of Tuesday logged by hand: Review session holds the 5 pages Home counts as Done', async () => {
+    const { app, home } = await loggedByHand(pagesRange(6, 10));
+    await app.until(() => (home.title() ?? '').startsWith('Done · 5 pages'), 'Home to say Tuesday is done');
+    try {
+      // It opens with no pages.
+      expect(await home.openReview()).toEqual(pagesRange(6, 10));
+    } finally {
+      await app.close();
+    }
+  });
 });
