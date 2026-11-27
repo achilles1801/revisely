@@ -501,6 +501,18 @@ export class Session {
     await this.app.idle(30);
   }
 
+  /** A row of the Pages sheet: goes to that page and marks nothing (SESS-1). */
+  async goTo(page: number): Promise<void> {
+    await this.openPages();
+    const { fireEvent } = this.app.mods.rtl;
+    await this.app.act(async () => {
+      fireEvent.press(this.app.screen.getByTestId(`session-pages-go-${page}`));
+    });
+    await this.app.until(() => pagerState().current === page, `the session to go to page ${page}`);
+    await this.app.until(() => this.app.screen.queryByTestId('session-pages-toggle-here') == null, 'the Pages sheet to close');
+    await this.app.idle(30);
+  }
+
   /** Marks the page on screen as revised, in the Pages sheet. */
   async check(): Promise<void> {
     if (await this.isChecked()) throw new Error('the page on screen is already marked');

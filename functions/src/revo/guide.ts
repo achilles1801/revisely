@@ -81,7 +81,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'A revision session',
-    covers: ['SESS-1', 'SESS-3', 'SESS-4', 'SESS-5'],
+    covers: ['SESS-1', 'SESS-3', 'SESS-4', 'SESS-5', 'SESS-9'],
     routes: ['ActiveRevision', 'ActivityAll'],
     text: lines(
       '- Home → “Start revision” (or “Continue revision”). The session shows today’s pages in the plan’s order, as mushaf pages.',

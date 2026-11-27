@@ -53,13 +53,35 @@ async function checkedBackFromHere(session: Session): Promise<number[]> {
   return out.sort((a, b) => a - b);
 }
 
-it('[SESS-9] today’s session, swiped back to a page already done and left: opened again from Home, on that page, both pages checked', async () => {
+it('[SESS-9] today’s session, gone ahead with the Pages sheet to a page still to revise and left: opened again from Home, on that page, the page revised checked', async () => {
+  const phone = await account();
+  let { app, home } = await openHome(phone, '2026-11-02 21:00');
+  let session = await home.startSession();
+  await session.swipe();
+  expect(session.current()).toBe(2);
+  // A row of the Pages sheet goes to a page and marks nothing.
+  await session.goTo(4);
+  expect(session.current()).toBe(4);
+  await session.back();
+  await app.untilSynced();
+  await app.close();
+
+  ({ app, home } = await openHome(phone, '2026-11-02 21:10'));
+  session = await home.startSession();
+  expect(session.pages()).toEqual(MON);
+  expect(session.current()).toBe(4);
+  expect(count(app)).toBe('1/5');
+  expect(await checkedBackFromHere(session)).toEqual([1]);
+  await session.back();
+  await app.close();
+});
+
+it('[SESS-9] gone back to look at a page already done and left: opened again on the first page still to revise, not the one looked at', async () => {
   const phone = await account();
   let { app, home } = await openHome(phone, '2026-11-02 21:00');
   let session = await home.startSession();
   await session.swipe();
   await session.swipe();
-  expect(session.current()).toBe(3);
   await session.swipeBack();
   await session.swipeBack();
   expect(session.current()).toBe(1);
@@ -69,10 +91,8 @@ it('[SESS-9] today’s session, swiped back to a page already done and left: ope
 
   ({ app, home } = await openHome(phone, '2026-11-02 21:10'));
   session = await home.startSession();
-  expect(session.pages()).toEqual(MON);
-  expect(session.current()).toBe(1);
+  expect(session.current()).toBe(3);
   expect(count(app)).toBe('2/5');
-  expect(await session.isChecked()).toBe(true);
   await session.back();
   await app.close();
 });
@@ -141,9 +161,9 @@ it('[SESS-9] [SESS-7] [CARRY-2] catch-up pages added to today, two revised and l
   await home2.ready();
   session = await home2.startSession();
   expect(session.pages()).toEqual(pages);
-  expect(session.current()).toBe(pages[2]);
-  // The two catch-up pages revised, and the page it opens on, which the day had already revised before (the seed's).
-  expect(await checkedBackFromHere(session)).toEqual([...pages.slice(0, 3)].sort((a, b) => a - b));
+  // It was on the third, which the day had already revised (the seed's), as the fourth: so on the first still to revise.
+  expect(session.current()).toBe(pages[4]);
+  expect(await checkedBackFromHere(session)).toEqual([...pages.slice(0, 4)].sort((a, b) => a - b));
   await session.back();
   await again.close();
 });

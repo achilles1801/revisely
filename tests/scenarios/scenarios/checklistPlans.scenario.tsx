@@ -146,16 +146,18 @@ describe('6. Revised ahead', () => {
     await app.close();
   });
 
-  it('[AHEAD-1] [AHEAD-3] [AHEAD-4] tomorrow’s last page, alone; done, Keep going holds the day after alone, and Home passes over tomorrow', async () => {
+  it('[AHEAD-1] [AHEAD-3] [AHEAD-4] tomorrow, its pages done ahead checked, on its last page; done, Keep going holds the day after alone, and Home passes over tomorrow', async () => {
     const { app } = await scenarioPhone('revise-ahead');
     const home = new Home(app);
     await home.ready();
+    // The whole of tomorrow (AHEAD-1): the pages revised ahead before are behind 596, checked.
     const ahead = await home.openAhead();
-    expect(ahead.pages()).toEqual([596]);
+    expect(ahead.pages()[ahead.pages().length - 1]).toBe(596);
     expect(ahead.current()).toBe(596);
-    expect(ahead.canSwipeBack()).toBe(false);
+    expect(ahead.canSwipeBack()).toBe(true);
     await ahead.swipe();
-    expect(ahead.endCard()).toMatch(/Revision complete .+ 1 page revised /);
+    // The day's whole count: its two pages revised ahead before and this one (AHEAD-1).
+    expect(ahead.endCard()).toMatch(/Revision complete .+ 3 pages revised /);
     await ahead.keepGoing();
     expect(ahead.pages()).toEqual([597, 598, 599]);
     expect(ahead.canSwipeBack()).toBe(false);

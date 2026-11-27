@@ -122,11 +122,11 @@ describe('revised ahead', () => {
     // Done · 7 (Monday's five and the two ahead), and tomorrow goes on from its first page not done.
     expect(home.title()).toMatch(/^Done · 7 pages/);
     expect(plain(home.ahead())).toBe(`Tomorrow starts at ${place(8)}`);
-    // The whole day, 6 and 7 checked (AHEAD-1), on 7: the page the session was on when it was left (SESS-9).
+    // The whole day, 6 and 7 checked (AHEAD-1), on 8: the session was left on 7, already revised, so on the first page
+    // still to revise (SESS-9).
     const rest = await home.openAhead();
     expect(rest.pages()).toEqual(TUE);
-    expect(rest.current()).toBe(7);
-    expect(await rest.isChecked()).toBe(true);
+    expect(rest.current()).toBe(8);
     await rest.back();
     await app.close();
 

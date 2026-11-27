@@ -145,11 +145,12 @@ function ActiveRevisionScreenBody() {
     return plan.pages.length > 0 ? plan : null;
   });
   const openedCredited = openedAhead ? creditedPagesOf(logs, openedAhead) : NO_PAGES;
-  // Where a day of this session opens (SESS-9): the page it was on when left, while that page is still the day's; else
-  // its first page not done (AHEAD-1).
+  // Where a day of this session opens (SESS-9): the page it was on when left, while that page is the day's and still to
+  // revise; else its first page not done (AHEAD-1). A page already done it was on (gone back to look at one, or passed
+  // over on the way) would only have to be swiped past again.
   const placeOn = (day: string, dayPages: readonly number[], done: ReadonlySet<number>): number | undefined => {
     const kept = sessionDay ? sessionPlaceFor(user?.id, sessionDay, day) : null;
-    return kept != null && dayPages.includes(kept) ? kept : firstNotDone(dayPages, done);
+    return kept != null && dayPages.includes(kept) && !done.has(kept) ? kept : firstNotDone(dayPages, done);
   };
 
   // Keep going (#168): the revision days after today, each with its pages, in
