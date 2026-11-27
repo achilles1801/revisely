@@ -71,8 +71,10 @@ export interface TodayLines {
   detail: { kind: 'text'; text: string } | { kind: 'progress'; done: number; total: number };
   /** Both lines, in words (VoiceOver). */
   label: string;
-  /** Nothing to revise yet. */
+  /** Nothing to revise yet, or a rest day: no pages today, so no "Change". */
   empty: boolean;
+  /** A rest day (HOME-9): no pages today, with pages memorized. Its detail says where the next revision day starts. */
+  rest?: boolean;
   cta: string;
   /** The button is solid (else an outline). */
   solid: boolean;
@@ -153,9 +155,30 @@ export function todayLines(
   partial: PartialPages = NONE,
   /** How many of the carried pages came from Insights ("Revise these first tomorrow"); the rest are leftovers. */
   carriedInsights = 0,
+  /**
+   * With no pages today: whether any page is memorized, and the next revision day ("Tomorrow", its first page). With
+   * pages memorized the day is a rest day in the plan (HOME-9), never "Nothing to revise yet".
+   */
+  rest: { memorized: boolean; next?: { lead: string; first: number } | null } = { memorized: false },
 ): TodayLines {
   const ordered = [...new Set(list)];
   const total = ordered.length;
+  if (total === 0 && rest.memorized) {
+    // Majd, Nov 27 2026, on a rest day of his plan: "telling me to mark memorized pages when i already have memorized
+    // pages marked?" The day says it rests, where the next one starts, and offers that day (an outline: resting is fine).
+    const title = t('lib.today.restTitle');
+    const next = rest.next ?? null;
+    const detail = next ? t('lib.today.startsAtAhead', { lead: next.lead, place: placeOf(next.first, partial) }) : t('lib.today.restDetail');
+    return {
+      title: { text: title, dot: false, chevron: false },
+      detail: { kind: 'text', text: detail },
+      label: spoken(t('lib.today.titleDetail', { title, detail })),
+      empty: true,
+      rest: true,
+      cta: next ? t('lib.today.reviseAheadCta') : '',
+      solid: false,
+    };
+  }
   if (total === 0) {
     const title = t('lib.today.nothingTitle');
     const detail = t('lib.today.nothingDetail');

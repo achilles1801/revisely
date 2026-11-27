@@ -97,6 +97,15 @@ describe('Today’s lines (E: "Starts at")', () => {
     });
   });
 
+  it('[HOME-9] no pages today with pages memorized: a rest day, where the next day starts, "Revise ahead" (an outline)', () => {
+    const rest = todayLines('not_started', [], new Set(), 0, 0, undefined, 0, { memorized: true, next: { lead: 'Tomorrow', first: 1 } });
+    expect(rest).toMatchObject({ title: { text: 'Rest day' }, rest: true, empty: true, cta: 'Revise ahead', solid: false });
+    expect(rest.detail).toEqual({ kind: 'text', text: expect.stringMatching(/^Tomorrow starts at /) });
+    // No next revision day: says so, and no button.
+    const none = todayLines('completed', [], new Set([3]), 0, 0, undefined, 0, { memorized: true });
+    expect(none).toMatchObject({ title: { text: 'Rest day' }, detail: { kind: 'text', text: 'Nothing is scheduled today.' }, cta: '' });
+  });
+
   it('keeps "last page", "20 pages", "Juz 28" and "Al-Mujadila" together (no-break spaces and hyphens)', () => {
     const t = todayLines('not_started', range(542, 561), new Set());
     expect(t.title.text).toBe(`Starts at Al${NBHY}Mujadila`);

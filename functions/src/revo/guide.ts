@@ -62,7 +62,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'Plans',
-    covers: ['SCHED-1', 'SCHED-2', 'SCHED-3', 'SCHED-4', 'SCHED-5', 'SCHED-6', 'SCHED-7', 'CARRY-5'],
+    covers: ['SCHED-1', 'SCHED-2', 'SCHED-3', 'SCHED-4', 'SCHED-5', 'SCHED-6', 'SCHED-7', 'CARRY-5', 'HOME-9'],
     routes: ['PlanEdit', 'PlanDayEdit'],
     text: lines(
       '- The plan goes round the memorized pages in a cycle, a set amount each revision day. Each memorized page comes round once a cycle.',
@@ -74,7 +74,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       'How to (all in “Edit schedule”: Settings → Revision → “Schedule”):',
       '- Change the daily amount: “Daily amount” → Pages or Juz → “Pages per day” or “Ajzaʼ per day” → Save.',
       '- Make a new plan: “Create new plan” → “Balanced” (pages, in even days), “By Juz” (whole juz each day) or “Weakest” (Smart Tracking only: weakest and most overdue pages first) → “Pages per day” or “Juz per day”, “Today starts at” (a surah, juz or page) and “Reverse order” → Apply → Save (top right).',
-      '- Edit one day: tap it (today is “Today’s revision”) → “Add or remove content” (pick surahs or ajzaʼ) or “Make rest day” → back → Save. “Add rest day” adds a day; hold a day and drag to move it; swipe to delete it. A rest day is a day of the cycle with nothing to revise, so it comes round every cycle: it isn’t a pause.',
+      '- Edit one day: tap it (today is “Today’s revision”) → “Add or remove content” (pick surahs or ajzaʼ) or “Make rest day” → back → Save. “Add rest day” adds a day; hold a day and drag to move it; swipe to delete it. A rest day (a cycle day with nothing to revise) comes round every cycle; it isn’t a pause. Home then says “Rest day”, where the next day starts, and “Revise ahead”.',
       '- “Saved plans”: “Save current plan…” keeps it under a name; a plan’s “Load” (then Save) or bin.',
       '- Back to automatic: “Use automatic schedule”.',
     ),
@@ -349,7 +349,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Revising one juz backwards while the rest goes forward: no; “Reverse order” turns the whole plan backwards. Closest: “Create new plan” → “Balanced” → “Reverse order” on → “Today starts at” → that juz → Apply → Save: today starts at the juz’s end and goes back page by page, into the juz before it. (“By Juz” reversed puts the juz in reverse order, each one’s pages in their usual order.)',
       '- A plan of whole surahs made for you: there is no surah mode (only pages, juz, or weakest). Closest: in “Edit schedule”, tap a day → “Add or remove content” → Surahs; or “Jump to…” → Surah.',
       '- Revising a passage as a session without touching the plan: no. Closest: “Jump to…” (moves today’s start), or read it in the reader with the timer, and log it with Activity → + → “Revised elsewhere”.',
-      '- Pausing the plan for a holiday: there’s no pause, and missed days don’t pile up: the plan follows the calendar, and their pages are offered for three days. Back from the trip, “Jump to…” picks up where you stopped. (Rest days come round every cycle, so they aren’t a pause.)',
+      '- Pausing the plan for a holiday: there’s no pause, and missed days don’t pile up: the plan follows the calendar, and their pages are offered for three days. Back from the trip, “Jump to…” picks up where you stopped.',
       '- Getting a streak back after two missed days, catching up days older than three, or moving a session to another day: no.',
       '- Following the phone’s light or dark setting, choosing reminder times, translations in Bengali, Russian, Malay, Korean or Italian, tafsir, a tajweed mushaf, recitation offline, sharing progress with a teacher, exporting data, several active plans at once (one is active; others can be saved): not yet.',
     ),

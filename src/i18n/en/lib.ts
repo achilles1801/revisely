@@ -127,6 +127,10 @@ export const lib = {
     nothingTitle: 'Nothing to revise yet',
     nothingDetail: "Start by marking what you've memorized. Most people begin with Juz 30.",
     markCta: 'Mark memorized pages',
+    /** A day of the plan with no pages, with pages memorized (HOME-9): never "Nothing to revise yet". */
+    restTitle: 'Rest day',
+    restDetail: 'Nothing is scheduled today.',
+    reviseAheadCta: 'Revise ahead',
     done: 'Done · {{pages}}',
     continueCta: 'Continue revision',
     reviewCta: 'Review session',
