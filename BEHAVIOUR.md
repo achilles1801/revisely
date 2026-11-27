@@ -875,7 +875,9 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   users and use their recordings to better train our model and we truly cross that final bar then we can charge"), and
   there it starts on (`TRAINING_STORE_DEFAULT`; Majd, Nov 26 2026: "start on") until the user sets it: a value saved on
   the phone before, which the user never chose, never counts. Until the release switch is on, the store app never asks
-  for a take to be kept. Off, takes are no longer kept. Deleting the account deletes the takes it kept.
+  for a take to be kept. Off, takes are no longer kept, and the ones already kept stay. Kept takes are held with no
+  time limit (Majd, Nov 26 2026, on how long to hold them and whether turning it off deletes them: "forever; keep it").
+  Deleting the account deletes the takes it kept.
 - **RECITE-27.** (Revisely Dev) A take needs at least one ayah recited, in every mode, on the server and on the phone.
   Less than that (the mic pressed for two seconds, nothing said) isn't a take: no summary, a short line saying to recite
   at least one ayah, nothing in Activity, Insights or Revo, no remembered marks and no saved audio. In Test me that place

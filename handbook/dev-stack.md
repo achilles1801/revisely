@@ -427,13 +427,13 @@ events, every dismissal and Put back, and the final result). Late labels (`/dism
   `keepsTakes`) and its `BUCKET` names the bucket. Today production's `BUCKET` is empty, so it keeps nothing.
 - **Who reads:** nobody through the client SDKs (`storage.rules`, `match /recite-tests/**`, tested in
   `tests/firestore-rules/keptTakesStorage.test.ts`). The lab reads with admin access (`fetch_takes.py`).
-- **Deleting:** Delete account deletes `recite-tests/<uid>/` (`deleteUserAccount`, ACCOUNT-1). Turning the switch off
-  stops new takes and leaves what is kept (whether off should also delete is Majd's call).
-- **Retention:** a bucket lifecycle rule on the `recite-tests/` prefix deletes takes older than the period Majd picks.
-  Nothing sets one today, on dev or production.
+- **Retention and deleting** (Majd, Nov 26 2026, on how long to hold them and whether turning the switch off deletes
+  them: "forever; keep it"): kept takes are held with no time limit, so no lifecycle rule deletes them. Turning the switch
+  off stops new takes and keeps the ones already kept. Delete account deletes `recite-tests/<uid>/`
+  (`deleteUserAccount`, ACCOUNT-1).
 
 **Cost, measured on dev's 111 kept takes (Nov 26 2026):** a take averages 1.7 MB of WAV (mean 54 s, median 27 s) and 9 KB
-of JSON, so 1,000 takes are about 1.7 GB. The bucket's no-cost limits (a `firebasestorage.app` bucket on Blaze, in a US
+of JSON, so 1,000 takes are about 1.7 GB, held for good. The bucket's no-cost limits (a `firebasestorage.app` bucket on Blaze, in a US
 region) are 5 GB stored, 5,000 uploads and 50,000 reads a month, and 100 GB downloaded. That 5 GB is shared with the
 recording backup. With nothing else in it, about 2,900 takes fit. Past it, standard storage is about $0.02–0.026 per GB a
 month, so about $0.035–0.045 a month per 1,000 takes kept, adding up as takes accumulate (100,000 takes: about $3.50–4.50
@@ -445,9 +445,8 @@ ADPCM the phone already sends (4:1) instead of WAV would cut storage about four 
 2. `firebase deploy --only functions:deleteUserAccount` to production (deletes `recite-tests/<uid>/`).
 3. revisely-internal: set `BUCKET=revision-buddy-3a398.firebasestorage.app` on production's `recite-check` and
    `recite-check-pair`, and give their service account `roles/storage.objectCreator` on that bucket.
-4. The lifecycle rule on `recite-tests/` (the period Majd picks).
-5. Majd: the privacy policy, App Store Connect's App Privacy (Audio Data's purposes) and Play's Data safety (see the PR).
-6. The release PR: `TRAINING_TAKES_RELEASED = true` (the store default is already on), RECITE-26 loses "(Revisely Dev)",
+4. Majd: the privacy policy, App Store Connect's App Privacy (Audio Data's purposes) and Play's Data safety (see the PR).
+5. The release PR: `TRAINING_TAKES_RELEASED = true` (the store default is already on), RECITE-26 loses "(Revisely Dev)",
    and its line moves from Revo's Dev guide to the main guide.
 
 ## Native code for Revisely Dev only: `modules-dev/` (Recite on the phone, Nov 23 2026)
