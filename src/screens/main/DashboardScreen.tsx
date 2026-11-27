@@ -465,18 +465,14 @@ export default function DashboardScreen() {
     }
   };
 
-  // Today's ayah: its page in the mushaf, in the Read tab, as Al-Kahf opens.
+  // Today's ayah and Al-Kahf open the reader over Home, in Home's own stack, so back comes back to Home (HOME-7, KAHF-2;
+  // Majd, Nov 26 2026). The Read tab's reader would leave back on the Read tab's surah list.
   const openAyah = (page: number) => {
-    navigation.getParent()?.navigate('Read', { screen: 'QuranReader', params: { pageNumber: page }, initial: false });
+    navigation.navigate('QuranReader', { pageNumber: page });
   };
 
   const openKahf = () => {
-    navigation.getParent()?.navigate('Read', {
-      screen: 'QuranReader',
-      params: { pageNumber: kahfPages()[0] },
-      // Keep the surah index beneath it, so back lands on the Read tab's root.
-      initial: false,
-    });
+    navigation.navigate('QuranReader', { pageNumber: kahfPages()[0] });
   };
 
   const markKahfRead = async (minutes: number) => {
