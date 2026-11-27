@@ -32,24 +32,40 @@ export function ProfilePicture({
   testID?: string;
 }) {
   const { palette } = useTheme();
+  // What is drawn, and a new photo loading on top of it: a change of photo never blanks or flashes (HOME-8). Undefined
+  // (the phone's copy not read yet, a moment as the app starts): neither a photo nor the letter, so neither flashes.
+  const [shown, setShown] = useState<string | null>(photoUrl ?? null);
+  const [next, setNext] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [photoUrl]);
+  useEffect(() => {
+    if (photoUrl === undefined || photoUrl === shown) {
+      setNext(null);
+      return;
+    }
+    if (photoUrl == null || shown == null || failed) {
+      setShown(photoUrl);
+      setNext(null);
+      setFailed(false);
+      return;
+    }
+    setNext(photoUrl);
+  }, [photoUrl]); // eslint-disable-line react-hooks/exhaustive-deps
   const large = size >= 64;
   const ringW = large ? 2.5 : 1.5;
   const gap = large ? 2.5 : 1;
   const outer = premium ? size + 2 * (ringW + gap) : size;
-  const showPhoto = !!photoUrl && !failed;
+  const showPhoto = !!shown && !failed;
   const picture = (
     <View style={[styles.center, { width: size, height: size, borderRadius: size / 2, backgroundColor: palette.fill, overflow: 'hidden' }]}>
       {showPhoto ? (
         <Image
-          source={{ uri: photoUrl! }}
+          source={{ uri: shown! }}
           style={{ width: size, height: size }}
           onError={() => setFailed(true)}
           accessibilityIgnoresInvertColors
           testID={testID ? `${testID}-photo` : undefined}
         />
-      ) : (
+      ) : photoUrl === undefined ? null : (
         <Text
           style={[typeV2.name, { color: palette.text, fontSize: Math.round(size * 0.42), lineHeight: Math.round(size * 0.52) }]}
           maxFontSizeMultiplier={1}
@@ -58,6 +74,19 @@ export function ProfilePicture({
           {initial}
         </Text>
       )}
+      {next ? (
+        <Image
+          source={{ uri: next }}
+          style={[StyleSheet.absoluteFill, { opacity: 0 }]}
+          onLoad={() => {
+            setShown(next);
+            setNext(null);
+            setFailed(false);
+          }}
+          onError={() => setNext(null)}
+          accessibilityIgnoresInvertColors
+        />
+      ) : null}
     </View>
   );
   const corner = large ? 30 : 17;

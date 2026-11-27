@@ -19,6 +19,7 @@ import { EditSessionModal } from '../../components/EditSessionModal';
 import { greetingName } from '../../lib/displayName';
 import { setHomePrefs, useHomePrefs } from '../../lib/homePrefs';
 import { kahfCardState, kahfPages, kahfReadingSession, kahfReadOn } from '../../lib/kahf';
+import { rememberKahf, useKahfKnown } from '../../lib/kahfKnown';
 import { useKahfFriday } from '../../hooks/useKahfFriday';
 import * as firestoreService from '../../services/firestoreService';
 import { queueChange, withPendingReadings } from '../../lib/offline/queue';
@@ -74,7 +75,7 @@ import { aheadLead, nextRevisionDayPlan } from '../../lib/aheadPlan';
 import type { HistoryItem } from '../../lib/streakFromItems';
 import { handLogsOf, loadActivityHistory, sameHistory, shareActivityHistory, withPendingHandLogs } from '../../lib/activityHistory';
 import { accountDesignEnabled } from '../../lib/release/accountDesign';
-import { useAccountJourney } from '../../lib/accountJourney';
+import { useAccountJourney, usePagesRevisedOnPhone } from '../../lib/accountJourney';
 import { latestMilestone } from '../../lib/badges';
 import { useNewBadge } from '../../lib/badgeSeen';
 import { usePremium } from '../../lib/premium';
@@ -257,10 +258,13 @@ export default function DashboardScreen() {
   // seen there (lib/badgeSeen), so only badges won from now on arrive as new.
   const accountV2 = accountDesignEnabled();
   const journey = useAccountJourney({ enabled: accountV2, load: false });
-  const latestBadge = accountV2 && journey ? latestMilestone(journey.pagesRevised) : undefined;
+  // Until the history is in, the count this phone last worked out (HOME-8): the badge is there with Home's first frame.
+  const revisedOnPhone = usePagesRevisedOnPhone(user?.id);
+  const revisedNow = journey?.pagesRevised ?? revisedOnPhone;
+  const latestBadge = accountV2 && revisedNow != null ? latestMilestone(revisedNow) : undefined;
   useNewBadge(accountV2 ? user?.id : null, latestBadge);
   const premiumNow = usePremium(user?.id, accountV2 && reciteLiveForAccount(user));
-  const photoUrl = useAccountPhoto(firebaseUser);
+  const photoUrl = useAccountPhoto(firebaseUser, user?.id);
 
   // Done today: the next revision day, which Home's quiet line opens (#168). It goes on past the cycle's
   // end (AHEAD-3): a day that repeats today's pages opens as a new round, and one that begins the plan
@@ -347,20 +351,26 @@ export default function DashboardScreen() {
       };
     }, [kahfFriday, kahfEnabled, authUid]),
   );
+  // What this phone last knew for this Friday (HOME-8): the card shows with Home's first frame, and the server's answer
+  // replaces it quietly once read.
+  const kahfKnown = useKahfKnown(user?.id, kahfFriday);
+  const kahfLoaded = sessionsLoadedFor === kahfFriday;
   const kahfDone = useMemo(
-    () => (kahf ? kahfReadOn(kahf, readingSessions, logs) : false),
-    [kahf, readingSessions, logs],
+    () => (kahf ? kahfReadOn(kahf, readingSessions, logs) || (!kahfLoaded && kahfKnown === true) : false),
+    [kahf, readingSessions, logs, kahfLoaded, kahfKnown],
   );
+  useEffect(() => {
+    if (user?.id && kahfFriday && kahfLoaded) rememberKahf(user.id, kahfFriday, kahfDone);
+  }, [user?.id, kahfFriday, kahfLoaded, kahfDone]);
   const kahfState = kahfCardState({
     enabled: kahfEnabled,
     friday: kahfFriday,
     dismissedDay: homePrefs.kahfDismissedDay,
     done: kahfDone,
   });
-  // Until the sessions are in, a prompt might be about to turn into
-  // "Done ✓"; wait rather than flash it.
-  const showKahfCard =
-    kahfState === 'done' || (kahfState === 'prompt' && sessionsLoadedFor === kahfFriday);
+  // Until the sessions are in, a prompt might be about to turn into "Done ✓": wait rather than flash it, unless this
+  // phone already knows this Friday's answer.
+  const showKahfCard = kahfState === 'done' || (kahfState === 'prompt' && (kahfLoaded || kahfKnown !== null));
 
   if (!user || !assignment) {
     return (

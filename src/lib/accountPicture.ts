@@ -11,6 +11,7 @@ import { File } from 'expo-file-system';
 import { authHeaders, bucketName, CloudError, objectUrl, uploadUrl } from './recordingCloud';
 import { isDevVariant } from './variant';
 import { logger } from './logger';
+import { usePhotoOnPhone } from './photoOnPhone';
 
 // ------------------------------------------------------------------ the picker (Revisely Dev's native module)
 
@@ -61,8 +62,13 @@ let override: { uid: string; url: string | null } | null = null;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
-/** The account's picture: its sign-in profile's photo, or the one just set on this phone (the profile has it too). */
-export function useAccountPhoto(user: FirebaseUser | null | undefined): string | null {
+/**
+ * The account's picture to draw: its sign-in profile's photo, or the one just set on this phone (the profile has it too),
+ * kept on the phone (lib/photoOnPhone) so Home's first frame has it before Auth has checked the saved sign-in (HOME-8).
+ * `uid` is the account the app shows (its copy's, which can open before Auth has a user). Undefined only for the moment
+ * the phone's copy is being read as the app starts.
+ */
+export function useAccountPhoto(user: FirebaseUser | null | undefined, uid: string | null | undefined): string | null | undefined {
   useSyncExternalStore(
     (l) => {
       listeners.add(l);
@@ -70,6 +76,15 @@ export function useAccountPhoto(user: FirebaseUser | null | undefined): string |
     },
     () => override,
   );
+  const account = uid ?? user?.uid ?? null;
+  // What the account says now; undefined until Auth has this account.
+  const live =
+    override && override.uid === account ? override.url : user && user.uid === account ? user.photoURL || null : undefined;
+  return usePhotoOnPhone(account, live);
+}
+
+/** The picture's link as the account has it now (not the phone's copy): the one just set here, or the profile's. */
+export function accountPhotoLink(user: FirebaseUser | null | undefined): string | null {
   if (!user) return null;
   if (override && override.uid === user.uid) return override.url;
   return user.photoURL || null;

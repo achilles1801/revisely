@@ -480,6 +480,14 @@ current basic sounds". October 2026's version was removed for the voices it offe
 
 ## Sheets and updates
 
+- **HOME-8.** On a cold start, Home's first frame draws what the phone already knows, without waiting for Firebase Auth
+  to check the saved sign-in or for the server: the account's picture (its photo, kept on the phone with its link, or the
+  first letter), the latest badge on it (ACCOUNT-7, from the pages revised last worked out here), Friday's Al-Kahf card
+  (read or not, as last known here for this Friday) and today's ayah with its English (HOME-7). Each is then refreshed
+  quietly from the account and the server: a new photo replaces the old only once it is on the phone, never with a blank
+  or the letter in between; a photo removed elsewhere goes; a card known here for this Friday changes only if the server
+  says otherwise. Before anything is known here (a first start, another Friday), they wait as before (KAHF-2: no prompt
+  that flips to Done).
 - **SHEET-1.** One sheet at a time: a sheet asked to open while another is open, or still closing,
   opens once that one has gone (a sheet opened from inside another opens over it). So whatever opens
   a sheet (the user, an update, Revo's "Open Jump to"), the screen under it takes taps again once the
