@@ -658,7 +658,7 @@ export function DayBlocks({
   // What the day still has to revise (REC-3), as Revised elsewhere reads it: today or yesterday, its
   // session's assignment (the plan's pages without one), less what is revised for it already.
   const reviseWord: 'today' | 'yesterday' | null = day === today ? 'today' : day === previousIsoDay(today) ? 'yesterday' : null;
-  const dueToRevise = reviseWord == null ? [] : revised.assigned.length > 0 ? revised.assigned : user ? planDuePages(user, day, pages.filter((p) => p.status === 'memorized')) : [];
+  const dueToRevise = reviseWord == null ? [] : revised.assigned.length > 0 ? revised.assigned : user ? planDuePages(user, day, revisablePages(pages)) : [];
   const revisedForDay = [...revised.revised, ...doneAhead.flatMap((a) => a.pages)];
   const addSittingRevised = async (id: string, toRevise: number[]) => {
     if (!user || revisingSitting) return;

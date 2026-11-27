@@ -66,6 +66,58 @@ export function carriedPagesOn(user: User | null, day: string, pages: readonly n
   return pages.filter((p) => carried.has(p));
 }
 
+/** A day's pages and how far they've got, without the streak: what Home, the widget and the reminders all read (USER-2). */
+export interface DayProgress {
+  /** The day's pages in the session's order, carried pages first. */
+  pages: number[];
+  /** Of them, the pages that make the day done (SESS-7, lib/carryOver duePagesOf). */
+  own: number[];
+  /** Pages done for the day: credited to it, revised in its sessions, or logged by hand for it (ACT-15). */
+  done: Set<number>;
+  /**
+   * The pages that finish the day, as a count to show: its own, or on a day with none of its own (an off day given pages
+   * from Insights), all its pages.
+   */
+  finishing: number[];
+  /** Of `finishing`, how many are done, as the status counts them. */
+  finishingDone: number;
+  status: TodayStatus;
+}
+
+/**
+ * How far a revision day has got, as Home counts it (SESS-2, SESS-7, AHEAD-2, ACT-15). The widget and the reminders read
+ * the same, so a day Home calls done is done on the widget, and no reminder asks for it (USER-2; Nov 27 2026, the
+ * user-matrix sweep: both counted only the day's own sessions, so a day revised ahead or logged by hand still read as
+ * not started there).
+ */
+export function dayProgress(input: {
+  user: User;
+  pages: readonly UserPage[];
+  logs: readonly RevisionLog[];
+  /** The revision day. */
+  day: string;
+  /** Its assignment (generateDailyAssignment's pages), carried pages included. */
+  assignment: readonly number[];
+  /** The Activity items (lib/activityHistory): the pages logged by hand among them count. Null until they've loaded. */
+  history: readonly HistoryItem[] | null;
+}): DayProgress {
+  const { user, pages, logs, day, assignment, history } = input;
+  const list = [...new Set(assignment)];
+  const own = duePagesOf(list, user, day, revisablePages(pages));
+  // Pages logged by hand for the day count as its sessions' do (ACT-15), once each.
+  const counted = history ? [...logs, ...handLogsOf(history)] : logs;
+  const done = doneOnDay(counted, day);
+  // A day with none of its own pages (an off day given pages from Insights) is done once its pages are:
+  // Home said "N of N" and Continue revision for good (Nov 8 2026).
+  if (own.length === 0) {
+    const finishingDone = list.filter((p) => done.has(p)).length;
+    const status = list.length > 0 && finishingDone === list.length ? 'completed' : finishingDone > 0 ? 'partial' : 'not_started';
+    return { pages: list, own, done, finishing: list, finishingDone, status };
+  }
+  const { status, pagesCompleted } = todayStatusOf(own, creditedOnDay(counted, day), caughtUpOnDay(counted, day));
+  return { pages: list, own, done, finishing: own, finishingDone: Math.min(pagesCompleted, own.length), status };
+}
+
 export function todaySnapshot(input: {
   user: User;
   pages: readonly UserPage[];
@@ -78,20 +130,10 @@ export function todaySnapshot(input: {
   history: readonly HistoryItem[] | null;
   now: number;
 }): TodaySnapshot {
-  const { user, pages, logs, day, assignment, history } = input;
-  const list = [...new Set(assignment)];
-  const own = duePagesOf(list, user, day, revisablePages(pages));
+  const { user, pages, logs, day, history } = input;
+  const { pages: list, own, done, status } = dayProgress(input);
   const carried = carriedPagesOn(user, day, list);
   const insights = insightsPagesOn(user, day);
-  // Pages logged by hand for today count as its sessions' do (ACT-15), once each.
-  const counted = history ? [...logs, ...handLogsOf(history)] : logs;
-  const done = doneOnDay(counted, day);
-  // A day with none of its own pages (an off day given pages from Insights) is done once its pages are:
-  // Home said "N of N" and Continue revision for good (Nov 8 2026).
-  const status =
-    own.length === 0 && list.length > 0 && list.every((p) => done.has(p))
-      ? ('completed' as const)
-      : todayStatusOf(own, creditedOnDay(counted, day), caughtUpOnDay(counted, day)).status;
   // From the Activity items once they've loaded, with the phone's sessions over them; the logs until then.
   const streak = history
     ? streakDetailFromItems({ user, pages, items: withPhoneSessions(history, logs, input.now), today: day })

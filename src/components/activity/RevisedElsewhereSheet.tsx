@@ -16,6 +16,7 @@ import { queueChange } from '../../lib/offline/queue';
 import { revisedElsewhereChoices } from '../../lib/activityAdd';
 import { creditedOnDay } from '../../lib/aheadCredit';
 import { planDuePages } from '../../lib/carryOver';
+import { revisablePages } from '../../lib/memorizedAyahs';
 import { manualRevisionItem } from '../../lib/manualRevision';
 import { describePassage, pagesNote } from '../../lib/passages';
 import { logger } from '../../lib/logger';
@@ -53,7 +54,8 @@ export function RevisedElsewhereSheet({
     }
   }, [visible]);
 
-  const memorizedPages = useMemo(() => (pages ?? []).filter((p) => p.status === 'memorized'), [pages]);
+  // The pages Home revises, a partly memorized page among them (MEM-4): the day's plan is Home's (USER-2).
+  const memorizedPages = useMemo(() => revisablePages(pages ?? []), [pages]);
   const memorized = useMemo(() => new Set(memorizedPages.map((p) => p.pageNumber)), [memorizedPages]);
   // What the day had scheduled: its session's assignment, or the plan's pages for it.
   const due = useMemo(() => {

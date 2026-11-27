@@ -3,6 +3,9 @@
 // nothing changed, it says something else (REVO-35): "done" once, then what's ahead, in turn.
 
 import { placeOfPage } from '../passages';
+import { aheadLead, nextRevisionDayPlan } from '../aheadPlan';
+import type { TodaySnapshot } from '../todaySnapshot';
+import type { RevisionLog, User, UserPage } from '../../types';
 import type { RevoContext } from './types';
 import { passageLong, passageShort } from './words';
 import { t } from '../../i18n';
@@ -194,6 +197,30 @@ interface Opening {
  */
 export function revoHello(name: string | null): string {
   return name ? t('revo.greeting.hello', { name }) : t('revo.greeting.helloNoName');
+}
+
+/**
+ * The greeting's extras as the phone has them (useRevoContext; the user-matrix property test checks the same): Home's
+ * "Done · N", and once today is done, where the next revision day starts (Home's "Tomorrow starts at …").
+ */
+export function greetingExtrasFor(src: {
+  user: User;
+  pages: readonly UserPage[];
+  logs: readonly RevisionLog[];
+  day: string;
+  assignment: readonly number[];
+  snapshot: TodaySnapshot;
+}): GreetingExtras {
+  const { user, pages, logs, day, assignment, snapshot } = src;
+  let next: GreetingExtras['next'] = null;
+  if (snapshot.status === 'completed' && assignment.length > 0) {
+    const plan = nextRevisionDayPlan(user, pages, day, new Set(assignment), logs);
+    if (plan && plan.pages.length > 0) {
+      next = { lead: aheadLead(user, pages, day, plan, { long: true }), first: plan.pages[0], pages: plan.pages.length };
+    }
+  }
+  // Smart Tracking unset is off, as Activity reads it.
+  return { doneCount: snapshot.done.size, next, strength: user.smartTrackingEnabled === true };
 }
 
 /** `open` counts the opens before this one, today, in the same state (0: the first; nextOpens). */

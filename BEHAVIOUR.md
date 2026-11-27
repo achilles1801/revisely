@@ -259,7 +259,8 @@ permission when "Daily reminders" is on, and a no saves reminders off.
 - **REMIND-1.** While today's revision isn't done, up to three a day: 8:00 AM, 20 minutes after Asr at
   the prayer place (3:00 PM without one), and an hour before the revision day ends (quiet between
   midnight and Fajr). Two due within 30 minutes become one. Once today is done, the rest of today's go,
-  and the next becomes one quiet congratulation. Tomorrow gets the same three.
+  and the next becomes one quiet congratulation. Tomorrow gets the same three. A day is done as Home counts it, and a
+  day already revised ahead gets none (USER-2).
 - **REMIND-2.** (Revisely Dev) Someone who doesn't open the app still gets one reminder a day, at the morning time,
   on each day after tomorrow, for a week counting the day the app was last open. It names where that day's
   revision is, in words that change from one day to the next, and is never a second reminder on a day. Then they stop until
@@ -1929,6 +1930,34 @@ shows up once and they must go through it and complete it … just the main stuf
 - **NEW-4.** It opens before Home, so nothing opens over it: "A new update is ready", "New version
   available" and Revo wait for Home, a widget's link opened at launch goes through after Done, and an
   update never restarts the app under it. Only "Update required" comes first.
+
+## Every kind of user
+
+Majd, Nov 27 2026, after HOME-9: "can we have a session sweep through all different possible scenarios that could arise
+from every type of user so we can make sure we take into account every single case and edge case so bugs like this
+never come again". The kinds of user, the screens and what tests each: `tests/scenarios/USER-MATRIX.md`. The property
+test `properties/userMatrix.property.ts` generates accounts across it (nothing to all 604 memorized, part of a page,
+pages, juz and custom plans with rest days, plans not started yet, days done, part done, missed, revised ahead or logged
+by hand, carried pages, the Fajr boundary, every zone, Arabic) and checks these on what each screen shows.
+
+- **USER-1.** What Home's Today post says fits the account, whoever it is. It never shows the new account's state while
+  anything is memorized (HOME-9), nor anything else while nothing is. No line is empty or shows a missing number, and the
+  button opens what it names: Start or Continue a day with pages, Revise ahead a later day with pages, Review session a
+  day that is done; a rest day with no next day has none. "N of total" shows only while part of the day is done. The
+  memorized line never rounds something memorized down to 0% nor anything short of all of it up to 100%: a few ayahs
+  read "0.1%", all but a few "99.9%". (Found by the sweep: one ayah memorized read "0% of the Quran memorized".)
+- **USER-2.** Home, the widget, the reminders and Revo agree about a day: whether it is done and which of its pages are
+  left. A day is done as Home counts it (SESS-2, SESS-7): its own pages revised that day, revised ahead the day before
+  (AHEAD-2), or logged by hand (ACT-15); on a day with none of its own (pages from Insights on a rest day), all of its
+  pages. Once Home says Done, the widget shows it done and no reminder asks for that day (only the congratulation,
+  REMIND-1). A rest day reads on the widget as on Home: "Rest day", then where the next revision day starts (it had an
+  empty title). A later day already revised ahead gets no reminder asking for it, and a page done ahead is never named as
+  one still to revise. The widget counts what finishes the day: its own pages, or on a day with none of its own, all of
+  them. Activity's Revised elsewhere (and its page picker) offers a day's pages as Home has them, a partly memorized
+  page among them (MEM-4). (Found by the sweep, Nov 27 2026: the reminders and the widget counted only the day's own
+  sessions, so a day revised ahead or logged by hand still had "Good morning, today is …" coming, and the widget showed
+  it not done; a day of pages from Insights never read as done on the widget; and with ayahs of a page memorized,
+  Revised elsewhere worked the day out without that page, so it offered other pages than Home's.)
 
 ## Naming the Qur'an
 

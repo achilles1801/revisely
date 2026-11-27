@@ -39,7 +39,7 @@ const lines = (...l: string[]) => l.join('\n');
 export const GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     title: 'Finding your way',
-    covers: ['NAME-1', 'NAME-2', 'REVO-25', 'REVO-41', 'TAB-2', 'HOME-1', 'HOME-3'],
+    covers: ['NAME-1', 'NAME-2', 'REVO-25', 'REVO-41', 'TAB-2', 'HOME-1', 'HOME-3', 'USER-1'],
     routes: ['Dashboard', 'ReadIndex', 'Activity', 'Settings'],
     text: lines(
       '- The tab bar: Home, Activity, Read (swipe between them). Insights is in Activity; tapping Activity again goes back to its start.',
@@ -97,7 +97,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
   },
   {
     title: 'The streak',
-    covers: ['SESS-2', 'SESS-6', 'SESS-7', 'ACT-15'],
+    covers: ['SESS-2', 'SESS-6', 'SESS-7', 'ACT-15', 'USER-2'],
     routes: ['Dashboard'],
     text: lines(
       '- A revision day counts when every page scheduled for it is revised and credited to that day (in its own session, or revised ahead before it came). Home then says Done.',

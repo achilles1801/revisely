@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { useSharedActivityHistory } from '../activityHistory';
-import { aheadLead, nextRevisionDayPlan } from '../aheadPlan';
 import { generateDailyAssignment } from '../algorithm';
 import { gapsInsightsEnabled } from '../insightsGaps';
 import { journalFirstDay } from '../journal';
@@ -23,7 +22,7 @@ import { revoGaps } from './gaps';
 import { recitationForRevo } from './recitation';
 import { revoPatternsOn, revoReciteOn } from './release';
 import type { FactSources } from './facts';
-import type { GreetingExtras } from './greeting';
+import { greetingExtrasFor, type GreetingExtras } from './greeting';
 import type { RevoContext } from './types';
 
 /** "Wednesday": the next revision day with pages, when it isn't tomorrow. */
@@ -79,18 +78,9 @@ export function useRevoContext(): {
     const src = sources();
     if (!src) return { context: null, extras: {} };
     const { snapshot } = src;
-    // Home's "Tomorrow starts at …" (DashboardScreen's aheadNext): only once today is done.
-    let next: GreetingExtras['next'] = null;
-    if (snapshot.status === 'completed' && assignment.length > 0) {
-      const plan = nextRevisionDayPlan(src.user, src.pages, day, new Set(assignment), src.logs);
-      if (plan && plan.pages.length > 0) {
-        next = { lead: aheadLead(src.user, src.pages, day, plan, { long: true }), first: plan.pages[0], pages: plan.pages.length };
-      }
-    }
     return {
       context: buildRevoContext({ user: src.user, pages: src.pages, logs: src.logs, snapshot, history: src.history, patterns: revoPatternsOn(), recite: revoReciteOn(), recitation: recitation(), gaps, ramadan }),
-      // Smart Tracking unset is off, as Activity reads it.
-      extras: { doneCount: snapshot.done.size, next, strength: src.user.smartTrackingEnabled === true },
+      extras: greetingExtrasFor({ user: src.user, pages: src.pages, logs: src.logs, day, assignment, snapshot }),
     };
   }, [sources, assignment, day, recitation, gaps, ramadan]);
   return { day, context, extras, build, sources };

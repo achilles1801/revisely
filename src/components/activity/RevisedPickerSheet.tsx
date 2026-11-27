@@ -15,6 +15,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { queueChange } from '../../lib/offline/queue';
 import { creditedOnDay } from '../../lib/aheadCredit';
 import { planDuePages } from '../../lib/carryOver';
+import { revisablePages } from '../../lib/memorizedAyahs';
 import { manualRevisionItem } from '../../lib/manualRevision';
 import { logger } from '../../lib/logger';
 import { getPagesForJuz } from '../../lib/quranData';
@@ -65,7 +66,8 @@ export function RevisedPickerSheet({
     }
   }, [visible]);
 
-  const memorizedPages = useMemo(() => (pages ?? []).filter((p) => p.status === 'memorized'), [pages]);
+  // The pages Home revises, a partly memorized page among them (MEM-4): the day's plan is Home's (USER-2).
+  const memorizedPages = useMemo(() => revisablePages(pages ?? []), [pages]);
   // What the day had scheduled: its session's assignment, or the plan's pages for it.
   const due = useMemo(() => {
     const assigned = [...new Set(logs.filter((l) => l.date === day).flatMap((l) => l.assignedPages ?? []))];

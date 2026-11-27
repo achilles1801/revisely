@@ -29,6 +29,7 @@ import {
 import type { Place } from '../prayer/prefs';
 import { dayTimes, type CalcSettings } from '../prayer/times';
 import { streakFromLogs } from '../streak';
+import { dayProgress } from '../todaySnapshot';
 import { streakReadingFromItems, type HistoryItem } from '../streakFromItems';
 import type { QuranPage, RevisionLog, User, UserPage } from '../../types';
 import { reminderCopy, type ReminderKind } from './copy';
@@ -157,9 +158,21 @@ export function planRevisionReminders(input: PlanReminderInput): PlannedReminder
   const todayPages = pagesOf(today);
   const tomorrowPages = pagesOf(tomorrow);
 
-  const todayRevised = new Set(input.logs.filter((l) => l.date === today.day).flatMap((l) => l.pagesRevised));
-  // As Home and the widget: done once as many pages were revised as are assigned.
-  const doneToday = todayRevised.size > 0 && todayRevised.size >= todayPages.length;
+  // As Home and the widget count it (USER-2, lib/todaySnapshot dayProgress): a day is done once the pages that finish it
+  // are, revised that day, ahead the day before (AHEAD-2) or logged by hand (ACT-15). A day done ahead gets no reminder
+  // asking for it, and a page done ahead isn't named as one still to revise.
+  const progressOf = (rev: Revision, pages: number[]) =>
+    dayProgress({
+      user,
+      pages: input.pages,
+      logs: input.logs,
+      day: rev.day,
+      assignment: pages,
+      history: input.history ?? null,
+    });
+  const todayProgress = progressOf(today, todayPages);
+  const todayRevised = todayProgress.done;
+  const doneToday = todayProgress.status === 'completed';
   // The streak as Home and the widget count it (lib/streak).
   const streak = input.history
     ? streakReadingFromItems({ user, pages: input.pages, items: input.history, today: today.day }).streak
@@ -168,9 +181,18 @@ export function planRevisionReminders(input: PlanReminderInput): PlannedReminder
   const juzPlan = user.scheduleMode === 'juz';
 
   const planned: PlannedReminder[] = [];
-  const add = (rev: Revision, all: number[], revised: Set<number>, kind: ReminderKind, at: Date, index: number) => {
+  const add = (
+    rev: Revision,
+    all: number[],
+    revised: ReadonlySet<number>,
+    kind: ReminderKind,
+    at: Date,
+    index: number,
+  ) => {
     const overnight = dayKey(at) !== dayKey(rev.start);
-    const remaining = all.filter((p) => !revised.has(p));
+    const left = all.filter((p) => !revised.has(p));
+    // Every page done but the day not (a page done twice over, never both ways at once): it names the day from its start.
+    const remaining = left.length > 0 ? left : all;
     const copy = reminderCopy({
       kind,
       juzPlan,
@@ -203,21 +225,27 @@ export function planRevisionReminders(input: PlanReminderInput): PlannedReminder
     todaySlots.forEach((slot, i) => add(today, todayPages, todayRevised, slot.kind, slot.at, i));
   }
 
-  // Tomorrow: nothing revised yet.
-  if (tomorrowPages.length > 0) {
-    slotsFor(tomorrow, input).forEach((slot, i) => add(tomorrow, tomorrowPages, new Set(), slot.kind, slot.at, i + 1));
+  // Tomorrow: what is left of it once the pages revised ahead are counted; none if they finished it.
+  const tomorrowProgress = progressOf(tomorrow, tomorrowPages);
+  if (tomorrowPages.length > 0 && tomorrowProgress.status !== 'completed') {
+    slotsFor(tomorrow, input).forEach((slot, i) =>
+      add(tomorrow, tomorrowPages, tomorrowProgress.done, slot.kind, slot.at, i + 1),
+    );
   }
 
-  // The days after (REMIND-2): one each, nothing revised yet, never more than one a day. A day with no pages gets none.
+  // The days after (REMIND-2): one each, never more than one a day. A day with no pages, or already revised ahead, gets none.
   let later = tomorrow;
   for (let n = 0; n < (input.laterDays ?? 0); n++) {
     later = revisionAt(user, later.end);
     const pages = pagesOf(later);
     if (pages.length === 0) continue;
+    // A day already revised ahead needs no reminder (USER-2).
+    const progress = progressOf(later, pages);
+    if (progress.status === 'completed') continue;
     const slots = slotsFor(later, input);
     const slot = slots.find((s) => s.kind === 'morning') ?? slots[0];
     // At the morning time, worded for a day away; the wording turns with the day (copy's variant).
-    if (slot) add(later, pages, new Set(), 'away', slot.at, 0);
+    if (slot) add(later, pages, progress.done, 'away', slot.at, 0);
   }
 
   return planned;

@@ -8,8 +8,11 @@
 // midnight) with the app closed. The app rewrites it whenever anything changes.
 
 import { generateDailyAssignment } from '../algorithm';
-import { catchUpIndex, caughtUpOnDay, creditedOnDay, creditIndex, needDone, needDoneCount } from '../aheadCredit';
-import { duePagesOf, planDuePages } from '../carryOver';
+import { catchUpIndex, creditIndex } from '../aheadCredit';
+import { planDuePages } from '../carryOver';
+import { dayProgress } from '../todaySnapshot';
+import { aheadLead, nextRevisionDayPlan } from '../aheadPlan';
+import { aheadLine } from '../todayLines';
 import { aliveStreak, completedDays } from '../streak';
 import { streakReadingFromItems, type HistoryItem } from '../streakFromItems';
 import { CalcSettings, dayTimes } from '../prayer/times';
@@ -176,6 +179,25 @@ function localDay(s: string): Date {
 
 export { aliveStreak };
 
+/**
+ * A rest day's words, as Home's Today post says them (lib/todayLines, HOME-9): "Rest day", and where the next revision
+ * day starts ("Tomorrow starts at Al-Kahf"), or "Nothing is scheduled today." with none.
+ */
+function restDayWords(
+  user: User,
+  pages: UserPage[],
+  logs: RevisionLog[],
+  day: string,
+  partial: PartialPages,
+): { title: string; where: string } {
+  const plan = nextRevisionDayPlan(user, pages, day, new Set(), logs);
+  const where =
+    plan && plan.pages.length > 0
+      ? aheadLine(aheadLead(user, pages, day, plan), plan.pages[0], partial).text
+      : t('lib.today.restDetail');
+  return { title: t('lib.today.restTitle'), where };
+}
+
 export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
   const base = {
     v: 1 as const,
@@ -215,23 +237,31 @@ export function buildWidgetSnapshot(input: WidgetInputs): WidgetSnapshot {
       max: 2,
     });
 
-    // As Home: done once every page of the day is revised, today or ahead.
-    const credited = creditedOnDay(input.logs, day);
-    const caughtUp = caughtUpOnDay(input.logs, day);
-    // The pages that finish the day (SESS-7): its own; or the carried pages, when Keep daily
-    // amount filled the day with them (they still count for the days they were missed).
-    const own = duePagesOf(assignment.pages, user, day, memorized);
-    const total = own.length;
-    const doneHere = needDoneCount(own, credited, caughtUp);
-    const completed = needDone(own, credited, caughtUp);
+    // As Home counts it (USER-2, lib/todaySnapshot dayProgress): done once the pages that finish the day are, revised
+    // that day, ahead, caught up or logged by hand. Those pages are its own; or the carried pages, when Keep daily amount
+    // filled the day with them (SESS-7); or, on a day with none of its own (pages from Insights on an off day), all of it.
+    const progress = dayProgress({
+      user,
+      pages: input.pages,
+      logs: input.logs,
+      day,
+      assignment: assignment.pages,
+      history: input.history ?? null,
+    });
+    const total = progress.finishing.length;
+    const completed = progress.status === 'completed';
+    const doneHere = progress.finishingDone;
+    // A rest day (no pages; something memorized, or the widget would ask to set up): named as Home names it (HOME-9,
+    // USER-2), "Rest day", then where the next revision day starts, never an empty title.
+    const rest = assignment.pages.length === 0 ? restDayWords(user, input.pages, input.logs, day, partial) : null;
 
     days.push({
       day,
       startsAt: startsAt.getTime(),
       endsAt: endsAt.getTime(),
-      title,
-      where: juzLabel(assignment.juzBreakdown),
-      short: shortLabel(assignment.pages, title, partial),
+      title: rest?.title ?? title,
+      where: rest?.where ?? juzLabel(assignment.juzBreakdown),
+      short: rest?.title ?? shortLabel(assignment.pages, title, partial),
       total,
       done: completed ? total : doneHere,
       completed,
