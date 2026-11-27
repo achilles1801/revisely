@@ -153,4 +153,19 @@ struct MarkView: View {
 enum Copy {
   static func pages(_ n: Int) -> String { n == 1 ? "1 page" : "\(n) pages" }
   static func streak(_ n: Int) -> String? { n > 0 ? "\(n)-day streak" : nil }
+
+  /// A rest day: no pages to revise and not done (HOME-9, USER-2). The app names it ("Rest day") with where the next
+  /// revision day starts, as Home does; the counts ("0 pages left") say nothing, so its lines are Home's words instead.
+  static func rest(_ d: WidgetDay) -> Bool { !d.completed && d.total <= 0 }
+  static let nothingScheduled = "Nothing is scheduled today"
+
+  /// The day's title: "Done for today" once done; a rest day's own (an older app wrote none: "Rest day").
+  static func title(_ d: WidgetDay) -> String {
+    if d.completed { return "Done for today" }
+    if rest(d) { return d.title.isEmpty ? "Rest day" : d.title }
+    return d.title
+  }
+
+  /// Under a rest day's title: where the next revision day starts (or that nothing is scheduled).
+  static func restPlace(_ d: WidgetDay) -> String { d.place.isEmpty ? nothingScheduled : d.place }
 }

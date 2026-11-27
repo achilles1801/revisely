@@ -149,8 +149,23 @@ object Copy {
 
   fun setUp(state: TodayState) = if (state is TodayState.Stale) STALE else SET_UP
 
+  /**
+   * A rest day: no pages to revise and not done (HOME-9, USER-2). The app names it ("Rest day") with where the next
+   * revision day starts, as Home does; the counts ("0 pages left") say nothing, so its lines are Home's words instead.
+   */
+  fun rest(d: WidgetDay) = !d.completed && d.total <= 0
+  const val NOTHING_SCHEDULED = "Nothing is scheduled today"
+
+  /** The day's title: "Done for today" once done; a rest day's own (an older app wrote none: "Rest day"). */
+  fun title(d: WidgetDay) = when {
+    d.completed -> "Done for today"
+    rest(d) -> d.title.ifEmpty { "Rest day" }
+    else -> d.title
+  }
+
   /** 2×2: what's left, or what was revised. */
   fun smallStatus(d: WidgetDay) = when {
+    rest(d) -> NOTHING_SCHEDULED
     d.completed -> "${pages(d.total)} revised"
     d.done > 0 -> "${d.left} left · ${d.done} done"
     else -> "${pages(d.left)} left"
@@ -158,6 +173,7 @@ object Copy {
 
   /** 4×2: progress, or tomorrow once today is done. */
   fun mediumStatus(d: WidgetDay, next: WidgetDay?) = when {
+    rest(d) -> NOTHING_SCHEDULED
     d.completed -> next?.let { "Tomorrow · ${it.title}" } ?: "Revised"
     d.done > 0 -> "${d.done} of ${d.total} done"
     else -> "${pages(d.left)} left"
@@ -167,14 +183,23 @@ object Copy {
 
   /** 4×1: the title, and one line under it. */
   fun wideLine(d: WidgetDay) = when {
+    rest(d) -> d.place.ifEmpty { NOTHING_SCHEDULED }
     d.completed -> listOfNotNull("${pages(d.total)} revised", streak(d.streak)).joinToString(" · ")
     d.done > 0 -> listOf("${d.done} of ${d.total} done", d.place).filter { it.isNotEmpty() }.joinToString(" · ")
     else -> listOf("${pages(d.left)} left", d.place).filter { it.isNotEmpty() }.joinToString(" · ")
   }
 
   /** 2×1: what's left over where it starts, or done over the streak. */
-  fun tinyTitle(d: WidgetDay) = if (d.completed) "Done for today" else "${pages(d.left)} left"
-  fun tinyLine(d: WidgetDay) = if (d.completed) streak(d.streak) ?: "${pages(d.total)} revised" else d.short
+  fun tinyTitle(d: WidgetDay) = when {
+    rest(d) -> d.title.ifEmpty { "Rest day" }
+    d.completed -> "Done for today"
+    else -> "${pages(d.left)} left"
+  }
+  fun tinyLine(d: WidgetDay) = when {
+    rest(d) -> d.place.ifEmpty { NOTHING_SCHEDULED }
+    d.completed -> streak(d.streak) ?: "${pages(d.total)} revised"
+    else -> d.short
+  }
 
   /** Start or Continue, while there's something to revise. */
   fun action(d: WidgetDay): String? = when {
