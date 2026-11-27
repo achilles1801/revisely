@@ -2174,7 +2174,9 @@ of this deal. those users can have premium for life".
 Each has a `KNOWN BUG` test that fails on purpose. Fixing one turns its test red: change it to an
 ordinary test in the fix's PR.
 
-None open.
+| Rule | What happens | Test |
+| --- | --- | --- |
+| SESS-4, SESS-9, USER-2 | Pages logged by hand for today (Activity's + → Revised elsewhere, ACT-15) count on Home, but not in the session or the review it opens. With 3 of 5 logged, Home says "Continue at Al-Baqarah, 3rd page · 3 of 5" and Continue opens on the first page with nothing checked; with all 5, Home says "Done · 5 pages" and Review session opens with no pages. The session and review read only the phone's sessions (`ActiveRevisionScreen`'s done pages, `reviewPagesInOrder`). Fixing it needs a decision on what unchecking a hand-logged page there does (ACT-14: a session never takes hand-added pages with it). Found by the user-matrix sweep, Nov 27 2026. | `scenarios/screensAgree.scenario.tsx` |
 
 Fixed in November 2026 (the tests that pinned them are ordinary tests now):
 
