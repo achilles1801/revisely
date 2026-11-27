@@ -186,6 +186,13 @@ export interface PaletteV2 extends AccentTokens {
   markTajweed: string;
   markTajweedFirm: string;
   /**
+   * A word said wrong and corrected straight away (RECITE-33; Majd, Nov 27 2026: "show as corrected i think"): never a
+   * mistake, so never a mistake's colour. A calm green, pastel like the three, the ink at 4.5:1 on it, apart from each of
+   * them, the page's grey highlight, the peek veil and the Ramadan theme (design.test). `…Firm` as for the others.
+   */
+  markCorrected: string;
+  markCorrectedFirm: string;
+  /**
    * The paid recitation check, drawn special: a gradient, start to end, the same for every accent, only for it (its
    * row in the mic's menu, the mic's badge). Each end reads at 4.5:1 as text on the sheet; `onPremium` is the glyph on it.
    */
@@ -230,6 +237,8 @@ const BASE_LIGHT: Base = {
   markSlipFirm: '#F4C878',
   markTajweed: '#D6C8F5',
   markTajweedFirm: '#BFA9EF',
+  markCorrected: '#B5E0CA',
+  markCorrectedFirm: '#94D0B2',
   premium: ['#7C3AED', '#DB2777'],
   onPremium: '#FFFFFF',
 };
@@ -269,6 +278,8 @@ const BASE_DARK: Base = {
   markSlipFirm: '#937035',
   markTajweed: '#55487F',
   markTajweedFirm: '#6B5C9E',
+  markCorrected: '#2F5E4A',
+  markCorrectedFirm: '#3D7560',
   premium: ['#A78BFA', '#F472B6'],
   onPremium: '#000000',
 };

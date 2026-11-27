@@ -2,7 +2,7 @@
 
 import type { QuranWords } from '../recite/quranWords';
 import type { WordFollow } from '../recite/hiddenPage';
-import { isUnclear, strongestByWord, type Mark } from './contract';
+import { isCorrected, isUnclear, strongestByWord, type Mark } from './contract';
 import { barUpTo, furthestWord, LiveState, LiveStatus, mistakeCount } from './state';
 import { marksByVisit, SUB_RELEASE_S } from './wordLine';
 import { SAMPLE_RATE } from '../recite/segmenter';
@@ -10,13 +10,14 @@ import { formatAccuracy, pageAccuracy, ScoreLevel, scoreLevel } from './score';
 
 /**
  * A word in the bar: the newest one said (`current`, in the following ink), one said before it, one said wrong (as heard, on red), one with a wrong
- * haraka or letter (tone `slip`, on amber; `part` says which) or a tajweed note (on violet): the page's highlights (Majd,
- * Nov 15 2026; components/reciteLive/markColours' `toneFill`). The colours never follow the accent.
+ * haraka or letter (tone `slip`, on amber; `part` says which), one said wrong and corrected straight away (`corrected`, on
+ * its green, RECITE-33) or a tajweed note (on violet): the page's highlights (Majd, Nov 15 2026;
+ * components/reciteLive/markColours' `toneFill`). The colours never follow the accent.
  */
 export interface BarWord {
   w: number;
   text: string;
-  tone: 'current' | 'said' | 'wrong' | 'slip' | 'tajweed';
+  tone: 'current' | 'said' | 'wrong' | 'slip' | 'corrected' | 'tajweed';
   /** A `slip` word's mistake: a wrong haraka or a wrong letter (a letter when it has both), for a screen reader. */
   part?: 'harakat' | 'letter';
 }
@@ -39,8 +40,14 @@ export function barWords(
   const skipped = new Set<number>();
   const slipped = new Map<number, 'harakat' | 'letter'>();
   const tajweed = new Set<number>();
+  const corrected = new Set<number>();
   if (opts.check) {
     for (const m of Object.values(state.marks)) {
+      // Said wrong and corrected straight away (RECITE-33): the word as the page has it, on its own colour.
+      if (isCorrected(m)) {
+        corrected.add(m.w);
+        continue;
+      }
       if (m.kind === 'word' && m.heard) wrong.set(m.w, m);
       if (m.kind === 'skipped') skipped.add(m.w);
       if (m.kind === 'tajweed') tajweed.add(m.w);
@@ -59,7 +66,9 @@ export function barWords(
         ? { w, text: m.heard ?? words.uthmani(w), tone: 'wrong' }
         : part
           ? { w, text: words.uthmani(w), tone: 'slip', part }
-          : { w, text: words.uthmani(w), tone: tajweed.has(w) ? 'tajweed' : out.length === 0 ? 'current' : 'said' },
+          : corrected.has(w)
+            ? { w, text: words.uthmani(w), tone: 'corrected' }
+            : { w, text: words.uthmani(w), tone: tajweed.has(w) ? 'tajweed' : out.length === 0 ? 'current' : 'said' },
     );
   }
   return out;
@@ -81,8 +90,10 @@ function lineWords(state: LiveState, words: QuranWords, check: boolean, now: num
     if (marks.some((m) => m.kind === 'skipped')) continue;
     const released = now != null && now >= x.e / SAMPLE_RATE + SUB_RELEASE_S;
     if (x.sub && !x.settled && !released && marks.length === 0 && running) continue;
-    const wrong = marks.find((m) => m.kind === 'word' && m.heard);
-    const slips = marks.filter((m) => (m.kind === 'harakat' || m.kind === 'letter') && !isUnclear(m));
+    const wrong = marks.find((m) => m.kind === 'word' && m.heard && !isCorrected(m));
+    const slips = marks.filter((m) => (m.kind === 'harakat' || m.kind === 'letter') && !isUnclear(m) && !isCorrected(m));
+    // The visit said wrong, then corrected straight away (RECITE-33): as heard, on its own colour.
+    const fixed = marks.find(isCorrected);
     const part = slips.length ? (slips.some((m) => m.kind === 'letter') ? ('letter' as const) : ('harakat' as const)) : undefined;
     const tajweed = marks.some((m) => m.kind === 'tajweed');
     out.unshift(
@@ -90,7 +101,9 @@ function lineWords(state: LiveState, words: QuranWords, check: boolean, now: num
         ? { w: x.w, text: wrong.heard ?? words.uthmani(x.w), tone: 'wrong' }
         : part
           ? { w: x.w, text: words.uthmani(x.w), tone: 'slip', part }
-          : { w: x.w, text: words.uthmani(x.w), tone: tajweed ? 'tajweed' : out.length === 0 ? 'current' : 'said' },
+          : fixed
+            ? { w: x.w, text: fixed.heard ?? words.uthmani(x.w), tone: 'corrected' }
+            : { w: x.w, text: words.uthmani(x.w), tone: tajweed ? 'tajweed' : out.length === 0 ? 'current' : 'said' },
     );
   }
   return out;

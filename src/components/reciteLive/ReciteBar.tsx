@@ -125,7 +125,9 @@ export function spokenBarWord(w: { text: string; tone: string; part?: 'harakat' 
           : t('reciteLive.bar.wrongHaraka')
         : w.tone === 'tajweed'
           ? t('reciteLive.bar.tajweed')
-          : '';
+          : w.tone === 'corrected'
+            ? t('reciteLive.bar.corrected')
+            : '';
   return mark ? t('reciteLive.bar.wordWithMark', { word: w.text, mark }) : w.text;
 }
 

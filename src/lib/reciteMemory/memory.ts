@@ -12,15 +12,18 @@
 // clearly: it counts as wrong. "Clear now" clears it at once. Words & harakat never clears a tajweed note (it didn't
 // check one).
 
-import { countsAsMistake, GROUP_RANK, Mark, MarkGroup, markGroup } from '../reciteLive/contract';
+import { countsAsMistake, GROUP_RANK, isCorrected, Mark, MarkGroup, markGroup } from '../reciteLive/contract';
 import type { ClearRecord, MemoryRecord, TakeRecord } from './record';
 
 /** Right takes in a row, each on a revision day of its own, that clear a remembered mistake. */
 export const CLEAR_AFTER = 2;
 
-/** Whether a mark is remembered on the page: every mark the summary lists, Not clear included (RMEM-2). */
+/**
+ * Whether a mark is remembered on the page: every mark the summary lists, Not clear included (RMEM-2), but a word
+ * corrected straight away, which the reciter fixed themself and isn't a word to fix (RECITE-33).
+ */
 export function remembers(m: Mark): boolean {
-  return countsAsMistake(m) || m.kind === 'tajweed';
+  return (countsAsMistake(m) || m.kind === 'tajweed') && !isCorrected(m);
 }
 
 /** Whether a take checked a group: words and harakat always, tajweed only at Strict. */

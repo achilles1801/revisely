@@ -5,8 +5,8 @@
 import fc from 'fast-check';
 import { quranWords } from '../../../src/lib/recite/__fixtures__/quranWords';
 import type { Mark, MarkKind } from '../../../src/lib/reciteLive/contract';
-import { isUnclear } from '../../../src/lib/reciteLive/contract';
-import { wordMemories } from '../../../src/lib/reciteMemory/memory';
+import { isCorrected, isMistake, isUnclear, markGroup } from '../../../src/lib/reciteLive/contract';
+import { remembers, wordMemories } from '../../../src/lib/reciteMemory/memory';
 import type { ClearRecord, MemoryRecord, TakeRecord } from '../../../src/lib/reciteMemory/record';
 import { liveTakes, recitationInsights, takeMistakes } from '../../../src/lib/reciteInsights/insights';
 import { pagesReached, perPageLabel, PER_PAGE_FROM } from '../../../src/lib/reciteLive/score';
@@ -59,6 +59,8 @@ const markArb = (from: number, to: number) =>
     ending: fc.boolean(),
     heard: fc.constantFrom<string | undefined>(undefined, 'عَدْلٌ', 'ignore the rules'),
     sound: fc.boolean(),
+    // Said wrong and corrected straight away (RECITE-33), now and then.
+    corrected: fc.constantFrom(false, false, false, true),
   }).map((m): Mark => {
     const w = from + Math.floor(m.at * (to - from + 1));
     const ref = words.ref(w);
@@ -70,6 +72,7 @@ const markArb = (from: number, to: number) =>
       if (m.sound) mark.detail = 'sound';
     }
     if (m.into && (m.kind === 'word' || m.kind === 'skipped')) mark.into = { w: 1000, ayah: m.into, ...(m.ending ? { ending: true as const } : {}) };
+    if (m.corrected && m.kind === 'word') mark.corrected = true;
     return mark;
   });
 
@@ -179,6 +182,38 @@ describe('Recite insights over generated takes [RINS-1]', () => {
       }),
       { numRuns: 120 },
     );
+  });
+
+  it('a word corrected straight away is no mistake: not in the counts, not remembered on the page, never sent to Revo [RECITE-33]', () => {
+    let seen = 0;
+    fc.assert(
+      fc.property(accountArb, ({ takes, clears }) => {
+        const recs = records(takes, clears);
+        const ins = recitationInsights(recs, TODAY);
+        const window = liveTakes(recs).filter((t) => t.day >= ins.from && t.day <= TODAY);
+        expect(ins.mistakes).toBe(window.reduce((x, t) => x + t.marks.filter(isMistake).length, 0));
+        // Remembered on the page only for a mistake (or Not clear, or tajweed) on the word, never for a corrected one alone.
+        const all = liveTakes(recs).flatMap((t) => t.marks);
+        const remembered = new Set([...wordMemories(recs).values()].map((m) => `${m.w}|${m.group}`));
+        for (const m of all.filter(isCorrected)) {
+          seen += 1;
+          expect(remembers(m)).toBe(false);
+          const other = all.some((x) => x.w === m.w && markGroup(x) === markGroup(m) && remembers(x));
+          if (!other) expect(remembered.has(`${m.w}|${markGroup(m)}`)).toBe(false);
+        }
+        // Revo is told every other mark of a take attached, and the server's own count adds up.
+        for (const take of liveTakes(recs)) {
+          const a = takeAttachment(recs, take, words, TODAY);
+          if (a?.kind !== 'reciteTake') throw new Error('not a take');
+          const sent = take.marks.filter((m) => !isCorrected(m) && (take.level === 'strict' || m.kind !== 'tajweed'));
+          expect(a.facts.marks).toHaveLength(sent.length);
+          expect(a.facts.mistakes).toBe(sent.filter(isMistake).length);
+          expect(validateAttachment(JSON.parse(JSON.stringify(a)), TODAY)).toEqual(a);
+        }
+      }),
+      { numRuns: 80 },
+    );
+    expect(seen).toBeGreaterThan(0);
   });
 
   it('the server takes exactly what the phone sends with every question, and reads it in words [RINS-1]', () => {
@@ -338,7 +373,8 @@ describe('Mistakes a page in long takes: Insights and Revo [RECITE-24]', () => {
           return;
         }
         const pagesOf = (t: TakeRecord) => pagesReached(words, t.from, t.to);
-        const mistakesOf = (t: TakeRecord) => t.marks.filter((m) => m.kind !== 'tajweed' && !isUnclear(m)).length;
+        // Never a tajweed note, a Not clear or a word corrected straight away (RECITE-33).
+        const mistakesOf = (t: TakeRecord) => t.marks.filter(isMistake).length;
         expect(ins.perPage).toEqual({ takes: long.length, pages: long.reduce((n, t) => n + pagesOf(t), 0), mistakes: long.reduce((n, t) => n + mistakesOf(t), 0) });
         const p = ins.perPage!;
         const rates = long.map((t) => mistakesOf(t) / pagesOf(t));

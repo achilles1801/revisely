@@ -7,6 +7,8 @@
 import { settledUpTo, withoutVisit, withVisit, type WordVisit } from './wordLine';
 import {
   countsAsMistake,
+  isCorrected,
+  isMistake,
   isUnclear,
   FinalResult,
   LiveEvent,
@@ -78,7 +80,7 @@ export interface LiveState {
 /** A mark taken off with "Not a mistake": the mark, and what it had counted in the score (taken off with it). */
 export interface Removed {
   mark: Mark;
-  counted: 'mistakes' | 'unclear' | 'tajweed' | null;
+  counted: 'mistakes' | 'unclear' | 'corrected' | 'tajweed' | null;
 }
 
 export const LIVE_IDLE: LiveState = {
@@ -285,11 +287,12 @@ export function applyEvent(state: LiveState, raw: LiveEvent): LiveState {
       // the take's.
       // By the checker's own places (an extra word on the word it came after), as it judged them.
       const judged = new Set(Object.values(marks).map((m) => checkerWord(m)));
-      const kept = { mistakes: 0, unclear: 0, tajweed: 0 };
+      const kept = { mistakes: 0, unclear: 0, corrected: 0, tajweed: 0 };
       for (const m of finalKeepsLive(state) ? [] : Object.values(state.marks)) {
         if (marks[m.id] || judged.has(checkerWord(m)) || state.dismissed.includes(m.id) || beforeStart(m, start)) continue;
         marks[m.id] = m;
         if (isUnclear(m)) kept.unclear++;
+        else if (isCorrected(m)) kept.corrected++;
         else if (countsAsMistake(m)) kept.mistakes++;
         else if (m.kind === 'tajweed') kept.tajweed++;
       }
@@ -298,12 +301,13 @@ export function applyEvent(state: LiveState, raw: LiveEvent): LiveState {
       // The checker's final score leaves out what was dismissed during the take, so putting one back counts it again.
       const answered = e.result.score ?? state.score;
       const finalScore: LiveScore | null =
-        answered && (kept.mistakes || kept.unclear || kept.tajweed)
+        answered && (kept.mistakes || kept.unclear || kept.corrected || kept.tajweed)
           ? {
               ...answered,
               mistakes: answered.mistakes + kept.mistakes,
               tajweed: answered.tajweed + kept.tajweed,
               ...(answered.unclear != null ? { unclear: answered.unclear + kept.unclear } : {}),
+              ...(answered.corrected != null ? { corrected: answered.corrected + kept.corrected } : {}),
               accuracy: answered.reached > 0 ? Math.max(0, 1 - (answered.mistakes + kept.mistakes) / answered.reached) : 1,
             }
           : answered;
@@ -314,9 +318,11 @@ export function applyEvent(state: LiveState, raw: LiveEvent): LiveState {
           ? null
           : isUnclear(m)
             ? finalScore.unclear != null ? 'unclear' : 'mistakes'
-            : countsAsMistake(m)
-              ? 'mistakes'
-              : 'tajweed';
+            : isCorrected(m)
+              ? finalScore.corrected != null ? 'corrected' : 'mistakes'
+              : countsAsMistake(m)
+                ? 'mistakes'
+                : 'tajweed';
         removed[m.id] = { mark: m, counted };
       }
       return {
@@ -369,6 +375,9 @@ export function dismissMark(state: LiveState, id: string): LiveState {
   if (score && score.unclear != null && isUnclear(mark)) {
     if (score.unclear > 0) counted = 'unclear';
     score = { ...score, unclear: Math.max(0, score.unclear - 1) };
+  } else if (score && score.corrected != null && isCorrected(mark)) {
+    if (score.corrected > 0) counted = 'corrected';
+    score = { ...score, corrected: Math.max(0, score.corrected - 1) };
   } else if (score && countsAsMistake(mark) && score.mistakes > 0) {
     counted = 'mistakes';
     const mistakes = score.mistakes - 1;
@@ -392,6 +401,7 @@ export function restoreMark(state: LiveState, id: string): LiveState {
   delete removed[id];
   let score = state.score;
   if (score && r.counted === 'unclear' && score.unclear != null) score = { ...score, unclear: score.unclear + 1 };
+  else if (score && r.counted === 'corrected' && score.corrected != null) score = { ...score, corrected: score.corrected + 1 };
   else if (score && r.counted === 'mistakes') {
     const mistakes = score.mistakes + 1;
     score = { ...score, mistakes, accuracy: score.reached > 0 ? 1 - mistakes / score.reached : 1 };
@@ -426,16 +436,24 @@ export function marksOnPage(state: LiveState, words: QuranWords, page: number): 
 }
 
 /**
- * Mistakes so far: the server's count when it has sent one, else the marks shown. "Not clear" marks never count: a
- * checker that sends `unclear` has left them out already; from one that doesn't, the ones shown are taken out.
+ * Mistakes so far: the server's count when it has sent one, else the marks shown. "Not clear" marks (RECITE-3) and
+ * corrected ones (RECITE-33) never count: a checker that sends `unclear` or `corrected` has left them out already; from
+ * one that doesn't, the ones shown are taken out.
  */
 export function mistakeCount(state: LiveState): number {
   const marks = Object.values(state.marks);
   if (state.score) {
-    if (state.score.unclear != null) return state.score.mistakes;
-    return Math.max(0, state.score.mistakes - marks.filter(isUnclear).length);
+    let n = state.score.mistakes;
+    if (state.score.unclear == null) n -= marks.filter(isUnclear).length;
+    if (state.score.corrected == null) n -= marks.filter(isCorrected).length;
+    return Math.max(0, n);
   }
-  return marks.filter((m) => countsAsMistake(m) && !isUnclear(m)).length;
+  return marks.filter(isMistake).length;
+}
+
+/** Corrected marks so far (RECITE-33): the server's count when it sends one, else the marks shown. */
+export function correctedCount(state: LiveState): number {
+  return state.score?.corrected ?? Object.values(state.marks).filter(isCorrected).length;
 }
 
 /**

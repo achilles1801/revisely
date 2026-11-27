@@ -37,6 +37,12 @@ export interface Mark {
   sure: 'clear' | 'likely';
   /** Final answer only (contract draft 6): the reciter went on with a similar ayah, or ended it as another ends. */
   into?: MarkInto;
+  /**
+   * Said wrong, then said right straight away (RECITE-33; Majd, Nov 27 2026: "show as corrected i think"): shown in a
+   * colour of its own, never counted. The checker sends the same mark again with it once its second opinion agrees
+   * (revisely-internal #96), or with it from the start (a wrong word said before going back). Absent: as before.
+   */
+  corrected?: true;
 }
 
 /**
@@ -64,6 +70,11 @@ export interface LiveScore {
    * the checker counts them so. Absent: a checker that still counts them in `mistakes` (the app takes them out).
    */
   unclear?: number;
+  /**
+   * Corrected marks (RECITE-33), counted apart and not in `mistakes`, when the checker counts them so. Absent: a checker
+   * that still counts them in `mistakes` (the phone's engine before 0.2.3; the app takes them out), or sends none.
+   */
+  corrected?: number;
   /** 1 − mistakes ÷ reached (the model session's rule). */
   accuracy: number;
 }
@@ -258,6 +269,7 @@ export function parseMark(raw: unknown): Mark | null {
   if (t) mark.t = t;
   const into = parseInto(m.into);
   if (into) mark.into = into;
+  if (m.corrected === true) mark.corrected = true;
   return mark;
 }
 
@@ -270,6 +282,7 @@ export function parseScore(raw: unknown): LiveScore | null {
     mistakes: s.mistakes,
     tajweed: isNum(s.tajweed) ? s.tajweed : 0,
     ...(isNum(s.unclear) ? { unclear: s.unclear } : {}),
+    ...(isNum(s.corrected) ? { corrected: s.corrected } : {}),
     accuracy: Math.min(1, Math.max(0, s.accuracy)),
   };
 }
@@ -405,9 +418,10 @@ export function severityOf(mark: Pick<Mark, 'kind'>): Severity {
  * a mistake. `tajweed`: a tajweed note (Strict), never counted, labelled Beta wherever it shows. `unclear` isn't a tier:
  * a haraka or letter not heard clearly enough to judge, shown and never counted (RECITE-3). RECITE-2.
  */
-export type MarkTier = 'mistake' | 'unclear' | 'tajweed';
-export function markTier(mark: Pick<Mark, 'kind' | 'sure'>): MarkTier {
+export type MarkTier = 'mistake' | 'unclear' | 'tajweed' | 'corrected';
+export function markTier(mark: Pick<Mark, 'kind' | 'sure' | 'corrected'>): MarkTier {
   if (mark.kind === 'tajweed') return 'tajweed';
+  if (isCorrected(mark)) return 'corrected';
   return isUnclear(mark) ? 'unclear' : 'mistake';
 }
 
@@ -424,12 +438,15 @@ export function markGroup(mark: Pick<Mark, 'kind'>): MarkGroup {
 /** Which of a word's marks shows when it has several: a word mistake over a haraka or letter over a tajweed note. */
 export const GROUP_RANK: Record<MarkGroup, number> = { tajweed: 0, slip: 1, word: 2 };
 
-/** How strong a mark is beside another on its word: its group, then a mistake over a Not clear in the same group. */
-const strength = (m: Mark) => GROUP_RANK[markGroup(m)] * 2 + (isUnclear(m) ? 0 : 1);
+/**
+ * How strong a mark is beside another on its word: its group, then a mistake over a Not clear in the same group. A
+ * corrected mark is under every mark of a word or a haraka or letter, and over a tajweed note (RECITE-33).
+ */
+const strength = (m: Mark) => (isCorrected(m) ? 1.5 : GROUP_RANK[markGroup(m)] * 2 + (isUnclear(m) ? 0 : 1));
 
 /**
- * One highlight per word: its strongest mark, a word mistake over a haraka or letter over a tajweed note, and a mistake
- * over a Not clear (RECITE-2).
+ * One highlight per word: its strongest mark, a word mistake over a haraka or letter over a tajweed note, a mistake over
+ * a Not clear (RECITE-2), and any of them over a corrected mark (RECITE-33).
  */
 export function strongestByWord(marks: readonly Mark[]): Map<number, Mark> {
   const byWord = new Map<number, Mark>();
@@ -440,7 +457,10 @@ export function strongestByWord(marks: readonly Mark[]): Map<number, Mark> {
   return byWord;
 }
 
-/** Marks the checker's `mistakes` has counted (everything but tajweed notes; "not clear" ones too, until `unclear`). */
+/**
+ * Marks the checker's `mistakes` has counted (everything but tajweed notes; "not clear" ones too, until `unclear`, and
+ * corrected ones, until `corrected`). Which of them are mistakes: `isMistake`.
+ */
 export const countsAsMistake = (mark: Pick<Mark, 'kind'>) => mark.kind !== 'tajweed';
 
 /**
@@ -448,4 +468,11 @@ export const countsAsMistake = (mark: Pick<Mark, 'kind'>) => mark.kind !== 'tajw
  * haraka needs very clear recitation, and "there's a difference between someone saying 100% the wrong haraqa vs them
  * not sounding clear". Shown, worded so, and never counted in the score.
  */
-export const isUnclear = (mark: Pick<Mark, 'kind' | 'sure'>) => (mark.kind === 'harakat' || mark.kind === 'letter') && mark.sure === 'likely';
+export const isUnclear = (mark: Pick<Mark, 'kind' | 'sure' | 'corrected'>) =>
+  (mark.kind === 'harakat' || mark.kind === 'letter') && mark.sure === 'likely' && !mark.corrected;
+
+/** Said wrong and corrected straight away (RECITE-33): shown, never counted. A tajweed note is never one. */
+export const isCorrected = (mark: Pick<Mark, 'kind' | 'corrected'>) => mark.corrected === true && mark.kind !== 'tajweed';
+
+/** A mistake: counted in the score and named so. Never a tajweed note, a Not clear (RECITE-3) or a corrected word (RECITE-33). */
+export const isMistake = (mark: Pick<Mark, 'kind' | 'sure' | 'corrected'>) => countsAsMistake(mark) && !isUnclear(mark) && !isCorrected(mark);

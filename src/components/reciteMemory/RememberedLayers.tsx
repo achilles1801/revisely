@@ -23,7 +23,10 @@ function rectStyle(r: Rect, scale: number) {
   return { left: r.x0 * scale, top: r.y0 * scale, width: (r.x1 - r.x0) * scale, height: (r.y1 - r.y0) * scale };
 }
 
-type Colours = Pick<PaletteV2, 'markWord' | 'markWordFirm' | 'markSlip' | 'markSlipFirm' | 'markTajweed' | 'markTajweedFirm'>;
+type Colours = Pick<
+  PaletteV2,
+  'markWord' | 'markWordFirm' | 'markSlip' | 'markSlipFirm' | 'markTajweed' | 'markTajweedFirm' | 'markCorrected' | 'markCorrectedFirm'
+>;
 
 /** The mark a remembered mistake is drawn and described by: its latest wrong try. */
 export const markOf = (m: WordMemory): Mark | null => m.lastMark;

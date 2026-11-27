@@ -6,7 +6,7 @@ import { pageNameOfAyah, surahName } from '../passages';
 import { firstWordsOfAyah } from '../recite/quranWords';
 import { tajweedName } from '../reciteCheck/result';
 import type { QuranWords } from '../recite/quranWords';
-import { isUnclear, type Mark, type MarkInto } from './contract';
+import { isCorrected, isUnclear, type Mark, type MarkInto } from './contract';
 import { t } from '../../i18n';
 
 /** A "not clear" mark's line, on its card and in the summary. */
@@ -14,11 +14,17 @@ export function unclearNote(): string {
   return t('reciteLive.describe.unclearNote');
 }
 
+/** A corrected mark's line (RECITE-33), on its card and in the summary. */
+export function correctedNote(): string {
+  return t('reciteLive.describe.correctedNote');
+}
+
 /**
  * "Wrong word", "Wrong haraka", "Madd munfasil (Beta)". A wrong haraka or letter is a mistake like a wrong word (Majd,
  * Nov 22 2026), and a tajweed note is labelled Beta wherever it shows (RECITE-2).
  */
 export function markTitle(mark: Mark): string {
+  if (isCorrected(mark)) return t('reciteLive.describe.corrected');
   if (isUnclear(mark)) return t('reciteLive.describe.notClear');
   switch (mark.kind) {
     case 'word':
@@ -42,7 +48,7 @@ export function markTitle(mark: Mark): string {
 /** "An-Naml, ayah 23", and "· likely" for a mark past the normal bar only. */
 export function markPlace(mark: Mark): string {
   const place = pageNameOfAyah(ayahKey(mark.ayah[0], mark.ayah[1]));
-  return mark.sure === 'likely' && !isUnclear(mark) ? t('reciteLive.describe.placeLikely', { place }) : place;
+  return mark.sure === 'likely' && !isUnclear(mark) && !isCorrected(mark) ? t('reciteLive.describe.placeLikely', { place }) : place;
 }
 
 /**
@@ -230,6 +236,7 @@ export function findingNote(mark: Mark): string {
     const { main, sub } = tajweedLines(mark);
     return sub ? t('reciteLive.describe.noteWithSub', { main, sub }) : main;
   }
+  if (isCorrected(mark)) return correctedNote();
   if (mark.kind === 'skipped') return t('reciteLive.describe.leftOut');
   if (isUnclear(mark)) return unclearNote();
   const slip = slipLine(mark);

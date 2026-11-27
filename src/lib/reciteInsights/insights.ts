@@ -8,7 +8,7 @@
 
 import { shiftDay } from '../journal';
 import type { QuranWords } from '../recite/quranWords';
-import { countsAsMistake, GROUP_RANK, isUnclear, Mark, MarkGroup, MarkKind } from '../reciteLive/contract';
+import { GROUP_RANK, isMistake, isUnclear, Mark, MarkGroup, MarkKind } from '../reciteLive/contract';
 import { pagesReached, PER_PAGE_FROM } from '../reciteLive/score';
 import { CLEAR_AFTER, wordMemories, WordMemory } from '../reciteMemory/memory';
 import type { ClearRecord, MemoryRecord, TakeRecord } from '../reciteMemory/record';
@@ -31,9 +31,9 @@ export interface MistakeKinds {
 
 export const NO_KINDS: Readonly<MistakeKinds> = { wrong: 0, skipped: 0, added: 0, harakat: 0, letter: 0 };
 
-/** Which mistake a mark counts as, or null when it isn't one (Not clear, a tajweed note). */
-export function mistakeKindOf(m: Pick<Mark, 'kind' | 'sure'>): keyof MistakeKinds | null {
-  if (!countsAsMistake(m) || isUnclear(m)) return null;
+/** Which mistake a mark counts as, or null when it isn't one (Not clear, a word corrected straight away, a tajweed note). */
+export function mistakeKindOf(m: Pick<Mark, 'kind' | 'sure' | 'corrected'>): keyof MistakeKinds | null {
+  if (!isMistake(m)) return null;
   switch (m.kind) {
     case 'word':
       return 'wrong';

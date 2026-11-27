@@ -32,6 +32,8 @@ export const reciteLive = {
     wrongHaraka: 'wrong haraka',
     wrongLetter: 'wrong letter',
     tajweed: 'tajweed note',
+    /** A word said wrong and corrected straight away (RECITE-33). */
+    corrected: 'corrected',
     paused: 'Paused',
     /** After Stop, a follow-along take's result in the bar (a tap opens the summary). */
     resultDone: 'Done',
@@ -112,6 +114,9 @@ export const reciteLive = {
     /** Tajweed notes are labelled Beta wherever they show (Majd, Nov 22 2026). */
     tajweed_one: '{{count}} tajweed note (Beta)',
     tajweed_other: '{{count}} tajweed notes (Beta)',
+    /** Words said wrong and corrected straight away, after the mistakes and before Not clear (RECITE-33). */
+    corrected_one: '{{count}} corrected',
+    corrected_other: '{{count}} corrected',
     unclear_one: '{{count}} not clear',
     unclear_other: '{{count}} not clear',
     unfinished: 'The end of this take wasn’t checked. What it found before then is kept.',
@@ -210,6 +215,9 @@ export const reciteLive = {
   describe: {
     unclearNote: 'Say it more clearly. Not counted in the score.',
     notClear: 'Not clear',
+    /** A word said wrong and corrected straight away (RECITE-33; Majd, Nov 27 2026). */
+    corrected: 'Corrected',
+    correctedNote: 'You said another word here, then corrected it. Not counted in the score.',
     outOfOrder: 'Out of order',
     wrongWord: 'Wrong word',
     skippedWord: 'Skipped word',

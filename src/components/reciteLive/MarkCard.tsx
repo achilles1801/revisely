@@ -8,10 +8,11 @@ import { Tap } from '../v2/Tap';
 import { Box, placeMenu } from '../verse/menuPlacement';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { Mark } from '../../lib/reciteLive/contract';
-import { isUnclear, markGroup } from '../../lib/reciteLive/contract';
-import { markFill } from './markColours';
+import { isCorrected, isUnclear } from '../../lib/reciteLive/contract';
+import { markFill, shownGroup } from './markColours';
 import { Phrase, Row, SmallPill } from './MarkParts';
 import {
+  correctedNote,
   expectedPhrase,
   markPlace,
   markTitle,
@@ -42,13 +43,14 @@ export function MarkBlock({
   // Not clear: what the checker thinks it heard is the unclear part, so only what was expected shows, and why.
   const unclear = isUnclear(mark);
   const recited = unclear ? null : recitedPhrase(words, mark);
-  const slip = unclear ? unclearNote() : slipLine(mark);
+  // Corrected (RECITE-33): what was heard and expected, as on a wrong word's card, and that it isn't counted.
+  const slip = unclear ? unclearNote() : isCorrected(mark) ? correctedNote() : slipLine(mark);
   return (
     <View style={[styles.block, !first && { borderTopColor: palette.separator, borderTopWidth: layoutV2.hairline }]} testID={`mark-card-${mark.kind}`}>
       <View style={styles.head}>
         <View style={styles.headText}>
           <View style={styles.titleRow}>
-            <View style={[styles.swatch, { backgroundColor: fill }]} testID={`mark-card-swatch-${markGroup(mark)}`} />
+            <View style={[styles.swatch, { backgroundColor: fill }]} testID={`mark-card-swatch-${shownGroup(mark)}`} />
             <Text style={[typeV2.name, { color: palette.text }]} maxFontSizeMultiplier={1.4}>
               {markTitle(mark)}
             </Text>

@@ -7,8 +7,11 @@ import { quranWords } from '../../../src/lib/recite/__fixtures__/quranWords';
 import {
   countsAsMistake,
   GROUP_RANK,
+  isCorrected,
+  isMistake,
   isUnclear,
   markGroup,
+  parseEvent,
   strongestByWord,
   type FinalResult,
   type LiveEvent,
@@ -18,6 +21,7 @@ import {
 } from '../../../src/lib/reciteLive/contract';
 import {
   applyEvent,
+  correctedCount,
   dismissMark,
   findingStart,
   liveConnecting,
@@ -234,6 +238,8 @@ describe('[RECITE-2] what a take marks, how it counts, and how it shows', () => 
     markSlipFirm: 'amber!',
     markTajweed: 'violet',
     markTajweedFirm: 'violet!',
+    markCorrected: 'green',
+    markCorrectedFirm: 'green!',
   };
 
   it('three colours: red for words (wrong, skipped, added), amber for harakat and letters (Not clear too), violet for tajweed', () => {
@@ -345,6 +351,136 @@ describe('[RECITE-4] Not a mistake takes a mark off; Undo or Put back brings it 
           // …and Put back still has it, as the final answer gave it.
           expect(restoreMark(s, m.id).marks[m.id]).toEqual(m);
         }
+      }),
+      { numRuns: runs(150) },
+    );
+  });
+});
+
+describe('[RECITE-33] a word said wrong and corrected straight away is Corrected: shown in its own colour, never counted', () => {
+  const palette = {
+    markWord: 'red',
+    markWordFirm: 'red!',
+    markSlip: 'amber',
+    markSlipFirm: 'amber!',
+    markTajweed: 'violet',
+    markTajweedFirm: 'violet!',
+    markCorrected: 'green',
+    markCorrectedFirm: 'green!',
+  };
+  /** Some of a take's marks as the checker sends them corrected (`flags`, in turn); a tajweed note never is. */
+  const withCorrected = (s: LiveState, flags: boolean[]): LiveState => ({
+    ...s,
+    marks: Object.fromEntries(
+      Object.entries(s.marks).map(([id, m], i) => [id, flags.length && flags[i % flags.length] && m.kind !== 'tajweed' ? { ...m, corrected: true as const } : m]),
+    ),
+  });
+  /** A score as the checker sends it: corrected marks counted apart (`corrected`), or in its mistakes (the phone's engine). */
+  function scoreWith(marks: readonly Mark[], reached: number, unclearApart: boolean, correctedApart: boolean): LiveScore {
+    const s = scoreOf(marks, reached, unclearApart);
+    if (!correctedApart) return s;
+    const corrected = marks.filter(isCorrected).length;
+    const mistakes = s.mistakes - corrected;
+    return { ...s, mistakes, corrected, accuracy: reached > 0 ? 1 - mistakes / reached : 1 };
+  }
+
+  it('the contract reads `corrected` on a mark and on the score; without it, a mark is as before', () => {
+    const mark = { id: 'm', w: 10, ayah: [1, 2], kind: 'word', sure: 'clear', heard: 'ٱللَّهُ' };
+    expect(parseEvent({ type: 'mark', mark: { ...mark, corrected: true } })).toMatchObject({ mark: { corrected: true } });
+    expect(parseEvent({ type: 'mark', mark })).not.toHaveProperty('mark.corrected');
+    expect(parseEvent({ type: 'mark', mark: { ...mark, corrected: 'yes' } })).not.toHaveProperty('mark.corrected');
+    expect(parseEvent({ type: 'score', reached: 9, mistakes: 0, tajweed: 0, unclear: 0, corrected: 1, accuracy: 1 })).toMatchObject({ score: { corrected: 1 } });
+    expect(parseEvent({ type: 'score', reached: 9, mistakes: 0, tajweed: 0, accuracy: 1 })).not.toHaveProperty('score.corrected');
+  });
+
+  it('the same mark sent again with `corrected` replaces it: one mark, now Corrected in green, and one mistake fewer', () => {
+    fc.assert(
+      fc.property(takeArb, (t) => {
+        const s0 = { ...played(t), score: null };
+        fc.pre(s0.status !== 'done');
+        const w = t.lock;
+        const r = words.ref(w);
+        const wrong: Mark = { id: 'fixed', w, ayah: [r.sura, r.ayah], kind: 'word', sure: 'clear', heard: 'ٱللَّهُ', heardExact: true };
+        const s1 = applyEvent(s0, { type: 'mark', mark: wrong });
+        fc.pre(s1.marks.fixed != null);
+        const s2 = applyEvent(s1, { type: 'mark', mark: { ...wrong, corrected: true } });
+        expect(Object.keys(s2.marks).sort()).toEqual(Object.keys(s1.marks).sort());
+        expect(mistakeCount(s2)).toBe(mistakeCount(s1) - 1);
+        expect(correctedCount(s2)).toBe(correctedCount(s1) + 1);
+        expect(markTitle(s2.marks.fixed)).toBe('Corrected');
+        expect(markFill(palette, s2.marks.fixed)).toBe('green');
+      }),
+      { numRuns: runs(150) },
+    );
+  });
+
+  it('never counts, whether the checker counts corrected marks apart or in its mistakes, with Not clear either way', () => {
+    fc.assert(
+      fc.property(takeArb, fc.array(fc.boolean(), { maxLength: 6 }), fc.boolean(), fc.boolean(), (t, flags, unclearApart, correctedApart) => {
+        const s = withCorrected(played(t), flags);
+        const marks = Object.values(s.marks);
+        expect(mistakeCount({ ...s, score: null })).toBe(marks.filter(isMistake).length);
+        const scored = { ...s, score: scoreWith(marks, 200, unclearApart, correctedApart) };
+        expect(mistakeCount(scored)).toBe(marks.filter(isMistake).length);
+        // A corrected mark is never Not clear, and never a mistake.
+        for (const m of marks.filter(isCorrected)) {
+          expect(isUnclear(m)).toBe(false);
+          expect(isMistake(m)).toBe(false);
+        }
+      }),
+      { numRuns: runs(200) },
+    );
+  });
+
+  it('Not a mistake on it leaves the count as it was; Undo or Put back brings it back as it was', () => {
+    fc.assert(
+      fc.property(takeArb, fc.boolean(), fc.boolean(), fc.nat(), (t, unclearApart, correctedApart, pick) => {
+        const s0 = withCorrected(played(t), [true]);
+        const corrected = Object.values(s0.marks).filter(isCorrected);
+        fc.pre(corrected.length > 0);
+        const s = { ...s0, score: scoreWith(Object.values(s0.marks), 200, unclearApart, correctedApart), dismissed: [], removed: {} };
+        const m = corrected[pick % corrected.length];
+        const off = dismissMark(s, m.id);
+        expect(off.marks[m.id]).toBeUndefined();
+        expect(mistakeCount(off)).toBe(mistakeCount(s));
+        const back = restoreMark(off, m.id);
+        expect(back.marks).toEqual(s.marks);
+        expect(back.score).toEqual(s.score);
+      }),
+      { numRuns: runs(150) },
+    );
+  });
+
+  it('a word with a mistake too shows the mistake; a corrected word shows over a tajweed note alone', () => {
+    fc.assert(
+      fc.property(pageArb.chain((p) => fc.array(markArb(p), { minLength: 1, maxLength: 12 })), fc.array(fc.boolean(), { minLength: 1, maxLength: 6 }), (raw, flags) => {
+        const marks = raw.map((m, i) => (flags[i % flags.length] && m.kind !== 'tajweed' ? { ...m, corrected: true as const } : m));
+        for (const [w, shown] of strongestByWord(marks)) {
+          const here = marks.filter((m) => m.w === w);
+          if (here.some((m) => m.kind !== 'tajweed' && !isCorrected(m))) expect(isCorrected(shown)).toBe(false);
+          else if (here.some(isCorrected)) expect(isCorrected(shown)).toBe(true);
+        }
+      }),
+      { numRuns: runs(200) },
+    );
+  });
+
+  it('in the final answer it stays Corrected and uncounted, and its record keeps it so', () => {
+    fc.assert(
+      fc.property(takeArb, fc.array(fc.boolean(), { minLength: 1, maxLength: 6 }), fc.boolean(), (t, flags, correctedApart) => {
+        const s0 = withCorrected(played(t), flags);
+        fc.pre(s0.start != null && s0.status !== 'done');
+        const marks = Object.values(s0.marks);
+        const [from, to] = words.pageRange(t.page);
+        const done = applyEvent({ ...s0, protocol: 10 }, { type: 'done', result: finalOf(marks, from, to - 1, s0.start, scoreWith(marks, to - from, true, correctedApart)) });
+        expect(mistakeCount(done)).toBe(Object.values(done.marks).filter(isMistake).length);
+        const r = recordFromTake(done, words, {
+          id: 'r', createdAt: 1, rev: 2, day: '2026-11-27', level: 'words', hidden: false, secs: 60, recordingId: null, timeOf: () => null, openWords: () => [],
+        });
+        if (!r) return;
+        expect(r.mistakes).toBe(Object.values(done.marks).filter(isMistake).length);
+        const back = fromStored(r.id, toStored(r)) as TakeRecord;
+        expect(back.marks.filter(isCorrected).map((m) => m.id).sort()).toEqual(r.marks.filter(isCorrected).map((m) => m.id).sort());
       }),
       { numRuns: runs(150) },
     );

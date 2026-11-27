@@ -75,6 +75,18 @@ describe('the findings line: two tiers (Majd, Nov 22 2026) [RECITE-2, RECITE-3]'
     // Before, a wrong letter read "1 harakat slip".
     expect(findingsLine([m('a', { kind: 'letter' })])).toBe('1 wrong letter');
   });
+
+  it('a word corrected straight away has a line of its own, after the mistakes and before Not clear, never a wrong word [RECITE-33]', () => {
+    expect(
+      findingsLine([
+        m('a', { kind: 'word', corrected: true }),
+        m('b', { kind: 'word' }),
+        m('c', { kind: 'harakat', sure: 'likely' }),
+        m('d', { kind: 'word', corrected: true }),
+      ]),
+    ).toBe('1 wrong word, 2 corrected, 1 not clear');
+    expect(findingsLine([m('a', { kind: 'word', corrected: true })])).toBe('1 corrected');
+  });
 });
 
 describe('the take summary with screen readers and the largest text', () => {

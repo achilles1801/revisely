@@ -409,13 +409,13 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     // Mistake detection reached the store app with 1.0.5 (its lines are in GUIDE_SECTIONS). Strict stays Revisely Dev's
     // until it has a release of its own (Majd, Nov 17 2026).
     title: 'Only in Revisely Dev',
-    covers: ['SESS-8', 'LANG-2', 'RECITE-7', 'RECITE-26', 'RECITE-27', 'RECITE-28', 'RECITE-29', 'RECITE-30', 'SET-5', 'ONBOARD-5'],
+    covers: ['SESS-8', 'LANG-2', 'RECITE-7', 'RECITE-26', 'RECITE-27', 'RECITE-28', 'RECITE-29', 'RECITE-30', 'RECITE-33', 'SET-5', 'ONBOARD-5'],
     routes: ['Settings'],
     text: lines(
       '- Settings → Testing → “Preview onboarding”: the first setup’s screens on a blank account, saving nothing.',
       '- Revo’s mic (field empty): tap and speak; the words appear as heard, in the app’s language (Arabic or English). A pause or Stop ends it; nothing is sent until send.',
       '- Settings → Mushaf and Recite → “Mistakes to mark”: “Mistakes”, or “Strict (Beta)”, which also marks tajweed in violet: ghunnah, ikhfa, qalqalah, idgham (with and without ghunnah), iqlab, a natural madd dropped, “Madd munfasil” at 4 or 5 counts, a lazim madd held short, and “Madd ʿarid” once it’s set to a length. It doesn’t check “Madd muttasil”, munfasil at 2 counts or ikhfa of meem yet, so never say it checks every tajweed rule. It’s Beta: it can miss a slip or note a correct word.',
-      '- Two tiers of marks. Mistakes: a wrong or skipped word, a hesitation (“Hesitated here”, on the word they didn’t know; after the end, “Extra word”), a wrong haraka or letter, each named on its card (“Wrong word”, “Wrong haraka”, “Wrong letter”, “Wrong shadda”) and in the summary, and counted in the score, never called a “slip”. Tajweed notes (Strict): “(Beta)” after the name, never counted. “Not clear” is neither, never counted. Red for words, amber for harakat, letters and Not clear, violet for tajweed.',
+      '- Two tiers of marks. Mistakes: a wrong or skipped word, a hesitation (“Hesitated here”, on the word they didn’t know; after the end, “Extra word”), a wrong haraka or letter, each named on its card (“Wrong word”, “Wrong haraka”, “Wrong letter”, “Wrong shadda”) and in the summary, counted in the score, never a “slip”. Tajweed notes (Strict): “(Beta)” after the name. Never counted: tajweed, “Not clear” and “Corrected” (a word put right at once). Red: words; amber: harakat, letters and Not clear; violet: tajweed; green: Corrected.',
       // The main guide's two lines on this go with the release's re-record of its replies.
       '- “Recite the mistakes again” and "Recite your N mistakes here" are gone: never offer them. To work on a mistake, recite the passage again.',
       '- A take needs at least one ayah recited (or about a mushaf line of a very long one). Less isn’t kept.',
