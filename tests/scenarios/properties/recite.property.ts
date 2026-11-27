@@ -1620,6 +1620,28 @@ describe('[RECITE-20] on a hidden page the newest word shown is in the following
 });
 
 describe('[RECITE-20] a hidden page is drawn empty: faint rules where words are hidden, the markers and the words shown in their own ink', () => {
+  // Majd, Nov 26 2026, of page 316 in the dark: "theres still instances where the white still shows up when the page is
+  // hidden ... ensure that never happens again". The hamzat wasl's sign over ٱلْأَعْلَىٰ (20:68) reaches past its box into
+  // أَنتَ's; on Android's w1080 image the scaling spreads its edge a pixel further, faint (alpha 94 of 255), measured by
+  // scripts/check-hidden-page.py at (912.593, 356.03). It shows whatever else is shown only while ٱلْأَعْلَىٰ is.
+  it('[RECITE-20] no faint fringe of a hidden word shows on Android’s page images: the wasla over ٱلأعلى beside أنت (page 316, w1080)', () => {
+    const PAGE = 316;
+    const AT = { x: 912.593, y: 356.03 };
+    const w = words.verseFirstWord(20, 68) + 5;
+    const [from, to] = words.pageRange(PAGE);
+    expect(words.pageOf(w)).toBe(PAGE);
+    fc.assert(
+      fc.property(fc.uniqueArray(fc.integer({ min: from, max: to - 1 }), { maxLength: 40 }), fc.boolean(), fc.boolean(), (others, self, before) => {
+        // أَنتَ (the word before it, on its right) shown or not, the rest of the page anyhow.
+        const shown = (v: number) => (v === w ? self : v === w - 1 ? before : others.includes(v));
+        const covers = hiddenInkPlan(words, PAGE, shown).lines.flatMap((l) => l.covers);
+        const covered = covers.some((c) => c.x0 <= AT.x && AT.x <= c.x1 && c.y0 <= AT.y && AT.y <= c.y1);
+        expect({ self, before, covered }).toEqual({ self, before, covered: !self });
+      }),
+      { numRuns: runs(150) },
+    );
+  });
+
   // A page, and what it shows: a run of words from where a take started (the words recited), and maybe a few more shown
   // by hand further on (peeks, a verse shown whole).
   const caseArb = fc.integer({ min: 3, max: 604 }).chain((page) => {
