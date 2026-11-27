@@ -47,6 +47,8 @@ import { formatBearing, qiblaBearing, nearestCity, bundledCities } from '../../l
 import { CarryOverSetting } from '../../components/CarryOverSetting';
 import { useTabBarFootprint } from '../../navigation/TabBar';
 import { SettingSwitch } from '../../components/settings/SettingSwitch';
+import { TafsirBooksSheet } from '../../components/settings/TafsirBooksSheet';
+import { booksValue } from '../../lib/revo/tafsirBooks';
 import { HELP_ICON } from '../../components/help/HelpButton';
 import { useHelpButtons } from '../../components/help/useHelpButtons';
 import { SettingIcon } from '../../components/settings/SettingIcon';
@@ -328,6 +330,7 @@ export default function SettingsScreen() {
   // Home's background (HOME-6, with Home v3): Glow, Two glows, Glow and an ayah; kept on this phone.
   const homeBackground = useHomeBackground();
   const [homeBackgroundSheet, setHomeBackgroundSheet] = useState(false);
+  const [tafsirSheet, setTafsirSheet] = useState(false);
   const [chosenLanguage, setChosenLanguage] = useState<LanguageChoice>(languageChoice);
   const pickLanguage = (next: LanguageChoice) => {
     setChosenLanguage(next);
@@ -1289,6 +1292,16 @@ export default function SettingsScreen() {
                         />
                       </View>
                     ) : null}
+                    {revoOpen && isDevVariant() ? (
+                      // The books Revo answers about the Qur'an from (REVO-47): Ibn Kathir until chosen.
+                      <Row
+                        icon="library-outline"
+                        label={t('settings.revo.tafsir')}
+                        value={booksValue(revoSettings.tafsirBooks ?? [])}
+                        onPress={() => setTafsirSheet(true)}
+                        testID="settings-revo-tafsir"
+                      />
+                    ) : null}
                     <Row icon="trash-outline" label={t('settings.revo.deleteConversations')} destructive onPress={confirmRevoHistoryDelete} />
                   </>
                 ) : null}
@@ -1752,6 +1765,12 @@ export default function SettingsScreen() {
           })),
         ]}
         testID="language-sheet"
+      />
+      <TafsirBooksSheet
+        visible={tafsirSheet}
+        onClose={() => setTafsirSheet(false)}
+        books={revoSettings?.tafsirBooks}
+        onChange={(tafsirBooks) => revoBackend().setOptions({ tafsirBooks })}
       />
       <ActionSheet
         visible={homeBackgroundSheet}

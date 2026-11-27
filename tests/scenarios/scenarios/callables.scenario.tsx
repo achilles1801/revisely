@@ -371,7 +371,7 @@ it('[REVO-1] [REVO-3] [REVO-4] [REVO-23] Revo through the app’s own backend: a
   // A tester who hasn't turned it on.
   expect(await refusal(app, () => ask())).toBe('off');
   await app.act(async () => {
-    await expect(withAuthRetry(() => revo().setOptions({ optIn: true }))).resolves.toEqual({ optIn: true, memoryOn: true, mushafOn: true });
+    await expect(withAuthRetry(() => revo().setOptions({ optIn: true }))).resolves.toEqual({ optIn: true, memoryOn: true, mushafOn: true, tafsirBooks: ['ibnKathir'] });
   });
 
   // An answer, then a follow-up in its conversation.
@@ -462,7 +462,7 @@ it('[REVO-37] the release switch: everyone opens Revo to an account that isn’t
     expect(release().currentRevoRelease()).toBe('everyone');
     expect(revoAvailable(app.app.user, release().currentRevoRelease())).toBe(true);
     await app.act(async () => {
-      await expect(withAuthRetry(() => revo().setOptions({ optIn: true }))).resolves.toEqual({ optIn: true, memoryOn: true, mushafOn: true });
+      await expect(withAuthRetry(() => revo().setOptions({ optIn: true }))).resolves.toEqual({ optIn: true, memoryOn: true, mushafOn: true, tafsirBooks: ['ibnKathir'] });
     });
     let answer: unknown;
     await app.act(async () => {

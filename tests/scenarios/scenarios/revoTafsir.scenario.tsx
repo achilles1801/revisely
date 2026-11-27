@@ -63,12 +63,13 @@ async function ask(app: OpenApp, question: string) {
 }
 
 type Logged = { kind: string; problems: string[]; messages: { role: string; content: unknown }[]; stream?: boolean };
+const documentTitles = (r: Logged) => (r.messages[0].content as { type: string; title?: string }[]).filter((b) => b.type === 'document').map((b) => b.title);
 async function modelRequests(uid: string): Promise<Logged[]> {
   const docs = await listServerDocs(`emulator/anthropic/accounts/${uid}/requests`);
   return docs.sort((a, b) => Number(a.at) - Number(b.at)) as unknown as Logged[];
 }
 
-it('[REVO-44] a question about the Qur’an asked in Revo (Revisely Dev): the ayat are found, the answer comes only from the four tafsirs, each book’s own words under it, the passage on a tap, and it counts as a question', async () => {
+it('[REVO-44] [REVO-47] a question about the Qur’an asked in Revo (Revisely Dev): the ayat are found, the answer comes only from the book everyone starts with (Ibn Kathir), its own words under it, the passage on a tap, and it counts as a question', async () => {
   setZone(ZONES.amman);
   setNow('2026-11-26 10:00');
   const phone = new Phone('phone');
@@ -95,32 +96,34 @@ it('[REVO-44] a question about the Qur’an asked in Revo (Revisely Dev): the ay
     await ask(app, 'Why did she send a gift instead of answering?');
     await app.until(() => app.screen.queryByTestId('revo-tafsir-sources') != null, 'the answer from the tafsir');
 
-    // The answer first (the recorded reply, functions/test-recordings/anthropic/revo-tafsir.json), then each book's own
-    // words: al-Sa'di's and al-Qurtubi's Arabic (as the books have it) with Revo's English, labelled, and Ibn Kathir's
-    // own English words.
-    expect(app.screen.getByText(/The books give a few reasons, and they fit together/)).toBeTruthy();
+    // The answer first (the recorded reply, functions/test-recordings/anthropic/revo-tafsir.json, from Ibn Kathir alone),
+    // then the book's own words: its Arabic (as the book has it) with Revo's English, labelled, and its own English words.
+    expect(app.screen.getByText(/The books give this reason/)).toBeTruthy();
     expect(app.screen.getByText('From the tafsir')).toBeTruthy();
-    expect(app.screen.getByTestId('revo-tafsir-source-saadi')).toBeTruthy();
+    expect(app.screen.getByTestId('revo-tafsir-source-ibnKathir')).toBeTruthy();
     expect(app.screen.getByTestId('revo-tafsir-source-ibnKathirEn')).toBeTruthy();
-    expect(app.screen.getByTestId('revo-tafsir-source-qurtubi')).toBeTruthy();
+    expect(app.screen.queryByTestId('revo-tafsir-source-saadi')).toBeNull();
     expect(app.mods.rtl.within(app.screen.getByTestId('revo-tafsir-source-ibnKathirEn')).getByText(/I will send him a gift befitting for one of his status/)).toBeTruthy();
-    expect(app.screen.getAllByText(/Revo’s translation/).length).toBe(2);
-    // al-Qurtubi's words keep the book's harakat.
-    const qurtubi = app.mods.rtl.within(app.screen.getByTestId('revo-tafsir-source-qurtubi')).queryAllByText(/.+/).map((e: { props: { children: unknown } }) => String(e.props.children));
-    expect(qurtubi.some((text: string) => text.replace(/[\u064B-\u0652]/g, '').startsWith('فيه ست مسائل') && /[\u064B-\u0652]/.test(text))).toBe(true);
+    expect(app.screen.getAllByText(/Revo’s translation/).length).toBe(1);
+    // Ibn Kathir's Arabic keeps the book's harakat.
+    const arabic = app.mods.rtl.within(app.screen.getByTestId('revo-tafsir-source-ibnKathir')).queryAllByText(/.+/).map((e: { props: { children: unknown } }) => String(e.props.children));
+    expect(arabic.some((text: string) => text.replace(/[\u064B-\u0652]/g, '').startsWith('قال الحسن البصري') && /[\u064B-\u0652]/.test(text))).toBe(true);
+    // Nothing to offer: the book answered.
+    expect(app.screen.queryByTestId('revo-tafsir-offer')).toBeNull();
 
     // A tap shows the passage around the words.
     expect(app.screen.queryByTestId('revo-tafsir-passage')).toBeNull();
-    await tap(app, 'revo-tafsir-source-saadi');
+    await tap(app, 'revo-tafsir-source-ibnKathir');
     await app.until(() => app.screen.queryByTestId('revo-tafsir-passage') != null, 'the passage');
 
-    // The server found the ayat, then sent the books as documents with citations on, and no structured output.
+    // The server found the ayat, then sent the chosen book (with its English) as documents with citations on, and no
+    // structured output; no other book's words.
     const requests = await modelRequests(uid);
     expect(requests.map((r) => r.kind)).toEqual(['revo-locate', 'revo-tafsir']);
     expect(requests.every((r) => r.problems.length === 0)).toBe(true);
+    expect(documentTitles(requests[1])).toEqual(['Tafsir Ibn Kathir', 'Tafsir Ibn Kathir (English, abridged)']);
     const blocks = requests[1].messages[0].content as { type: string; title?: string; citations?: { enabled: boolean } }[];
     const docs = blocks.filter((b) => b.type === 'document');
-    expect(docs.map((d) => d.title)).toEqual(['Tafsir al-Sa\'di', 'Tafsir Ibn Kathir', 'Tafsir al-Tabari', 'Tafsir al-Qurtubi', 'Tafsir Ibn Kathir (English, abridged)']);
     expect(docs.every((d) => d.citations?.enabled === true)).toBe(true);
 
     // It counted as one of the day's 20 questions.
@@ -239,13 +242,17 @@ it('[REVO-45] [REVO-25] [REVO-44] Revo in the mushaf (Revisely Dev): an R at the
     await tap(app, 'reader-revo');
     await app.until(() => app.screen.queryByText(/Ask me anything about this page/) != null, 'Revo about the page');
     expect(app.screen.getByText('An-Naml, 3rd page')).toBeTruthy();
+    // The line names the books chosen (REVO-47): Ibn Kathir, everyone's to start.
+    expect(app.screen.getByText(/I answer only from Ibn Kathir, and show you where/)).toBeTruthy();
     await tap(app, 'revo-chip-What’s happening here?');
     await app.until(() => app.screen.queryByTestId('revo-tafsir-sources') != null, 'the answer from the tafsir');
     expect(asks.sent[asks.sent.length - 1]).toMatchObject({ question: 'What’s happening here?', quran: { from: [27, 23], to: [27, 35] } });
-    // The first starter on a whole page is answered ahead (functions/test-recordings/tafsir/answers/p379.json): no
-    // model call, and it isn't counted as one of the day's questions.
+    // The first starter on a whole page is answered ahead (functions/test-recordings/tafsir/answers/ibnKathir/p379.json,
+    // from Ibn Kathir alone: all four's quotes books not chosen, REVO-47): no model call, and it isn't counted.
     expect((await modelRequests(uid)).map((r) => r.kind)).toEqual([]);
     expect((await getServerDoc(`revoUsage/${uid}`))?.count ?? 0).toBe(0);
+    expect(app.screen.getByTestId('revo-tafsir-source-ibnKathir')).toBeTruthy();
+    expect(app.screen.queryByTestId('revo-tafsir-source-saadi')).toBeNull();
     // Another question on the page is answered live from the tafsir, and counted.
     await ask(app, 'Why did she send a gift instead of answering?');
     await app.until(() => app.screen.queryAllByTestId('revo-tafsir-sources').length === 2, 'the live answer');

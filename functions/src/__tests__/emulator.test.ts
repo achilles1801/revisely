@@ -8,7 +8,8 @@ import { asTafsirPage } from '../revo/tafsir/pages';
 import { selectPieces } from '../revo/tafsir/select';
 import { buildTafsirRequest } from '../revo/tafsir/request';
 import { buildLocateRequest } from '../revo/tafsir/locate';
-import { compiledSchemas, driftOf, inTestEmulator, kindOf, Recording, schemaSha256, shortRequest, testNow } from '../emulator';
+import { compiledSchemas, driftOf, firstBookOf, inTestEmulator, kindOf, Recording, schemaSha256, shortRequest, testNow } from '../emulator';
+import { DEFAULT_TAFSIR_BOOKS, TafsirBook } from '../revo/tafsir/books';
 import type { RevoContext } from '../revo/types';
 
 const recording = (name: string): Recording =>
@@ -119,7 +120,8 @@ describe('the recorded tafsir replies', () => {
   const page = asTafsirPage(JSON.parse(readFileSync(join(__dirname, '..', '..', 'test-recordings', 'tafsir', 'p379.json'), 'utf8')), 379);
   const q = 'Why did she send a gift instead of answering?';
   const requests = {
-    'revo-tafsir': buildTafsirRequest({ question: q, place: 'surah 27, ayat 23 to 35', books: selectPieces([page], { start: page.start, end: page.end }, q, true) }).request,
+    // REVO-47: from the books everyone starts with, Ibn Kathir alone.
+    'revo-tafsir': buildTafsirRequest({ question: q, place: 'surah 27, ayat 23 to 35', books: selectPieces([page], { start: page.start, end: page.end }, q, true, DEFAULT_TAFSIR_BOOKS) }).request,
     'revo-locate': buildLocateRequest('How was my week?'),
   } as const;
 
@@ -129,5 +131,13 @@ describe('the recorded tafsir replies', () => {
 
   it.each(Object.keys(requests) as (keyof typeof requests)[])('%s was recorded with the request the functions send now', (name) => {
     expect(driftOf(shortRequest(requests[name]), recording(name).request)).toEqual([]);
+  });
+
+  it('[REVO-47] an answer from one book is told apart by its first document, for a test’s answer from that book', () => {
+    const one = (books: TafsirBook[]) => buildTafsirRequest({ question: q, place: 'here', books: selectPieces([page], { start: page.start, end: page.end }, q, true, books) }).request;
+    expect(firstBookOf(one(['saadi']))).toBe('saadi');
+    expect(firstBookOf(one(['ibnKathir']))).toBe('ibnKathir');
+    expect(firstBookOf(one(['tabari', 'qurtubi']))).toBe('tabari');
+    expect(kindOf(one(['qurtubi']))).toBe('revo-tafsir');
   });
 });

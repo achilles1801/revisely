@@ -1,115 +1,111 @@
 {
-  "recordedAt": "2026-11-26T07:22:22.731Z",
-  "how": "scripts/tafsir/record-replies.js: the real API, the request revoAsk builds for the gift question on page 379 (test-recordings/tafsir/p379.json).",
+  "recordedAt": "2026-11-27T23:31:05.183Z",
+  "how": "scripts/tafsir/record-replies.js: the real API, the request revoAsk builds for the gift question on page 379 (test-recordings/tafsir/p379.json), from Ibn Kathir alone (the books everyone starts with).",
   "request": {
     "model": "claude-haiku-5-5",
     "max_tokens": 2000,
     "thinking": {
       "type": "disabled"
     },
-    "systemSha256": "b508f0041c66108035a3b4634e75fd95652fc6a49283434a6b21f5a4669d3365",
+    "systemSha256": "dd8e36934cdf2b53463e2b090482950ab6257f2b1155aac1f1c8352e4f45b5f1",
     "outputSchemaSha256": "8f612858b9afa6f5335d36110bae1d040c3ae3886401fcb8660d60b9255e55e5"
   },
   "status": 200,
   "body": {
     "model": "claude-haiku-5-5",
-    "id": "msg_011ChR8unqxEpurBsE3sw1dz",
+    "id": "msg_011ChUJbBCG4CsaWh3rimCJm",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "The question is about Bilqis (the queen of Sheba) sending a gift to Sulayman. The books give a few reasons, and they fit together.\n\nAl-Sa'di says she wanted to test him before committing: she sent the gift to see whether he was a king or a prophet, and to judge from his response how to act. "
+        "text": "The question is about Bilqis (the queen of Sheba) sending a gift. The books give this reason: she judged that a gift would work on people and might keep Sulayman from attacking, so she chose peace over fighting. "
       },
       {
         "citations": [
           {
             "type": "char_location",
-            "cited_text": "فقالت لهم -مقنعة لهم عن رأيهم ومبينة سوء مغبة القتال- إن الملوك إذا دخلوا قرية أفسدوها قتلا وأسرا ونهبا لأموالها، وتخريبا لديارها، وجعلوا أعزة أهلها أذلة أي: جعلوا الرؤساء السادة أشراف الناس من الأذلين، أي: فهذا رأي غير سديد، وأيضا فلست بمطيعة له قبل الاختبار وإرسال من يكشف عن أحواله ويتدبرها، وحينئذ نكون على بصيرة من أمرنا.\n\n",
+            "cited_text": "قال الحسن البصري، رحمه الله: فوضوا أمرهم إلى علجة تضطرب ثدياها، فلما قالوا لها ما قالوا، كانت هي أحزم رأيا منهم، وأعلم بأمر سليمان، وأنه لا قبل لها بجنوده وجيوشه، وما سخر له من الجن والإنس والطير، وقد شاهدت من قضية الكتاب مع الهدهد أمرا عجيبا بديعا، فقالت لهم:\n\nإني أخشى أن نحاربه ونمتنع عليه، فيقصدنا بجنوده، ويهلكنا بمن معه، ويخلص إلي وإليكم الهلاك والدمار دون غيرنا؛ ولهذا قالت: ﴿إن الملوك إذا دخلوا قرية أفسدوها﴾ .\n\n",
             "document_index": 0,
-            "document_title": "Tafsir al-Sa'di",
-            "start_char_index": 2330,
-            "end_char_index": 2658
+            "document_title": "Tafsir Ibn Kathir",
+            "start_char_index": 619,
+            "end_char_index": 1039
           }
         ],
         "type": "text",
-        "text": "Her point was that it was not sound to obey him before testing him and sending someone to examine his condition, so that we would be acting with insight."
+        "text": "She knew that Sulayman had no need for her armies and that she could not stand against his soldiers, so she said to them: I fear that if we fight him, he will come at us with his armies and destroy us."
       },
       {
         "type": "text",
-        "text": " "
+        "text": " Her plan was to "
       },
       {
         "citations": [
           {
             "type": "char_location",
-            "cited_text": "فقالت: وإني مرسلة إليهم بهدية فناظرة بم يرجع المرسلون منه. ",
+            "cited_text": "ثم عدلت إلى المهادنة والمصالحة والمسالمة والمخادعة والمصانعة، فقالت:\n\n﴿وإني مرسلة إليهم بهدية فناظرة بم يرجع المرسلون﴾ أي: سأبعث إليه بهدية تليق به وأنظر ماذا يكون جوابه بعد ذلك، فلعله يقبل ذلك ويكف عنا، أو يضرب علينا خراجا نحمله إليه في كل عام، ونلتزم له بذلك ويترك قتالنا ومحاربتنا.\n\n",
             "document_index": 0,
-            "document_title": "Tafsir al-Sa'di",
-            "start_char_index": 2658,
-            "end_char_index": 2717
+            "document_title": "Tafsir Ibn Kathir",
+            "start_char_index": 1323,
+            "end_char_index": 1609
           }
         ],
         "type": "text",
-        "text": "She said: I am sending them a gift, and I will look at what the messengers come back with."
+        "text": "send him a gift befitting one of his status, and see what his response would be, perhaps he would accept it and leave us alone, or would impose a tribute on us that we would pay each year."
       },
       {
         "type": "text",
-        "text": "\n\nIbn Kathir reports the same aim: "
+        "text": "\n\nIbn Kathir (English, abridged): "
       },
       {
         "citations": [
           {
             "type": "char_location",
-            "cited_text": "meaning, 'I will send him a gift befitting for one of his status, and will wait and see what his response will be.\n\n",
-            "document_index": 4,
+            "cited_text": "meaning, 'I will send him a gift befitting for one of his status, and will wait and see what his response will be.\n\nShe understood how gift-giving has a good effect on people.\" ",
+            "document_index": 1,
             "document_title": "Tafsir Ibn Kathir (English, abridged)",
             "start_char_index": 290,
-            "end_char_index": 406
+            "end_char_index": 467
           }
         ],
         "type": "text",
-        "text": "'I will send him a gift befitting for one of his status, and will wait and see what his response will be."
+        "text": "'I will send him a gift befitting for one of his status, and will wait and see what his response will be. She understood how gift-giving has a good effect on people."
       },
       {
         "type": "text",
-        "text": " "
+        "text": "\"\n\nIbn Kathir (Arabic): "
       },
       {
         "citations": [
           {
             "type": "char_location",
-            "cited_text": "Ibn 'Abbas and others said: \"She said to her people, if he accepts the gift, he is a king, so fight him; but if he does not accept it, he is a Prophet, so follow him.\"",
-            "document_index": 4,
-            "document_title": "Tafsir Ibn Kathir (English, abridged)",
-            "start_char_index": 467,
-            "end_char_index": 634
+            "cited_text": "وقال ابن عباس وغير واحد: قالت لقومها: إن قبل الهدية فهو ملك فقاتلوه، وإن لم يقبلها فهو نبي فاتبعوه.",
+            "document_index": 0,
+            "document_title": "Tafsir Ibn Kathir",
+            "start_char_index": 1715,
+            "end_char_index": 1814
           }
         ],
         "type": "text",
-        "text": "Ibn 'Abbas and others said: \"She said to her people, if he accepts the gift, he is a king, so fight him; but if he does not accept it, he is a Prophet, so follow him.\""
+        "text": "Ibn 'Abbas and others said: she told her people that if he accepts the gift, he is a king, so fight him; but if he does not accept it, he is a Prophet, so follow him."
       },
       {
         "type": "text",
-        "text": "\n\nAl-Qurtubi adds the same test, that a king would be pleased with wealth and a prophet would not: "
+        "text": "\n\nThe books also differ on the wisdom of her choice: Qatada praised her, saying "
       },
       {
         "citations": [
           {
             "type": "char_location",
-            "cited_text": "فيه ست مسائل: الأولى- قوله تعالى: ﴿وإني مرسلة إليهم بهدية﴾ هذا من حسن نظرها وتدبيرها، أي إني أجرب هذا الرجل بهدية، وأعطيه فيها نفائس من الأموال، وأغرب عليه بأمور المملكة، فإن كان ملكا دنياويا أرضاه المال وعملنا معه بحسب ذلك، وإن كان نبيا لم يرضه المال ولازمنا في أمر الدين، فينبغي لنا أن نؤمن به ونتبعه على دينه، فبعثت إليه بهدية عظيمة أكثر الناس في تفصيلها، فقال سعيد بن جبير عن ابن عباس:\n\nأرسلت إليه بلبنة من ذهب، فرأت الرسل الحيطان من ذهب فصغر عندهم ما جاءوا به. ",
-            "document_index": 3,
-            "document_title": "Tafsir al-Qurtubi",
-            "start_char_index": 356,
-            "end_char_index": 822
+            "cited_text": "قال قتادة: رحمها الله ورضي عنها، ما كان أعقلها في إسلامها وفي شركها!! علمت أن الهدية تقع موقعا من الناس.\n\n",
+            "document_index": 0,
+            "document_title": "Tafsir Ibn Kathir",
+            "start_char_index": 1609,
+            "end_char_index": 1715
           }
         ],
         "type": "text",
-        "text": "if he is a worldly king, money will satisfy him and we will deal with him accordingly, and if he is a prophet, money will not satisfy him and he will insist on matters of religion"
-      },
-      {
-        "type": "text",
-        "text": ".\n\nNote that the books describe her motive, not a ruling. For the full story, a qualified teacher can take you through it."
+        "text": "how intelligent she was in her Islam and in her disbelief! She knew that a gift would have an effect on people."
       }
     ],
     "container": null,
@@ -117,14 +113,14 @@
     "stop_sequence": null,
     "stop_details": null,
     "usage": {
-      "input_tokens": 4194,
-      "cache_creation_input_tokens": 3644,
+      "input_tokens": 2060,
+      "cache_creation_input_tokens": 1417,
       "cache_read_input_tokens": 0,
       "cache_creation": {
-        "ephemeral_5m_input_tokens": 3644,
+        "ephemeral_5m_input_tokens": 1417,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 498,
+      "output_tokens": 495,
       "output_tokens_details": {
         "thinking_tokens": 0
       },

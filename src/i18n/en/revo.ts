@@ -424,8 +424,22 @@ export const revo = {
     /** Revisely Dev (REVO-46): the greeting's offer of the next page's tafsir, and its starter. */
     nextOffer: 'Want what the tafsir says about {{place}} before you go on?',
     nextChip: 'What does the tafsir say?',
-    greetingPage: 'Ask me anything about this page. I answer only from the tafsir, and show you where.',
-    greetingAyah: 'Ask me anything about this ayah. I answer only from the tafsir, and show you where.',
+    /** REVO-47: {{books}} is the chosen books (booksInWords: "Ibn Kathir", "Ibn Kathir and al-Sa’di", "the four tafsirs"). */
+    greetingPage: 'Ask me anything about this page. I answer only from {{books}}, and show you where.',
+    greetingAyah: 'Ask me anything about this ayah. I answer only from {{books}}, and show you where.',
+    bookIn: {
+      tabari: 'al-Tabari',
+      ibnKathir: 'Ibn Kathir',
+      qurtubi: 'al-Qurtubi',
+      saadi: 'al-Sa’di',
+    },
+    booksTwo: '{{a}} and {{b}}',
+    booksThree: '{{a}}, {{b}} and {{c}}',
+    booksAll: 'the four tafsirs',
+    /** REVO-47: the chosen books said nothing on it, and this one does. The button asks for it in the user's words. */
+    offer: '{{book}} does speak to this. Want to see what he says?',
+    offerButton: 'See {{book}}’s view',
+    offerAsk: 'What does {{book}} say?',
     startPage1: 'What’s happening here?',
     startPage2: 'What do these ayat teach?',
     startPage3: 'Who is this about?',

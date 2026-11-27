@@ -35,6 +35,7 @@ import { RevoError, type RevoStreamChunk, handleClear, handleDayInReview, handle
 import { inTestEmulator, recordedAnthropic, testNow } from './emulator';
 import { asTafsirPage, cachedLoader } from './revo/tafsir/pages';
 import type { TafsirAnswer } from './revo/tafsir/reply';
+import type { TafsirBook } from './revo/tafsir/books';
 import { AdminError, TOTALS_AUDIENCE, consoleOrigins, handleAdminMetrics, handleAdminRevo, handleMetricsTotals, metricsFor, requireAdmin } from './metrics/admin';
 import type { Metrics } from './metrics/aggregate';
 import {
@@ -373,24 +374,29 @@ const tafsirPages = cachedLoader(async (page) => {
   return asTafsirPage(JSON.parse(bytes.toString('utf8')), page);
 });
 
-/** "What's happening here?" answered ahead for a page (revo/tafsir/ahead.ts); null when there is none. Kept by the instance. */
-const aheadAnswers = new Map<number, Promise<TafsirAnswer | null>>();
-function tafsirAhead(page: number): Promise<TafsirAnswer | null> {
-  if (!aheadAnswers.has(page)) {
+/**
+ * "What's happening here?" answered ahead for a page (revo/tafsir/ahead.ts): from all four books
+ * (tafsir/answers/v1/p<page>.json), or from one book alone (tafsir/answers/v1/<book>/p<page>.json, REVO-47); null when
+ * there is none. Kept by the instance.
+ */
+const aheadAnswers = new Map<string, Promise<TafsirAnswer | null>>();
+function tafsirAhead(page: number, book?: TafsirBook): Promise<TafsirAnswer | null> {
+  const name = book ? `${book}/p${page}.json` : `p${page}.json`;
+  if (!aheadAnswers.has(name)) {
     const read = async (): Promise<TafsirAnswer | null> => {
       if (inTestEmulator()) {
-        const file = join(__dirname, '..', 'test-recordings', 'tafsir', 'answers', `p${page}.json`);
+        const file = join(__dirname, '..', 'test-recordings', 'tafsir', 'answers', name);
         return existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as TafsirAnswer) : null;
       }
-      const file = getStorage().bucket().file(`tafsir/answers/v1/p${page}.json`);
+      const file = getStorage().bucket().file(`tafsir/answers/v1/${name}`);
       const [exists] = await file.exists();
       if (!exists) return null;
       const [bytes] = await file.download();
       return JSON.parse(bytes.toString('utf8')) as TafsirAnswer;
     };
-    aheadAnswers.set(page, read().catch(() => null));
+    aheadAnswers.set(name, read().catch(() => null));
   }
-  return aheadAnswers.get(page)!;
+  return aheadAnswers.get(name)!;
 }
 
 /** Revo's dependencies; with the callable's response when the phone asked for the answer as it is written. */

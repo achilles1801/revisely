@@ -239,3 +239,48 @@ describe('answers written ahead', () => {
     expect(aheadPageOf({ from: [112, 1], to: [114, 6] })).toBe(604);
   });
 });
+
+describe('the books chosen (REVO-47)', () => {
+  const { chosenBooks, quotableBooks, booksInWords, BACKUP_ORDER, DEFAULT_TAFSIR_BOOKS } = require('./books');
+  const page = asTafsirPage(JSON.parse(readFileSync(join(__dirname, '..', '..', '..', 'test-recordings', 'tafsir', 'p379.json'), 'utf8')), 379);
+  const scope = { start: page.start, end: page.end };
+  const q = 'Why did she send a gift instead of answering?';
+
+  it('are Ibn Kathir alone until chosen, and any of the four, each once, as stored', () => {
+    expect(DEFAULT_TAFSIR_BOOKS).toEqual(['ibnKathir']);
+    expect(chosenBooks(undefined)).toEqual(['ibnKathir']);
+    expect(chosenBooks([])).toEqual(['ibnKathir']);
+    expect(chosenBooks(['nope', 7])).toEqual(['ibnKathir']);
+    expect(chosenBooks(['saadi', 'tabari', 'saadi'])).toEqual(['tabari', 'saadi']);
+    expect(chosenBooks(['saadi', 'qurtubi', 'ibnKathir', 'tabari'])).toEqual(['tabari', 'ibnKathir', 'qurtubi', 'saadi']);
+  });
+
+  it("send only the chosen books' words, Ibn Kathir's English with Ibn Kathir", () => {
+    expect(selectPieces([page], scope, q, true, ['ibnKathir']).map((b) => b.book)).toEqual(['ibnKathir', 'ibnKathirEn']);
+    expect(selectPieces([page], scope, q, false, ['ibnKathir']).map((b) => b.book)).toEqual(['ibnKathir']);
+    expect(selectPieces([page], scope, q, true, ['saadi', 'qurtubi']).map((b) => b.book)).toEqual(['saadi', 'qurtubi']);
+    expect(selectPieces([page], scope, q, true, ['tabari', 'ibnKathir', 'qurtubi', 'saadi']).map((b) => b.book)).toEqual(['saadi', 'ibnKathir', 'tabari', 'qurtubi', 'ibnKathirEn']);
+    const docs = buildTafsirRequest({ question: q, place: 'here', books: selectPieces([page], scope, q, true, ['saadi']) }).request.messages[0].content as { type: string; title?: string }[];
+    expect(docs.filter((b) => b.type === 'document').map((b) => b.title)).toEqual(["Tafsir al-Sa'di"]);
+  });
+
+  it('give a book alone more to go on, at under half the text of all four', () => {
+    const chars = (books: string[]) =>
+      selectPieces([page], scope, q, true, books as never)
+        .flatMap((b) => b.pieces)
+        .reduce((n, x) => n + x.range[1] - x.range[0], 0);
+    const alone = selectPieces([page], scope, q, true, ['tabari']).find((b) => b.book === 'tabari')!;
+    expect(alone.pieces.length).toBe(PER_BOOK * 2);
+    expect(chars(['ibnKathir'])).toBeLessThan(chars(['tabari', 'ibnKathir', 'qurtubi', 'saadi']) / 2);
+  });
+
+  it('let an answer quote only them, and name them in a sentence', () => {
+    expect([...quotableBooks(['ibnKathir'])]).toEqual(['ibnKathir', 'ibnKathirEn']);
+    expect([...quotableBooks(['saadi'])]).toEqual(['saadi']);
+    expect(booksInWords(['ibnKathir'])).toBe('Ibn Kathir');
+    expect(booksInWords(['ibnKathir', 'saadi'])).toBe("Ibn Kathir or al-Sa'di");
+    expect(booksInWords(['tabari', 'ibnKathir', 'qurtubi'])).toBe('al-Tabari, Ibn Kathir or al-Qurtubi');
+    expect(booksInWords(['tabari', 'ibnKathir', 'qurtubi', 'saadi'])).toBe('the four tafsirs');
+    expect(BACKUP_ORDER).toEqual(['ibnKathir', 'saadi', 'tabari', 'qurtubi']);
+  });
+});

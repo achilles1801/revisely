@@ -5,10 +5,10 @@
  *   config/app.revo                                read: who has Revo (release.ts, REVO-37), at most once a minute
  *   config/coach, coachLedgerDay/{day}             read: the daily cap and the day's spend (REVO-4)
  *   users/{uid}.smartTrackingEnabled               read: whether Revo speaks of ratings (REVO-36)
- *   coachSettings/{uid}                            revoOn (Revo's own switch, settings.ts), memoryOn; optIn is the Ask coach's
+ *   coachSettings/{uid}                            revoOn (Revo's own switch, settings.ts), memoryOn, mushafOn, tafsirBooks; optIn is the Ask coach's
  *   revoUsage/{uid}                                { uid, day, count }: questions on that revision day
  *   users/{uid}/revoChats/{chatId}                 { uid, kind, title, day, createdAt, updatedAt, turns, meta? }
- *   users/{uid}/revoChats/{chatId}/messages/{id}   the message, uid, and on a user message the attachments (attachData: one; attachList: several)
+ *   users/{uid}/revoChats/{chatId}/messages/{id}   the message, uid, and on a user message the attachments (attachData: one; attachList: several), and on an answer the offered book's (backup)
  *   users/{uid}/revoMemory/{id}                    { uid, text, source, day, chatId, at }
  *   revoAnswers/{uid}__{sha256}                    a cached first answer (server only)
  *   coachLedger, coachLedgerDay                    the Ask coach's ledger, shared (coach/admin.ts)
@@ -121,6 +121,9 @@ export function adminRevoStore(db: Firestore): RevoStore {
       const fields: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() };
       if (patch.optIn !== undefined) fields[REVO_ON] = patch.optIn;
       if (patch.memoryOn !== undefined) fields.memoryOn = patch.memoryOn;
+      // Until Nov 27 2026 the mushaf's switch was returned and never kept, so turning it off didn't hold (REVO-45).
+      if (patch.mushafOn !== undefined) fields.mushafOn = patch.mushafOn;
+      if (patch.tafsirBooks !== undefined) fields.tafsirBooks = patch.tafsirBooks;
       await settingsRef(uid).set(fields, { merge: true });
       const snap = await settingsRef(uid).get();
       return revoSettingsOf((f) => snap.get(f));
