@@ -875,11 +875,18 @@ function journalDaysFrom(
 }
 
 /** Daily logs, newest day first: the days' summaries built from their timestamped notes. */
-export async function getJournalEntries(limitCount: number = 400, userId?: string): Promise<JournalEntry[]> {
+export async function getJournalEntries(
+  limitCount: number = 400,
+  userId?: string,
+  fromServer = false,
+): Promise<JournalEntry[]> {
   const uid = userId || getCurrentUserId();
+  // fromServer (Activity, ACT-36): never Firestore's memory, which is empty on a cold start and answered offline reads
+  // with nothing; offline or before Auth the read fails instead, and what the phone kept stays on screen.
+  const read = fromServer ? getDocsFromServer : getDocs;
   const [dayDocs, noteDocs] = await Promise.all([
-    getDocs(query(collection(db, 'users', uid, 'journal'), orderBy('date', 'desc'), limit(limitCount))),
-    getDocs(query(collectionGroup(db, 'entries'), where('uid', '==', uid))),
+    read(query(collection(db, 'users', uid, 'journal'), orderBy('date', 'desc'), limit(limitCount))),
+    read(query(collectionGroup(db, 'entries'), where('uid', '==', uid))),
   ]);
   return journalDaysFrom(dayDocs.docs, noteDocs.docs);
 }
@@ -985,9 +992,15 @@ function readingSessionFromFirestore(id: string, data: FirestoreReadingSession):
 }
 
 /** Most recent reading sessions, newest first. */
-export async function getReadingSessions(limitCount: number = 500, userId?: string): Promise<ReadingSession[]> {
+export async function getReadingSessions(
+  limitCount: number = 500,
+  userId?: string,
+  fromServer = false,
+): Promise<ReadingSession[]> {
   const q = query(getReadingSessionsRef(userId), orderBy('startedAt', 'desc'), limit(limitCount));
-  const snapshot = await getDocs(q);
+  // fromServer (Activity, ACT-36): never Firestore's memory, which is empty on a cold start and answered offline reads
+  // with nothing; offline or before Auth the read fails instead, and what the phone kept stays on screen.
+  const snapshot = await (fromServer ? getDocsFromServer : getDocs)(q);
   return snapshot.docs.map((d) => readingSessionFromFirestore(d.id, d.data() as FirestoreReadingSession));
 }
 
@@ -1191,6 +1204,7 @@ export async function getActivityItemsBetween(
   from: string,
   to: string,
   userId?: string,
+  fromServer = false,
 ): Promise<{
   revisions: {
     id: string;
@@ -1206,8 +1220,12 @@ export async function getActivityItemsBetween(
   reads: { id: string; day: string; pages: number[]; minutes: number | null; occurredAt: number | null }[];
 }> {
   const uid = userId || getCurrentUserId();
+  // fromServer (Activity, ACT-36): never Firestore's memory, which is empty on a cold start and answered offline reads
+  // with nothing; offline or before Auth the read fails instead, and what the phone kept stays on screen.
   const range = (c: string) =>
-    getDocs(query(collection(db, 'users', uid, c), where('day', '>=', from), where('day', '<=', to)));
+    (fromServer ? getDocsFromServer : getDocs)(
+      query(collection(db, 'users', uid, c), where('day', '>=', from), where('day', '<=', to)),
+    );
   const [rev, mem, read] = await Promise.all([range('revisions'), range('memorizations'), range('reads')]);
   return {
     revisions: rev.docs.map((d) => {
@@ -1300,9 +1318,12 @@ export async function getMemorizationsBetween(
   from: string,
   to: string,
   userId?: string,
+  fromServer = false,
 ): Promise<{ day: string; pages: number[]; verses?: number[] }[]> {
   const uid = userId || getCurrentUserId();
-  const snap = await getDocs(
+  // fromServer (Activity, ACT-36): never Firestore's memory, which is empty on a cold start and answered offline reads
+  // with nothing; offline or before Auth the read fails instead, and what the phone kept stays on screen.
+  const snap = await (fromServer ? getDocsFromServer : getDocs)(
     query(collection(db, 'users', uid, 'memorizations'), where('day', '>=', from), where('day', '<=', to)),
   );
   // An item added by the ayah carries its ayahs (MEM-2: it counts by their share of the page).
