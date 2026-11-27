@@ -296,7 +296,9 @@ current basic sounds". October 2026's version was removed for the voices it offe
   Thursday evening the card says Friday began at maghrib. It comes and goes on time with Home left open, and on
   coming back to the app. (Changed Nov 21 2026, Majd: it followed the revision day, so it showed on Friday evening
   after maghrib and never on Thursday evening.)
-- **KAHF-2.** Al-Kahf read inside that window counts for that Friday: "Mark as read", or every page of it in
+- **KAHF-2.** The card's "Read" opens Al-Kahf's first page in the reader over Home, and back comes back to Home, as
+  today's ayah does (HOME-7; before, it opened in the Read tab over its surah list).
+  Al-Kahf read inside that window counts for that Friday: "Mark as read", or every page of it in
   readings that ended inside it (the reader's timer), with the pages revised on Friday's own revision day. Read on
   Thursday evening, the card shows it as done on Friday morning. Read on Thursday before maghrib, it doesn't count.
   Activity still shows each reading on the revision day it was done (DAY-9): a Thursday-evening reading is on
@@ -476,7 +478,10 @@ current basic sounds". October 2026's version was removed for the voices it offe
   International once that surah is on the phone (word for word; a verse with a footnote shows the Arabic alone), then
   where it is, "Al-Qamar (54:17)". It sits under the posts, pushed to the foot of the screen when there is room and after
   them when there isn't, so it never covers them, at any text size, in either direction. A tap opens its page in the
-  mushaf.
+  reader over Home, and back, the swipe or the button, comes back to Home (Majd, Nov 26 2026: "clicking on the verse of
+  the day on the homepage takes me to the page which is correct, but then when I swipe out of the page, it should
+  actually take me back to the homepage, not to the third tab"). The Read tab stays as it was. (Before: the page opened
+  in the Read tab, and back went to its surah list.)
 
 ## Sheets and updates
 
