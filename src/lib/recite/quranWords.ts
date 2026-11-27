@@ -14,6 +14,7 @@
 // page's words are one contiguous range.
 
 import { looseWord, normalizeWord } from './arabic';
+import { setHiddenInk, type HiddenInkData } from './hiddenInk';
 import { getSurahDisplay } from '../quranData';
 import type { Rect } from '../ayahBounds';
 
@@ -220,8 +221,11 @@ let loading: Promise<QuranWords> | null = null;
 export function loadQuranWords(): Promise<QuranWords> {
   if (loaded) return Promise.resolve(loaded);
   if (!loading) {
-    loading = readAsset()
-      .then((data) => {
+    // The hidden page's patches and notches (lib/recite/hiddenInk) with the words, so a page hidden is whole at once; a
+    // page without them is still drawn (their boxes alone).
+    loading = Promise.all([readAsset(), readHiddenInk().catch(() => null)])
+      .then(([data, ink]) => {
+        if (ink) setHiddenInk(ink);
         loaded = new QuranWords(data);
         return loaded;
       })
@@ -260,6 +264,13 @@ async function readAsset(): Promise<QuranWordsData> {
   if (!asset.localUri) await asset.downloadAsync();
   const uri = asset.localUri ?? asset.uri;
   return JSON.parse(await readText(uri)) as QuranWordsData;
+}
+
+async function readHiddenInk(): Promise<HiddenInkData> {
+  const { Asset } = require('expo-asset') as typeof import('expo-asset');
+  const asset = Asset.fromModule(require('../../data/hiddenInk.dat'));
+  if (!asset.localUri) await asset.downloadAsync();
+  return JSON.parse(await readText(asset.localUri ?? asset.uri)) as HiddenInkData;
 }
 
 /**

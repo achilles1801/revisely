@@ -2,6 +2,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { QuranWords, QuranWordsData } from '../quranWords';
+import { setHiddenInk, type HiddenInkData } from '../hiddenInk';
 
 let data: QuranWordsData | null = null;
 let words: QuranWords | null = null;
@@ -14,7 +15,11 @@ export function wordsData(): QuranWordsData {
 }
 
 export function quranWords(): QuranWords {
-  if (!words) words = new QuranWords(wordsData());
+  if (!words) {
+    words = new QuranWords(wordsData());
+    // The hidden page's patches and notches, as loadQuranWords reads them with the words.
+    setHiddenInk(JSON.parse(readFileSync(join(__dirname, '../../../data/hiddenInk.dat'), 'utf8')) as HiddenInkData);
+  }
   return words;
 }
 

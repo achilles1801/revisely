@@ -360,8 +360,29 @@ until its part is set up.
       word cut beside a hidden one, no hidden word's ink in an opening. Run it after the page lines, the images or the
       word data change.
     - Word by word, a hidden word takes no extra edge (`WORD_EDGE` in `hiddenPage.ts`).
-    - The limit: about 12% of words share columns with the next without touching (a kaf's top stroke over the previous
-      word); the edge leaves that stroke's tip (up to about 20 units) over the word recited rather than cut it.
+    - About 12% of words share columns with the next without touching (a kaf's top stroke over the previous word): no
+      straight edge parts them. The hidden page gives those strokes patches and notches (below).
+  - **Nothing of a hidden word shows, on any page** (RECITE-20; Majd, Nov 26 2026, of page 316 in the dark: "theres
+    still instances where the white still shows up when the page is hidden ... we should do a full run through of every
+    page and ensure that never happens again"). His circled bit was the hamzat wasl's sign over ٱلْأَعْلَىٰ: `HiddenInkLayer`
+    opened a unit past each shown word's box, and the sign reaches to within that unit of أَنتَ's box.
+    - `scripts/check-hidden-page.py` lays the plan's covers over the page images (the originals, w1080, w1440) in every
+      reading state (nothing shown, up to each word, from each word, each word alone, all but one) and fails on any
+      hidden word's ink that shows or shown word's ink that is covered. It owns each ink pixel to a word (a stroke whole,
+      even its edge past its box; or a marker, a quarter sign with its quarter's first word, a surah header or the
+      basmala, which are never covered) and keeps a copy of the plan, checked against the app's with `--js-plans`.
+      Measured Nov 26 2026, before: 24,906 bits of hidden words showing on the originals (every page; w1080 22,018, w1440
+      23,763) and 5,046 of shown words cut; after, none of either in any set.
+    - A shown word's opening is its box (`WORD_EDGE` 0 in `HiddenInkLayer`). Where a straight edge still can't part two
+      words' ink (a hamza under an alif past its box, a kaf's top, a descender into the next line's rows, a pixel of the
+      smaller sets' blur), `src/data/hiddenInk.dat` (`lib/recite/hiddenInk`; 33,068 rects on 603 pages, 17,320 stored,
+      written by the script's `--write`) gives the word patches (covers over that ink, while it is hidden) and notches
+      (holes over it, cut from the covers while it is shown), each holding that word's ink and no other's in any set.
+      Patches are drawn again over the newest word's green ink, which is its box in its line's own rows. An asset like
+      `quranWords.dat` (656 KB), read with it by `loadQuranWords`, so it isn't in every update's bundle.
+    - `hiddenInk.test` holds the plan's side in CI on all 604 pages (a hidden word's box and patches covered, a shown
+      word's box and notches open, markers whole) and pins ink measured on the images (the wasla on 316, a hamza on 472).
+    - Run the script (`--write`) after the word boxes, the page lines, the marker rows, the plan or the images change.
   - **A voice search with one result opens the reader at the ayah, nothing listening** (SEARCH-4; Majd, Nov 17 2026:
     "it takes me to the mushaf with the verse highlighted without it still recording then clicking back shows me that
     one search result"). It replaced Nov 15's "opens the reader reciting".

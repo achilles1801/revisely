@@ -862,15 +862,16 @@ describe('mistakes are highlights (Majd, Nov 15 2026: “only things we should s
     await event({ type: 'at', w: A23 + 3 });
     const { wordBox } = require('../../../lib/reciteLive/geometry');
     // Majd, Nov 22 2026: "i dont see the words being a different color as its recited with page hidden". The page's own
-    // image, tinted, seen through the newest word's box only (the word before it isn't inked).
+    // image, tinted, seen through the newest word's box only (the word before it isn't inked), no wider: a unit more showed
+    // the next word's edge, still hidden, in green (Majd, Nov 26 2026; BEHAVIOUR.md RECITE-20).
     const ink = flatStyle(screen.getByTestId('live-follow-ink'));
     const box = wordBox(words, A23 + 2);
-    expect(ink.left).toBeCloseTo((box.x0 - 1) * 0.38);
-    expect(ink.width).toBeCloseTo((box.x1 - box.x0 + 2) * 0.38);
+    expect(ink.left).toBeCloseTo(box.x0 * 0.38);
+    expect(ink.width).toBeCloseTo((box.x1 - box.x0) * 0.38);
     expect(ink.overflow).toBe('hidden');
     const image = screen.getByTestId('live-follow-ink-image');
     expect(image.props.source).toEqual({ uri: 'file:///379.png' });
-    expect(flatStyle(image)).toMatchObject({ tintColor: p.followInk, width: 389, height: 629, left: -(box.x0 - 1) * 0.38 });
+    expect(flatStyle(image)).toMatchObject({ tintColor: p.followInk, width: 389, height: 629, left: -box.x0 * 0.38 });
     expect(screen.queryAllByTestId('live-follow-ink')).toHaveLength(1);
     expect(screen.queryByTestId('live-word-box')).toBeNull();
     expect(screen.queryAllByTestId('live-ayah-band')).toHaveLength(0);
@@ -881,7 +882,7 @@ describe('mistakes are highlights (Majd, Nov 15 2026: “only things we should s
     expect(bg('live-highlight-word')).toBe(p.markWord);
     // The next word said: it takes the ink.
     await event({ type: 'said', upTo: A23 + 3 });
-    expect(flatStyle(screen.getByTestId('live-follow-ink')).left).toBeCloseTo((wordBox(words, A23 + 3).x0 - 1) * 0.38);
+    expect(flatStyle(screen.getByTestId('live-follow-ink')).left).toBeCloseTo(wordBox(words, A23 + 3).x0 * 0.38);
     // The page shown: no ink, only the band.
     fireEvent.press(screen.getByTestId('recite-eye'));
     expect(screen.queryByTestId('live-follow-ink')).toBeNull();

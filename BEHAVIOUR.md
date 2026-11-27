@@ -819,7 +819,12 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   in place in its own ink. Nothing over or under a marker shows while the word beside it on that side is hidden (a
   sajdah's overline did beside page 379's ۲٤, Nov 22 2026), nor in the corners of its opening beside its round outline
   (a damma or a kaf's top reaching in; Majd, Nov 25 2026: "hidden view shows a lot of pieces of letters ... this also
-  applies for the tracker and following along when hidden"). Nothing of it fills in afterwards (Majd's Dev take, Nov 22 2026: "it should just appear ready
+  applies for the tracker and following along when hidden"). No piece of a hidden word shows beside a word shown, and none of a
+  word shown is covered, in any reading state, on any page, in any image set (Majd, Nov 26 2026, of page 316's hamzat wasl
+  sign beside أنت: "we should do a full run through of every page and ensure that never happens again"): a shown word's
+  opening is its box, no wider, and where a straight edge can't part two words' ink, the hidden one's takes a patch and the
+  shown one's a notch, each holding that word's ink and no other's. The newest word's following ink is its box in its line's
+  own rows. Nothing of it fills in afterwards (Majd's Dev take, Nov 22 2026: "it should just appear ready
   from the start like it was before"). During a take the newest word shown is in the following colour (green, the same as the word being
   newest word in the bar) and the words before it in the page's own ink; it moves on with each word shown, never to a word
   still covered. A word with a mark keeps its wash and the page's ink instead: the mark says more than where the reciter
