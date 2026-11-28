@@ -82,11 +82,21 @@ export function TopBar({
   );
 }
 
-/** The top bar's title, for a `center` that adds to it (Settings' crescent in Ramadan, THEME-3). */
-export function BarTitle({ title }: { title: string }) {
+/**
+ * The top bar's title, for a `center` that adds to it (Settings' crescent in Ramadan, THEME-3). With `fit`, a name a little
+ * too long for the middle shrinks (to 80%) before it is cut (an Insights page's, beside its range chip).
+ */
+export function BarTitle({ title, fit }: { title: string; fit?: boolean }) {
   const { palette } = useTheme();
   return (
-    <Text style={[typeV2.barTitle, { color: palette.text }]} numberOfLines={1} accessibilityRole="header" maxFontSizeMultiplier={1.4}>
+    <Text
+      style={[typeV2.barTitle, { color: palette.text }]}
+      numberOfLines={1}
+      accessibilityRole="header"
+      maxFontSizeMultiplier={1.4}
+      adjustsFontSizeToFit={fit}
+      minimumFontScale={fit ? 0.8 : undefined}
+    >
       {title}
     </Text>
   );

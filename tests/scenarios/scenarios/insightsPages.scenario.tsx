@@ -211,6 +211,46 @@ it('[ACT-39] Weak spots’ page starts from its point: the pages weak now and th
   await app.close();
 });
 
+it('[ACT-39] Weak spots’ row on the list says the page’s own figure, the pages weak now, not the skipped pages too', async () => {
+  setZone(ZONES.chicago);
+  setNow('2026-07-01 20:00');
+  const phone = new Phone();
+  const first = await newAccount(phone, { memorized: pagesRange(582, 604), user: { dailyPageCapacity: 5, smartTrackingEnabled: true } });
+  const uid = first.uid;
+  await first.close();
+  await markPreviewTester(uid);
+  // Two pages weak now; p. 600 skipped twice in the range (a weak spot's row, but not a weak page).
+  await sessionOn(uid, ago(5), [582, 590], [[582, 1], [590, 2]]);
+  for (const [p, r] of [[582, 1], [590, 2]]) await setServerDoc(`users/${uid}/pages/${p}`, { weaknessRating: r });
+  // As a session writes them (the Activity seed's way): the revision item and its session, each with the skip.
+  for (const n of [8, 12]) {
+    const day = ago(n);
+    const at = `${day}T18:00:00.000Z`;
+    await setServerDoc(`users/${uid}/revisions/${day}`, {
+      id: day, uid, day, countsFor: day, occurredAt: Date.parse(at), source: 'session', pages: [598, 599], skipped: [600], assigned: [598, 599, 600], minutes: 8, recordings: [],
+    });
+    await setServerDoc(`users/${uid}/sessions/${day}`, {
+      id: day, date: day, state: 'COMPLETED', createdAt: timestamp(at), updatedAt: timestamp(at), completedAt: timestamp(at), durationMinutes: 8,
+      assignedPages: [598, 599, 600], totalAssignedPages: 3, pagesRevised: [598, 599], pagesSkipped: [600], weaknessUpdates: [], completionPercentage: 67,
+    });
+  }
+
+  setNow(`${TODAY} 09:00`);
+  const app = await phone.open(devActivity);
+  await app.until(() => app.app.user?.previewTester === true, 'the account to be a tester');
+  const nav = app.mods.require<{ navigation: { current: any } }>('./navRef').navigation;
+  await app.act(async () => {
+    nav.current.navigate('Activity');
+  });
+  await app.until(() => shows(app, 'insights-row-weak'), 'Weak spots’ row');
+  // Once the revisions have loaded, p. 600 (skipped twice) leads the row's line, ahead of An-Naba's weak page.
+  await app.until(() => /^Weak spots, \d+ pages?, (?!An-Naba)/.test(label(app, 'insights-row-weak') ?? ''), 'the skipped page first on the row’s line');
+  expect(label(app, 'insights-row-weak')).toMatch(/^Weak spots, 2 pages, /);
+  await tap(app, 'insights-row-weak');
+  await app.until(() => /^2 weak pages/.test(label(app, 'insights-weak-figure') ?? ''), 'the page’s two weak pages');
+  await app.close();
+});
+
 it('[ACT-40] Pace’s page starts from its point: minutes a page and its trend, week by week, and the part of the day they’re quickest', async () => {
   setZone(ZONES.chicago);
   setNow('2026-07-01 20:00');
@@ -248,5 +288,30 @@ it('[ACT-40] Pace’s page starts from its point: minutes a page and its trend, 
 
   // Quickest at dawn, slowest in the morning.
   expect(text(app, 'insights-pace-quickest')).toBe('[sunny-outline] Quickest at dawn 1.6 min a page before 7 AM, 2.2 from 7 AM to noon.');
+  await app.close();
+});
+
+it('[ACT-40] a young account’s Pace: no trend, and its line names its span, never “against the month before” it hasn’t had', async () => {
+  setZone(ZONES.chicago);
+  setNow('2026-07-01 20:00');
+  const phone = new Phone();
+  const first = await newAccount(phone, { memorized: pagesRange(582, 604), user: { dailyPageCapacity: 5 } });
+  const uid = first.uid;
+  await first.close();
+  await markPreviewTester(uid);
+  // Two weeks of timed revisions (ten, Pace's least), nothing before them.
+  for (const n of [1, 2, 3, 4, 5, 6, 8, 9, 10, 12]) {
+    const day = ago(n);
+    const at = new Date(`${day}T15:00:00.000Z`).getTime();
+    await setServerDoc(`users/${uid}/revisions/manual-${day}`, {
+      id: `manual-${day}`, uid, day, countsFor: day, occurredAt: at, source: 'manual', pages: [582, 583, 584, 585, 586], skipped: [], assigned: [], minutes: 10, recordings: [],
+    });
+  }
+
+  setNow(`${TODAY} 09:00`);
+  const app = await openSection(phone, 'insights-row-pace');
+  await app.until(() => /^2 min a page/.test(label(app, 'insights-pace-figure') ?? ''), 'the pace, 2');
+  expect(label(app, 'insights-pace-figure')).toBe('2 min a page');
+  expect(text(app, 'insights-pace-figure-line')).toBe('10 timed revisions in 30 days ›');
   await app.close();
 });

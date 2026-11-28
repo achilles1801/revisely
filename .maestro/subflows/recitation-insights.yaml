@@ -35,10 +35,10 @@ appId: com.revisionbuddy.app
     direction: DOWN
     centerElement: true
     timeout: 45000
-# The trend above the range pills, and the chart under them.
+# The trend, and the chart under it (the page's one range is the header's: no pills of the chart's own).
 - scrollUntilVisible:
     element:
-      id: insights-recitation-span-pills
+      id: insights-recitation-chart
     direction: DOWN
     centerElement: true
     timeout: 20000

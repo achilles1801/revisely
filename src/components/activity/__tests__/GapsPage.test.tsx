@@ -59,6 +59,14 @@ describe('[ACT-42] Gaps’ own page', () => {
     expect(cellSize(TODAY)).toBe(CELL_MAX);
   });
 
+  it('a young account (2 weeks) at a longer range: the card names its real span, as the figure does, never "last 3 months"', () => {
+    const first = dayBefore(13);
+    renderPage(allBut(14, [3, 7, 10]), 90, first, null);
+    const title = within(screen.getByTestId('insights-gaps-days')).getAllByText(/^Every day, /)[0].props.children;
+    expect([title].flat().join('')).toMatch(/^Every day, since \d+ \w+$/);
+    expect(screen.queryByText('Every day, last 3 months')).toBeNull();
+  });
+
   it('one gap: one tile, "your only gap", with its dates', () => {
     renderPage(allBut(30, [10, 11, 12]), 30, dayBefore(29), null);
     const tiles = screen.getByTestId('insights-gaps-tiles');

@@ -164,10 +164,19 @@ describe('Insights: Recitation’s page (ACT-44, RINS-2)', () => {
     // The same week again clears it: the newest is lit.
     await act(async () => fireEvent.press(screen.getByTestId('insights-recitation-bars-bar-2026-11-02')));
     expect(text('insights-recitation-pick')).toBe('This week · no takes');
-    // A year: a bar a month.
-    await act(async () => fireEvent.press(screen.getByTestId('insights-recitation-span-1y')));
+    // One range, the header's: the chart has no span of its own (Nov 28 2026).
+    expect(screen.queryByTestId('insights-recitation-span')).toBeNull();
+  });
+
+  it('[ACT-44] the chart spans the header’s range: a bar a week at 30 days and 3 months, a bar a month over All time', async () => {
+    await open(data({ range: 90 }));
+    expect(text('insights-recitation-chart')).toContain('Your mistakes, week by week');
+    expect(screen.getAllByTestId(/^insights-recitation-bars-bar-/)).toHaveLength(13);
+    screen.unmount();
+    await open(data({ range: 'all' }));
     expect(text('insights-recitation-chart')).toContain('Your mistakes, month by month');
     expect(screen.getAllByTestId(/^insights-recitation-bars-bar-/)).toHaveLength(12);
+    expect(screen.queryByTestId('insights-recitation-span')).toBeNull();
   });
 
   it('[ACT-44] fixed and still slipping: the words still marked, the share fixed, the worst passage and See all', async () => {

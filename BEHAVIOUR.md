@@ -1441,7 +1441,9 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   shouldn't be shown on the journal day card -- it adds to the overstimulation") and no Add a note: the day has both. Under
   them, "Your revision" with the range chip (ACT-22), then the sections in ACT-29's order as quiet rows: the name, one grey
   line, the figure at the end and ›, the whole row one button that opens the section on a page of its own: its name and the
-  range chip in the top bar (one range: a change there is the list's too), then the section as Insights drew it, starting at
+  range chip in the top bar (one range: a change there is the list's too; Back and help on the other side, so the name has
+  the middle; it shrinks to 80% before it would be cut, and where even that wouldn't fit beside the chip, with large text,
+  the chip goes to the top of the page: the name is never cut, on any iPhone at any text size), then the section as Insights drew it, starting at
   its figure with no title or subtitle of its own (board A4); its own controls (Ask, Days) stay. A section with nothing
   to say yet has no row: Gaps until a gap can be measured, Weak spots until a page is rated weak (none without Smart
   Tracking), Recitation until a take, Memorization until a page was memorized in the last twelve months, Pace until ten timed
@@ -1504,7 +1506,8 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   always says which: the longest and the most recent, each with its dates (one tile when they are the same gap, "your
   only gap" when there is one), and the days usually revised between gaps (the median, from two gaps; "usually" from
   three); lengths short enough for a third of an SE ("2 days", "3 wk", "2 mo", "60+ days"; Days makes them exact), never
-  wrapping, the tiles stacking from text 1.2 times the usual size. Then every day of the range: revised in the accent,
+  wrapping, the tiles stacking from text 1.2 times the usual size. Then every day of the range, its card named by the same span as the figure ("Every day, last 3 months", or "Every
+  day, since 3 November" on an account younger than the range): revised in the accent,
   one day missed (not a gap) grey, a gap's days on a quiet red with a red edge, today outlined until revised; 7 a row up to
   a month, 15 up to 100 days, 21 for longer, so a year still fits an SE. A tap on any day of a gap picks it: the line above
   becomes its days and length ("20–21 Nov · 2 days"), the gap fills red, and a tap on the line opens it on the calendar
@@ -1516,8 +1519,9 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   getting stronger?" (Majd, Nov 27 2026: "yes build all seven screens"; board
   `~/Documents/revisely-today-mocks/insights-v2/board-rest.png`). First the memorized pages weak now (last rated 1–2), "4
   weak pages", with the trend against how many were weak as the range began ("↓ from 9", green when fewer; none over All
-  time or with no session before the range on record) and "Pages you rated weak in your last session of them". Then a
-  card, "Weak and moderate, week by week" (the range's weeks, 4 at least and 26 at most), each week's bar stacked weak
+  time or with no session before the range on record) and "Pages you rated weak in your last session of them". Its row on
+  the one Activity tab says the same figure, the pages weak now, never the pages skipped twice as well (its line still
+  names the weak spot first). Then a card, "Weak and moderate, week by week" (the range's weeks, 4 at least and 26 at most), each week's bar stacked weak
   (red) under moderate (amber): the pages weak and moderate at that week's end, a page's rating then being its last session
   rating by then (a page rated only later counts as strong then). The line over the chart is the newest week ("This week ·
   4 weak · 7 moderate"), or the week tapped (ACT-41). Then the page rated weak most often in the range, at least twice
@@ -1527,7 +1531,8 @@ International", "The Clear Quran®") and in `lib/quranenc`.
 - **ACT-40.** (Revisely Dev) Pace's own page (ACT-35) starts from its point, "Am I getting quicker, and when am I
   sharpest?" (same board). First minutes a page ("1.8 min a page") with its trend against the same length before ("↓ from
   2.1", green when quicker; none over All time or when they read the same), over "24 timed revisions, against the 3 months
-  before ›", which lists each one (ACT-23). Then a card, "Minutes a page, week by week" (the range's weeks, 4 at least and
+  before ›", which lists each one (ACT-23); with nothing before to be against (a young account), its span instead ("10 timed
+  revisions in 30 days ›"). Then a card, "Minutes a page, week by week" (the range's weeks, 4 at least and
   26 at most, from the first with a timed revision): the line over the chart is the newest week ("This week · 1.7 min a
   page", or "no timed revisions") or the week tapped (ACT-41). Last, when they're quickest: the timed revisions in the range
   by the part of the day each began (before 7 AM, 7 AM to noon, noon to 5 PM, 5 to 9 PM, after 9 PM, on the phone's clock),
@@ -1544,8 +1549,9 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   compares ("The last 3 months against the 3 before"), or "Since 9 September" when the range is longer than the account.
   Then "Days revised, week by week": a bar a week (Sunday first, none before
   the account's first week), its line the week tapped, else this one ("Week of 18 Oct · 6 of 7 days", "This week · 3 of 5
-  days so far"), with its own pills, 4 weeks, 3 months or a year, opening on the one nearest the range (the page reads a
-  year of items for it); a short history's first empty slot is named by its week's first day (ACT-41). Then "When you revise": the 24 hours as bars once timed revisions fall on 3 days (ACT-31), the
+  days so far"), over the range: 4 weeks at 7 or 30 days, 3 months at 3 months, a year at All time (the page reads a
+  year of items for it). The header's range is the page's one range, as on every Insights page: the chart's own 4 weeks |
+  3 months | Year said the same thing a second way (Nov 28 2026); a short history's first empty slot is named by its week's first day (ACT-41). Then "When you revise": the 24 hours as bars once timed revisions fall on 3 days (ACT-31), the
   busiest in full colour; a tap on an hour (never a press-and-hold) makes the line that hour's minutes and sessions, the
   same hour again puts back the busiest. Full cycles: a cycle runs from its first day until every page it needs (those
   memorized by then) has been revised once, and the next begins the day after; the hero is those finished in the range on
@@ -1573,7 +1579,8 @@ International", "The Clear Quran®") and in `lib/quranenc`.
     away or a tajweed note; a take kept without its final answer never counts in a rate.
   - Then the mistakes a page by kind on Insights' one chart (ACT-41) in Insights' pages' card, stacked: wrong or skipped words, hesitations (an
     extra word), harakat and letters. 4 weeks or 3 months draw a bar a week (from its Monday, this week last), a year a
-    bar a month; the range sets which it opens on, and the pills change it. Every week or month of the span has its
+    bar a month; the range sets which: 4 weeks at 7 or 30 days, 3 months at 3 months, a year at All time (the header's range
+    is the page's one range: the chart's own pills said the same thing a second way and didn't follow it; Nov 28 2026). Every week or month of the span has its
     slot, so a young account's chart is never one wide block. It opens on the newest week or month with takes, picked;
     the line above names the lit bar ("Week of 2 Nov · 0.7 a page", "… · no mistakes", "… · no takes"); a tap on a kind shows it alone, its line and bars that kind's. Takes
     without a mistake in the span say so in place of empty bars; none, "No takes in the last 4 weeks".

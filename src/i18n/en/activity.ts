@@ -625,9 +625,6 @@ export const activity = {
     weekBar_other: '{{week}}, {{done}} of {{count}} days',
     weekReadBar_one: '{{week}}, {{count}} day read, {{time}}',
     weekReadBar_other: '{{week}}, {{count}} days read, {{time}}',
-    span4w: '4 weeks',
-    span3m: '3 months',
-    span1y: 'A year',
     /** The 24 hours as bars: a tap on one (no press-and-hold). */
     hoursTitle: 'When you revise',
     tapAnHour: 'Tap an hour',

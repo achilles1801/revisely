@@ -5,7 +5,7 @@
 //
 // One switch, Revising | Full cycles | Reading:
 //   Revising     the days revised in the range with the trend against as long before, how many days most weeks; the days
-//                of each week, week by week (4 weeks, 3 months or a year); when you revise, the 24 hours as bars.
+//                of each week, week by week, over the range (4 weeks, 3 months or a year); when you revise, the 24 hours.
 //   Full cycles  each cycle's days against the plan's, the days late in red ("3 of 4 on time").
 //   Reading      the days read the same way, with the time.
 // Every chart is Insights' one chart (TapChart, ACT-41): a tap picks a bar and the line above it becomes that bar; the same
@@ -17,7 +17,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { typeV2 } from '../../theme/v2';
 import { PillTabs } from '../v2/PillTabs';
 import { ChromeText } from './ChromeText';
-import { ChartPills, TapChart, type ChartBar } from './TapChart';
+import { TapChart, type ChartBar } from './TapChart';
 import { InsightCard, InsightHero, type Trend as HeroTrend } from './InsightPageParts';
 import type { InsightsData } from './InsightsView';
 import { busiestHours, busiestRun, HOURS_FROM_DAYS, minutesByHour, timedDays } from '../../lib/insightsView';
@@ -25,7 +25,6 @@ import { hourDetail, minutesWords } from '../../lib/insightsTaps';
 import { dayAndMonth, rangeSpan } from '../../lib/insightsRange';
 import {
   againstWords,
-  CHART_SPANS,
   cyclesFigure,
   daysAgainstBefore,
   fullCycles,
@@ -68,18 +67,12 @@ const heroTrend = (trend: Trend | null, before: string | null): HeroTrend | null
 /** A colour at 45% (the hours outside the busiest): the board's lighter bars. */
 const soft = (colour: string) => (/^#[0-9a-f]{6}$/i.test(colour) ? `${colour}73` : colour);
 
-const SPAN_LABEL: Record<ChartSpan, () => string> = {
-  '4w': () => t('activity.consistency.span4w'),
-  '3m': () => t('activity.consistency.span3m'),
-  '1y': () => t('activity.consistency.span1y'),
-};
-
 export function ConsistencyPage({ data }: { data: InsightsData }) {
   const range = data.range ?? 30;
   const [kind, setKind] = useState<ConsistencyKind>('revising');
-  // The weeks chart's own span, opening on the one nearest the range (and following the range when it changes).
-  const [chartSpan, setChartSpan] = useState<ChartSpan>(spanFor(range));
-  useEffect(() => setChartSpan(spanFor(range)), [range]);
+  // The weeks chart spans the range: the page has one range, the header's, as every Insights page (Nov 28 2026: the
+  // chart's own 4 weeks | 3 months | Year said the same thing as the header's chip, a second way).
+  const chartSpan = spanFor(range);
   return (
     <View testID="consistency-page">
       <View style={styles.kinds}>
@@ -97,11 +90,11 @@ export function ConsistencyPage({ data }: { data: InsightsData }) {
         />
       </View>
       {kind === 'revising' ? (
-        <Revising data={data} chartSpan={chartSpan} onSpan={setChartSpan} />
+        <Revising data={data} chartSpan={chartSpan} />
       ) : kind === 'cycles' ? (
         <Cycles data={data} />
       ) : (
-        <Reading data={data} chartSpan={chartSpan} onSpan={setChartSpan} />
+        <Reading data={data} chartSpan={chartSpan} />
       )}
     </View>
   );
@@ -117,7 +110,7 @@ function sinceOrAgainst(data: InsightsData, sinceStart: string | null, hasTrend:
 
 // ── Revising ─────────────────────────────────────────────────────────────
 
-function Revising({ data, chartSpan, onSpan }: { data: InsightsData; chartSpan: ChartSpan; onSpan: (s: ChartSpan) => void }) {
+function Revising({ data, chartSpan }: { data: InsightsData; chartSpan: ChartSpan }) {
   const { palette } = useTheme();
   const range = data.range ?? 30;
   const span = rangeSpan(range, data.today, data.firstDay);
@@ -162,7 +155,6 @@ function Revising({ data, chartSpan, onSpan }: { data: InsightsData; chartSpan: 
         }
         spokenOf={(w) => t('activity.consistency.weekBar', { week: weekName(w), done: w.days, count: w.of })}
         chartSpan={chartSpan}
-        onSpan={onSpan}
         testID="consistency-weeks"
       />
       {hoursShown && top > 0 ? (
@@ -188,7 +180,6 @@ function WeeksCard({
   lineOf,
   spokenOf,
   chartSpan,
-  onSpan,
   testID,
 }: {
   title: string;
@@ -196,12 +187,11 @@ function WeeksCard({
   lineOf: (w: WeekBar) => string;
   spokenOf: (w: WeekBar) => string;
   chartSpan: ChartSpan;
-  onSpan: (s: ChartSpan) => void;
   testID: string;
 }) {
   const { palette } = useTheme();
   const [picked, setPicked] = useState<string | null>(null);
-  // A pick from another span means nothing in this one.
+  // A pick from another range means nothing in this one.
   useEffect(() => setPicked(null), [chartSpan]);
   // Nothing in any week of the span: the chart's one grey line, never an empty frame (ACT-41).
   const any = weeks.some((w) => w.days > 0);
@@ -226,7 +216,6 @@ function WeeksCard({
         slotLabel={weeks.length > 0 ? (before) => weekLabel(shiftDay(weeks[0].week, -7 * before), weeks.length) : undefined}
         testID={`${testID}-chart`}
       />
-      <ChartPills options={CHART_SPANS.map((s) => ({ key: s, label: SPAN_LABEL[s]() }))} value={chartSpan} onChange={onSpan} testID={`${testID}-span`} />
     </InsightCard>
   );
 }
@@ -317,7 +306,7 @@ function Cycles({ data }: { data: InsightsData }) {
 
 // ── Reading ──────────────────────────────────────────────────────────────
 
-function Reading({ data, chartSpan, onSpan }: { data: InsightsData; chartSpan: ChartSpan; onSpan: (s: ChartSpan) => void }) {
+function Reading({ data, chartSpan }: { data: InsightsData; chartSpan: ChartSpan }) {
   const range = data.range ?? 30;
   const span = rangeSpan(range, data.today, data.firstDay);
   const days = useMemo(() => new Set(data.read.map((r) => r.day)), [data.read]);
@@ -350,7 +339,6 @@ function Reading({ data, chartSpan, onSpan }: { data: InsightsData; chartSpan: C
         }
         spokenOf={(w) => t('activity.consistency.weekReadBar', { week: weekName(w), count: w.days, time: minutesWords(w.minutes) })}
         chartSpan={chartSpan}
-        onSpan={onSpan}
         testID="consistency-read-weeks"
       />
     </>

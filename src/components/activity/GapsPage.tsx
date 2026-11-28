@@ -130,7 +130,7 @@ export function GapsPage({ view, revised, today, window, firstDay, knownSince, l
         </View>
       ) : null}
 
-      <InsightCard title={t('insights.gaps.everyDay', { range: props.lastWords })} hint={count > 0 ? t('insights.gaps.tapGap') : null} testID="insights-gaps-days">
+      <InsightCard title={t('insights.gaps.everyDay', { range: since ?? props.lastWords })} hint={count > 0 ? t('insights.gaps.tapGap') : null} testID="insights-gaps-days">
         {gap ? (
           <Tap
             onPress={

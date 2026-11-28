@@ -3,6 +3,8 @@ import { NO_KINDS, type SimilarSlip, type SlippingPassage } from '../insights';
 import { plainText } from '../../passages';
 import { perPageLabel, PER_PAGE_FROM } from '../../reciteLive/score';
 import { i18n } from '../../../i18n';
+import { setQuranWordsForTests } from '../../recite/quranWords';
+import { wordsData } from '../../recite/__fixtures__/quranWords';
 
 const TODAY = '2026-11-16'; // a Monday
 
@@ -58,6 +60,22 @@ describe('Recite insights in words', () => {
     const ending = similar({ from: [113, 3], into: [113, 5], ending: true, times: 1, lastDay: '2026-11-15' });
     expect(plainText(similarTitle(ending))).toBe('Al-Falaq 3');
     expect(plainText(similarNote(ending, TODAY))).toBe('You ended it as ayah 5 ends · yesterday');
+  });
+
+  describe('with the ayahs’ words', () => {
+    beforeAll(() => setQuranWordsForTests(wordsData()));
+    afterAll(() => setQuranWordsForTests(null));
+
+    // iOS takes a line's direction from its first letter outside an isolate. The ayahs' Arabic came first, so the line ran
+    // right to left and the "·" before the reference landed at its left edge (the E2E shot of Nov 28 2026).
+    it('isolates the ayahs’ Arabic, so a similar ayah’s title reads in the app’s direction', () => {
+      const title = similarTitle(similar({ from: [82, 14], into: [83, 23] }));
+      expect(title.startsWith('\u2068«')).toBe(true);
+      const outside = title.replace(/\u2068[^\u2069]*\u2069/g, '');
+      expect(outside).not.toMatch(/\p{Script=Arabic}/u);
+      expect(outside).toMatch(/^[^\p{L}]*\p{Script=Latin}/u);
+      expect(plainText(title)).toMatch(/»\u2069 → \u2068«.+»\u2069 · Al-Infitar 14 → Al-Mutaffifin 23$/);
+    });
   });
 
   it('a take’s slip into a similar ayah, under its line in Activity (RINS-3), names both by surah', () => {

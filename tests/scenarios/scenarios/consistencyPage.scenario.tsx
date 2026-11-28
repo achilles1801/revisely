@@ -6,7 +6,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { resetInsightsRangeForTests } from '../../../src/components/activity/InsightsRangeChip';
+import { InsightsRangeChip, resetInsightsRangeForTests } from '../../../src/components/activity/InsightsRangeChip';
 import { ActivityBlocksViews } from '../../../src/components/activity/ActivityBlocksViews';
 import { setActivityOneTabForTests } from '../../../src/lib/release/activityOneTab';
 import * as firestoreService from '../../../src/services/firestoreService';
@@ -69,6 +69,8 @@ const METRICS = { frame: { x: 0, y: 0, width: 440, height: 956 }, insets: { top:
 function open(onOpenCalendar = jest.fn()) {
   render(
     <SafeAreaProvider initialMetrics={METRICS}>
+      {/* The page's header chip: the page's one range (ActivitySectionScreen). */}
+      <InsightsRangeChip firstDay={mockFirst} testID="section-range" />
       <ActivityBlocksViews
         today={TODAY}
         section="consistency"
@@ -107,7 +109,7 @@ describe('Consistency’s own page', () => {
     });
   });
 
-  it('[ACT-43] Revising: the days revised against the 30 before, most weeks, week by week tapped (a year too), the hours tapped, never held', async () => {
+  it('[ACT-43] Revising: the days revised against the 30 before, most weeks, week by week tapped (a year at All time), the hours tapped, never held', async () => {
     open();
     // The page reads a year of weeks, whatever the range.
     await waitFor(() => expect(firestoreService.getActivityItemsBetween).toHaveBeenCalled());
@@ -127,9 +129,17 @@ describe('Consistency’s own page', () => {
     expect(text('consistency-weeks-line')).toBe('Week of 8 Nov · 7 of 7 days');
     fireEvent.press(screen.getByTestId('consistency-weeks-chart-bar-2026-11-08'));
     expect(text('consistency-weeks-line')).toBe('This week · 6 of 6 days so far');
-    // A year: 52 weeks, a Saturday missed in each before the last month.
-    fireEvent.press(screen.getByTestId('consistency-weeks-span-1y'));
-    expect(screen.getAllByTestId(/^consistency-weeks-chart-bar-/)).toHaveLength(52);
+    // One range, the header's: the chart has no span of its own. All time: a year of weeks, a Saturday missed in each before
+    // the last month.
+    expect(screen.queryByTestId('consistency-weeks-span')).toBeNull();
+    fireEvent.press(screen.getByTestId('section-range'));
+    fireEvent.press(screen.getByTestId('sheet-action-range-all'));
+    // The sheet acts once iOS reports it gone (SHEET-1), which the harness's Modal leaves to the test.
+    await act(async () => {
+      const { Modal } = jest.requireActual<typeof import('react-native')>('react-native');
+      screen.UNSAFE_queryAllByType(Modal).forEach((m) => (m.props as { onDismiss?: () => void }).onDismiss?.());
+    });
+    await waitFor(() => expect(screen.getAllByTestId(/^consistency-weeks-chart-bar-/)).toHaveLength(52));
     fireEvent.press(screen.getByTestId('consistency-weeks-chart-bar-2026-06-07'));
     expect(text('consistency-weeks-line')).toBe('Week of 7 Jun · 6 of 7 days');
 

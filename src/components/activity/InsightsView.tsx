@@ -1356,12 +1356,15 @@ function WeakSpots({
     return n > 0 ? `${r.reason} · ${t('activity.insights.stillMarked', { count: n })}` : r.reason;
   };
   if (row) {
+    // The page's own figure, the pages weak now (ACT-39), so the number tapped is the number the page opens on. The rows
+    // also hold pages skipped twice in the range: 6 here against the page's 4 on the Activity seed (iOS E2E, Nov 28 2026).
+    const weakNow = weakCount({ logs: [], memorized: data.memorized, rating: data.rating, today: data.today, window: null }).now;
     return (
       <SectionRow
         title={t('activity.insights.weakSpots')}
         line={rows.length > 0 ? t('activity.oneTab.weakFirst', { label: rows[0].label }) : null}
-        figure={pagesRow(pages.length).figure}
-        unit={pagesRow(pages.length).unit}
+        figure={pagesRow(weakNow).figure}
+        unit={pagesRow(weakNow).unit}
         onPress={row}
         separator={!last}
         testID="insights-row-weak"
@@ -2056,8 +2059,10 @@ function PacePage({ data, pace, onShowTimed, sheet }: { data: InsightsData; pace
         value={formatPace(pace.perPage)}
         unit={t('activity.insights.minAPage')}
         trend={trend}
+        // "Against the month before" only when there is one to be against: a young account's line says its span instead
+        // (the iOS E2E shot of Nov 28 said "11 timed revisions, against the month before" with nothing before).
         line={
-          span.before
+          span.before && before != null
             ? t('activity.insights.paceLine', { count: pace.revisions, before: span.before })
             : t('activity.insights.paceLineAll', { count: pace.revisions, span: span.inWords })
         }
