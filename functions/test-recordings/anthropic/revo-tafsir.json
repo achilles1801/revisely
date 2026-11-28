@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-11-27T23:31:05.183Z",
+  "recordedAt": "2026-11-28T00:17:14.763Z",
   "how": "scripts/tafsir/record-replies.js: the real API, the request revoAsk builds for the gift question on page 379 (test-recordings/tafsir/p379.json), from Ibn Kathir alone (the books everyone starts with).",
   "request": {
     "model": "claude-haiku-5-5",
@@ -7,37 +7,19 @@
     "thinking": {
       "type": "disabled"
     },
-    "systemSha256": "dd8e36934cdf2b53463e2b090482950ab6257f2b1155aac1f1c8352e4f45b5f1",
+    "systemSha256": "70b20d4c4313ee15f17959c07b7b870a1ecdf94464b2698d5840be002e89ab5b",
     "outputSchemaSha256": "8f612858b9afa6f5335d36110bae1d040c3ae3886401fcb8660d60b9255e55e5"
   },
   "status": 200,
   "body": {
     "model": "claude-haiku-5-5",
-    "id": "msg_011ChUJbBCG4CsaWh3rimCJm",
+    "id": "msg_011ChUN7JDdAuvfjjCMKmnbf",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "The question is about Bilqis (the queen of Sheba) sending a gift. The books give this reason: she judged that a gift would work on people and might keep Sulayman from attacking, so she chose peace over fighting. "
-      },
-      {
-        "citations": [
-          {
-            "type": "char_location",
-            "cited_text": "قال الحسن البصري، رحمه الله: فوضوا أمرهم إلى علجة تضطرب ثدياها، فلما قالوا لها ما قالوا، كانت هي أحزم رأيا منهم، وأعلم بأمر سليمان، وأنه لا قبل لها بجنوده وجيوشه، وما سخر له من الجن والإنس والطير، وقد شاهدت من قضية الكتاب مع الهدهد أمرا عجيبا بديعا، فقالت لهم:\n\nإني أخشى أن نحاربه ونمتنع عليه، فيقصدنا بجنوده، ويهلكنا بمن معه، ويخلص إلي وإليكم الهلاك والدمار دون غيرنا؛ ولهذا قالت: ﴿إن الملوك إذا دخلوا قرية أفسدوها﴾ .\n\n",
-            "document_index": 0,
-            "document_title": "Tafsir Ibn Kathir",
-            "start_char_index": 619,
-            "end_char_index": 1039
-          }
-        ],
-        "type": "text",
-        "text": "She knew that Sulayman had no need for her armies and that she could not stand against his soldiers, so she said to them: I fear that if we fight him, he will come at us with his armies and destroy us."
-      },
-      {
-        "type": "text",
-        "text": " Her plan was to "
+        "text": "She sent the gift because she preferred a truce to war. Ibn Kathir's reading is that, having seen the might of Sulayman's armies, she judged that fighting him would bring ruin on her people, so she turned to peaceful means, hoping he would accept a gift or a yearly tribute and leave them alone. "
       },
       {
         "citations": [
@@ -51,61 +33,43 @@
           }
         ],
         "type": "text",
-        "text": "send him a gift befitting one of his status, and see what his response would be, perhaps he would accept it and leave us alone, or would impose a tribute on us that we would pay each year."
+        "text": "She then turned to peace, reconciliation, submission and conciliation, saying: \"Indeed, I am going to send to them a gift and see with what the messengers return.\" That is, she would send him a gift suited to him, and see what his answer would be; perhaps he would accept it and hold back from us, or impose a tribute we would bring him every year."
       },
       {
         "type": "text",
-        "text": "\n\nIbn Kathir (English, abridged): "
+        "text": "\n\nIbn Kathir also notes that "
       },
       {
         "citations": [
           {
             "type": "char_location",
-            "cited_text": "meaning, 'I will send him a gift befitting for one of his status, and will wait and see what his response will be.\n\nShe understood how gift-giving has a good effect on people.\" ",
+            "cited_text": "She understood how gift-giving has a good effect on people.\" ",
             "document_index": 1,
             "document_title": "Tafsir Ibn Kathir (English, abridged)",
-            "start_char_index": 290,
+            "start_char_index": 406,
             "end_char_index": 467
           }
         ],
         "type": "text",
-        "text": "'I will send him a gift befitting for one of his status, and will wait and see what his response will be. She understood how gift-giving has a good effect on people."
+        "text": "she understood how gift-giving has a good effect on people."
       },
       {
         "type": "text",
-        "text": "\"\n\nIbn Kathir (Arabic): "
-      },
-      {
-        "citations": [
-          {
-            "type": "char_location",
-            "cited_text": "وقال ابن عباس وغير واحد: قالت لقومها: إن قبل الهدية فهو ملك فقاتلوه، وإن لم يقبلها فهو نبي فاتبعوه.",
-            "document_index": 0,
-            "document_title": "Tafsir Ibn Kathir",
-            "start_char_index": 1715,
-            "end_char_index": 1814
-          }
-        ],
-        "type": "text",
-        "text": "Ibn 'Abbas and others said: she told her people that if he accepts the gift, he is a king, so fight him; but if he does not accept it, he is a Prophet, so follow him."
-      },
-      {
-        "type": "text",
-        "text": "\n\nThe books also differ on the wisdom of her choice: Qatada praised her, saying "
+        "text": " Her test was to see whether he was a king or a prophet: "
       },
       {
         "citations": [
           {
             "type": "char_location",
-            "cited_text": "قال قتادة: رحمها الله ورضي عنها، ما كان أعقلها في إسلامها وفي شركها!! علمت أن الهدية تقع موقعا من الناس.\n\n",
-            "document_index": 0,
-            "document_title": "Tafsir Ibn Kathir",
-            "start_char_index": 1609,
-            "end_char_index": 1715
+            "cited_text": "Ibn 'Abbas and others said: \"She said to her people, if he accepts the gift, he is a king, so fight him; but if he does not accept it, he is a Prophet, so follow him.\"",
+            "document_index": 1,
+            "document_title": "Tafsir Ibn Kathir (English, abridged)",
+            "start_char_index": 467,
+            "end_char_index": 634
           }
         ],
         "type": "text",
-        "text": "how intelligent she was in her Islam and in her disbelief! She knew that a gift would have an effect on people."
+        "text": "if he accepts the gift, he is a king, so fight him; but if he does not accept it, he is a Prophet, so follow him."
       }
     ],
     "container": null,
@@ -114,13 +78,13 @@
     "stop_details": null,
     "usage": {
       "input_tokens": 2060,
-      "cache_creation_input_tokens": 1417,
-      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 1507,
       "cache_creation": {
-        "ephemeral_5m_input_tokens": 1417,
+        "ephemeral_5m_input_tokens": 0,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 495,
+      "output_tokens": 354,
       "output_tokens_details": {
         "thinking_tokens": 0
       },

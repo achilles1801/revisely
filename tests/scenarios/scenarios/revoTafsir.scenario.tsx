@@ -98,16 +98,16 @@ it('[REVO-44] [REVO-47] a question about the Qur’an asked in Revo (Revisely De
 
     // The answer first (the recorded reply, functions/test-recordings/anthropic/revo-tafsir.json, from Ibn Kathir alone),
     // then the book's own words: its Arabic (as the book has it) with Revo's English, labelled, and its own English words.
-    expect(app.screen.getByText(/The books give this reason/)).toBeTruthy();
+    expect(app.screen.getByText(/She sent the gift because she preferred a truce to war/)).toBeTruthy();
     expect(app.screen.getByText('From the tafsir')).toBeTruthy();
     expect(app.screen.getByTestId('revo-tafsir-source-ibnKathir')).toBeTruthy();
     expect(app.screen.getByTestId('revo-tafsir-source-ibnKathirEn')).toBeTruthy();
     expect(app.screen.queryByTestId('revo-tafsir-source-saadi')).toBeNull();
-    expect(app.mods.rtl.within(app.screen.getByTestId('revo-tafsir-source-ibnKathirEn')).getByText(/I will send him a gift befitting for one of his status/)).toBeTruthy();
+    expect(app.mods.rtl.within(app.screen.getByTestId('revo-tafsir-source-ibnKathirEn')).getByText(/She understood how gift-giving has a good effect on people/)).toBeTruthy();
     expect(app.screen.getAllByText(/Revo’s translation/).length).toBe(1);
     // Ibn Kathir's Arabic keeps the book's harakat.
     const arabic = app.mods.rtl.within(app.screen.getByTestId('revo-tafsir-source-ibnKathir')).queryAllByText(/.+/).map((e: { props: { children: unknown } }) => String(e.props.children));
-    expect(arabic.some((text: string) => text.replace(/[\u064B-\u0652]/g, '').startsWith('قال الحسن البصري') && /[\u064B-\u0652]/.test(text))).toBe(true);
+    expect(arabic.some((text: string) => text.replace(/[\u064B-\u0652]/g, '').startsWith('ثم عدلت إلى المهادنة') && /[\u064B-\u0652]/.test(text))).toBe(true);
     // Nothing to offer: the book answered.
     expect(app.screen.queryByTestId('revo-tafsir-offer')).toBeNull();
 

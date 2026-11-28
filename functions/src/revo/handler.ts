@@ -587,7 +587,9 @@ export async function handleRevoAsk(auth: { uid: string } | undefined, data: unk
   if (chatId && !chat) throw new RevoError('not-found', MESSAGES.chatGone);
   const history = chat ? await deps.store.lastMessages(uid, chat.id, REVO_HISTORY) : [];
   const memory = settings.memoryOn ? (await deps.store.listMemory(uid, REVO_MEMORY_CAP * 2)).slice(0, REVO_MEMORY_CAP) : [];
-  const atAsk = started.getTime();
+  // After the conversation's last message, always: messages are read in time order, and two turns within one clock tick
+  // (a test's clock that stands still) came back in either order, so the app didn't see the latest answer last (REVO-47).
+  const atAsk = Math.max(started.getTime(), (chat?.updatedAt ?? 0) + 1);
 
   // A first question with nothing attached: the same one again today is free.
   const cacheable = !chat && attached.length === 0;
