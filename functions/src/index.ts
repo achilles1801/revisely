@@ -57,7 +57,9 @@ import { SUPPORT_ORIGINS, SUPPORT_PAGES, SupportError } from './support/logic';
 import { handleDevPremium, handleSupportApplication, handleSupportLink } from './support/handler';
 import { adminSupportStore, deleteSupportData } from './support/admin';
 import { AccountInfo, consoleErrorOf, handleAdminConsole } from './console/handler';
-import { StaffCaller, roleOf } from './console/roles';
+import { Role, StaffCaller, roleOf } from './console/roles';
+import { RoleActor, setRole, staff as consoleStaff } from './console/staff';
+import { AUDIO_PREFIX as LABEL_AUDIO_PREFIX, LABEL_PROJECTS } from './console/labels';
 import { earlyAccessOn, grantEarlyAccess } from './support/early';
 import { PackError, handleRecitePack } from './recitePack/handler';
 import { adminPackDeps } from './recitePack/admin';
@@ -509,7 +511,8 @@ export const coachDigestDays = onRequest({ invoker: 'public', maxInstances: 1, t
 const PROJECT = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'revision-buddy-3a398';
 // The test emulator serves the console from localhost.
 const CONSOLE_ORIGINS: (string | RegExp)[] = testing ? [...consoleOrigins(PROJECT), /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/] : consoleOrigins(PROJECT);
-const metricsCollector = collector(adminDb, PROJECT, { emulator: process.env.FUNCTIONS_EMULATOR === 'true' });
+// Open Door's overdue count joins the alarms where the program runs (revisely-dev today; SUPPORT_PAGES).
+const metricsCollector = collector(adminDb, PROJECT, { emulator: process.env.FUNCTIONS_EMULATOR === 'true', openDoor: !!SUPPORT_PAGES[PROJECT] });
 const adminLog = (entry: Record<string, unknown>) => logger.info('admin', entry);
 
 function adminFailure(name: string, err: unknown): HttpsError {
@@ -522,12 +525,21 @@ function adminFailure(name: string, err: unknown): HttpsError {
  * The caller's account as the console sees it: its custom claims read live from Firebase Auth (not the ID token's
  * copy, which lasts an hour), so a role taken away with set-role.js stops working at the next call.
  */
-async function staffClaims(auth: { uid: string } | undefined): Promise<{ uid: string; email: string | null; claims: Record<string, unknown> } | null> {
+async function staffClaims(
+  auth: { uid: string } | undefined,
+): Promise<{ uid: string; email: string | null; emailVerified: boolean; name: string | null; photo: string | null; claims: Record<string, unknown> } | null> {
   if (!auth?.uid) return null;
   try {
     const user = await getAuth().getUser(auth.uid);
     if (user.disabled) return null;
-    return { uid: user.uid, email: user.email ?? null, claims: (user.customClaims ?? {}) as Record<string, unknown> };
+    return {
+      uid: user.uid,
+      email: user.email ?? null,
+      emailVerified: user.emailVerified,
+      name: user.displayName ?? null,
+      photo: user.photoURL ?? null,
+      claims: (user.customClaims ?? {}) as Record<string, unknown>,
+    };
   } catch (err) {
     if ((err as { code?: string }).code === 'auth/user-not-found') return null;
     throw err;
@@ -808,24 +820,42 @@ const consoleDeps = {
   async hasPlan(uid: string) {
     return (await adminDb.doc(`users/${uid}`).get()).exists;
   },
+  staff: () => consoleStaff(getAuth()),
+  setRole: (uid: string, role: Role | null, by: RoleActor) => setRole(getAuth(), adminDb, uid, role, by),
   programOpen: !!SUPPORT_PAGES[PROJECT_ID] || testing,
   project: PROJECT_ID,
   metricsEnvs: metricsEnvironments(PROJECT_ID).map(({ env, label, here }) => ({ env, label, here })),
   now: () => Date.now(),
   log: (entry: Record<string, unknown>) => logger.info('console', entry),
+  // Invites and the waiting list: the dev console only for now (Majd, Nov 16 2026), where people outside the team sign in.
+  invites: LABEL_PROJECTS.includes(PROJECT_ID) || testing,
+  labels: {
+    db: adminDb,
+    log: (entry: Record<string, unknown>) => logger.warn('console', entry),
+    open: LABEL_PROJECTS.includes(PROJECT_ID) || testing,
+    async audio(path: string) {
+      if (!path.startsWith(LABEL_AUDIO_PREFIX)) throw new Error('not a label clip');
+      const [bytes] = await getStorage().bucket().file(path).download();
+      return bytes;
+    },
+    now: () => Date.now(),
+  },
 };
 
 export const adminConsole = onCall({ cors: CONSOLE_ORIGINS, timeoutSeconds: 60, maxInstances: 3 }, async (request) => {
   try {
     const staff = await staffClaims(request.auth);
-    const caller: StaffCaller | null = staff ? { uid: staff.uid, email: staff.email, role: roleOf(staff.claims) } : null;
+    const provider = (request.auth?.token as { firebase?: { sign_in_provider?: string } } | undefined)?.firebase?.sign_in_provider ?? null;
+    const caller: StaffCaller | null = staff
+      ? { uid: staff.uid, email: staff.email, role: roleOf(staff.claims), emailVerified: staff.emailVerified, name: staff.name, photo: staff.photo, method: provider }
+      : null;
     // The test emulator decodes App Check tokens without verifying them, and the console there has none.
     return await handleAdminConsole(caller, request.data, !!request.app || testing, consoleDeps);
   } catch (err) {
     const known = consoleErrorOf(err);
     if (known) throw new HttpsError(known.code, known.message);
-    // Never the request's data: it may hold a note.
-    logger.error('adminConsole failed', { message: (err as Error).message });
+    // Never the request's data: it may hold a note. The reason goes in the message (#645: a field named `message` is lost).
+    logger.error(failure('adminConsole', err));
     throw new HttpsError('internal', 'The console could not do that. Try again.');
   }
 });

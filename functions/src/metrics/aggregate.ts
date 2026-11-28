@@ -98,6 +98,8 @@ export interface Input {
   activity?: ActivityRow[] | null;
   /** Staff accounts in this project's Auth (sources.staffUids): left out of retention like the owner. */
   staffUids?: Set<string> | null;
+  /** Open Door's queue, in a project with the program (adminStore's collector); null when it couldn't be read */
+  openDoor?: { pending: number; overdue: number; oldestPending: number | null } | null;
   sources?: Record<string, string>;
 }
 
@@ -370,7 +372,7 @@ function appTiles(totals: Totals | null | undefined) {
 
 export interface Alert { id: string; level: 'ok' | 'warn' | 'alarm' | 'nodata'; title: string; value: string }
 
-export function alertsOf(m: Pick<Metrics, 'revo' | 'month' | 'functions' | 'app'>): Alert[] {
+export function alertsOf(m: Pick<Metrics, 'revo' | 'month' | 'functions' | 'app'>, openDoor?: Input['openDoor'], now = Date.now()): Alert[] {
   const out: Alert[] = [];
   const hour = m.revo['1h'];
   const calls = hour.totals.calls + hour.totals.failed;
@@ -399,6 +401,20 @@ export function alertsOf(m: Pick<Metrics, 'revo' | 'month' | 'functions' | 'app'
   const streaks = atLimit.filter((a) => a.limitStreak >= 3);
   out.push({ id: 'limit', level: streaks.length ? 'warn' : 'ok', title: 'Accounts at the limit', value: atLimit.length ? `${atLimit.length} in 7 d` : 'none in 7 d' });
   out.push({ id: 'tcq', level: 'nodata', title: 'The Clear Quran budget', value: 'not connected' });
+  // Open Door promises a reply within 7 days (REPLY_WITHIN_DAYS): an application waiting longer is an alarm. Only in a
+  // project with the program; counts only, never who.
+  if (openDoor === null) out.push({ id: 'open-door-overdue', level: 'nodata', title: 'Open Door replies', value: 'no data' });
+  else if (openDoor) {
+    const oldest = openDoor.oldestPending == null ? null : Math.floor((now - openDoor.oldestPending) / 86_400_000);
+    out.push({
+      id: 'open-door-overdue',
+      level: openDoor.overdue > 0 ? 'alarm' : 'ok',
+      title: 'Open Door replies',
+      value: openDoor.overdue > 0
+        ? `${openDoor.overdue} past the 7-day promise${oldest != null ? ` (oldest ${oldest} days)` : ''}`
+        : openDoor.pending > 0 ? `${openDoor.pending} waiting, none past 7 days` : 'nothing waiting',
+    });
+  }
   return out;
 }
 
@@ -435,7 +451,7 @@ export function build(input: Input): Metrics {
     app[k] = appRange(k, input.totals);
   }
   const m = month(input, now);
-  const alerts = alertsOf({ revo, month: m, functions, app });
+  const alerts = alertsOf({ revo, month: m, functions, app }, input.openDoor, now);
   const look: Metrics['look'] = [];
   for (const a of alerts) if (a.level === 'alarm') look.push({ level: 'alarm', text: `${a.title}: ${a.value}` });
   for (const a of revo['7d'].accounts) if (a.limitStreak >= 3) look.push({ level: 'warn', uid: a.uid, text: `reached ${DAILY_QUESTIONS} questions on ${a.limitStreak} days in a row. Heavy use, not an error: the limit held.` });
