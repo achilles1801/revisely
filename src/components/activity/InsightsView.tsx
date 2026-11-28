@@ -48,7 +48,6 @@ import { CoverageFill } from './CoverageFill';
 import { PillTabs } from '../v2/PillTabs';
 import { PillButton } from '../v2/PillButton';
 import { JuzDots } from '../v2/JuzDots';
-import { MemorizationBars } from './MemorizationBars';
 import { memorizedInSettingsEnabled } from '../../lib/release/memorizedInSettings';
 import { coverageRecency } from '../../lib/recency';
 import {
@@ -77,6 +76,7 @@ import { gapsView } from '../../lib/insightsGaps';
 import { RecitationInsights } from './RecitationInsights';
 import { FirstSection, SectionAlone, useFirstSection, useSectionAlone } from './sectionPlace';
 import { SectionRow } from './SectionRow';
+import { ChartPills, LABELS_ALL_UP_TO, TapChart } from './TapChart';
 import { consistencyRow, coverageRow, pagesRow, paceRow } from '../../lib/activityRowValues';
 import { DEFAULT_SECTIONS, sectionsToShow, type InsightsSection, type TabLayout } from '../../lib/activitySections';
 import { stillMarkedWords } from '../../lib/reciteInsights/insights';
@@ -1450,12 +1450,8 @@ function MemorizationUpgraded({ data, onOpenDay, onEditMemorized }: { data: Insi
   const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
   const added = memorizedIn(data.memorizations, data.today, span.window);
   const share = quranShare(data.memorized.size);
-  const few = series.length <= 7;
-  const label = (key: string, i: number) => {
-    if (unit === 'month') return monthLabel(key, few || i === 0 || i === series.length - 1 || key === picked);
-    return formatNumber(Number(key.slice(8)));
-  };
-  const shortDay = (key: string) => formatDate(new Date(`${key}T00:00:00Z`), { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  const top = Math.max(unit === 'month' ? 10 : 3, ...series.map((b) => b.pages));
+  const [a, b] = palette.ring;
   const items = picked
     ? (unit === 'month'
         ? monthOfMemorizing(data.memorizations, picked).items
@@ -1508,31 +1504,39 @@ function MemorizationUpgraded({ data, onOpenDay, onEditMemorized }: { data: Insi
       ) : null}
       {series.length > 0 ? (
         <>
-          <View style={styles.memUnits}>
-            {(['month', 'day'] as const).map((u) => (
-              <PillButton
-                key={u}
-                title={u === 'month' ? t('activity.insights.byMonth') : t('activity.insights.byDay')}
-                size="sm"
-                variant={u === unit ? 'solid' : 'outline'}
-                onPress={() => choose(u)}
-                testID={`insights-memorization-${u}`}
-              />
-            ))}
-          </View>
-          <MemorizationBars
-            unit={unit}
-            series={series}
+          <ChartPills
+            options={[
+              { key: 'month' as const, label: t('activity.insights.byMonth') },
+              { key: 'day' as const, label: t('activity.insights.byDay') },
+            ]}
+            value={unit}
+            onChange={choose}
+            testID="insights-memorization"
+          />
+          <TapChart
+            bars={series.map((x, i) => ({
+              key: x.key,
+              value: x.pages,
+              valueText: `+${formatNumber(x.pages)}`,
+              // Days past ten bars: the ends with their month ("6 Oct", "3 Nov"), the pick by its number.
+              label:
+                unit === 'month'
+                  ? monthLabel(x.key, true)
+                  : series.length > LABELS_ALL_UP_TO && (i === 0 || i === series.length - 1)
+                    ? formatDate(new Date(`${x.key}T00:00:00Z`), { day: 'numeric', month: 'short', timeZone: 'UTC' })
+                    : formatNumber(Number(x.key.slice(8))),
+              spoken:
+                unit === 'month'
+                  ? t('activity.insights.monthPages', { month: monthName(x.key), count: x.pages })
+                  : t('activity.insights.dayPages', { day: dayAndMonth(x.key), count: x.pages }),
+            }))}
             picked={picked}
             onPick={setPicked}
-            label={label}
-            // Too many days for a label each: the first and the last, with their month ("6 Oct", "3 Nov").
-            endLabels={unit === 'day' && series.length > 10 ? [shortDay(series[0].key), shortDay(series[series.length - 1].key)] : null}
-            a11yLabel={(key, pages) =>
-              unit === 'month'
-                ? t('activity.insights.monthPages', { month: monthName(key), count: pages })
-                : t('activity.insights.dayPages', { day: dayAndMonth(key), count: pages })
-            }
+            colours={[a]}
+            gradient={[a, b]}
+            max={top}
+            testID={`insights-memorization-bars-${unit}`}
+            barTestID={(key) => `insights-memorization-bar-${key}`}
           />
         </>
       ) : null}
@@ -1898,7 +1902,7 @@ const styles = StyleSheet.create({
   // Memorization in Revisely Dev (MEM-10): the dots, Edit memorized pages, Month | Day, and the gradient bars.
   memDots: { marginTop: 10 },
   memEdit: { flexDirection: 'row', alignItems: 'center', gap: 16, minHeight: 52, paddingVertical: 12, marginTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
-  memUnits: { flexDirection: 'row', gap: 6, marginTop: 14 },
+  // A bar's value may be wider than a day's thin bar: it spills over its neighbours rather than being cut.
   monthCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
   monthValue: { fontWeight: '600', marginBottom: 3 },
   monthBar: { alignSelf: 'stretch', borderRadius: 5 },

@@ -1388,6 +1388,14 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   opens the first juz (ACT-21); Plan them (Plan it for one) puts their memorized pages first tomorrow (ACT-24) and becomes
   "First tomorrow ✓", with "Add to plan ›" under it on a custom plan. With none slipping there is no row. The list's row
   (ACT-35) and the two tabs' Insights are as before.
+- **ACT-41.** (Revisely Dev) Insights' charts are one chart, tapped one way (Majd, Nov 27 2026: "i can't even click on an
+  hour on that chart i need to hold it down like what bro"; "yes build all seven screens" from the Insights v2 boards).
+  Its bars sit side by side, each a button. A tap picks a bar: the line above the chart becomes that bar's value, and the
+  other bars fade; the same bar again clears it. Nothing needs a press-and-hold. A bar can be stacked, its parts in the
+  colours of its key. The value shows above every bar when there are 7 or fewer, otherwise above the lit one (the pick,
+  else the newest). The labels under the bars all show up to 10 bars, otherwise the two ends and the pick, and an end
+  next to the pick gives way to it. Its choices are a row of small pills (a range: 4 weeks, 3 months, a year; or Month
+  and Day). Memorization's chart (MEM-10) is this chart.
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
   strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
   stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,
