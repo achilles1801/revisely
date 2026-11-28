@@ -26,7 +26,9 @@ import type {
   RevoMessage,
   RevoRefusal,
   RevoSettings,
+  TafsirBook,
 } from './types';
+import { chosenTafsirBooks } from './tafsirBooks';
 import { t } from '../../i18n';
 
 export interface RevoBackend {
@@ -46,6 +48,8 @@ export interface RevoBackend {
     attachments?: RevoAttachment[];
     /** A question about these ayat, answered from the tafsir (Revisely Dev: the page open in the mushaf, or a held ayah). */
     quran?: QuranScope;
+    /** (REVO-47) The offer of another book's view, taken: answered from that book alone. */
+    tafsirBook?: TafsirBook;
   }, opts?: {
     /**
      * The answer so far, as it is written (Revisely Dev: an answer from the tafsir streams; others come whole). The
@@ -196,8 +200,14 @@ const firebaseRevo: RevoBackend = {
     return onSnapshot(
       doc(db, 'coachSettings', uid),
       // Revo's own switch (functions/src/revo/admin.ts REVO_ON); `optIn` is the Ask coach's.
-      (snap) => cb({ optIn: snap.get('revoOn') === true, memoryOn: snap.get('memoryOn') !== false, mushafOn: snap.get('mushafOn') !== false }),
-      () => cb({ optIn: false, memoryOn: true, mushafOn: true }),
+      (snap) =>
+        cb({
+          optIn: snap.get('revoOn') === true,
+          memoryOn: snap.get('memoryOn') !== false,
+          mushafOn: snap.get('mushafOn') !== false,
+          tafsirBooks: chosenTafsirBooks(snap.get('tafsirBooks')),
+        }),
+      () => cb({ optIn: false, memoryOn: true, mushafOn: true, tafsirBooks: chosenTafsirBooks(undefined) }),
     );
   },
   watchUsage(uid, cb) {
@@ -222,8 +232,14 @@ const firebaseRevo: RevoBackend = {
       (snap) =>
         cb(
           snap.docs.map((d) => {
-            // The attachments themselves (attachData, attachList) stay out of the screen's state.
-            const { attachData: _a, attachList: _l, uid: _u, ...m } = d.data() as RevoMessage & { attachData?: unknown; attachList?: unknown; uid?: string };
+            // The attachments themselves (attachData, attachList) and an offered book's answer (backup, REVO-47) stay
+            // out of the screen's state.
+            const { attachData: _a, attachList: _l, uid: _u, backup: _b, ...m } = d.data() as RevoMessage & {
+              attachData?: unknown;
+              attachList?: unknown;
+              uid?: string;
+              backup?: unknown;
+            };
             return { ...m, id: d.id };
           }),
         ),
@@ -253,7 +269,7 @@ const firebaseRevo: RevoBackend = {
   },
   async setOptions(input) {
     const out = (await call('revoSetOptions', input)) as Partial<RevoSettings> | null;
-    return { optIn: out?.optIn === true, memoryOn: out?.memoryOn !== false, mushafOn: out?.mushafOn !== false };
+    return { optIn: out?.optIn === true, memoryOn: out?.memoryOn !== false, mushafOn: out?.mushafOn !== false, tafsirBooks: chosenTafsirBooks(out?.tafsirBooks) };
   },
   async clear(what) {
     await call('revoClear', { what });

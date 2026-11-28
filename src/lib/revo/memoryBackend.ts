@@ -120,7 +120,12 @@ export function createMemoryRevoBackend(opts: { now?: () => number; optIn?: bool
       return chats.some((c) => c.id === chatId) ? { chatId } : null;
     },
     async setOptions(input) {
-      settings = { optIn: input.optIn ?? settings.optIn, memoryOn: input.memoryOn ?? settings.memoryOn };
+      settings = {
+        optIn: input.optIn ?? settings.optIn,
+        memoryOn: input.memoryOn ?? settings.memoryOn,
+        ...(input.mushafOn ?? settings.mushafOn) !== undefined ? { mushafOn: input.mushafOn ?? settings.mushafOn } : {},
+        ...(input.tafsirBooks ?? settings.tafsirBooks) ? { tafsirBooks: input.tafsirBooks ?? settings.tafsirBooks } : {},
+      };
       if (input.optIn === false) {
         chats = [];
         messages.clear();

@@ -357,6 +357,8 @@ export interface RevoMessage {
   actionState?: 'added' | 'dismissed';
   /** An answer from the tafsir (Revisely Dev): the books' words it rests on, at most three (REVO-44). */
   sources?: TafsirSource[];
+  /** (REVO-47) The chosen books said nothing on it, and this book does: Revo offers its view, one tap away. */
+  offer?: TafsirBook;
   /** The ayat a question about the Qur'an was about. */
   quran?: QuranScope;
 }
@@ -369,6 +371,8 @@ export interface QuranScope {
 
 /** The four tafsirs, and Ibn Kathir's abridged English (cited in English). */
 export type TafsirBookId = 'tabari' | 'ibnKathir' | 'qurtubi' | 'saadi' | 'ibnKathirEn';
+/** A book Revo can be asked to answer from (Settings → Revo AI → Tafsir, REVO-47). */
+export type TafsirBook = Exclude<TafsirBookId, 'ibnKathirEn'>;
 
 /** A book's words under an answer from the tafsir (functions/src/revo/tafsir/reply.ts). */
 export interface TafsirSource {
@@ -410,6 +414,8 @@ export interface RevoSettings {
   memoryOn: boolean;
   /** Revo at the foot of the mushaf's pages (Revisely Dev, REVO-25); on unless turned off. Older servers leave it out. */
   mushafOn?: boolean;
+  /** The books Revo answers about the Qur'an from (Revisely Dev, REVO-47); Ibn Kathir alone until chosen. */
+  tafsirBooks?: TafsirBook[];
 }
 
 export interface RevoAskResult {

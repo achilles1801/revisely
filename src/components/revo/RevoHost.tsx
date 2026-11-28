@@ -507,6 +507,7 @@ function RevoHostInner({ available, onOpenChange }: { available: boolean; onOpen
               onAttachments={setAttachments}
               quran={quran}
               onQuran={setQuran}
+              tafsirBooks={settings?.tafsirBooks}
               onAdd={() => {
                 fullBeforeAdd.current = full;
                 setView({ name: 'add' });

@@ -173,8 +173,25 @@ app; `askCoach`/`setCoachOptIn` stay as they were until Insights links to Revo. 
     sentence) and the chat its `quran`, so follow-ups use the same ayat. The app draws them under the answer
     (`components/revo/TafsirSources`: "From the tafsir", a tap shows the passage). The emulator answers the two new
     requests from `revo-locate.json` and `revo-tafsir.json` (real replies, `scripts/tafsir/record-replies.js`; record
-    them again when the request's model, thinking or system prompt changes); `replies.<kind>` on an account sets one
-    kind's reply.
+    them again when the request's model, thinking or system prompt changes; `revo-tafsir.json` is Ibn Kathir alone, the
+    books everyone starts with); `replies.<kind>` on an account sets one kind's reply, and `replies['revo-tafsir:<book>']`
+    the reply to a request whose first document is that book's.
+  - **The books chosen** (REVO-47; Majd, Nov 27 2026: "pick which tafsir they want with ibn kathir as the default for
+    everyone", then "any of the tafsir options or all of them", and the backup "if it exists"). coachSettings
+    `tafsirBooks` (written by `revoSetOptions`, any of the four, at least one; `chosenBooks` in `tafsir/books.ts` reads it,
+    Ibn Kathir alone when absent) picks what `selectPieces` takes: only those books, Ibn Kathir's English with Ibn Kathir,
+    and more pieces a book when fewer are chosen (`piecesPerBook`: 12 alone, 9 for two). The system prompt is the same
+    whatever the choice (cached once; the documents name the books). Ibn Kathir alone on page 379's gift question: 3,477
+    input tokens against 7,838 for all four (the recorded replies). It saves almost nothing (an answer is about a tenth of
+    a cent); the point is the choice. When the chosen books' answer cites nothing (they don't say), `backupOf` asks each
+    other book alone, side by side (metered as `tafsir-backup`, not counted), and the first in `BACKUP_ORDER` (Ibn Kathir,
+    al-Sa'di, al-Tabari, al-Qurtubi) whose answer cites it is kept on the reply as `backup` (server only; `publicMessage`
+    and the app's `watchMessages` drop it) with `offer: <book>`. The app shows the offer line and one starter; a tap sends
+    `tafsirBook`, and the server saves the kept answer as the next turn without a model call or a count (one taken late,
+    with no `backup`, is answered live from that book and counted). The first starter's answer written ahead is served
+    only when every book it quotes is chosen: all four's (`tafsir/answers/v1/p<page>.json`), then each chosen book's own
+    (`tafsir/answers/v1/<book>/p<page>.json`, written by `scripts/tafsir/answers-batch.js --book <book>`); otherwise it is
+    answered live. Settings → Revo AI → Tafsir is `components/settings/TafsirBooksSheet` (saves one after another).
   - **In the mushaf** (REVO-45; Majd, Nov 26 2026, reversing REVO-25's "no revo in the mushaf tab at all" for Dev):
     `RevoHost` sets `useRevoInMushaf()` (Dev, Revo on, `mushafOn` not false). The reader then puts a 30pt R
     (44pt to tap) in `ReaderFrame`'s `quietEnd`, the quiet footer's empty end slot beside the page number, in the room

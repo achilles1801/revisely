@@ -16,7 +16,8 @@ import { useRamadanDecor } from '../ramadan/quiet';
 import { prepare } from '../../lib/revo/facts';
 import type { RevoPlace } from '../../lib/revo/place';
 import { useRevoContext } from '../../lib/revo/useRevoContext';
-import { REVO_DAILY_QUESTIONS, type RevoAction, type RevoAttachment, type RevoMessage, type RevoRefusal } from '../../lib/revo/types';
+import { REVO_DAILY_QUESTIONS, type RevoAction, type RevoAttachment, type RevoMessage, type RevoRefusal, type TafsirBook } from '../../lib/revo/types';
+import { booksInWords, DEFAULT_TAFSIR_BOOKS } from '../../lib/revo/tafsirBooks';
 import { atListEnd } from '../../lib/revo/sheetFit';
 import { carryForTomorrow } from '../../lib/weakSpotActions';
 import { greetingName } from '../../lib/displayName';
@@ -48,6 +49,7 @@ export function RevoChat({
   onAttachments,
   quran = null,
   onQuran,
+  tafsirBooks = DEFAULT_TAFSIR_BOOKS,
   onAdd,
   onHistory,
   onMemory,
@@ -70,6 +72,8 @@ export function RevoChat({
   /** Opened from the mushaf (REVO-45): the page or ayah the questions are about, answered from the tafsir (REVO-44). */
   quran?: RevoQuranOpen | null;
   onQuran?: (q: RevoQuranOpen | null) => void;
+  /** The books Revo answers about the Qur'an from (Settings → Revo AI → Tafsir, REVO-47), named in its line from the mushaf. */
+  tafsirBooks?: readonly TafsirBook[];
   /** Opens Add to chat. */
   onAdd: () => void;
   onHistory: () => void;
@@ -156,12 +160,17 @@ export function RevoChat({
   const nextPage = !fromMushaf && !chatId && (place == null || place.kind === 'home') && isDevVariant() && context && !context.today.done ? (context.today.nextPages[0] ?? null) : null;
   const nextOffer: RevoQuranOpen | null = nextPage ? { scope: pageScope(nextPage), label: plainText(describePassage([nextPage])), kind: 'page' } : null;
   const greeting = fromMushaf
-    ? t(quran.kind === 'page' ? 'revo.tafsir.greetingPage' : 'revo.tafsir.greetingAyah')
+    ? t(quran.kind === 'page' ? 'revo.tafsir.greetingPage' : 'revo.tafsir.greetingAyah', { books: booksInWords(tafsirBooks) })
     : opener?.text && nextOffer
       ? `${opener.text} ${t('revo.tafsir.nextOffer', { place: nextOffer.label })}`
       : (opener?.text ?? null);
   const lastRevo = [...messages].reverse().find((m) => m.role === 'revo');
-  const chips = chatId
+  // REVO-47: the chosen books said nothing, and another book does: its view is the one starter, until it's taken.
+  const offer = chatId && lastRevo?.offer && messages[messages.length - 1]?.id === lastRevo.id ? lastRevo.offer : null;
+  const offerChip = offer ? t('revo.tafsir.offerButton', { book: t(`revo.tafsir.bookIn.${offer}`) }) : null;
+  const chips = offerChip
+    ? [offerChip]
+    : chatId
     ? (lastRevo?.chips ?? [])
     : fromMushaf
       ? quran.kind === 'page'
@@ -172,7 +181,7 @@ export function RevoChat({
           [t('revo.tafsir.nextChip'), ...(opener?.chips ?? [])].slice(0, phase?.kind === 'during' && facts == null ? 4 : 3)
         : (opener?.chips ?? []);
 
-  const ask = async (question: string) => {
+  const ask = async (question: string, fromBook: TafsirBook | null = null) => {
     const ctx = build();
     if (!ctx) return;
     const sent = attachments;
@@ -196,6 +205,7 @@ export function RevoChat({
         attach: sent.length === 1 ? sent[0] : null,
         ...(sent.length > 1 ? { attachments: sent } : {}),
         ...(about ? { quran: about.scope } : {}),
+        ...(fromBook ? { tafsirBook: fromBook } : {}),
       }, isDevVariant() ? { onText: setStreamed } : undefined);
       // Checked by the backend, and read here, never inside a state update: React throws an
       // updater's error again while rendering, outside this try (REACT-NATIVE-10).
@@ -303,6 +313,7 @@ export function RevoChat({
               ) : null}
               {m.textAfter ? <RevoText text={m.textAfter} /> : null}
               {m.sources?.length ? <TafsirSources sources={m.sources} /> : null}
+              {m.offer ? <RevoText text={t('revo.tafsir.offer', { book: t(`revo.tafsir.book.${m.offer}`) })} testID="revo-tafsir-offer" /> : null}
               {knownAction(m.action) ? (
                 <PlanCard
                   action={m.action}
@@ -356,7 +367,11 @@ export function RevoChat({
             body={t('revo.chat.dailyBody', { back: back.long })}
           />
         ) : (
-          <Chips chips={chips} onPick={(c) => void ask(c)} disabled={pending != null} />
+          <Chips
+            chips={chips}
+            onPick={(c) => void (offer && c === offerChip ? ask(t('revo.tafsir.offerAsk', { book: t(`revo.tafsir.bookIn.${offer}`) }), offer) : ask(c))}
+            disabled={pending != null}
+          />
         )}
         {fromMushaf ? (
           <View style={styles.quranChip}>

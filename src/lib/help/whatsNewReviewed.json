@@ -61,11 +61,12 @@
     "SEARCH-1": "25d3ce6d14ad81fe"
   },
   "1.0.6/ask": {
-    "REVO-45": "88032875373782b9",
-    "REVO-44": "ae2603bef58d1e11"
+    "REVO-45": "ff90b843a4ecfcae",
+    "REVO-44": "e65d336c91e16d38"
   },
   "1.0.6/books": {
-    "REVO-44": "ae2603bef58d1e11"
+    "REVO-44": "e65d336c91e16d38",
+    "REVO-47": "21e2e873747cd96c"
   },
   "1.0.6/schedule": {
     "REVO-43": "8754c1b0ee7c7f6d",

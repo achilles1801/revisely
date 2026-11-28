@@ -282,10 +282,10 @@ export const NEXT_RELEASE: WhatsNewRelease | null = {
       id: 'books',
       title: 'In the books’ own words',
       text:
-        'Every answer shows its sources: Tafsir al-Tabari, Ibn Kathir, al-Qurtubi and al-Sa’di, quoted as they wrote it. ' +
+        'Every answer quotes its tafsir as it was written: Ibn Kathir, or any of al-Tabari, al-Qurtubi and al-Sa’di you choose in Settings. ' +
         'Tap a quote for the whole passage.',
       moment: 'books',
-      covers: ['REVO-44'],
+      covers: ['REVO-44', 'REVO-47'],
       needs: 'tafsir',
     },
     {

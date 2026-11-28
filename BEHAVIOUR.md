@@ -1784,8 +1784,8 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   costs an answer: if the model's service refuses the schedule's format, Revo asks again with the store app's and
   answers, with no draft.
 - **REVO-44.** (Revisely Dev) A question about the Qur'an (what an ayah means, what happens in a passage, who someone in
-  it is, or why) is answered only from Tafsir al-Tabari, Tafsir Ibn Kathir, Tafsir al-Qurtubi and Tafsir al-Sa'di (Majd,
-  Nov 26 2026: "all answers MUST stem from those tafseer books"). Asked from the mushaf, it is about the page or the
+  it is, or why) is answered only from Tafsir al-Tabari, Tafsir Ibn Kathir, Tafsir al-Qurtubi and Tafsir al-Sa'di, the
+  ones chosen (REVO-47) (Majd, Nov 26 2026: "all answers MUST stem from those tafseer books"). Asked from the mushaf, it is about the page or the
   held ayah (REVO-45); asked anywhere else in Revo, the ayat it is about are found first, and a question that isn't
   about the Qur'an is answered as before. The answer comes first, then "From the tafsir": up to three books, one quote
   each, as the book has it (the Arabic with Revo's English for it, labelled "Revo's translation", or Ibn Kathir's own
@@ -1803,9 +1803,28 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   in the room kept under the page, so it never covers it; not with the controls up, nor while a take runs. A tap opens
   Revo about that page: its chip ("An-Naml, 3rd page"), a line that it answers only from the tafsir, and three
   starters; the first, "What's happening here?", is answered ahead for every page, so it comes at once and isn't
-  counted as a question. A held ayah's menu starts with "Ask Revo" ("About this ayah, from the tafsir"), which opens Revo about
+  counted as a question; it is shown only when every book it quotes was chosen (REVO-47), and otherwise answered from
+  the chosen books as any question. A held ayah's menu starts with "Ask Revo" ("About this ayah, from the tafsir"), which opens Revo about
   that ayah. Their questions are answered from the tafsir (REVO-44). Never in a revision session. Turned off, neither
   shows. Settings → Revo AI's footer says in one line that answers about the Qur'an come only from the four tafsirs.
+  Revo's line about the page or ayah names the books chosen ("I answer only from Ibn Kathir"). The switch is kept with
+  the account, so turned off it stays off.
+
+- **REVO-47.** (Revisely Dev) The books Revo answers about the Qur'an from (Majd, Nov 27 2026: "users can pick which
+  tafsir they want with ibn kathir as the default for everyone", and "the picker should be someone being able to pick
+  any of the tafsir options or all of them"). Settings → Revo AI → Tafsir lists All four, Tafsir Ibn Kathir, Tafsir
+  al-Sa'di, Tafsir al-Tabari and Tafsir al-Qurtubi, each with a one-line note, checked when chosen. Any of them can be
+  chosen, at least one (the last can't be dropped); All four chooses them all, and tapped again goes back to Ibn Kathir
+  alone. Until it's changed, the choice is Ibn Kathir alone. The row shows the book, the two, "3 of 4" or "All four".
+  A question about the Qur'an (REVO-44) is answered from the chosen books only: no other book's words are sent to the
+  model or shown under the answer (Ibn Kathir in English comes with Ibn Kathir). When the chosen books say nothing on it
+  (Majd: "if someone let's say has ibn kathir and there's no answer for that verse or page or whatever then revo should
+  ask the user if they want to see x's view on it as a backup if it exists"), Revo asks each other book on its own and,
+  if one does say something, ends its answer with "Al-Sa'di does speak to this. Want to see what he says?" and one
+  starter, "See al-Sa'di's view"; the first such book in the order Ibn Kathir, al-Sa'di, al-Tabari, al-Qurtubi is the
+  one offered. A tap asks "What does al-Sa'di say?" in the conversation and shows that book's answer at once, from that
+  book alone, its words under it; it isn't counted again. A book that says nothing either is never offered, and with
+  none, there is no offer.
 
 - **REVO-46.** (Revisely Dev) While today isn't done, Revo's greeting from Home ends by offering the tafsir of the next
   page to revise ("Want what the tafsir says about Al-Hashr, 4th page before you go on?"), and its first starter, "What

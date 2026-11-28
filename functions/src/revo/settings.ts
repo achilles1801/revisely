@@ -9,11 +9,12 @@
  * fallback once every tester has that app.
  */
 import type { RevoSettings } from './types';
+import { chosenBooks } from './tafsir/books';
 
 export const REVO_ON = 'revoOn';
 
 export function revoSettingsOf(get: (field: string) => unknown): RevoSettings {
   const on = get(REVO_ON);
   const optIn = on === true || (on === undefined && get('optIn') === true);
-  return { optIn, memoryOn: get('memoryOn') !== false, mushafOn: get('mushafOn') !== false };
+  return { optIn, memoryOn: get('memoryOn') !== false, mushafOn: get('mushafOn') !== false, tafsirBooks: chosenBooks(get('tafsirBooks')) };
 }
