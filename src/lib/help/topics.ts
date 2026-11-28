@@ -597,8 +597,8 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         id: 'insightsMore.recitation',
         icon: 'mic-outline',
         title: 'Recitation',
-        text: 'Your Recite score over the range, the passages that keep slipping and the similar ayahs you went on with. Tap one to read it.',
-        covers: ['RINS-2'],
+        text: 'Mistakes a page over the range and by kind week by week, the words you’ve fixed and those still slipping, and how long you usually recite. Tap a passage to read it.',
+        covers: ['RINS-2', 'ACT-44'],
         when: 'liveRecite',
       },
       {
