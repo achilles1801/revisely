@@ -83,6 +83,28 @@ class TimelineTest {
     assertEquals("1 page", Copy.pages(1))
   }
 
+  @Test fun `a rest day says so, never "0 pages left"`() {
+    // As the app writes it (lib/widgets/snapshot): no pages, "Rest day", and where the next revision day starts.
+    val rest = WidgetDay(
+      day = "2026-11-27", startsAt = 0, endsAt = 1, title = "Rest day", place = "Tomorrow starts at Al‑Fatihah",
+      short = "Rest day", total = 0, done = 0, completed = false, streak = 3,
+    )
+    assertTrue(Copy.rest(rest))
+    assertEquals("Nothing is scheduled today", Copy.smallStatus(rest))
+    assertEquals("Nothing is scheduled today", Copy.mediumStatus(rest, null))
+    assertEquals("Tomorrow starts at Al‑Fatihah", Copy.wideLine(rest))
+    assertEquals("Rest day", Copy.tinyTitle(rest))
+    assertEquals("Tomorrow starts at Al‑Fatihah", Copy.tinyLine(rest))
+    assertNull(Copy.action(rest))
+    assertEquals("revisely://home", Copy.todayLink(TodayState.Ready(rest, null)))
+    // An older app wrote a rest day with no words: the widget still says it rests.
+    val bare = rest.copy(title = "", place = "", short = "")
+    assertEquals("Rest day", Copy.tinyTitle(bare))
+    assertEquals("Rest day", Copy.title(bare))
+    assertEquals("Done for today", Copy.title(rest.copy(completed = true)))
+    assertEquals("Nothing is scheduled today", Copy.wideLine(bare))
+  }
+
   @Test fun `the next prayer, the one whose time it is, and the countdown's end`() {
     val m = Timeline.prayer(prayer, at(2026, 11, 9, 13, 8, 55), ny)!!
     assertEquals(PrayerName.ASR, m.next)

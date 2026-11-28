@@ -142,7 +142,7 @@ struct TodaySmall: View {
       }
       Spacer(minLength: 6)
       if let day {
-        Text(day.completed ? "Done for today" : day.title)
+        Text(Copy.title(day))
           .font(.system(size: 16, weight: .semibold))
           .tone(day.completed ? palette.accentText : palette.text)
           .lineLimit(2)
@@ -167,6 +167,7 @@ struct TodaySmall: View {
   private var day: WidgetDay? { if case .ready(let d, _) = entry.state { return d } else { return nil } }
 
   private func status(_ day: WidgetDay) -> String {
+    if Copy.rest(day) { return Copy.nothingScheduled }
     if day.completed { return "\(Copy.pages(day.total)) revised" }
     if day.done > 0 { return "\(day.left) left · \(day.done) done" }
     return "\(Copy.pages(day.left)) left"
@@ -189,7 +190,7 @@ struct TodayMedium: View {
         }
         .lineLimit(1)
         if let day {
-          Text(day.completed ? "Done for today" : day.title)
+          Text(Copy.title(day))
             .font(.system(size: 17, weight: .semibold))
             .tone(day.completed ? palette.accentText : palette.text)
             .lineLimit(1)
@@ -221,6 +222,7 @@ struct TodayMedium: View {
   private var next: WidgetDay? { if case .ready(_, let n) = entry.state { return n } else { return nil } }
 
   private func status(_ day: WidgetDay) -> String {
+    if Copy.rest(day) { return Copy.nothingScheduled }
     if day.completed { return next.map { "Tomorrow · \($0.title)" } ?? "Revised" }
     if day.done > 0 { return "\(day.done) of \(day.total) done" }
     return "\(Copy.pages(day.left)) left"
@@ -260,7 +262,7 @@ struct TodayRectangular: View {
             .widgetAccentable()
           Text(day.completed ? "Revised" : "Today").font(.headline).widgetAccentable()
         }
-        Text(day.short).font(.body).lineLimit(1)
+        Text(Copy.rest(day) ? Copy.title(day) : day.short).font(.body).lineLimit(1)
         Text(detail(day)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
       } else {
         Text("Revisely").font(.headline).widgetAccentable()
@@ -272,6 +274,7 @@ struct TodayRectangular: View {
 
   private func detail(_ day: WidgetDay) -> String {
     let streak = Copy.streak(day.streak)
+    if Copy.rest(day) { return Copy.restPlace(day) }
     if day.completed { return streak ?? Copy.pages(day.total) }
     // Short, so the streak fits on the line: "20 left · 54-day streak".
     return ["\(day.left) left", streak].compactMap { $0 }.joined(separator: " · ")
@@ -285,7 +288,10 @@ struct TodayCircular: View {
     ZStack {
       AccessoryWidgetBackground()
       if case .ready(let day, _) = entry.state {
-        if day.completed {
+        if Copy.rest(day) {
+          // A rest day: nothing to count down.
+          Image(systemName: "moon.stars").font(.system(size: 20, weight: .medium)).widgetAccentable()
+        } else if day.completed {
           VStack(spacing: 0) {
             Image(systemName: "checkmark").font(.system(size: 20, weight: .bold)).widgetAccentable()
             if day.streak > 0 { Text("\(day.streak)d").font(.system(size: 11, weight: .medium)) }
@@ -315,7 +321,9 @@ struct TodayInline: View {
 
   var body: some View {
     if case .ready(let day, _) = entry.state {
-      if day.completed {
+      if Copy.rest(day) {
+        Label(Copy.title(day), systemImage: "moon.stars")
+      } else if day.completed {
         Label(Copy.streak(day.streak).map { "Revised · \($0)" } ?? "Revised today", systemImage: "checkmark.circle")
       } else {
         // Short: it shares the line with the date.

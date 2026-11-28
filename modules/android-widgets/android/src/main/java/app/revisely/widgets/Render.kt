@@ -75,7 +75,7 @@ internal class Render(private val context: Context, private val snapshot: Snapsh
         v.visible(R.id.aw_setup, !ready)
         if (shape == Shape.SMALL) v.visible(R.id.aw_status, ready) else v.visible(R.id.aw_foot, ready)
         if (day != null) {
-          val title = if (day.completed) "Done for today" else day.title
+          val title = Copy.title(day)
           v.setTextViewText(R.id.aw_title, title)
           if (shape == Shape.SMALL) fit(v, R.id.aw_title, title, 16f, size.width - 32f, 2)
           else fit(v, R.id.aw_title, title, 17f, size.width - 32f - 52f, 1)
@@ -94,7 +94,7 @@ internal class Render(private val context: Context, private val snapshot: Snapsh
       }
       Shape.WIDE, Shape.TINY -> {
         if (day != null) {
-          val title = if (shape == Shape.WIDE) (if (day.completed) "Done for today" else day.title) else Copy.tinyTitle(day)
+          val title = if (shape == Shape.WIDE) Copy.title(day) else Copy.tinyTitle(day)
           v.setTextViewText(R.id.aw_title, title)
           val room = if (shape == Shape.WIDE) size.width - 28f - 48f - (if (Copy.action(day) != null) 84f else 0f) else size.width - 28f - 42f
           fit(v, R.id.aw_title, title, 15f, room, 1)
