@@ -261,7 +261,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
       '- Settings → Mushaf and Recite → “Mushaf”: Madani 1405 (the default) or Madani 1441. Page numbers stay the same for plans.',
       '- The next-prayer line under Home’s header opens the Prayer sheet: Times (today’s prayers, the next with a countdown) and Qibla (a compass to the Kaaba; it needs location, which stays on the phone).',
       '- Settings → Prayer: “Prayer times”, “Calculation” (method and madhab), “Qibla” and “Next prayer on Home” (a line under Home’s header).',
-      '- Settings → Reminders → “Friday Al-Kahf reminder”: a card on Home from Thursday’s maghrib to Friday’s (the Prayer sheet’s maghrib). Read on Thursday evening, it counts for that Friday; “Not today” hides it until Friday’s maghrib.',
+      '- Settings → Reminders → “Friday Al-Kahf reminder”: a row on Home from Thursday’s maghrib to Friday’s maghrib (the Prayer sheet’s); “Read” opens it, its check marks it read. Reading Thursday evening counts; “Not today” hides it.',
     ),
   },
   {
