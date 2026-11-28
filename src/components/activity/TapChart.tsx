@@ -45,11 +45,16 @@ export const MAX_BAR_WIDTH = 28;
 export const MIN_SLOTS = 7;
 
 /** Where the bars go in `width` points: the slots, the gap between them, each slot's width and each bar's. */
-export function chartLayout(n: number, width: number): { slots: number; lead: number; gap: number; slot: number; bar: number } {
-  const slots = Math.max(n, MIN_SLOTS);
+export function chartLayout(
+  n: number,
+  width: number,
+  maxBar: number = MAX_BAR_WIDTH,
+  minSlots: number = MIN_SLOTS,
+): { slots: number; lead: number; gap: number; slot: number; bar: number } {
+  const slots = Math.max(n, minSlots);
   const gap = slots > 60 ? 1 : slots > 14 ? 2 : 6;
   const slot = Math.max(0, (width - gap * (slots - 1)) / slots);
-  return { slots, lead: slots - n, gap, slot, bar: Math.min(MAX_BAR_WIDTH, slot) };
+  return { slots, lead: slots - n, gap, slot, bar: Math.min(maxBar, slot) };
 }
 
 /** The bar lit: the one picked, else the newest. */
@@ -84,6 +89,8 @@ export function TapChart({
   testID,
   barTestID,
   empty,
+  maxBar = MAX_BAR_WIDTH,
+  minSlots = MIN_SLOTS,
 }: {
   bars: readonly ChartBar[];
   /** The picked bar's key, or none. */
@@ -102,6 +109,9 @@ export function TapChart({
   barTestID?: (key: string) => string;
   /** With no bars, what the chart says instead (an empty frame never shows). */
   empty?: string;
+  /** A bar's widest (MEM-12: 28 pt by month, 14 by day) and the fewest slots (6 months, 7 days). */
+  maxBar?: number;
+  minSlots?: number;
 }) {
   const { palette } = useTheme();
   const window = useWindowDimensions().width;
@@ -115,7 +125,7 @@ export function TapChart({
       </View>
     );
   }
-  const layout = chartLayout(n, measured ?? window - 32);
+  const layout = chartLayout(n, measured ?? window - 32, maxBar, minSlots);
   const pickedIndex = picked == null ? null : bars.findIndex((b) => b.key === picked);
   const pickAt = pickedIndex != null && pickedIndex >= 0 ? pickedIndex : null;
   const lit = litIndex(n, pickAt);
@@ -208,7 +218,7 @@ export function ChartPills<K extends string>({
 const styles = StyleSheet.create({
   bars: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 10 },
   col: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
-  bar: { borderRadius: 5, overflow: 'hidden', maxWidth: MAX_BAR_WIDTH },
+  bar: { borderRadius: 5, overflow: 'hidden' },
   stack: { flexDirection: 'column' },
   value: { width: 48, textAlign: 'center', fontWeight: '600', marginBottom: 3 },
   labels: { flexDirection: 'row', marginTop: 6 },
