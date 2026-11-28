@@ -97,7 +97,8 @@ describe('the help stays short and plain', () => {
     for (const liveRecite of [true, false])
       for (const devApp of [true, false])
         for (const sections of [true, false])
-          for (const oneTab of [true, false]) accounts.push({ smartTracking, liveRecite, devApp, sections, oneTab });
+          for (const oneTab of [true, false])
+            for (const beginner of [true, false]) accounts.push({ smartTracking, liveRecite, devApp, sections, oneTab, beginner });
 
   it(`shows at most ${MAX_TOPICS} topics a sheet, for every kind of account; a screen's own sheet is never empty`, () => {
     for (const s of screens) {

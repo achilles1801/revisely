@@ -262,6 +262,21 @@ describe('users/{userId}', () => {
       await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { whatsNewSeen: true } as any));
     });
 
+    it('[PATH-1] owner can set the path setup chose (beginner, hafiz) and clear it, with onboarding in the same write', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertSucceeds(updateDoc(doc(alice, `users/${ALICE}`), { path: 'beginner', onboardingComplete: true }));
+      await assertSucceeds(updateDoc(doc(alice, `users/${ALICE}`), { path: 'hafiz' }));
+      await assertSucceeds(updateDoc(doc(alice, `users/${ALICE}`), { path: null }));
+    });
+
+    it('[PATH-1] rejects a path that is not one of the paths', async () => {
+      const alice = env.authenticatedContext(ALICE).firestore();
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { path: 'middle' }));
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { path: '' }));
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { path: 3 } as any));
+      await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { path: { beginner: true } } as any));
+    });
+
     it('rejects an unknown carry-over mode', async () => {
       const alice = env.authenticatedContext(ALICE).firestore();
       await assertFails(updateDoc(doc(alice, `users/${ALICE}`), { carryOverMode: 'double' }));

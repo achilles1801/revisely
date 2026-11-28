@@ -21,6 +21,7 @@ import {
 import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { gapsInsightsEnabled } from '../../lib/insightsGaps';
 import { activityOneTabEnabled } from '../../lib/release/activityOneTab';
+import { isBeginner } from '../../lib/paths';
 import { activitySectionsEnabled } from '../../lib/activitySections';
 import { t } from '../../i18n';
 import { forwardIcon } from '../../i18n/direction';
@@ -120,6 +121,7 @@ export function HelpSheet({
     devApp: gapsInsightsEnabled(user),
     sections: activitySectionsEnabled(user),
     oneTab: activityOneTabEnabled(),
+    beginner: isBeginner(user),
   };
   const topics = topicsFor(shown, opts);
   const links = linksFor(shown, opts);

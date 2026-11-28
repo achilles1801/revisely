@@ -385,6 +385,17 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     ),
   },
   {
+    // The beginner path (Majd, Nov 28 2026: "beginner path, middle path (what we have now), and hafz path"): Revisely Dev
+    // until lib/release/beginnerPath is on.
+    title: 'Starting with nothing or a few surahs',
+    covers: ['PATH-1', 'BEGIN-1', 'BEGIN-2', 'BEGIN-3', 'BEGIN-4', 'BEGIN-5', 'BEGIN-6', 'BEGIN-7', 'BEGIN-8'],
+    routes: ['Dashboard', 'YourSurahs', 'LearnSurah'],
+    text: lines(
+      '- Setup’s “None yet, or a few surahs”: tick the short surahs known (none is fine). Home: “Start with …” Al-Fatihah until one is memorized, then the ring with about how long and “Learn next”; “Mark them” or “Add it” opens “Your surahs”. Their Home ayah has its English.',
+      '- “Learn”: an ayah at a time with its meaning: “Listen” (3× slowly), “Repeat”, “Without looking”; “I can recite it” memorizes it and names the next. Learning isn’t revising (no streak).',
+    ),
+  },
+  {
     // The Memorized picker (Majd, Nov 23 2026): Revisely Dev until it ships.
     title: 'Choosing what you memorized on the page',
     covers: ['MEM-8'],

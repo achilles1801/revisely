@@ -4,13 +4,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
-import { QuestionScreen } from '../../components/onboarding/QuestionScreen';
+import { BEGINNER_QUESTIONS, QuestionScreen } from '../../components/onboarding/QuestionScreen';
 import { PillButton } from '../../components/v2/PillButton';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useHaptics } from '../../design/haptics';
 import { DEFAULT_FAJR_METHOD } from '../../lib/fajrBoundary';
 import { firstDayPages } from '../../lib/onboardingChoices';
+import { pathFieldForSetup } from '../../lib/paths';
 import { reminderCopy } from '../../lib/reminders/copy';
 import { radiusV2, typeV2 } from '../../theme/v2';
 import { t } from '../../i18n';
@@ -28,9 +29,9 @@ export default function ReminderScreen() {
   const route = useRoute<RouteProps>();
   const { palette } = useTheme();
   const haptics = useHaptics();
-  const { pages, createDefaultUser, saveUser, completeOnboarding, askNotifications } = useOnboardingAccess();
+  const { user: account, pages, createDefaultUser, saveUser, completeOnboarding, askNotifications } = useOnboardingAccess();
   const { firebaseUser } = useAuth();
-  const { scheduleMode, dailyCapacity, dailyJuzCount, fajrBoundaryEnabled, locationCoords } = route.params;
+  const { scheduleMode, dailyCapacity, dailyJuzCount, fajrBoundaryEnabled, locationCoords, path } = route.params;
   const [starting, setStarting] = useState<'on' | 'off' | null>(null);
 
   const preview = useMemo(() => {
@@ -67,6 +68,8 @@ export default function ReminderScreen() {
         fajrBoundaryEnabled,
         locationCoords,
         fajrCalculationMethod: DEFAULT_FAJR_METHOD,
+        // The beginner's path (PATH-1); an account that never had one writes nothing new.
+        ...pathFieldForSetup(path, account),
       });
       haptics.success();
       // saveUser and the onboarding flag flip are independent: running them in
@@ -80,7 +83,8 @@ export default function ReminderScreen() {
 
   return (
     <QuestionScreen
-      step={5}
+      // The beginner path's last question is its fourth (BEGIN-1); today's, the fifth.
+      {...(path === 'beginner' ? { step: 4, total: BEGINNER_QUESTIONS } : { step: 5 })}
       title={t('onboarding.reminder.title')}
       subtitle={t('onboarding.reminder.subtitle')}
       onBack={() => navigation.goBack()}

@@ -54,6 +54,11 @@ import { RunningTimerChip } from '../../components/timer/RunningTimerChip';
 import { HeroGlow } from '../../components/v2/HeroGlow';
 import { HomeGround } from '../../components/home/HomeGround';
 import { HomeAyah } from '../../components/home/feed/HomeAyah';
+import { BeginnerAyah } from '../../components/beginner/BeginnerAyah';
+import { beginnerRing } from '../../components/beginner/BeginnerToday';
+import { LearnNextRow } from '../../components/beginner/LearnNextRow';
+import { BEGINNER_SURAHS, knownSurahs, minutesFor, nextSurahOnPath } from '../../lib/beginner/surahs';
+import { isBeginner } from '../../lib/paths';
 import { useHomeBackground } from '../../lib/homeBackground';
 import { RamadanHome, WithCrescent } from '../../components/ramadan';
 import { RamadanIntro } from '../../components/ramadan/RamadanIntro';
@@ -635,6 +640,22 @@ export default function DashboardScreen() {
   const onAhead = () =>
     aheadNext &&
     navigation.navigate('ActiveRevision', { aheadDay: aheadNext.plan.day, ...(aheadNext.plan.round ? { round: true } : {}) });
+  // A beginner's Home (PATH-1, BEGIN-2, BEGIN-3; Revisely Dev): the ring with the beginner's lines and quiet line. Only an
+  // account setup put on the beginner path gets it (lib/paths); everyone else's ring is exactly today's.
+  const beginnerHome =
+    homeRing && isBeginner(user)
+      ? beginnerRing({
+          lines: home.lines,
+          status: todayStatus.status,
+          minutes: minutesFor(assignment.pages.filter((p) => !donePagesToday.has(p)), partial),
+          onStart: () => navigation.navigate('LearnSurah', { sura: BEGINNER_SURAHS[0] }),
+          onSurahs: () => navigation.navigate('YourSurahs'),
+        })
+      : null;
+  // Learn next (BEGIN-6): the next surah on the path, once the ring isn't the beginner's start (which is Learn itself);
+  // none once all of the path is known.
+  const beginnerKnown = beginnerHome && !(home.lines.empty && !home.lines.rest) ? knownSurahs(pages) : null;
+  const learnNext = beginnerKnown ? nextSurahOnPath(beginnerKnown) : null;
   return (
     <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       {homeV3 ? <HomeGround background={background} ramadan={ramadan} bottom={tabBar} /> : <HeroGlow />}
@@ -683,7 +704,7 @@ export default function DashboardScreen() {
             done={donePagesToday}
             streak={calculatedStreak}
             streakGrace={streakNow?.grace ?? null}
-            onPrimary={handleCtaPress}
+            onPrimary={beginnerHome?.onPrimary ?? handleCtaPress}
             onJump={() => setJumpOpen(true)}
             catchUp={home.catchUp}
             onCarryOver={handleCarryOver}
@@ -692,9 +713,18 @@ export default function DashboardScreen() {
             ahead={aheadNext ? { lead: aheadNext.lead, first: aheadNext.plan.pages[0] } : null}
             onAhead={onAhead}
             help={<HelpButton screen="home" size={20} color={palette.secondary} maxFontSizeMultiplier={HEADER_MAX_SCALE} />}
-            lines={home.lines}
+            lines={beginnerHome?.lines ?? home.lines}
+            footer={beginnerHome?.footer}
           />
-        ) : (
+        ) : null}
+        {homeRing && beginnerKnown && learnNext != null ? (
+          <LearnNextRow
+            sura={learnNext}
+            learned={BEGINNER_SURAHS.filter((sura) => beginnerKnown.has(sura)).length}
+            onLearn={() => navigation.navigate('LearnSurah', { sura: learnNext })}
+          />
+        ) : null}
+        {homeRing ? null : (
           <TodayPost
             name={userName}
             initial={avatarInitial(userName, firebaseUser?.email)}
@@ -766,7 +796,8 @@ export default function DashboardScreen() {
           // sits over them.
           <>
             <View style={styles.grow} />
-            <HomeAyah day={revisionDay} onOpen={openAyah} />
+            {/* A beginner's keeps its meaning under it (BEGIN-4). */}
+            {beginnerHome ? <BeginnerAyah day={revisionDay} onOpen={openAyah} /> : <HomeAyah day={revisionDay} onOpen={openAyah} />}
           </>
         ) : null}
       </ScrollView>

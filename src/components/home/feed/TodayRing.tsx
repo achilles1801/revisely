@@ -154,6 +154,7 @@ export function TodayRing({
   onAhead,
   help,
   lines,
+  footer,
 }: {
   name: string;
   initial: string;
@@ -179,6 +180,8 @@ export function TodayRing({
   help?: React.ReactNode;
   /** The lines as Home worked them out (lib/homeToday). */
   lines: TodayLines;
+  /** A beginner's quiet line, last under the ring (BEGIN-2, BEGIN-3); none on today's path. */
+  footer?: React.ReactNode;
 }) {
   const { palette } = useTheme();
   const grace = streakGrace ?? null;
@@ -316,6 +319,7 @@ export function TodayRing({
               </Text>
             </Tap>
           ) : null}
+          {footer}
         </View>
       </View>
       {separator ? <View style={[styles.separator, { backgroundColor: palette.separator }]} testID="today-post-separator" /> : null}

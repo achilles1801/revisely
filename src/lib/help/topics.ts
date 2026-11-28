@@ -45,7 +45,17 @@ export type HelpScreen =
  * sessions, on a phone and print that have it) or only without it, only where Insights has Gaps and Last revised
  * (`devApp`: gapsInsightsEnabled, everyone's from 1.0.5), or only where Activity's sections can be arranged.
  */
-export type HelpWhen = 'smartTracking' | 'noSmartTracking' | 'liveRecite' | 'noLiveRecite' | 'devApp' | 'sections' | 'oneTab' | 'twoTabs';
+export type HelpWhen =
+  | 'smartTracking'
+  | 'noSmartTracking'
+  | 'liveRecite'
+  | 'noLiveRecite'
+  | 'devApp'
+  | 'sections'
+  | 'oneTab'
+  | 'twoTabs'
+  | 'beginner'
+  | 'notBeginner';
 
 /** What decides which topics an account sees (HELP-3). */
 export interface HelpOpts {
@@ -55,6 +65,8 @@ export interface HelpOpts {
   sections?: boolean;
   /** Activity as one tab (ACT-35): its sections' own pages, Consistency's as ACT-43 draws it. */
   oneTab?: boolean;
+  /** On the beginner path (PATH-1, Revisely Dev): Home tells how they start in place of missed days. */
+  beginner?: boolean;
 }
 
 /** Why a Recite topic has no rule to cover: RECITE-1 to RECITE-8 (BEHAVIOUR.md) don't describe that part of it yet. */
@@ -132,6 +144,18 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         title: 'Missed days',
         text: "They don't pile up. Their pages are offered here for three days; {{Add to today}} puts them first.",
         covers: ['SCHED-5', 'CARRY-1', 'CARRY-4'],
+        when: 'notBeginner',
+      },
+      {
+        // The beginner path (Revisely Dev): how they start, in place of missed days (the four topics a sheet).
+        id: 'home.beginner',
+        icon: 'leaf-outline',
+        title: 'Starting out',
+        text:
+          '{{Learn}} plays a surah ayah by ayah, slowly, with its meaning; {{I can recite it}} adds it to your revision. ' +
+          'Learned one elsewhere? Tap {{Add it}} under today.',
+        covers: ['BEGIN-2', 'BEGIN-3', 'BEGIN-5', 'BEGIN-6', 'BEGIN-7', 'BEGIN-8'],
+        when: 'beginner',
       },
       {
         id: 'home.streak',
@@ -657,6 +681,8 @@ export function topicsFor(screen: HelpScreen, opts: HelpOpts): HelpTopic[] {
     if (t.when === 'sections') return opts.sections === true;
     if (t.when === 'oneTab') return opts.oneTab === true;
     if (t.when === 'twoTabs') return opts.oneTab !== true;
+    if (t.when === 'beginner') return opts.beginner === true;
+    if (t.when === 'notBeginner') return opts.beginner !== true;
     return true;
   }).map(inLanguage);
 }

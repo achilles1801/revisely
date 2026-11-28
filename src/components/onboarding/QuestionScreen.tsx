@@ -9,20 +9,22 @@ import { backIcon } from '../../i18n/direction';
 
 /** Onboarding's questions: what's memorized, which juz, each day, day start, reminder. */
 export const QUESTIONS = 5;
+/** The beginner path's (BEGIN-1): what's memorized, which surahs, day start, reminder. */
+export const BEGINNER_QUESTIONS = 4;
 
 /** One bar per question, those reached in the primary fill. */
-function QuestionProgress({ step }: { step: number }) {
+function QuestionProgress({ step, total }: { step: number; total: number }) {
   const { palette } = useTheme();
   return (
     <View
       style={styles.progress}
       accessible
       accessibilityRole="progressbar"
-      accessibilityLabel={t('common.stepNOfTotal', { n: step, total: QUESTIONS })}
-      accessibilityValue={{ min: 1, max: QUESTIONS, now: step }}
+      accessibilityLabel={t('common.stepNOfTotal', { n: step, total })}
+      accessibilityValue={{ min: 1, max: total, now: step }}
       testID="question-progress"
     >
-      {Array.from({ length: QUESTIONS }, (_, i) => (
+      {Array.from({ length: total }, (_, i) => (
         <View
           key={i}
           style={[styles.segment, { backgroundColor: i < step ? palette.primary : palette.outline }]}
@@ -39,6 +41,7 @@ function QuestionProgress({ step }: { step: number }) {
  */
 export function QuestionScreen({
   step,
+  total = QUESTIONS,
   title,
   subtitle,
   onBack,
@@ -47,6 +50,8 @@ export function QuestionScreen({
   testID,
 }: {
   step: number;
+  /** How many questions this path has: today's five, or the beginner path's four (BEGIN-1). */
+  total?: number;
   title: string;
   subtitle?: string;
   onBack: () => void;
@@ -61,7 +66,7 @@ export function QuestionScreen({
         <View style={styles.back}>
           <IconButton icon={backIcon()} onPress={onBack} label={t('common.back')} size={26} testID="back" />
         </View>
-        <QuestionProgress step={step} />
+        <QuestionProgress step={step} total={total} />
       </View>
       <ScrollView style={styles.middle} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text style={[typeV2.largeTitle, { color: palette.text }]} accessibilityRole="header" maxFontSizeMultiplier={1.6}>

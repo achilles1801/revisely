@@ -6,6 +6,8 @@ import DashboardScreen from '../screens/main/DashboardScreen';
 import AlgorithmScreen from '../screens/main/AlgorithmScreen';
 import SettingsScreen from '../screens/main/SettingsScreen';
 import MemorizationScreen from '../screens/main/MemorizationScreen';
+import YourSurahsScreen from '../screens/main/YourSurahsScreen';
+import LearnSurahScreen from '../screens/main/LearnSurahScreen';
 import PlanEditScreen from '../screens/main/PlanEditScreen';
 import PlanDayEditScreen from '../screens/main/PlanDayEditScreen';
 import PrayerCalculationScreen from '../screens/prayer/PrayerCalculationScreen';
@@ -73,6 +75,10 @@ export type HomeStackParamList = {
   // edit: open with the pages ready to edit (Home's Memorized line). focusPages: open at those pages
   // (Activity's Memorized → Edit): their surah open and scrolled to, the pages ringed.
   Memorization: { edit?: boolean; focusPages?: number[] } | undefined;
+  /** A beginner's surahs to tick (BEGIN-5, Revisely Dev), from their Home. */
+  YourSurahs: undefined;
+  /** Learn a surah on the beginner path (BEGIN-7, Revisely Dev), from a beginner's Home. */
+  LearnSurah: { sura: number };
   // editedDay is set by PlanDayEdit when navigating back, so PlanEdit can
   // merge the day-level edit into its in-memory days[] without round-tripping
   // through a context or store.
@@ -181,6 +187,8 @@ const HIDE_TAB_BAR_ON = new Set([
   'PlanDayEdit',
   'ActiveRevision',
   'Memorization', // i18n-ignore (route names)
+  'YourSurahs', // i18n-ignore (route names)
+  'LearnSurah', // i18n-ignore (route names)
   'QuranReader',
   'QuranSearch',
   'ListenBack',
@@ -200,6 +208,8 @@ function sharedScreens() {
       <HomeStack.Screen name="ActiveRevision" component={ActiveRevisionScreen} />
       <HomeStack.Screen name="Settings" component={SettingsScreen} />
       <HomeStack.Screen name="Memorization" component={MemorizationScreen} />
+      <HomeStack.Screen name="YourSurahs" component={YourSurahsScreen} />
+      <HomeStack.Screen name="LearnSurah" component={LearnSurahScreen} />
       <HomeStack.Screen name="PlanEdit" component={PlanEditScreen} />
       <HomeStack.Screen name="PlanDayEdit" component={PlanDayEditScreen} />
       <HomeStack.Screen name="PrayerCalculation" component={PrayerCalculationScreen} />

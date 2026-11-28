@@ -2,6 +2,9 @@
 export type PageStatus = 'not_memorized' | 'in_progress' | 'memorized';
 
 // User profile and preferences
+/** The paths an account can be set to (lib/paths); today's path is the field's absence. */
+export type RevisionPathField = 'beginner' | 'hafiz';
+
 export interface User {
   id: string;
   createdAt: string;
@@ -76,6 +79,12 @@ export interface User {
   accent?: 'indigo' | 'crimson' | 'jade';
   /** The last "What's new" release this account finished, or set up on (lib/help/whatsNew, NEW-1). */
   whatsNewSeen?: string;
+  /**
+   * Which path setup put the account on (PATH-1, lib/paths): 'beginner' from setup's first answer "None yet, or a few
+   * surahs" (Revisely Dev). Absent: today's path, as every account set up before it. Null clears it. 'hafiz' is kept for
+   * a path not built yet.
+   */
+  path?: RevisionPathField | null;
   // Pages carried into one revision day. They go first that day and replace its
   // first `skip` scheduled pages (the ones the shift moved back). Only applies
   // while `day` is the revision day.

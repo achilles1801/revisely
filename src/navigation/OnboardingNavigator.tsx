@@ -6,6 +6,8 @@ import JuzSelectionScreen from '../screens/onboarding/JuzSelectionScreen';
 import DailyAmountScreen from '../screens/onboarding/DailyAmountScreen';
 import DayStartScreen from '../screens/onboarding/DayStartScreen';
 import ReminderScreen from '../screens/onboarding/ReminderScreen';
+import BeginnerSurahsScreen from '../screens/onboarding/BeginnerSurahsScreen';
+import type { RevisionPathField } from '../types';
 
 export type JourneyStage = 'in_progress' | 'complete';
 export type ScheduleMode = 'pages' | 'juz';
@@ -16,12 +18,16 @@ interface AmountAnswer {
   scheduleMode: ScheduleMode;
   dailyCapacity: number;
   dailyJuzCount: number;
+  /** The path setup's first answer chose, when it isn't today's (PATH-1): the beginner's setup sets 'beginner'. */
+  path?: RevisionPathField;
 }
 
 export type OnboardingStackParamList = {
   Welcome: undefined;
   JourneySelect: undefined;
   JuzSelection: { journeyStage: JourneyStage };
+  /** The beginner path's second question (BEGIN-1, Revisely Dev). */
+  BeginnerSurahs: undefined;
   DailyAmount: { journeyStage: JourneyStage };
   DayStart: AmountAnswer;
   Reminder: AmountAnswer & {
@@ -51,6 +57,7 @@ export function OnboardingNavigator() {
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
       <Stack.Screen name="JourneySelect" component={JourneySelectScreen} />
       <Stack.Screen name="JuzSelection" component={JuzSelectionScreen} />
+      <Stack.Screen name="BeginnerSurahs" component={BeginnerSurahsScreen} />
       <Stack.Screen name="DailyAmount" component={DailyAmountScreen} />
       <Stack.Screen name="DayStart" component={DayStartScreen} />
       <Stack.Screen name="Reminder" component={ReminderScreen} />
