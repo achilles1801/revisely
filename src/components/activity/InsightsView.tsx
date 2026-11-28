@@ -272,6 +272,7 @@ export function InsightsView({
             window={span.window}
             inWords={span.inWords}
             lastWords={span.lastWords}
+            before={span.before}
             all={span.all}
             firstDay={data.firstDay}
             knownSince={data.itemsFrom}

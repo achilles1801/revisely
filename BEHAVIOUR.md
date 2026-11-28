@@ -1405,6 +1405,23 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   chart has at least seven slots, the bars at the end (the newest at the right) and the slots before them empty, on an
   SE and a Pro Max alike. With nothing in its range it says so in one grey line ("Nothing here yet in this range"),
   never an empty frame.
+- **ACT-42.** (Revisely Dev) Gaps on its own page (the one Activity tab, ACT-35) starts from its point, "do I miss days,
+  how badly, and is it getting better?" (Majd, Nov 27 2026, on the page before: "2 days what? is that the longest gap
+  i've had? is that the most recent gap? do i usually have this gap? are there patterns here?"; then "yes build all seven
+  screens"). A gap is as ACT-28 counts it. First the gaps in the range ("2 gaps in 3 months", "since 2 November" when
+  the range is longer than the account), with an arrow against the range before when the account reaches back that far
+  ("↓ from 5", the good colour when fewer; ink, never red, when more, as Coverage's), and "You revised on 85 of 90 days". Then tiles, so a length
+  always says which: the longest and the most recent, each with its dates (one tile when they are the same gap, "your
+  only gap" when there is one), and the days usually revised between gaps (the median, from two gaps; "usually" from
+  three); lengths short enough for a third of an SE ("2 days", "3 wk", "2 mo", "60+ days"; Days makes them exact), never
+  wrapping, the tiles stacking from text 1.2 times the usual size. Then every day of the range: revised in the accent,
+  one day missed (not a gap) grey, a gap's days on a quiet red with a red edge, today outlined until revised; 7 a row up to
+  a month, 15 up to 100 days, 21 for longer, so a year still fits an SE. A tap on any day of a gap picks it: the line above
+  becomes its days and length ("20–21 Nov · 2 days"), the gap fills red, and a tap on the line opens it on the calendar
+  (ACT-28); the same gap again clears it, back to "85 of 90 days revised". Patterns under it: the weekday most missed
+  (ACT-22's words) and, against the range before, "Gaps are rarer and shorter" (or rarer, shorter, "More gaps than
+  before") with what it compares. Then the full revision against the plan and "When did I last revise…?", as in ACT-28.
+  With no gap: "0 gaps", no tiles, every day revised or one day missed. The store app keeps ACT-28's section.
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
   strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
   stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,

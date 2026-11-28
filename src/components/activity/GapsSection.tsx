@@ -8,14 +8,13 @@
 // one tap away (the Days switch, kept on the phone). Under the gaps, the full revision: pushed back by gaps, or on
 // schedule after one (lib/gapsCycle). The figures come from lib/insightsGaps.
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { typeV2 } from '../../theme/v2';
 import { t } from '../../i18n';
-import { chevron, forwardIcon } from '../../i18n/direction';
+import { chevron } from '../../i18n/direction';
 import { SectionRow } from './SectionRow';
 import { gapsRow } from '../../lib/activityRowValues';
 import { ChromeText, STACK_AT_SCALE } from './ChromeText';
@@ -39,9 +38,10 @@ import {
 } from '../../lib/insightsGaps';
 import { pushBackLine, type PushBack } from '../../lib/gapsCycle';
 import { useFirstSection, useSectionAlone } from './sectionPlace';
+import { GapsPage } from './GapsPage';
+import { GapsDaysSwitch, GapsLastRevisedLink, GapsRevision, useGapsInDays } from './GapsParts';
 
-/** The Days switch, kept on the phone: '1' shows every length in exact days. */
-export const GAPS_IN_DAYS_KEY = 'insights.gapsInDays';
+export { GAPS_IN_DAYS_KEY } from './GapsParts';
 
 /** A gap's bar: its height, and the least of the track it fills (a 2-day gap beside a 2-month one still shows). */
 const BAR_H = 6;
@@ -69,6 +69,8 @@ export interface GapsSectionProps {
   /** Last revised (ACT-30): the link at the section's end, and the full revision line (longest waiting first: the
    * late pages at the top). */
   onOpenLastRevised?: (sort?: 'waiting') => void;
+  /** The range before, in words ("the month before"; rangeSpan's `before`): Gaps' own page compares with it (ACT-42). */
+  before?: string | null;
   /** Drawn as its row on the one Activity tab (ACT-35): the row's tap, and whether it is the list's last. */
   row?: () => void;
   last?: boolean;
@@ -80,29 +82,17 @@ export function GapsSection(props: GapsSectionProps) {
     () => gapsView({ revised, today, window, firstDay, knownSince, lastRevisedOn }),
     [revised, today, window, firstDay, knownSince, lastRevisedOn],
   );
+  // Alone on its own page (the one Activity tab, ACT-35): the page drawn from its point (ACT-42).
+  const alone = useSectionAlone();
   // Nothing revised on record: nothing to measure a gap from.
   if (!view) return null;
+  if (alone && !props.row) return <GapsPage view={view} {...props} />;
   return <Gaps view={view} {...props} />;
 }
 
 function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpenLastRevised, row, last, ...props }: GapsSectionProps & { view: GapsView }) {
   const { palette } = useTheme();
-  // Every length in exact days (Majd, Nov 16 2026: "'days' specifically should always be an option"), kept.
-  const [inDays, setInDaysState] = useState(false);
-  // A tap before the stored choice is read wins over it.
-  const touched = useRef(false);
-  useEffect(() => {
-    AsyncStorage.getItem(GAPS_IN_DAYS_KEY)
-      .then((v) => {
-        if (!touched.current) setInDaysState(v === '1');
-      })
-      .catch(() => undefined);
-  }, []);
-  const setInDays = (next: boolean) => {
-    touched.current = true;
-    setInDaysState(next);
-    AsyncStorage.setItem(GAPS_IN_DAYS_KEY, next ? '1' : '0').catch(() => undefined);
-  };
+  const [inDays, setInDays] = useGapsInDays();
   const [allShown, setAllShown] = useState(false);
   // The full revision line: always when pages are late; on schedule only after a gap (with none it says nothing new).
   const revision = pushBack && (pushBack.late.length > 0 || view.gaps.length > 0) ? pushBackLine(pushBack, inDays) : null;
@@ -160,19 +150,7 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
           <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{t('insights.gaps.detail')}</ChromeText>
         </View>
         )}
-        {switchable ? (
-          <Tap
-            onPress={() => setInDays(!inDays)}
-            accessibilityRole="switch"
-            accessibilityState={{ checked: inDays }}
-            accessibilityLabel={inDays ? t('insights.gaps.inDaysOn') : t('insights.gaps.inDaysOff')}
-            hitSlop={8}
-            style={[styles.daysSwitch, inDays ? { backgroundColor: palette.text, borderColor: palette.text } : { borderColor: palette.outline }]}
-            testID="insights-gaps-in-days"
-          >
-            <ChromeText style={[typeV2.meta, styles.daysText, { color: inDays ? palette.bg : palette.text }]}>{t('insights.gaps.inDays')}</ChromeText>
-          </Tap>
-        ) : null}
+        {switchable ? <GapsDaysSwitch inDays={inDays} onChange={setInDays} /> : null}
       </View>
 
       {onOpenDay ? (
@@ -222,42 +200,8 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
         </View>
       ) : null}
 
-      {revision ? (
-        <Tap
-          onPress={onOpenLastRevised ? () => onOpenLastRevised('waiting') : undefined}
-          disabled={!onOpenLastRevised}
-          style={[styles.revision, { borderTopColor: palette.separator }]}
-          accessibilityRole={onOpenLastRevised ? 'button' : 'text'}
-          accessibilityLabel={`${revision.title}. ${revision.detail}`}
-          accessibilityHint={onOpenLastRevised ? t('insights.lastRevised.linkHint') : undefined}
-          testID="insights-gaps-revision"
-        >
-          <View style={[styles.mark, { backgroundColor: palette.bubble }]}>
-            <Ionicons name={revision.late ? 'refresh' : 'checkmark'} size={18} color={palette.text} />
-          </View>
-          <View style={styles.flex}>
-            <ChromeText style={[typeV2.name, { color: palette.text }]}>{revision.title}</ChromeText>
-            <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{revision.detail}</ChromeText>
-          </View>
-          {onOpenLastRevised ? <Ionicons name={forwardIcon()} size={16} color={palette.secondary} style={styles.revisionChevron} /> : null}
-        </Tap>
-      ) : null}
-
-      {onOpenLastRevised ? (
-        <Tap
-          onPress={() => onOpenLastRevised()}
-          accessibilityRole="button"
-          accessibilityHint={t('insights.lastRevised.linkHint')}
-          hitSlop={8}
-          style={styles.link}
-          testID="insights-gaps-last-revised"
-        >
-          <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={1.4}>
-            {t('insights.lastRevised.link')}
-          </ChromeText>
-          <Ionicons name={forwardIcon()} size={16} color={palette.link} />
-        </Tap>
-      ) : null}
+      {revision ? <GapsRevision revision={revision} onOpenLastRevised={onOpenLastRevised} /> : null}
+      {onOpenLastRevised ? <GapsLastRevisedLink onOpen={onOpenLastRevised} /> : null}
     </View>
   );
 }
