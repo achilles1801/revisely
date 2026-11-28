@@ -2,7 +2,7 @@ import { getPagesForJuz } from '../quranData';
 import { juzTiles } from '../insightsView';
 import { chartLayout } from '../../components/activity/TapChart';
 import { textWidth } from '../../../jest/textWidth';
-import { coverageBefore, doneByWords, juzDoneBy, partOfMonth, ratingsOn, slippingJuz, slippingWords, strengthWeeks, weakCount, weakMostOften, weekBarLabel, weekName } from '../insightsPages';
+import { coverageBefore, dayPartOf, doneByWords, juzDoneBy, partOfMonth, quickestPart, ratingsOn, slippingJuz, slippingWords, strengthWeeks, weakCount, weakMostOften, weekBarLabel, weekName } from '../insightsPages';
 
 const TODAY = '2026-11-28';
 const ago = (n: number) => {
@@ -160,6 +160,26 @@ describe('Weak spots over time (ACT-39)', () => {
     expect(weakMostOften(new Map([[7, 3], [2, 3], [1, 1]]), memorized)).toEqual({ page: 2, times: 3 });
     expect(weakMostOften(new Map([[1, 1]]), memorized)).toBeNull();
     expect(weakMostOften(new Map([[9, 4]]), memorized)).toBeNull();
+  });
+});
+
+describe('When they are quickest (ACT-40)', () => {
+  const at = (day: string, hour: number) => new Date(`${day}T${String(hour).padStart(2, '0')}:00:00`).getTime();
+  const session = (n: number, hour: number, minutes: number) => ({ day: ago(n), countsFor: ago(n), pages: [1, 2, 3, 4, 5], minutes, occurredAt: at(ago(n), hour) });
+
+  it('the parts of the day, by the hour a session began', () => {
+    expect([0, 6, 7, 11, 12, 16, 17, 20, 21, 23].map(dayPartOf)).toEqual(['dawn', 'dawn', 'morning', 'morning', 'afternoon', 'afternoon', 'evening', 'evening', 'night', 'night']);
+  });
+
+  it('the quickest part and the slowest, from three timed revisions in each', () => {
+    const revised = [session(1, 5, 8), session(2, 5, 8), session(3, 6, 8), session(4, 22, 11), session(5, 22, 11), session(6, 23, 11), session(7, 13, 50)];
+    expect(quickestPart(revised, TODAY, 30)).toEqual({ quickest: { part: 'dawn', perPage: 1.6 }, slowest: { part: 'night', perPage: 2.2 } });
+  });
+
+  it('nothing from one part alone, from too few, or when they differ by under 0.2 min a page', () => {
+    expect(quickestPart([session(1, 5, 8), session(2, 5, 8), session(3, 5, 8)], TODAY, 30)).toBeNull();
+    expect(quickestPart([session(1, 5, 8), session(2, 5, 8), session(3, 5, 8), session(4, 22, 11), session(5, 22, 11)], TODAY, 30)).toBeNull();
+    expect(quickestPart([session(1, 5, 8), session(2, 5, 8), session(3, 5, 8), session(4, 22, 8.5), session(5, 22, 8.5), session(6, 22, 8.5)], TODAY, 30)).toBeNull();
   });
 });
 

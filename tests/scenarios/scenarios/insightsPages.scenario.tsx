@@ -206,3 +206,43 @@ it('[ACT-39] Weak spots’ page starts from its point: the pages weak now and th
   await app.until(() => shows(app, 'insights-revise-weak-done'), 'First tomorrow ✓');
   await app.close();
 });
+
+it('[ACT-40] Pace’s page starts from its point: minutes a page and its trend, week by week, and the part of the day they’re quickest', async () => {
+  setZone(ZONES.chicago);
+  setNow('2026-07-01 20:00');
+  const phone = new Phone();
+  const first = await newAccount(phone, { memorized: pagesRange(582, 604), user: { dailyPageCapacity: 5 } });
+  const uid = first.uid;
+  await first.close();
+  await markPreviewTester(uid);
+
+  /** Five pages revised on `day` at `hour` (Chicago), in `minutes`. */
+  const timed = async (n: number, hour: number, minutes: number) => {
+    const day = ago(n);
+    const at = new Date(`${day}T${String(hour + 6).padStart(2, '0')}:00:00.000Z`).getTime();
+    await setServerDoc(`users/${uid}/revisions/manual-${day}`, {
+      id: `manual-${day}`, uid, day, countsFor: day, occurredAt: at, source: 'manual', pages: [582, 583, 584, 585, 586], skipped: [], assigned: [], minutes, recordings: [],
+    });
+  };
+  // This week, six at dawn (6 AM) at 1.6 min a page; last week six in the morning (9 AM) at 2.2; a month before, 2.5.
+  for (const n of [1, 2, 3, 4, 5, 6]) await timed(n, 6, 8);
+  for (const n of [8, 9, 10, 11, 12, 13]) await timed(n, 9, 11);
+  for (const n of [40, 45, 50]) await timed(n, 9, 12.5);
+
+  setNow(`${TODAY} 09:00`);
+  const app = await openSection(phone, 'insights-row-pace');
+
+  // The point: 1.9 min a page, down from 2.5 the month before, over its twelve timed revisions.
+  await app.until(() => /^1\.9 min a page/.test(label(app, 'insights-pace-figure') ?? ''), 'the pace, 1.9');
+  expect(label(app, 'insights-pace-figure')).toBe('1.9 min a page, Down from 2.5 the month before');
+  expect(text(app, 'insights-pace-figure-line')).toBe('12 timed revisions, against the month before ›');
+
+  // Week by week from the first with a timed revision: this week on the line, last week on a tap.
+  expect(text(app, 'insights-pace-week')).toBe('This week · 1.6 min a page');
+  await tap(app, `insights-pace-chart-bar-${ago(7)}`);
+  expect(text(app, 'insights-pace-week')).toMatch(/^Week of \d+ \w+ · 2\.2 min a page$/);
+
+  // Quickest at dawn, slowest in the morning.
+  expect(text(app, 'insights-pace-quickest')).toBe('[sunny-outline] Quickest at dawn 1.6 min a page before 7 AM, 2.2 from 7 AM to noon.');
+  await app.close();
+});

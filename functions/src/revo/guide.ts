@@ -364,11 +364,11 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
 export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     title: 'Revised elsewhere, a day’s entry and Home',
-    covers: ['ACT-33', 'ACT-34', 'ACT-35', 'ACT-37', 'ACT-38', 'ACT-39', 'ACT-41', 'ACT-42', 'HOME-4', 'HOME-5', 'HOME-6', 'HOME-7', 'HOME-10'],
+    covers: ['ACT-33', 'ACT-34', 'ACT-35', 'ACT-37', 'ACT-38', 'ACT-39', 'ACT-40', 'ACT-41', 'ACT-42', 'HOME-4', 'HOME-5', 'HOME-6', 'HOME-7', 'HOME-10'],
     routes: ['Dashboard', 'Activity'],
     text: lines(
       '- A day’s + → “Revised elsewhere”: a search for a surah or juz, then the 30 juz. Tap a juz to choose it, hold for its parts. Extra pages never change the schedule.',
-      '- Activity is one tab: “This week” (“Month”: the calendar), the picked day (tap opens it; no note), then “Your revision”: a row per section opening its page (empty ones hidden), “Edit sections” last. A section’s page: its figure, ↑/↓ against before; Coverage’s juz slipping out of rotation, “Plan them”; Gaps’ days; Weak spots by week, the page weak most often. Spot tests: own line, block, search filter. A note can show under a take or spot test (Note sheet’s Show under or “Add a note”).',
+      '- Activity is one tab: “This week” (“Month”: the calendar), the picked day (tap opens it; no note), then “Your revision”: a row per section opening its page (empty ones hidden), “Edit sections” last. A section’s page: its figure, ↑/↓ against before; Coverage’s juz slipping out of rotation, “Plan them”; Gaps’ days; Weak spots and Pace by week, with the page weak most often and when they’re quickest. Spot tests: own line, block, search filter. A note can show under a take or spot test (Note sheet’s Show under or “Add a note”).',
       '- Home: a ring of today’s pages; “Recent sessions” is in Activity, “Home background” in Appearance.',
     ),
   },

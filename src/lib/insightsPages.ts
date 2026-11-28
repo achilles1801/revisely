@@ -248,3 +248,46 @@ export function weekBarLabel(end: string, today: string, short: boolean): string
   if (short) return formatDay(shiftDay(end, -6), { day: 'numeric' });
   return end === today ? t('activity.insights.weekThisShort') : weekStartWords(end);
 }
+
+// ── Pace (ACT-40) ────────────────────────────────────────────────────────
+
+export type DayPart = 'dawn' | 'morning' | 'afternoon' | 'evening' | 'night';
+
+/** Before 7 AM, 7 to noon, noon to 5 PM, 5 to 9 PM, after 9 PM: by the hour a session began, on the phone's clock. */
+export function dayPartOf(hour: number): DayPart {
+  return hour < 7 ? 'dawn' : hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : hour < 21 ? 'evening' : 'night';
+}
+
+/** A part needs this many timed revisions in the range to count. */
+export const PART_MIN_ITEMS = 3;
+
+/**
+ * When they're quickest (ACT-40): minutes a page of the timed revisions in the range by the part of the day each began,
+ * the quickest part and the slowest, from two parts with PART_MIN_ITEMS each, at least 0.2 min a page apart. Null otherwise.
+ */
+export function quickestPart(
+  revised: { day: string; countsFor?: string; pages: number[]; minutes: number | null; occurredAt?: number | null }[],
+  today: string,
+  window: number,
+): { quickest: { part: DayPart; perPage: number }; slowest: { part: DayPart; perPage: number } } | null {
+  const sums = new Map<DayPart, { minutes: number; pages: number; items: number }>();
+  for (const r of revised) {
+    if (r.countsFor != null && r.countsFor !== r.day) continue;
+    if (r.occurredAt == null || r.minutes == null || r.minutes <= 0 || r.pages.length === 0) continue;
+    const age = daysBetween(r.day, today);
+    if (age < 0 || age >= window) continue;
+    const part = dayPartOf(new Date(r.occurredAt).getHours());
+    const s = sums.get(part) ?? { minutes: 0, pages: 0, items: 0 };
+    s.minutes += r.minutes;
+    s.pages += r.pages.length;
+    s.items += 1;
+    sums.set(part, s);
+  }
+  const parts = [...sums.entries()].filter(([, s]) => s.items >= PART_MIN_ITEMS).map(([part, s]) => ({ part, perPage: s.minutes / s.pages }));
+  if (parts.length < 2) return null;
+  parts.sort((a, b) => a.perPage - b.perPage);
+  const quickest = parts[0];
+  const slowest = parts[parts.length - 1];
+  if (slowest.perPage - quickest.perPage < 0.2) return null;
+  return { quickest, slowest };
+}

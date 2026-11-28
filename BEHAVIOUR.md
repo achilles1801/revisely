@@ -1450,6 +1450,15 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   ("Al-Hashr, last page" over "weak in 3 sessions in the last 30 days"), which opens it in the reader, and "Revise the 4
   weak pages first tomorrow" (ACT-24; then "First tomorrow ✓"). Ask stays at the top and "See all pages by strength" at
   the foot. Without Smart Tracking it is ACT-12's line, as before.
+- **ACT-40.** (Revisely Dev) Pace's own page (ACT-35) starts from its point, "Am I getting quicker, and when am I
+  sharpest?" (same board). First minutes a page ("1.8 min a page") with its trend against the same length before ("↓ from
+  2.1", green when quicker; none over All time or when they read the same), over "24 timed revisions, against the 3 months
+  before ›", which lists each one (ACT-23). Then a card, "Minutes a page, week by week" (the range's weeks, 4 at least and
+  26 at most, from the first with a timed revision): the line over the chart is the newest week ("This week · 1.7 min a
+  page", or "no timed revisions") or the week tapped (ACT-41). Last, when they're quickest: the timed revisions in the range
+  by the part of the day each began (before 7 AM, 7 AM to noon, noon to 5 PM, 5 to 9 PM, after 9 PM, on the phone's clock),
+  from two parts with three each at least 0.2 min a page apart: "Quickest at dawn" over "1.6 min a page before 7 AM, 2.2
+  after 9 PM." Pace still needs ten timed items (ACT-4); the two tiles and "A 20-page day" are the two tabs' only.
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
   strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
   stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,
