@@ -205,8 +205,24 @@ export function hourRange(from: number, to: number): string {
  * the biggest first. Null with no timed minutes.
  */
 export function busiestHours(hours: number[]): string | null {
+  const runs = busiestRuns(hours);
+  if (runs.length === 0) return null;
+  const [first, second] = runs;
+  return second
+    ? t('lib.insights.mostlyThen', { hours: hourRange(first.from, first.to), next: hourRange(second.from, second.to) })
+    : t('lib.insights.mostly', { hours: hourRange(first.from, first.to) });
+}
+
+/** The busiest hours as words for the middle of a line ("5–7 AM"); null with no timed minutes (Consistency's Reading). */
+export function busiestRun(hours: number[]): string | null {
+  const [first] = busiestRuns(hours);
+  return first ? hourRange(first.from, first.to) : null;
+}
+
+/** The runs of hours each at least half the busiest, the biggest first. */
+function busiestRuns(hours: number[]): { from: number; to: number; total: number }[] {
   const max = Math.max(0, ...hours);
-  if (max <= 0) return null;
+  if (max <= 0) return [];
   const runs: { from: number; to: number; total: number }[] = [];
   for (let h = 0; h < 24; h++) {
     if (hours[h] < max / 2) continue;
@@ -217,10 +233,7 @@ export function busiestHours(hours: number[]): string | null {
     } else runs.push({ from: h, to: h + 1, total: hours[h] });
   }
   runs.sort((a, b) => b.total - a.total || a.from - b.from);
-  const [first, second] = runs;
-  return second
-    ? t('lib.insights.mostlyThen', { hours: hourRange(first.from, first.to), next: hourRange(second.from, second.to) })
-    : t('lib.insights.mostly', { hours: hourRange(first.from, first.to) });
+  return runs;
 }
 
 // ── Weak spots ───────────────────────────────────────────────────────────

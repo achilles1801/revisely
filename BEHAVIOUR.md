@@ -1238,7 +1238,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   memorized item, a read item and a note on that day. A month steps with ‹ ›. Every account's since the
   November 2026 release (testers' before).
 - **ACT-4.** Insights use one definition each: coverage is the share of memorized pages revised within the range
-  (ACT-22; a longer range never covers less, and it never shows 100% while a page is left); consistency is the days with a revision or a read; pace is shown
+  (ACT-22; a longer range never covers less, and it never shows 100% while a page is left); consistency is the days with a revision or a read (on Revisely Dev's Consistency page and its row, ACT-43, the days revised, and the days read apart); pace is shown
   only from at least ten timed items; juz untouched longest is the juz whose least recently revised page is
   oldest, or never revised in the 30 or more days on record (ACT-25), among the juz at least half memorized
   (a juz under half is shown as being learned, so a page memorized today never makes its juz the one
@@ -1414,8 +1414,9 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   Its bars sit side by side, each a button. A tap picks a bar: the line above the chart becomes that bar's value, and the
   other bars fade; the same bar again clears it. Nothing needs a press-and-hold. A bar can be stacked, its parts in the
   colours of its key. The value shows above every bar when there are 7 or fewer, otherwise above the lit one (the pick,
-  else the newest). The labels under the bars all show up to 10 bars, otherwise the two ends and the pick, and an end
-  next to the pick gives way to it. Its choices are a row of small pills (a range: 4 weeks, 3 months, a year; or Month
+  else the newest). The labels under the bars all show up to 10 bars, otherwise the two ends and the pick, each with room
+  of its own at its bar (64 pt, growing with the text), never cut to its bar's slot (a year of weeks on an SE left "31
+  Aug" 3 pt), and an end that would meet the pick's label gives way to it. Its choices are a row of small pills (a range: 4 weeks, 3 months, a year; or Month
   and Day). Memorization's chart (MEM-10) is this chart. It is never one block (Majd, Nov 28 2026, of a month drawn as
   one full-width bar: "plz ensure something like this never happens (garbage ui)"): a bar is at most 28 pt wide, and the
   chart has at least seven slots, the bars at the end (the newest at the right) and the slots before them empty, on an
@@ -1459,6 +1460,32 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   by the part of the day each began (before 7 AM, 7 AM to noon, noon to 5 PM, 5 to 9 PM, after 9 PM, on the phone's clock),
   from two parts with three each at least 0.2 min a page apart: "Quickest at dawn" over "1.6 min a page before 7 AM, 2.2
   after 9 PM." Pace still needs ten timed items (ACT-4); the two tiles and "A 20-page day" are the two tabs' only.
+- **ACT-43.** (Revisely Dev) Consistency's own page answers "how steady am I, and am I getting steadier?" (Majd, Nov 27
+  2026: "i can't even see how my consistent is the last month or two weeks ago or what my trend is ... what about
+  consistency is completing our cycles? or consistency in terms of reading a page ... i can't even click on an hour on that
+  chart i need to hold it down like what bro"; "yes build all seven screens" from the Insights v2 boards). One switch,
+  Revising | Full cycles | Reading, each from the range (ACT-22). Revising: the days with a revision, out of the range's
+  days ("85" "of 90 days"), with the trend against as many days just before as a chip ("↑ from 76", green up, red down,
+  "Same as before"), none over All time, on an account younger than the two spans or when the items don't reach back;
+  under it how many days most weeks (the middle half of the whole weeks: "6 or 7 days most weeks") and what the trend
+  compares ("The last 3 months against the 3 before"), or "Since 9 September" when the range is longer than the account.
+  The figure opens the calendar at this month. Then "Days revised, week by week": a bar a week (Sunday first, none before
+  the account's first week), its line the week tapped, else this one ("Week of 18 Oct · 6 of 7 days", "This week · 3 of 5
+  days so far"), with its own pills, 4 weeks, 3 months or a year, opening on the one nearest the range (the page reads a
+  year of items for it). Then "When you revise": the 24 hours as bars once timed revisions fall on 3 days (ACT-31), the
+  busiest in full colour; a tap on an hour (never a press-and-hold) makes the line that hour's minutes and sessions, the
+  same hour again puts back the busiest. Full cycles: a cycle runs from its first day until every page it needs (those
+  memorized by then) has been revised once, and the next begins the day after; the hero is those finished in the range on
+  time against the plan's days for one ("3" "of 4 on time", with the trend), with none finished the pages of the one under
+  way ("120" "of 305 pages this cycle"), and "Your plan goes round all 305 pages every 15 days." under it; then the one
+  under way ("This cycle", "6 days · 120 of 305 pages") and the last six finished, each by its dates with its days and on
+  time or so many days late, a bar of its days against the plan's with the days late in red. Reading: the days read the
+  same way ("of 90 days read"), the time read and its busiest hours ("12 h 40 min · mostly 6–7 AM"), and days read week by
+  week with their time. Each chart is ACT-41's. Nothing breaks on the data: with nothing in a span the chart's one line,
+  never an empty frame; the figure and its words one line on an SE at the largest text (the 34 pt number grows to 1.15× at
+  most); a cycle's name and detail each one line, side by side when both fit, else the detail under the name. The page's
+  row on the one tab (ACT-35) counts the days revised, as the page's first figure does, and its line is when they revise.
+  Elsewhere Consistency is as ACT-22 and ACT-23 say (the store app's two tabs).
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
   strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
   stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,

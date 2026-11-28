@@ -77,6 +77,8 @@ import { RecitationInsights } from './RecitationInsights';
 import { FirstSection, SectionAlone, useFirstSection, useSectionAlone } from './sectionPlace';
 import { SectionRow } from './SectionRow';
 import { ChartPills, LABELS_ALL_UP_TO, MEM_CHART, TapChart } from './TapChart';
+import { ConsistencyPage } from './ConsistencyPage';
+import { activityOneTabEnabled } from '../../lib/release/activityOneTab';
 import { consistencyRow, coverageRow, pagesRow, paceRow } from '../../lib/activityRowValues';
 import { DEFAULT_SECTIONS, sectionsToShow, type InsightsSection, type TabLayout } from '../../lib/activitySections';
 import { stillMarkedWords } from '../../lib/reciteInsights/insights';
@@ -1055,6 +1057,11 @@ function Consistency({
   last,
 }: { data: InsightsData; onOpenDay?: (day: string) => void; onOpenCalendar?: (month: string) => void } & AsRow) {
   const { palette } = useTheme();
+  // Revisely Dev's one tab (ACT-43): Consistency's own page is Revising | Full cycles | Reading, and its row counts the days
+  // revised, as the page's first figure does.
+  const v2 = activityOneTabEnabled();
+  const alone = useSectionAlone();
+  const revisedDays = useMemo(() => new Set(data.revised.map((r) => r.day)), [data.revised]);
   // ACT-4: a day counts with a revision or a read.
   const active = useMemo(() => new Set([...data.revised.map((r) => r.day), ...data.read.map((r) => r.day)]), [data.revised, data.read]);
   const range = data.range ?? 30;
@@ -1114,17 +1121,28 @@ function Consistency({
   const max = Math.max(1, ...hours);
 
   if (row) {
+    // The one tab's row (ACT-43): the days revised, and when they revise from the revisions' hours.
+    const shown = v2 ? activeDays(revisedDays, data.today, span.window, data.firstDay) : inRange;
+    const revisedHours = v2 ? minutesByHour(data.revised, data.today, span.window) : hours;
+    const when = v2 ? (timedDays(data.revised, data.today, span.window) >= HOURS_FROM_DAYS ? busiestHours(revisedHours) : null) : busiest && hoursShown ? busiest : null;
     return (
       <SectionRow
         title={t('activity.insights.consistency')}
         // When they revise, once three days have times; otherwise the figure says it all.
-        line={busiest && hoursShown ? busiest : null}
-        figure={consistencyRow(inRange.done, inRange.of).figure}
-        unit={consistencyRow(inRange.done, inRange.of).unit}
+        line={when}
+        figure={consistencyRow(shown.done, shown.of).figure}
+        unit={consistencyRow(shown.done, shown.of).unit}
         onPress={row}
         separator={!last}
         testID="insights-row-consistency"
       />
+    );
+  }
+  if (v2 && alone) {
+    return (
+      <Section title={t('activity.insights.consistency')} detail={t('activity.insights.consistencyDetail')} testID="insights-consistency">
+        <ConsistencyPage data={data} onOpenCalendar={onOpenCalendar} />
+      </Section>
     );
   }
   return (

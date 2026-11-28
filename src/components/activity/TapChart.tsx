@@ -13,7 +13,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import { PillButton } from '../v2/PillButton';
-import { ChromeText } from './ChromeText';
+import { CHROME_MAX_SCALE, ChromeText } from './ChromeText';
 import { t } from '../../i18n';
 
 export interface ChartBar {
@@ -23,6 +23,8 @@ export interface ChartBar {
   value: number;
   /** A stacked bar's parts, bottom first, in `colours`' order. */
   parts?: readonly number[];
+  /** A single-colour bar's own colour, in place of `colours`' first (Consistency's busiest hours, ACT-43). */
+  colour?: string;
   /** The value above the bar ("+3", "0.7"); none draws nothing there. */
   valueText?: string;
   /** Under the bar: a month's initial, a day's number, a week's date. */
@@ -66,14 +68,32 @@ export function litIndex(n: number, picked: number | null): number {
 }
 
 /**
- * Whether bar `i` of `n` has its label: every one up to LABELS_ALL_UP_TO, else the two ends and the pick. An end next to
- * the pick gives way to it, so two labels never run into each other.
+ * Whether bar `i` of `n` has its label: every one up to LABELS_ALL_UP_TO, else the two ends and the pick. An end within
+ * `room` bars of the pick gives way to it, so two labels never run into each other (`labelRoom`: how many bars a label
+ * spans past ten; 1 when a label is no wider than a bar).
  */
-export function labelShown(n: number, i: number, picked: number | null): boolean {
+export function labelShown(n: number, i: number, picked: number | null, room = 1): boolean {
   if (n <= LABELS_ALL_UP_TO) return true;
   if (i === picked) return true;
   if (i !== 0 && i !== n - 1) return false;
-  return picked == null || Math.abs(i - picked) > 1;
+  return picked == null || Math.abs(i - picked) > room;
+}
+
+/**
+ * Past ten bars a label is no longer held to its bar's slot (on a year of weeks a slot is 5 pt; "31 Aug" was cut to
+ * nothing): it gets LABEL_WIDTH points of its own (times the text size, chrome's at most), centred on its bar and kept
+ * inside the chart, the first from the chart's start and the last to its end. An end gives way to the pick when the two
+ * would meet: within this many bars.
+ */
+export const LABEL_WIDTH = 64;
+export function labelRoom(step: number, labelWidth: number): number {
+  return Math.max(1, Math.ceil((1.5 * labelWidth) / Math.max(step, 1e-6)));
+}
+
+/** Where a label past ten bars sits: its left edge in the chart, kept inside it. */
+export function labelLeft(i: number, lead: number, step: number, gap: number, labelWidth: number, width: number): number {
+  const centre = (lead + i) * step + (step - gap) / 2;
+  return Math.max(0, Math.min(width - labelWidth, centre - labelWidth / 2));
 }
 
 /** Whether bar `i` of `n` shows its value above it. */
@@ -117,7 +137,7 @@ export function TapChart({
   minSlots?: number;
 }) {
   const { palette } = useTheme();
-  const window = useWindowDimensions().width;
+  const { width: window, fontScale } = useWindowDimensions();
   // The chart's width, measured; until then the screen's less the section's gutters.
   const [measured, setMeasured] = useState<number | null>(null);
   const n = bars.length;
@@ -128,10 +148,15 @@ export function TapChart({
       </View>
     );
   }
-  const layout = chartLayout(n, measured ?? window - 32, maxBar, minSlots);
+  const width = measured ?? window - 32;
+  const layout = chartLayout(n, width, maxBar, minSlots);
   const pickedIndex = picked == null ? null : bars.findIndex((b) => b.key === picked);
   const pickAt = pickedIndex != null && pickedIndex >= 0 ? pickedIndex : null;
   const lit = litIndex(n, pickAt);
+  // Past ten bars, a label's own room (LABEL_WIDTH), grown with the text as chrome grows, never past half the chart.
+  const step = layout.slot + layout.gap;
+  const labelWidth = Math.min(width / 2, LABEL_WIDTH * Math.min(Math.max(fontScale, 1), CHROME_MAX_SCALE));
+  const room = labelRoom(step, labelWidth);
   const top = Math.max(max ?? 0, ...bars.map((b) => b.value), 1e-9);
   const { gap, lead } = layout;
   const blanks = Array.from({ length: lead }, (_, i) => <View key={`lead-${i}`} style={styles.col} testID={`${testID}-slot-empty`} />);
@@ -166,7 +191,11 @@ export function TapChart({
                   <View style={[styles.bar, styles.stack, { width: layout.bar, height: h, opacity: faded ? 0.45 : 1 }]} testID={`${testID}-fill-${b.key}`}>
                     {[...parts.keys()].reverse().map((k) =>
                       parts[k] > 0 ? (
-                        <View key={k} style={{ flex: parts[k], backgroundColor: colours[k] ?? colours[0] }} testID={`${testID}-part-${b.key}-${k}`} />
+                        <View
+                          key={k}
+                          style={{ flex: parts[k], backgroundColor: !b.parts && b.colour ? b.colour : (colours[k] ?? colours[0]) }}
+                          testID={`${testID}-part-${b.key}-${k}`}
+                        />
                       ) : null,
                     )}
                   </View>
@@ -176,21 +205,48 @@ export function TapChart({
           );
         })}
       </View>
-      <View style={[styles.labels, { gap }]}>
-        {Array.from({ length: lead }, (_, i) => <View key={`lead-${i}`} style={styles.label} />)}
-        {bars.map((b, i) => (
-          <ChromeText
-            key={b.key}
-            style={[typeV2.meta, styles.label, { color: i === pickAt ? palette.text : palette.secondary, fontWeight: i === pickAt ? '600' : '400' }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.6}
-            testID={`${testID}-label-${b.key}`}
-          >
-            {labelShown(n, i, pickAt) ? b.label : ''}
-          </ChromeText>
-        ))}
-      </View>
+      {n <= LABELS_ALL_UP_TO ? (
+        <View style={[styles.labels, { gap }]}>
+          {Array.from({ length: lead }, (_, i) => <View key={`lead-${i}`} style={styles.label} />)}
+          {bars.map((b, i) => (
+            <ChromeText
+              key={b.key}
+              style={[typeV2.meta, styles.label, { color: i === pickAt ? palette.text : palette.secondary, fontWeight: i === pickAt ? '600' : '400' }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}
+              testID={`${testID}-label-${b.key}`}
+            >
+              {b.label}
+            </ChromeText>
+          ))}
+        </View>
+      ) : (
+        // Past ten bars: the ends and the pick, each in room of its own at its bar (LABEL_WIDTH), never cut to its slot.
+        <View style={[styles.labelsFree, { height: Math.ceil(18 * Math.min(Math.max(fontScale, 1), CHROME_MAX_SCALE)) }]}>
+          {bars.map((b, i) => {
+            if (!labelShown(n, i, pickAt, room)) return null;
+            const left = labelLeft(i, lead, step, gap, labelWidth, width);
+            const align = left <= 0 ? 'left' : left >= width - labelWidth ? 'right' : 'center';
+            return (
+              <ChromeText
+                key={b.key}
+                style={[
+                  typeV2.meta,
+                  styles.labelFree,
+                  { left, width: labelWidth, textAlign: align, color: i === pickAt ? palette.text : palette.secondary, fontWeight: i === pickAt ? '600' : '400' },
+                ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+                testID={`${testID}-label-${b.key}`}
+              >
+                {b.label}
+              </ChromeText>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 }
@@ -226,6 +282,8 @@ const styles = StyleSheet.create({
   value: { width: 48, textAlign: 'center', fontWeight: '600', marginBottom: 3 },
   labels: { flexDirection: 'row', marginTop: 6 },
   label: { flex: 1, textAlign: 'center' },
+  labelsFree: { marginTop: 6 },
+  labelFree: { position: 'absolute', top: 0 },
   pills: { flexDirection: 'row', gap: 6, marginTop: 14 },
   empty: { alignItems: 'center', justifyContent: 'center', marginTop: 10, paddingHorizontal: 16 },
 });

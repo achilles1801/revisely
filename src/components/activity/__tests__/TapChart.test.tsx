@@ -4,7 +4,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { Dimensions } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { chartLayout, ChartPills, MAX_BAR_WIDTH, MIN_SLOTS, TapChart, type ChartBar } from '../TapChart';
+import { chartLayout, ChartPills, LABEL_WIDTH, MAX_BAR_WIDTH, MIN_SLOTS, TapChart, type ChartBar } from '../TapChart';
 
 const mockPalette = require('../../../theme/v2').paletteV2(false, 'crimson');
 jest.mock('../../../context/ThemeContext', () => ({ useTheme: () => ({ palette: mockPalette, theme: mockPalette, isDark: false }) }));
@@ -61,10 +61,63 @@ describe('[ACT-41] the chart', () => {
     expect(screen.queryAllByText(/^\d+$/)).toHaveLength(1);
     expect(screen.getByText('12')).toBeTruthy();
     expect(screen.getByTestId('chart-label-w0')).toHaveTextContent('L0');
-    expect(screen.getByTestId('chart-label-w5')).toHaveTextContent('');
+    expect(screen.queryByTestId('chart-label-w5')).toBeNull();
     fireEvent.press(screen.getByTestId('chart-bar-w5'));
     expect(screen.getByTestId('chart-label-w5')).toHaveTextContent('L5');
     expect(screen.getByText('6')).toBeTruthy();
+  });
+
+  // A year of weeks on an SE: a slot is about 3 pt, and a label held to it ("31 Aug") was cut to nothing (ACT-43).
+  it.each([
+    [320, 1],
+    [320, 3.1],
+    [440, 1],
+  ])('past 10 bars each label has room of its own, inside the chart, never cut to its slot (%i pt, text ×%s)', (width, fontScale) => {
+    const dims = jest.spyOn(Dimensions, 'get').mockReturnValue({ width, height: 800, scale: 3, fontScale });
+    try {
+      const chart = width - 32;
+      const labelWidth = Math.min(chart / 2, LABEL_WIDTH * Math.min(fontScale, 1.4));
+      render(<Harness n={52} />);
+      const shown = () =>
+        screen.queryAllByTestId(/^chart-label-/).map((el) => StyleSheet.flatten(el.props.style) as { left: number; width: number; textAlign: string });
+      const check = () => {
+        for (const s of shown()) {
+          expect(s.width).toBe(labelWidth);
+          expect(s.left).toBeGreaterThanOrEqual(0);
+          expect(s.left + s.width).toBeLessThanOrEqual(chart + 1e-6);
+        }
+        // Never two labels over each other.
+        const spans = shown().map((s) => [s.left, s.left + s.width]).sort((a, b) => a[0] - b[0]);
+        for (let i = 1; i < spans.length; i++) expect(spans[i][0]).toBeGreaterThanOrEqual(spans[i - 1][1] - 1e-6);
+      };
+      check();
+      expect(shown().map((s) => s.textAlign)).toEqual(['left', 'right']);
+      // Picked near an end, the end gives way; picked in the middle, all three.
+      fireEvent.press(screen.getByTestId('chart-bar-w2'));
+      check();
+      expect(screen.queryByTestId('chart-label-w0')).toBeNull();
+      fireEvent.press(screen.getByTestId('chart-bar-w2'));
+      fireEvent.press(screen.getByTestId('chart-bar-w26'));
+      check();
+      expect(screen.getByTestId('chart-label-w26')).toHaveTextContent('L26');
+      expect(shown().length).toBeGreaterThanOrEqual(2);
+    } finally {
+      dims.mockRestore();
+    }
+  });
+
+  it('a bar may have a colour of its own', () => {
+    render(
+      <TapChart
+        bars={[{ key: 'a', value: 2, colour: 'teal', label: 'A', spoken: 'A' }, { key: 'b', value: 1, label: 'B', spoken: 'B' }]}
+        picked={null}
+        onPick={jest.fn()}
+        colours={['red']}
+        testID="chart"
+      />,
+    );
+    expect(StyleSheet.flatten(screen.getByTestId('chart-part-a-0').props.style).backgroundColor).toBe('teal');
+    expect(StyleSheet.flatten(screen.getByTestId('chart-part-b-0').props.style).backgroundColor).toBe('red');
   });
 
   it('a stacked bar draws its parts in their colours, bottom first', () => {
