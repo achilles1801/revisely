@@ -155,7 +155,10 @@ describe('<WelcomeScreen />', () => {
     expect(styleOf('welcome').backgroundColor).toBe(light.bg);
     // Indigo has a glow; it draws behind and takes no touches.
     expect(screen.getByTestId('hero-glow').props.pointerEvents).toBe('none');
-    expect(screen.getByText(/Your Quran,/)).toBeTruthy();
+    // The app's line (Majd, Nov 27 2026: "yes lock it in"): "Even one verse counts.", with "counts." in the accent.
+    expect(screen.getByText(/Even one verse/)).toBeTruthy();
+    expect(screen.getByTestId('welcome-accent')).toHaveTextContent('counts.');
+    expect(screen.getByText('Read, revise or understand a verse a day, and come closer to the Qur’an.')).toBeTruthy();
     expect(styleOf('welcome-accent').color).toBe(light.accentText);
     expect(screen.getByText('Takes under a minute')).toBeTruthy();
     expect(arabicLines(screen.UNSAFE_root as never)).toHaveLength(1);
@@ -166,6 +169,35 @@ describe('<WelcomeScreen />', () => {
     expect(mockNavigation.navigate).toHaveBeenCalledWith('JourneySelect');
     // Taps don't buzz in the new design.
     expect(Haptics.impactAsync).not.toHaveBeenCalled();
+  });
+
+  it('the headline is the app’s line word for word, in English and Arabic; nothing in it is cut to fit', async () => {
+    const { en } = jest.requireActual('../../../i18n/en') as typeof import('../../../i18n/en');
+    const { ar } = jest.requireActual('../../../i18n/ar') as typeof import('../../../i18n/ar');
+    expect(`${en.onboarding.welcome.title} ${en.onboarding.welcome.accent}`).toBe(en.common.slogan);
+    expect(en.common.slogan).toBe('Even one verse counts.');
+    expect(`${ar.onboarding?.welcome?.title} ${ar.onboarding?.welcome?.accent}`).toBe(ar.common?.slogan);
+    expect(ar.common?.slogan).toBe('ولو آية');
+    const { i18n } = jest.requireActual('../../../i18n') as typeof import('../../../i18n');
+    for (const lang of ['en', 'ar'] as const) {
+      await i18n.changeLanguage(lang);
+      try {
+        await show(v2(<WelcomeScreen />));
+        // The middle scrolls, so the largest text never clips or pushes Begin away; the line and the one under it are
+        // never shortened to fit.
+        const headline = screen.getByRole('header');
+        const body = screen.getByText(lang === 'en' ? /come closer to the Qur’an/ : /لتقترب من القرآن/);
+        for (const node of [headline, body]) {
+          expect(node.props.numberOfLines).toBeUndefined();
+          expect(node.props.adjustsFontSizeToFit).toBeFalsy();
+        }
+        expect(screen.UNSAFE_root.findAll((n: { type: unknown }) => n.type === 'RCTScrollView').length).toBeGreaterThan(0);
+        expect(screen.getByTestId('welcome-accent')).toHaveTextContent(lang === 'en' ? 'counts.' : 'آية');
+        screen.unmount();
+      } finally {
+        await i18n.changeLanguage('en');
+      }
+    }
   });
 
   it('Jade glows in light too (#62), its accent text in ink', async () => {

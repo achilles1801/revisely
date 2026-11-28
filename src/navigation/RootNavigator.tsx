@@ -7,6 +7,7 @@ import { OnboardingNavigator } from './OnboardingNavigator';
 import { MainNavigator } from './MainNavigator';
 import { navigationRef } from './navigationRef';
 import AuthScreen from '../screens/auth/AuthScreen';
+import { signInBEnabled } from '../lib/release/signInB';
 import { ConnectToSetUp } from '../components/offline/ConnectToSetUp';
 import { WhatsNewScreen } from '../components/whatsNew/WhatsNewScreen';
 import { useWhatsNewDue } from '../components/whatsNew/useWhatsNewDue';
@@ -47,7 +48,12 @@ export function RootNavigator() {
   }
 
   const content = !signedIn ? (
-    <AuthScreen />
+    // Sign-in B in Revisely Dev (AUTH-3–5), today's screen in the store app. B's screens load only when it's on.
+    signInBEnabled() ? (
+      React.createElement((require('./AuthNavigator') as typeof import('./AuthNavigator')).AuthNavigator)
+    ) : (
+      <AuthScreen />
+    )
   ) : onboardingComplete ? (
     whatsNew === 'wait' ? (
       // A moment while the phone's copy is read (the card to resume on, the switch).

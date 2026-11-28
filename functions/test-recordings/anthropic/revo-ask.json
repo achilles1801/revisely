@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-11-28T02:35:57.929Z",
+  "recordedAt": "2026-11-28T03:24:34.239Z",
   "how": "functions/scripts/record-anthropic.js",
   "request": {
     "model": "claude-sonnet-5-5",
@@ -13,13 +13,13 @@
   "status": 200,
   "body": {
     "model": "claude-sonnet-5-5",
-    "id": "msg_011ChUYgsQz2LP9vPinpGegC",
+    "id": "msg_011ChUcPq7596dPmyV8ruP2K",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "{\"text\":\"You finished the whole plan on 4 of the last 6 days. Thursday was nearly there with 9 pages, and only Saturday was missed. Today you've done 4 of 10 pages so far.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised this week\",\"days\":7},\"textAfter\":\"Six pages are left today, so how about finishing them this evening?\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"6 pages left, starting in Al-Infitar\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Why was Saturday missed?\",\"Which pages are weak?\",\"How is my streak?\"]}"
+        "text": "{\"text\":\"You finished the whole plan on four of the last seven days, and revised on most of the others. Saturday was missed and Thursday fell one page short, so the week is mostly steady.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised, last 7 days\",\"days\":7},\"textAfter\":\"Today has 6 pages left, starting from Al-Infitar. Finishing them keeps your streak growing.\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"6 pages left, from Al-Infitar\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Why did Saturday slip?\",\"Which pages are weak?\",\"How is the month?\"]}"
       }
     ],
     "container": null,
@@ -28,13 +28,13 @@
     "stop_details": null,
     "usage": {
       "input_tokens": 551,
-      "cache_creation_input_tokens": 0,
-      "cache_read_input_tokens": 19801,
+      "cache_creation_input_tokens": 19801,
+      "cache_read_input_tokens": 0,
       "cache_creation": {
-        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 19801,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 221,
+      "output_tokens": 229,
       "output_tokens_details": {
         "thinking_tokens": 0
       },

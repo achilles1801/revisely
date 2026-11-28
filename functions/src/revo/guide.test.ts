@@ -91,7 +91,10 @@ describe('nothing a user can see is left out of the guide (Majd, Nov 16 2026)', 
   });
 
   it('a rule only Revisely Dev has is in the Dev guide, never in the guide every account gets', () => {
-    expect(devRules.filter((id) => !devCovered.includes(id))).toEqual([]);
+    // Unless a user never meets it in Revo, as for every account's rules: sign-in B's screens (AUTH-3–5) come before
+    // there is an account, as ACCOUNT-2's and AUTH-2's do. GUIDE_INTERNAL's own tests keep its reasons to those kinds.
+    const signedOut = (id: string) => GUIDE_INTERNAL[id]?.startsWith('signed out: ');
+    expect(devRules.filter((id) => !devCovered.includes(id) && !signedOut(id))).toEqual([]);
     expect(mainCovered.filter((id) => devRules.includes(id))).toEqual([]);
   });
 

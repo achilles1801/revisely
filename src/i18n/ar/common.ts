@@ -3,6 +3,7 @@ import type { ArStrings } from './types';
 
 export const common: NonNullable<ArStrings['common']> = {
   back: 'رجوع',
+  slogan: 'ولو آية',
   cancel: 'إلغاء',
   close: 'إغلاق',
   delete: 'حذف',

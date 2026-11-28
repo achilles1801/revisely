@@ -418,6 +418,22 @@ current basic sounds". October 2026's version was removed for the voices it offe
   account's sign-ins were ended on the server, or it was disabled or deleted), the sign-in screen says "You were
   signed out. Sign in again to carry on." until the next sign-in, and Sentry hears of it once, with no account
   details. A sign-out or an account deletion from the app says nothing.
+- **AUTH-3.** (Revisely Dev) Signed out, the app opens on sign-in's welcome (Majd's direction B, Nov 27 2026): the
+  basmala, "Revisely" and the app's line ("Even one verse counts."), then three buttons of one size at the foot:
+  Continue with Apple (only where the phone offers Sign in with Apple), Continue with Google and Continue with email, and
+  "By continuing you agree to the Terms", whose Terms opens them. AUTH-2's line shows under the app's line. An Apple or
+  Google sign-in that fails says why above the buttons and leaves the welcome as it was; one cancelled says nothing.
+- **AUTH-4.** (Revisely Dev) Continue with email opens the email page, ‹ back to the welcome: "Create your account"
+  (Name, Email, Password; "At least 8 characters."; Create account) or "Sign in with email" (Email, Password; Sign in;
+  Forgot password?). It opens on creating, or on signing in after AUTH-2's sign-out. The line at its foot switches
+  between them, and everything typed stays. A wrong password says "That password doesn't match this email." with Forgot
+  password?; an email that already has an account says "This email already has an account." with Sign in instead, which
+  switches to signing in with the email and password still typed. The fields' group turns red, and so does the label of
+  the field at fault. ACCOUNT-2 holds: a failed attempt keeps the page, its mode and what's typed. The fields and the
+  button stay above the keyboard, on an SE too.
+- **AUTH-5.** (Revisely Dev) Forgot password? opens a sheet over the email page, "Reset your password", with the email
+  already typed. Send link sends the reset email and says so ("Check your email"); one that fails keeps the email and
+  says why. Closing the sheet leaves the email page as it was.
 
 ## Settings
 

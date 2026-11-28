@@ -90,6 +90,8 @@ interface AuthContextType {
    */
   signInDropped: boolean;
   error: string | null;
+  /** Firebase's code for `error` (auth/wrong-password…), or null: what sign-in B colours red and offers (AUTH-4). */
+  errorCode: string | null;
   // Auth actions
   signUp: (email: string, password: string, name?: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
@@ -115,7 +117,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [signInDropped, setSignInDropped] = useState(false);
   // A sign-out or a deletion from the app: Firebase's "nobody" after it is the app's own doing.
   const leaving = useRef(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setErrorText] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
+  /** An attempt's error in words, and Firebase's code for a screen that says more about it (sign-in B, AUTH-4). */
+  const setError = (message: string | null, code?: string | null) => {
+    setErrorText(message);
+    setErrorCode(message == null ? null : (code ?? null));
+  };
 
   useEffect(() => {
     let answered = false;
@@ -179,7 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Don't throw - auth succeeded, Firestore init can be retried
         }
       } catch (err: any) {
-        setError(getErrorMessage(err.code));
+        setError(getErrorMessage(err.code), err?.code);
         throw err;
       } finally {
         setIsSigningIn(false);
@@ -208,7 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           logger.error('Failed to check/create Firestore user:', firestoreErr);
         }
       } catch (err: any) {
-        setError(getErrorMessage(err.code));
+        setError(getErrorMessage(err.code), err?.code);
         throw err;
       } finally {
         setIsSigningIn(false);
@@ -238,7 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           logger.error('Failed to initialize Google user in Firestore:', firestoreErr);
         }
       } catch (err: any) {
-        setError(getErrorMessage(err.code));
+        setError(getErrorMessage(err.code), err?.code);
         throw err;
       } finally {
         setIsSigningIn(false);
@@ -274,7 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           logger.error('Failed to initialize Apple user in Firestore:', firestoreErr);
         }
       } catch (err: any) {
-        setError(getErrorMessage(err.code));
+        setError(getErrorMessage(err.code), err?.code);
         throw err;
       } finally {
         setIsSigningIn(false);
@@ -296,7 +304,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await firestoreService.deleteAccount();
       } catch (err: any) {
         resumeBackup();
-        setError(getErrorMessage(err.code) || err?.message || 'Failed to delete account.');
+        setError(getErrorMessage(err.code) || err?.message || 'Failed to delete account.', err?.code);
         throw err;
       }
       // The account is gone from the server. Nothing below can undo that, or keep
@@ -345,7 +353,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       discardStoppedBackup();
     } catch (err: any) {
       resumeBackup();
-      setError(getErrorMessage(err.code));
+      setError(getErrorMessage(err.code), err?.code);
       throw err;
     } finally {
       setIsLoading(false);
@@ -357,7 +365,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await resetPassword(email);
     } catch (err: any) {
-      setError(getErrorMessage(err.code));
+      setError(getErrorMessage(err.code), err?.code);
       throw err;
     }
   };
@@ -376,6 +384,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         provisionalUid,
         signInDropped,
         error,
+        errorCode,
         signUp,
         signIn,
         signInWithGoogle,
