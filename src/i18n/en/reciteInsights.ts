@@ -32,7 +32,9 @@ export const reciteInsights = {
   surahAyah: '{{surah}} {{ayah}}',
   /** A slip into a similar ayah: "Al-Baqarah 48 → 123". */
   slip: '{{from}} → {{into}}',
-  slipWords: '«{{from}}» → «{{into}}» · {{ref}}',
+  // The ayahs' words are isolated (\u2068…\u2069), so the line still reads left to right: iOS takes a line's direction
+  // from its first letter, and the "·" before the reference landed at the left edge (Nov 28 2026).
+  slipWords: '\u2068«{{from}}»\u2069 → \u2068«{{into}}»\u2069 · {{ref}}',
   intoWords: '«{{words}}» in {{surah}} ({{ayah}})',
   timesLast: '{{times}}, last {{when}}',
   ayahN: 'ayah {{n}}',
