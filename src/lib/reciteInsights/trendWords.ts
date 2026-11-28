@@ -15,19 +15,31 @@ export function perPageText(rate: number): string {
   return formatNumber(tenths, { maximumFractionDigits: 1 });
 }
 
-/** The trend against the period before: better (fewer a page), worse, or the same to a tenth; none with nothing before. */
+/** The trend as Insights' pages' hero takes it (components/activity/InsightPageParts `Trend`). */
 export interface TrendChip {
-  dir: 'down' | 'up' | 'same';
   text: string;
+  up: boolean;
+  good: boolean;
+  label: string;
 }
 
-export function trendChip(now: Rate, before: Rate | null): TrendChip | null {
+/**
+ * The trend against the period before, as Insights' pages show it: fewer mistakes a page is better (green), more is ink,
+ * never red (information, not a warning); none when the same to a tenth or with nothing before.
+ */
+export function trendChip(now: Rate, before: Rate | null, beforeWords: string | null): TrendChip | null {
   const a = perPage(now);
   const b = before ? perPage(before) : null;
   if (a === null || b === null) return null;
   const then = perPageText(b);
-  if (perPageText(a) === then) return { dir: 'same', text: t('reciteInsights.page.same') };
-  return { dir: a < b ? 'down' : 'up', text: t('reciteInsights.page.from', { n: then }) };
+  if (perPageText(a) === then) return null;
+  const up = a > b;
+  return {
+    text: t('activity.insights.trendFrom', { value: then }),
+    up,
+    good: !up,
+    label: t(up ? 'activity.insights.trendUp' : 'activity.insights.trendDown', { value: then, before: beforeWords ?? '' }),
+  };
 }
 
 /** Under the figure: "40 takes · 98.8% of words said right · last 3 months against the 3 months before". */

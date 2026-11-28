@@ -82,9 +82,6 @@ export const reciteInsights = {
     /** After the figure ("0.5 mistakes a page"); the figure is to a tenth. */
     unit: 'mistakes a page',
     under: '<{{n}}',
-    /** The trend chip against the period before, beside an arrow. */
-    from: 'from {{n}}',
-    same: 'same as before',
     line: '{{takes}} · {{right}} of words said right · {{span}}',
     lineNoScore: '{{takes}} · {{span}}',
     /** "last 3 months against the 3 months before". */

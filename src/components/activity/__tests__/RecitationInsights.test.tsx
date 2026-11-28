@@ -109,9 +109,30 @@ describe('Insights: Recitation’s page (ACT-44, RINS-2)', () => {
     // month before, had none: so up, from 0.
     const now = rateOf(inRange(), words);
     expect(now.mistakes).toBe(6);
-    expect(text('insights-recitation-rate')).toBe(perPageText(perPage(now)!));
-    expect(text('insights-recitation-trend-up')).toBe('from 0');
-    expect(text('insights-recitation-line')).toMatch(/^5 takes · \d+\.\d% of words said right · last 30 days, against the month before$/);
+    expect(text('insights-recitation-hero-value')).toBe(perPageText(perPage(now)!));
+    expect(text('insights-recitation-hero-trend')).toBe('from 0');
+    expect(text('insights-recitation-hero-line')).toMatch(/^5 takes · \d+\.\d% of words said right · last 30 days, against the month before$/);
+  });
+
+  it('[ACT-44] the trend is Insights’ pages’ pill: green when fewer a page, ink when more (never red), none when the same', async () => {
+    const pill = () => StyleSheet.flatten(screen.getByTestId('insights-recitation-hero-trend').props.style).backgroundColor;
+    const before = take(-35, KAHF, [mark(w22, 'word')], 0.98);
+    // More mistakes a page than the month before (above: up from 0): ink, never red.
+    await open(data());
+    expect(pill()).toBe(mockPalette.fill);
+    expect(pill()).not.toBe(mockPalette.redSubtle);
+    // A full line puts the pill under the figure and its words, never a word wrapped (an SE at 1.1× text).
+    expect(StyleSheet.flatten(screen.getByTestId('insights-recitation-hero').props.style).flexWrap).toBe('wrap');
+    screen.unmount();
+    // Fewer: green, and VoiceOver hears which way.
+    await open(data({ recitation: { records: [before, take(-3, KAHF, [], 1)], words } }));
+    expect(pill()).toBe(mockPalette.goodSubtle);
+    expect(screen.getByTestId('insights-recitation-hero').props.accessibilityLabel).toMatch(/^0 mistakes a page, Down from \S+ the month before$/);
+    screen.unmount();
+    // The same to a tenth: no pill, and the line compares with nothing.
+    await open(data({ recitation: { records: [before, take(-3, KAHF, [mark(w22, 'word')], 0.98)], words } }));
+    expect(screen.queryByTestId('insights-recitation-hero-trend')).toBeNull();
+    expect(text('insights-recitation-hero-line')).toMatch(/· last 30 days$/);
   });
 
   it('[ACT-44] mistakes by kind, a bar a week: a tap on a week sets the line, a tap on a kind shows it alone', async () => {
@@ -234,15 +255,15 @@ describe('Insights: Recitation’s page (ACT-44, RINS-2)', () => {
   it('[ACT-44] takes kept without their final answer only: the takes, no rate', async () => {
     const unfinished = [{ ...take(-3, KAHF, [mark(w22, 'word')], 0.98), unfinished: true as const }];
     await open(data({ recitation: { records: unfinished, words } }));
-    expect(screen.queryByTestId('insights-recitation-rate')).toBeNull();
+    expect(screen.queryByTestId('insights-recitation-hero-value')).toBeNull();
     // Nothing before it to compare with: no chip, and the line says only its span.
-    expect(text('insights-recitation-line')).toBe('1 take · last 30 days');
+    expect(text('insights-recitation-hero-line')).toBe('1 take · last 30 days');
   });
 
   it('[ACT-44] takes without a mistake say so in place of empty bars', async () => {
     const clean = [take(-3, KAHF, [], 1), take(-1, BAQ, [], 1)];
     await open(data({ recitation: { records: clean, words } }));
-    expect(text('insights-recitation-rate')).toBe('0');
+    expect(text('insights-recitation-hero-value')).toBe('0');
     expect(text('insights-recitation-clean')).toBe('No mistakes in any of these takes');
     expect(screen.queryByTestId('insights-recitation-fixed')).toBeNull();
   });

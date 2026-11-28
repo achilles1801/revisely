@@ -134,8 +134,6 @@ export const reciteInsights: NonNullable<ArStrings['reciteInsights']> = {
   page: {
     unit: 'خطأ في الصفحة',
     under: '<{{n}}',
-    from: 'سابقًا {{n}}',
-    same: 'كالفترة السابقة',
     line: '{{takes}} · {{right}} من الكلمات صحيحة · {{span}}',
     lineNoScore: '{{takes}} · {{span}}',
     against: '{{last}}، مقارنةً مع {{before}}',

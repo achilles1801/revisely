@@ -28,7 +28,7 @@ import {
   weekStart,
 } from '../../../src/lib/reciteInsights/trend';
 import { kindName, perPageText, spanLabel, trendChip } from '../../../src/lib/reciteInsights/trendWords';
-import { CHROME_MAX_SCALE } from '../../../src/components/activity/ChromeText';
+import { CHROME_MAX_SCALE, STACK_AT_SCALE } from '../../../src/components/activity/ChromeText';
 import { PAGE_TYPE, tilesStack } from '../../../src/components/activity/RecitationInsights';
 import { formatNumber, t } from '../../../src/i18n';
 import { runs } from './fixtures';
@@ -205,17 +205,24 @@ const WIDE = 1.06;
 describe('[ACT-44] whatever the page shows stays whole, on an SE and a Pro Max, at any text size', () => {
   const scaleArb = fc.double({ min: 1, max: 3, noNaN: true }).map((s) => Math.min(s, CHROME_MAX_SCALE));
 
-  it('[ACT-44] the figure, its unit and the trend chip; the figure alone on its line at worst', () => {
+  it('[ACT-44] the figure and its unit side by side under 1.2× text, the pill beside or under them; none ever cut', () => {
     fc.assert(
       fc.property(fc.double({ min: 0, max: 99.9, noNaN: true }), fc.double({ min: 0, max: 99.9, noNaN: true }), scaleArb, (now, then, scale) => {
         const figure = textWidth(perPageText(now), 'figure@20', (PAGE_TYPE.figure / 20) * scale) * WIDE;
         const unit = textWidth(t('reciteInsights.page.unit'), 'title@17', (PAGE_TYPE.unit / 17) * scale);
-        const chip = trendChip({ takes: 1, pages: 1, mistakes: now, kinds: { words: now, hesitations: 0, slips: 0 } }, { takes: 1, pages: 1, mistakes: then, kinds: { words: then, hesitations: 0, slips: 0 } });
-        const chipW = chip ? textWidth(chip.text, 'meta@13', scale) * WIDE + 16 + 16 : 0;
+        const chip = trendChip(
+          { takes: 1, pages: 1, mistakes: now, kinds: { words: now, hesitations: 0, slips: 0 } },
+          { takes: 1, pages: 1, mistakes: then, kinds: { words: then, hesitations: 0, slips: 0 } },
+          'the month before',
+        );
+        // Insights' pages' pill (InsightPageParts): a 12 pt arrow, 3 between, 8 inside each side, 4 before it.
+        const chipW = chip ? textWidth(chip.text, 'meta@13', scale) * WIDE + 12 + 3 + 16 + 4 : 0;
         for (const w of WIDTHS) {
+          // The hero's row wraps when full (InsightHero): the pill goes under, then the words; each fits a line.
           expect(figure).toBeLessThanOrEqual(inner(w));
           expect(unit).toBeLessThanOrEqual(inner(w));
           expect(chipW).toBeLessThanOrEqual(inner(w));
+          if (scale < STACK_AT_SCALE) expect(figure + 6 + unit).toBeLessThanOrEqual(inner(w));
         }
       }),
       { numRuns: runs(300) },

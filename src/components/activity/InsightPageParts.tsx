@@ -4,11 +4,11 @@
 // what to do about it (`InsightAdvice`).
 
 import React from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { Tap } from '../v2/Tap';
-import { ChromeText, STACK_AT_SCALE } from './ChromeText';
+import { ChromeText } from './ChromeText';
 import { typeV2 } from '../../theme/v2';
 import { formatNumeral } from '../../i18n';
 import { chevron, forwardIcon } from '../../i18n/direction';
@@ -25,7 +25,11 @@ export interface Trend {
   label: string;
 }
 
-/** "91%  came round  ↑ from 84%", over one grey line; with `onPressLine` the line is a button and ends in ›. */
+/**
+ * "91%  came round  ↑ from 84%", over one grey line; with `onPressLine` the line is a button and ends in ›. The pill, then
+ * the words, go under the figure when the line is full (Recitation's "mistakes a page" on an SE at 1.1× text, ACT-44),
+ * never a word wrapped.
+ */
 export function InsightHero({
   value,
   unit,
@@ -44,7 +48,6 @@ export function InsightHero({
   testID?: string;
 }) {
   const { palette } = useTheme();
-  const stacked = useWindowDimensions().fontScale >= STACK_AT_SCALE;
   const lineText = line ? (
     <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>
       {line}
@@ -54,7 +57,7 @@ export function InsightHero({
   return (
     <View style={styles.hero}>
       <View
-        style={[styles.heroRow, stacked && styles.heroWrap]}
+        style={styles.heroRow}
         accessible
         accessibilityLabel={[`${value} ${spokenText(unit)}`, trend?.label].filter(Boolean).join(', ')}
         testID={testID}
@@ -178,8 +181,7 @@ export function AdviceButton({ title, onPress, label, testID }: { title: string;
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   hero: { marginTop: 4 },
-  heroRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  heroWrap: { flexWrap: 'wrap', rowGap: 4 },
+  heroRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 6, rowGap: 4 },
   heroNumber: { fontSize: 34, lineHeight: 40, fontWeight: '700', letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
   heroUnit: { fontSize: 17, lineHeight: 22, flexShrink: 1 },
   trend: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, marginStart: 4, alignSelf: 'center' },

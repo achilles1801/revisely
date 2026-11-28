@@ -62,12 +62,16 @@ import {
 import { markFill } from '../reciteLive/markColours';
 import { WordChip } from '../reciteLive/WordChip';
 import { ChartPills, TapChart, type ChartBar } from './TapChart';
+import { InsightCard, InsightHero } from './InsightPageParts';
 import { useFirstSection, useSectionAlone } from './sectionPlace';
 import { formatNumber, t } from '../../i18n';
 import { forwardIcon } from '../../i18n/direction';
 import type { RangeSpan } from '../../lib/insightsRange';
 
-/** The page's figures' sizes, for the fit checks (tests/scenarios/properties/recitationPage.property.ts). */
+/**
+ * The page's figures' sizes, for the fit checks (tests/scenarios/properties/recitationPage.property.ts): the hero's are
+ * Insights' pages' hero's (InsightPageParts `InsightHero`), the tiles' this page's own.
+ */
 export const PAGE_TYPE = { figure: 34, unit: 17, tileFigure: 28 } as const;
 
 /**
@@ -175,7 +179,8 @@ function RecitationPage({ records, words, today, window, inWords, span, smartTra
   const litAt = pickedAt >= 0 ? pickedAt : bars.length - 1;
 
   const rate = perPage(trend.now);
-  const chip = trendChip(trend.now, trend.before);
+  const chip = trendChip(trend.now, trend.before, range.before);
+  const line = heroLine(trend.takes, trend.score !== null ? formatAccuracy(trend.score) : null, range.lastWords, chip ? range.before : null);
   const slipping = allPassages ? ins.slipping : ins.slipping.slice(0, 1);
   const total = fixed.fixed + fixed.slipping;
 
@@ -209,47 +214,17 @@ function RecitationPage({ records, words, today, window, inWords, span, smartTra
         </View>
       ) : null}
 
-      {/* The trend first: mistakes a page in the range, against the period before. */}
+      {/* The trend first: mistakes a page in the range, against the period before (Insights' pages' hero). */}
       <View testID="insights-recitation-figure">
-        {trend.takes > 0 ? (
-          <>
-            {/* Takes kept without their final answer only (RECITE-11): no rate, the line alone. */}
-            {rate !== null ? (
-            <View style={styles.hero}>
-              <ChromeText style={[styles.big, { color: palette.text }]} numberOfLines={1} testID="insights-recitation-rate">
-                {perPageText(rate)}
-              </ChromeText>
-              <ChromeText style={[styles.unit, { color: palette.secondary }]} numberOfLines={1}>
-                {t('reciteInsights.page.unit')}
-              </ChromeText>
-              {chip ? (
-                <View
-                  style={[
-                    styles.chip,
-                    { backgroundColor: chip.dir === 'down' ? palette.goodSubtle : chip.dir === 'up' ? palette.redSubtle : palette.fill },
-                  ]}
-                  testID={`insights-recitation-trend-${chip.dir}`}
-                >
-                  {chip.dir !== 'same' ? (
-                    <Ionicons name={chip.dir === 'down' ? 'arrow-down' : 'arrow-up'} size={13} color={chip.dir === 'down' ? palette.good : palette.onRedSubtle} />
-                  ) : null}
-                  <ChromeText
-                    style={[typeV2.meta, styles.strong, { color: chip.dir === 'down' ? palette.good : chip.dir === 'up' ? palette.onRedSubtle : palette.secondary }]}
-                    numberOfLines={1}
-                  >
-                    {chip.text}
-                  </ChromeText>
-                </View>
-              ) : null}
-            </View>
-            ) : null}
-            <ChromeText style={[typeV2.meta, styles.heroLine, { color: palette.secondary }]} testID="insights-recitation-line">
-              {heroLine(trend.takes, trend.score !== null ? formatAccuracy(trend.score) : null, range.lastWords, chip ? range.before : null)}
-            </ChromeText>
-          </>
+        {trend.takes > 0 && rate !== null ? (
+          <InsightHero value={perPageText(rate)} unit={t('reciteInsights.page.unit')} trend={chip} line={line} testID="insights-recitation-hero" />
         ) : (
-          <ChromeText style={[typeV2.body, styles.heroLine, { color: palette.secondary }]} testID="insights-recitation-line">
-            {t('reciteInsights.noTakes', { when: inWords })}
+          // No takes in the range; or takes kept without their final answer only (RECITE-11): no rate, the line alone.
+          <ChromeText
+            style={[trend.takes > 0 ? typeV2.meta : typeV2.body, styles.heroLine, { color: palette.secondary }]}
+            testID="insights-recitation-hero-line"
+          >
+            {trend.takes > 0 ? line : t('reciteInsights.noTakes', { when: inWords })}
           </ChromeText>
         )}
       </View>
@@ -264,13 +239,7 @@ function RecitationPage({ records, words, today, window, inWords, span, smartTra
         }}
         testID="insights-recitation-span"
       />
-      <View style={[styles.card, { backgroundColor: palette.fill }]} testID="insights-recitation-chart">
-        <View style={styles.cardHead}>
-          <ChromeText style={[typeV2.name, styles.flex, { color: palette.text }]} accessibilityRole="header">
-            {chartTitle(chartSpan)}
-          </ChromeText>
-          <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{t('reciteInsights.page.aPage')}</ChromeText>
-        </View>
+      <InsightCard title={chartTitle(chartSpan)} hint={t('reciteInsights.page.aPage')} testID="insights-recitation-chart">
         {anyTakes ? (
           <>
             <View style={styles.legend}>
@@ -323,7 +292,7 @@ function RecitationPage({ records, words, today, window, inWords, span, smartTra
             {t('reciteInsights.noTakes', { when: spanIn(chartSpan) })}
           </ChromeText>
         )}
-      </View>
+      </InsightCard>
 
       {/* What you've put right, and what still slips. */}
       {total > 0 ? (
@@ -503,15 +472,8 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 6 },
   title: { fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.3 },
   ask: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32, borderRadius: 16, borderWidth: 1, paddingHorizontal: 12 },
-  // The hero: the figure, its unit and the trend chip; the chip goes under them when the line is full.
-  hero: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 6, rowGap: 6, marginTop: 6 },
-  big: { fontSize: PAGE_TYPE.figure, lineHeight: 40, fontWeight: '700', letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
-  unit: { fontSize: PAGE_TYPE.unit, lineHeight: 22, fontWeight: '500' },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, alignSelf: 'center' },
   strong: { fontWeight: '600' },
   heroLine: { marginTop: 4 },
-  card: { marginTop: 12, borderRadius: 16, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 12 },
-  cardHead: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   kind: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 14, paddingHorizontal: 10, minHeight: 28, maxWidth: '100%' },
   dot: { width: 8, height: 8, borderRadius: 4 },

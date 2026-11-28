@@ -1557,12 +1557,12 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   what mistakes has the user corrected and doesn't make anymore and which are still slipping all the time and maybe even
   length of recitations"; "yes build all seven screens" from its board).
   - First, the mistakes a page in Insights' range ("0.5 mistakes a page"), with a chip against the same length before it
-    ("↓ from 0.9", green when fewer, red when more, "same as before" to a tenth; none for All time or with no takes
-    before), and its takes, the words said right and the span ("40 takes · 98.8% of words said right · last 3 months,
+    ("↓ from 0.9": green when fewer; ink, never red, when more; none when the same to a tenth, for All time or with no
+    takes before; Insights' pages' hero, InsightPageParts, the pill under the figure when the line is full), and its takes, the words said right and the span ("40 takes · 98.8% of words said right · last 3 months,
     against the 3 months before"; "against" only with the chip). A page is fair to long and short takes: each page a take reached counts by the share
     of its words recited, a line at least. Mistakes are the take summary's: never Not clear, a word corrected straight
     away or a tajweed note; a take kept without its final answer never counts in a rate.
-  - Then the mistakes a page by kind on Insights' one chart (ACT-41), stacked: wrong or skipped words, hesitations (an
+  - Then the mistakes a page by kind on Insights' one chart (ACT-41) in Insights' pages' card, stacked: wrong or skipped words, hesitations (an
     extra word), harakat and letters. 4 weeks or 3 months draw a bar a week (from its Monday, this week last), a year a
     bar a month; the range sets which it opens on, and the pills change it. Every week or month of the span has its
     slot, so a young account's chart is never one wide block. It opens on the newest week or month with takes, picked;
