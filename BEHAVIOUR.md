@@ -1501,7 +1501,8 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   always says which: the longest and the most recent, each with its dates (one tile when they are the same gap, "your
   only gap" when there is one), and the days usually revised between gaps (the median, from two gaps; "usually" from
   three); lengths short enough for a third of an SE ("2 days", "3 wk", "2 mo", "60+ days"; Days makes them exact), never
-  wrapping, the tiles stacking from text 1.2 times the usual size. Then every day of the range: revised in the accent,
+  wrapping, the tiles stacking from text 1.2 times the usual size. Then every day of the range, its card named by the same span as the figure ("Every day, last 3 months", or "Every
+  day, since 3 November" on an account younger than the range): revised in the accent,
   one day missed (not a gap) grey, a gap's days on a quiet red with a red edge, today outlined until revised; 7 a row up to
   a month, 15 up to 100 days, 21 for longer, so a year still fits an SE. A tap on any day of a gap picks it: the line above
   becomes its days and length ("20–21 Nov · 2 days"), the gap fills red, and a tap on the line opens it on the calendar
