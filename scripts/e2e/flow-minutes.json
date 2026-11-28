@@ -28,7 +28,8 @@
     "20-long-take": 15,
     "21-long-session": 16,
     "22-memorized-picker": 12,
-    "23-journal-design": 14
+    "23-journal-design": 14,
+    "24-insights-young": 12
   },
   "android": {
     "01-onboarding": 3,
@@ -58,6 +59,7 @@
     "20-long-take": 13,
     "21-long-session": 13.5,
     "22-memorized-picker": 10,
-    "23-journal-design": 12
+    "23-journal-design": 12,
+    "24-insights-young": 8
   }
 }

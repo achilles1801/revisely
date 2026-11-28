@@ -1,6 +1,8 @@
 # Insights' seven pages, from the one Activity tab's rows, in their order (activitySections' INSIGHTS_SECTIONS). Run by
-# 09-insights-pages.yaml, from Home, with `e2e/insights-pages` on.
-#   env THEME: light or dark, for the screenshots' names
+# 09-insights-pages.yaml and 24-insights-young.yaml, from Home, with `e2e/insights-pages` on. The list first
+# (09-insights-list-<THEME>): a section shows once it has something to say (Recitation needs takes, which the Activity
+# seed hasn't), so a page whose row isn't there is skipped, and the list's shot says which.
+#   env THEME: the screenshots' names' last part (light, dark, young-light, young-dark)
 appId: com.revisionbuddy.app
 ---
 - tapOn:
@@ -12,7 +14,22 @@ appId: com.revisionbuddy.app
 # From the list's top: the dark pass comes back to where the light one left it.
 - scrollUntilVisible:
     element:
-      id: insights-row-coverage
+      id: activity-sections-list
+    direction: UP
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: activity-edit-sections
+    direction: DOWN
+    timeout: 20000
+    optional: true
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-list-${THEME}
+- scrollUntilVisible:
+    element:
+      id: activity-sections-list
     direction: UP
     timeout: 20000
 - runFlow:

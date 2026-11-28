@@ -21,6 +21,11 @@ appId: com.revisionbuddy.app
     link: revisely://e2e/insights-pages?on=1
     optional: true
 - runFlow: ../subflows/open-link-prompt.yaml
+# Recitation's section needs mistake detection, Revisely Dev's; with no takes on the Activity seed its row stays away.
+- openLink:
+    link: revisely://e2e/recite-live?on=1
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
 - extendedWaitUntil:
     visible:
       id: today-post

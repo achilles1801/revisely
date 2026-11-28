@@ -1,7 +1,7 @@
-# One Insights page from its row on the one Activity tab: the top, then the end, then back to the list. Screenshots
-# 09-insights-<SECTION>-<THEME> and 09-insights-<SECTION>-end-<THEME>. Run by insights-pages.yaml.
+# One Insights page from its row on the one Activity tab, if the row is there: the top, then the end, then back to the
+# list. Screenshots 09-insights-<SECTION>-<THEME> and 09-insights-<SECTION>-end-<THEME>. Run by insights-pages.yaml.
 #   env SECTION: the section's id (coverage, consistency, gaps, weak, recitation, memorization, pace)
-#   env THEME:   light or dark
+#   env THEME:   the screenshots' names' last part
 appId: com.revisionbuddy.app
 ---
 - scrollUntilVisible:
@@ -9,30 +9,36 @@ appId: com.revisionbuddy.app
       id: insights-row-${SECTION}
     direction: DOWN
     centerElement: true
-    timeout: 30000
+    timeout: 20000
+    optional: true
 - runFlow:
-    file: tap-to-open.yaml
-    env:
-      ID: insights-row-${SECTION}
-      OPENS: activity-section
-- runFlow:
-    file: shot.yaml
-    env:
-      NAME: 09-insights-${SECTION}-${THEME}
-# The end: three long swipes reach it on every page at the seed's length.
-- repeat:
-    times: 3
+    when:
+      visible:
+        id: insights-row-${SECTION}
     commands:
-      - swipe:
-          start: 50%, 80%
-          end: 50%, 20%
-          duration: 500
-- runFlow:
-    file: shot.yaml
-    env:
-      NAME: 09-insights-${SECTION}-end-${THEME}
-- runFlow:
-    file: tap-to-open.yaml
-    env:
-      ID: back
-      OPENS: activity-blocks-views
+      - runFlow:
+          file: tap-to-open.yaml
+          env:
+            ID: insights-row-${SECTION}
+            OPENS: activity-section
+      - runFlow:
+          file: shot.yaml
+          env:
+            NAME: 09-insights-${SECTION}-${THEME}
+      # The end: three long swipes reach it on every page at the seed's length.
+      - repeat:
+          times: 3
+          commands:
+            - swipe:
+                start: 50%, 80%
+                end: 50%, 20%
+                duration: 500
+      - runFlow:
+          file: shot.yaml
+          env:
+            NAME: 09-insights-${SECTION}-end-${THEME}
+      - runFlow:
+          file: tap-to-open.yaml
+          env:
+            ID: back
+            OPENS: activity-blocks-views

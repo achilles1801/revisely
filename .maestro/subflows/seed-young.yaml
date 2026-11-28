@@ -1,0 +1,10 @@
+# Fills this flow's account as a young one (scripts/seed-young.js: two weeks of revising, a month of memorizing Juz 30),
+# then its few takes (scripts/seed-recite-takes.js, which needs the flow's CLOCK on 16 November 2026). Seeded once the
+# app has sent its own changes (app-sent.yaml), as seed-activity.yaml is.
+appId: com.revisionbuddy.app
+---
+- runFlow: app-sent.yaml
+- runScript:
+    file: ../scripts/seed-young.js
+- runScript:
+    file: ../scripts/seed-recite-takes.js
