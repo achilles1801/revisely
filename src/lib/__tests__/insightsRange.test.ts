@@ -1,3 +1,4 @@
+import { memorizedItemShare } from '../memorizedAyahs';
 import {
   activeDays,
   beforeWords,
@@ -140,6 +141,18 @@ describe('Insights’ range', () => {
     expect(memorizedIn(items, TODAY, 7)).toBe(1);
     expect(memorizedIn(items, TODAY, 30)).toBe(3);
     expect(memorizedIn(items, TODAY, 90)).toBe(3);
+  });
+
+  it('[MEM-12] counts by page share, as the bars do: a few ayahs of a page are part of a page, not a page', () => {
+    // Al-Baqarah 6–7 are part of its second page (page 3, 6–16); a whole page counts one.
+    const items = [
+      { day: TODAY, pages: [3], verses: [2006, 2007] },
+      { day: TODAY, pages: [4] },
+    ];
+    const n = memorizedIn(items, TODAY, 7);
+    expect(n).toBeGreaterThan(1);
+    expect(n).toBeLessThan(2);
+    expect(n).toBe(Math.round((memorizedItemShare(items[0]) + 1) * 10) / 10);
   });
 });
 

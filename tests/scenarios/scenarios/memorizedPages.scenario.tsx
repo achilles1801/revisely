@@ -165,7 +165,7 @@ it('[MEM-9] Memorized pages are off Home; Settings has them under Revision, edit
   await app.close();
 });
 
-it('[MEM-10] Activity’s Memorization opens the memorized pages; its chart starts at the first month or day memorized, by month or by day', async () => {
+it('[MEM-10] [MEM-12] Activity’s Memorization opens the memorized pages; its chart starts at the first month or day memorized, by month or by day, opening on Day under two months, in an axis of slots', async () => {
   const phone = await account();
   // Two pages memorized on Monday, one on Thursday (Today), so the days run from Monday, the months from November.
   for (const [at, page] of [[`${MONDAY} 09:00`, 561], ['2026-11-05 09:00', 560]] as const) {
@@ -187,11 +187,15 @@ it('[MEM-10] Activity’s Memorization opens the memorized pages; its chart star
   const app = await phone.open(devStack);
   await new Home(app).ready();
   await go(app, (n) => n.navigate('ActivitySection', { section: 'memorization' }));
-  await app.until(() => has(app, 'insights-memorization') && has(app, 'insights-memorization-bars-month'), 'Memorization');
-
-  // By month: November alone, no empty months before it.
-  expect(order(app, /^insights-memorization-bar-/)).toEqual(['insights-memorization-bar-2026-11']);
+  // Under two months of memorizing, it opens on Day (MEM-12).
+  await app.until(() => has(app, 'insights-memorization') && has(app, 'insights-memorization-bars-day'), 'Memorization, by day');
   expect(has(app, 'insights-edit-memorized')).toBe(true);
+
+  // By month: November alone, no empty months before it, in an axis of six slots (MEM-12).
+  await tap(app, 'insights-memorization-month');
+  await app.until(() => has(app, 'insights-memorization-bars-month'), 'the months');
+  expect(order(app, /^insights-memorization-bar-/)).toEqual(['insights-memorization-bar-2026-11']);
+  expect(app.screen.queryAllByTestId('memorization-slot-empty').length).toBe(2 * 5);
 
   // By day: from Monday, the first day memorized, to today.
   await tap(app, 'insights-memorization-day');
