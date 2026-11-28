@@ -91,6 +91,14 @@ export const DEFAULT_SECTIONS: SectionsLayout = {
   insights: { order: [...INSIGHTS_SECTIONS], hidden: [] },
 };
 
+/**
+ * Each side of a section page's top bar (ActivitySectionScreen): room for the range chip ("3 months ⌄", about 112 pt at 1×),
+ * whose label grows with the text up to ChoiceChip's 1.4×. Back and help, on the other side, need less.
+ */
+export function sectionBarSide(fontScale: number): number {
+  return Math.ceil(116 + 70 * (Math.min(Math.max(fontScale, 1), 1.4) - 1));
+}
+
 export const activitySectionsKey = (uid: string) => `@revisely_activity_sections:v1:${uid}`;
 
 /** Every signed-in account, from the mistake detection release (1.0.5; Majd, Nov 17 2026: Activity sections are in). */

@@ -2,19 +2,21 @@
 // as Insights drew it (Coverage's juz tiles, Consistency's days, and so on). Opened from its row on the one Activity tab.
 
 import React, { useRef } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, useWindowDimensions } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 // Gesture Handler's, as Activity's own: the tab pager's swipe must be able to start (CLAUDE.md, UI traps).
 import { ScrollView } from 'react-native-gesture-handler';
 import { TopSafeAreaView } from '../../components/SafeAreaView';
-import { TopBar } from '../../components/v2/TopBar';
+import { BarTitle, IconButton, TopBar } from '../../components/v2/TopBar';
+import { t } from '../../i18n';
+import { backIcon } from '../../i18n/direction';
 import { ActivityBlocksViews } from '../../components/activity/ActivityBlocksViews';
 import { InsightsRangeChip } from '../../components/activity/InsightsRangeChip';
 import { HelpButton } from '../../components/help/HelpButton';
 import { useTabBarFootprint } from '../../navigation/TabBar';
 import { useRevoFootprint } from '../../lib/revo/presence';
-import { SECTION_LABELS } from '../../lib/activitySections';
+import { SECTION_LABELS, sectionBarSide } from '../../lib/activitySections';
 import { journalFirstDay } from '../../lib/journal';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -30,18 +32,21 @@ export default function ActivitySectionScreen() {
   const bottom = useTabBarFootprint() + useRevoFootprint();
   const { props, toast } = useInsightsActions(bottom);
   const refresh = useRef<(() => Promise<unknown>) | null>(null);
+  const { fontScale } = useWindowDimensions();
   return (
     <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} testID="activity-section">
+      {/* Back and help on one side, the range on the other, so the name has the middle: with both on the right (sides of
+          150 pt) it had 70 pt on a 402 pt iPhone and every name was cut ("Memo…", "Cover…"; the iOS E2E shots, Nov 28). */}
       <TopBar
-        title={SECTION_LABELS.insights[section]}
-        onBack={() => navigation.goBack()}
-        right={
+        center={<BarTitle title={SECTION_LABELS.insights[section]} fit />}
+        left={
           <>
+            <IconButton icon={backIcon()} onPress={() => navigation.goBack()} label={t('common.back')} size={26} testID="back" />
             <HelpButton screen="insights" />
-            <InsightsRangeChip firstDay={journalFirstDay(user, [])} testID="section-range" />
           </>
         }
-        sideWidth={150}
+        right={<InsightsRangeChip firstDay={journalFirstDay(user, [])} testID="section-range" />}
+        sideWidth={sectionBarSide(fontScale)}
         separator
       />
       <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: bottom + layoutV2.rowPad }} contentInsetAdjustmentBehavior="never">
