@@ -31,24 +31,21 @@ function sheetsGone() {
 }
 
 describe('<KahfPost />', () => {
-  // Majd, Nov 27 2026: "i'm open to redesigning the surah kahf card". One quiet row: its pages and until when, never
-  // their numbers (NAME-1), ending in Read; no buttons (HOME-5).
-  it('suggests Al-Kahf in one line: its pages, until maghrib, then Read', async () => {
+  it('suggests Al-Kahf with its pages', async () => {
     renderPost();
-    expect(await screen.findByText('It’s Friday. 12 pages, before maghrib.')).toBeTruthy();
-    expect(screen.getByText('Read')).toBeTruthy();
-    expect(screen.queryByText(/293/)).toBeNull();
+    expect(await screen.findByText("It's Friday. Read Surah Al-Kahf.")).toBeTruthy();
+    expect(screen.getByText('The whole surah, pages 293–304.')).toBeTruthy();
   });
 
   it('[KAHF-1] on Thursday evening, says Friday began at maghrib', async () => {
     renderPost('prompt', true);
-    expect(await screen.findByText('Friday began at maghrib. 12 pages.')).toBeTruthy();
-    expect(screen.queryByText('It’s Friday. 12 pages, before maghrib.')).toBeNull();
+    expect(await screen.findByText('Friday began at maghrib. Read Surah Al-Kahf.')).toBeTruthy();
+    expect(screen.queryByText("It's Friday. Read Surah Al-Kahf.")).toBeNull();
   });
 
   it('Read opens the surah; Not today, in its menu, dismisses', async () => {
     const props = renderPost();
-    fireEvent.press(await screen.findByLabelText(/Read Surah Al-Kahf$/));
+    fireEvent.press(await screen.findByLabelText('Read Surah Al-Kahf'));
     expect(props.onRead).toHaveBeenCalled();
     fireEvent.press(screen.getByLabelText('Al-Kahf options'));
     fireEvent.press(screen.getByLabelText('Not today'));
@@ -80,7 +77,7 @@ describe('<KahfPost />', () => {
     expect(await screen.findByText('Done for this Friday.')).toBeTruthy();
     expect(screen.queryByLabelText('Mark Surah Al-Kahf as read')).toBeNull();
     expect(screen.queryByLabelText('Al-Kahf options')).toBeNull();
-    fireEvent.press(screen.getByLabelText(/Open Surah Al-Kahf$/));
+    fireEvent.press(screen.getByLabelText('Open Surah Al-Kahf'));
     expect(props.onRead).toHaveBeenCalled();
   });
 });

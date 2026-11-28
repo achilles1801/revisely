@@ -1,32 +1,26 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Text } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
 import { KAHF_MINUTE_CHOICES, KAHF_DEFAULT_MINUTES, kahfPages } from '../../../lib/kahf';
-import { NBSP } from '../../../lib/passages';
-import { arabicV2, typeV2 } from '../../../theme/v2';
+import { arabicV2 } from '../../../theme/v2';
 import { ActionSheet } from '../../v2/ActionSheet';
 import { Mark } from '../../v2/Mark';
-import { Tap } from '../../v2/Tap';
+import { PillButton } from '../../v2/PillButton';
 import { RowText, ThreadRow } from '../../v2/ThreadRow';
 import { arabicLabelLines } from '../../../lib/platformUi';
 import { t } from '../../../i18n';
 
-/** How far the card's line grows with Dynamic Type before it wraps (as Today's lines). */
-const LINE_MAX_SCALE = 1.6;
-
 /**
- * The Islamic Friday on Home (Thursday's maghrib to Friday's, KAHF-1): one quiet row suggesting Surah Al-Kahf, in the
- * calmer Home's own words (Majd, Nov 27 2026: "i'm open to redesigning the surah kahf card"; board:
- * ~/Documents/revisely-today-mocks/kahf-v2/). A tap on the row, or on "Read" ending its grey line, opens it (KAHF-2);
- * the check beside ⋯ marks it read, asking how long it took (a sheet), and logs a reading session; ⋯ hides it until
- * Friday's maghrib (KAHF-3). No buttons: Home's one solid button stays the Today post's (HOME-5). Once read, its mark is
- * the check and the line says so.
+ * The Islamic Friday on Home (Thursday's maghrib to Friday's, KAHF-1): a post
+ * suggesting Surah Al-Kahf. Read opens it; "Mark as read" asks how long it took
+ * (a sheet) and logs a reading session; ⋯ hides it until Friday's maghrib. Once
+ * read, its mark is done.
  */
 export function KahfPost({
   state,
   eve = false,
   saving = false,
+  quietRead = false,
   onRead,
   onMarkRead,
   onDismiss,
@@ -35,6 +29,8 @@ export function KahfPost({
   /** Thursday evening, after maghrib: Friday has begun but the revision day is still Thursday's. */
   eve?: boolean;
   saving?: boolean;
+  /** HOME-5 (Revisely Dev): Read is an outline like "Mark as read", so Home's one solid button is the Today post's. */
+  quietRead?: boolean;
   onRead: () => void;
   onMarkRead: (minutes: number) => void;
   onDismiss: () => void;
@@ -42,10 +38,9 @@ export function KahfPost({
   const { palette } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [picking, setPicking] = useState(false);
-  const n = kahfPages().length;
+  const pages = kahfPages();
+  const range = t('home.kahf.range', { from: pages[0], to: pages[pages.length - 1] });
   const done = state === 'done';
-  const line = done ? t('home.kahf.doneFriday') : eve ? t('home.kahf.fridayBegan', { n }) : t('home.kahf.itsFriday', { n });
-  const link = done ? t('home.kahf.open') : t('home.kahf.read');
 
   return (
     <>
@@ -58,46 +53,35 @@ export function KahfPost({
           </Text>
         }
         meta={t('home.kahf.friday')}
-        figure={
-          done ? undefined : (
-            <Tap
-              onPress={() => setPicking(true)}
-              disabled={saving}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={t('home.kahf.markReadLabel')}
-              accessibilityState={{ disabled: saving, busy: saving }}
-              style={[styles.check, { borderColor: palette.outline, opacity: saving ? 0.5 : 1 }]}
-              testID="kahf-mark"
-            >
-              <Ionicons name="checkmark" size={18} color={palette.secondary} />
-            </Tap>
-          )
-        }
         onMenu={done ? undefined : () => setMenuOpen(true)}
         menuLabel={t('home.kahf.options')}
-        onPress={onRead}
         testID="kahf-post"
+        footer={
+          done ? (
+            <PillButton title={t('home.kahf.open')} variant="outline" onPress={onRead} accessibilityLabel={t('home.kahf.openLabel')} />
+          ) : (
+            <>
+              <PillButton
+                title={t('home.kahf.read')}
+                variant={quietRead ? 'outline' : 'solid'}
+                onPress={onRead}
+                accessibilityLabel={t('home.kahf.readLabel')}
+                testID="kahf-read"
+              />
+              <PillButton
+                title={saving ? t('common.saving') : t('home.kahf.markRead')}
+                variant="outline"
+                onPress={() => setPicking(true)}
+                disabled={saving}
+                accessibilityLabel={t('home.kahf.markReadLabel')}
+                testID="kahf-mark"
+              />
+            </>
+          )
+        }
       >
-        <Tap
-          onPress={onRead}
-          hitSlop={6}
-          accessibilityRole="button"
-          accessibilityLabel={`${line} ${done ? t('home.kahf.openLabel') : t('home.kahf.readLabel')}`}
-          style={styles.line}
-          testID="kahf-read"
-        >
-          <RowText secondary>
-            <Text maxFontSizeMultiplier={LINE_MAX_SCALE} testID="kahf-line">
-              {line}
-            </Text>
-            {NBSP}
-            {NBSP}
-            <Text maxFontSizeMultiplier={LINE_MAX_SCALE} style={[styles.link, { color: palette.accentText }]}>
-              {link}
-            </Text>
-          </RowText>
-        </Tap>
+        <RowText>{done ? t('home.kahf.doneFriday') : eve ? t('home.kahf.fridayBegan') : t('home.kahf.itsFriday')}</RowText>
+        <RowText secondary>{done ? t('home.kahf.saved', { range }) : t('home.kahf.whole', { range })}</RowText>
       </ThreadRow>
 
       <ActionSheet
@@ -110,7 +94,7 @@ export function KahfPost({
         visible={picking}
         onClose={() => setPicking(false)}
         title={t('home.kahf.howLong')}
-        message={t('home.kahf.savedOf', { n })}
+        message={t('home.kahf.savedOf', { range })}
         actions={KAHF_MINUTE_CHOICES.map((m) => ({
           key: `m${m}`,
           label: t('home.kahf.minutes', { m }),
@@ -123,10 +107,3 @@ export function KahfPost({
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  // A ring the size of a tap target's heart, its check centred by the box (design: a mark inside a ring).
-  check: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  line: { alignSelf: 'flex-start' },
-  link: { ...typeV2.body, fontWeight: '600' },
-});

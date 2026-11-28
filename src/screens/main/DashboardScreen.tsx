@@ -700,6 +700,7 @@ export default function DashboardScreen() {
             state={kahfState === 'done' ? 'done' : 'prompt'}
             eve={revisionDay !== kahfFriday}
             saving={kahfSaving}
+            quietRead={homeV3}
             onRead={openKahf}
             onMarkRead={markKahfRead}
             onDismiss={() => setHomePrefs({ kahfDismissedDay: kahfFriday })}

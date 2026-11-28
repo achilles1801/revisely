@@ -37,16 +37,20 @@ export const home = {
     openLabel: 'Open Surah Al-Kahf',
     read: 'Read',
     readLabel: 'Read Surah Al-Kahf',
+    markRead: 'Mark as read',
     markReadLabel: 'Mark Surah Al-Kahf as read',
     /** Read inside the Islamic Friday (Thursday's maghrib to Friday's), Thursday evening included. */
     doneFriday: 'Done for this Friday.',
-    /** Friday itself: its pages, and until when (the Islamic Friday ends at Friday's maghrib). */
-    itsFriday: 'It’s Friday. {{n}} pages, before maghrib.',
+    itsFriday: "It's Friday. Read Surah Al-Kahf.",
     /** Thursday evening: the Islamic Friday begins at Thursday's maghrib. */
-    fridayBegan: 'Friday began at maghrib. {{n}} pages.',
+    fridayBegan: 'Friday began at maghrib. Read Surah Al-Kahf.',
+    /** Its pages: "pages 293–304". */
+    range: 'pages {{from}}–{{to}}',
+    saved: 'Saved as a reading session, {{range}}.',
+    whole: 'The whole surah, {{range}}.',
     notToday: 'Not today',
     howLong: 'How long did it take?',
-    savedOf: 'Saved as a reading session of Al-Kahf, all {{n}} pages.',
+    savedOf: 'Saved as a reading session of Al-Kahf ({{range}}).',
     minutes: '{{m}} minutes',
     usual: 'Usual',
   },
