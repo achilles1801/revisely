@@ -59,10 +59,18 @@ export function InsightHero({
         accessibilityLabel={[`${value} ${spokenText(unit)}`, trend?.label].filter(Boolean).join(', ')}
         testID={testID}
       >
-        <ChromeText style={[styles.heroNumber, { color: palette.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+        <ChromeText
+          style={[styles.heroNumber, { color: palette.text }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.6}
+          testID={testID ? `${testID}-value` : undefined}
+        >
           {formatNumeral(value)}
         </ChromeText>
-        <ChromeText style={[styles.heroUnit, { color: palette.secondary }]}>{unit}</ChromeText>
+        <ChromeText style={[styles.heroUnit, { color: palette.secondary }]} testID={testID ? `${testID}-unit` : undefined}>
+          {unit}
+        </ChromeText>
         {trend ? (
           <View style={[styles.trend, { backgroundColor: trend.good ? palette.goodSubtle : palette.fill }]} testID={testID ? `${testID}-trend` : undefined}>
             <Ionicons name={trend.up ? 'arrow-up' : 'arrow-down'} size={12} color={trend.good ? palette.good : palette.text} />
@@ -83,17 +91,22 @@ export function InsightHero({
   );
 }
 
-/** A quiet card: its title, and a grey hint at the end ("tap a juz"), over the chart or tiles. */
-export function InsightCard({ title, hint, children, testID }: { title: string; hint?: string | null; children: React.ReactNode; testID?: string }) {
+/**
+ * A quiet card: its title, and a grey hint at the end ("tap a juz"), over the chart or tiles. Without a title, the rows
+ * alone (Consistency's cycles, ACT-43).
+ */
+export function InsightCard({ title, hint, children, testID }: { title?: string | null; hint?: string | null; children: React.ReactNode; testID?: string }) {
   const { palette } = useTheme();
   return (
     <View style={[styles.card, { backgroundColor: palette.fill }]} testID={testID}>
-      <View style={styles.cardHead}>
-        <ChromeText style={[typeV2.name, styles.flex, { color: palette.text }]} accessibilityRole="header">
-          {title}
-        </ChromeText>
-        {hint ? <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{hint}</ChromeText> : null}
-      </View>
+      {title || hint ? (
+        <View style={styles.cardHead}>
+          <ChromeText style={[typeV2.name, styles.flex, { color: palette.text }]} accessibilityRole="header">
+            {title}
+          </ChromeText>
+          {hint ? <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{hint}</ChromeText> : null}
+        </View>
+      ) : null}
       {children}
     </View>
   );

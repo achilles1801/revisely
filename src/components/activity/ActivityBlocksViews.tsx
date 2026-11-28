@@ -35,6 +35,7 @@ import { journalFirstDay } from '../../lib/journal';
 import { smartTrackingOn } from '../../lib/smartTracking';
 import { gapsInsightsEnabled } from '../../lib/insightsGaps';
 import { pushBack } from '../../lib/gapsCycle';
+import { CONSISTENCY_LOAD_DAYS } from '../../lib/consistencyView';
 import { revisablePages } from '../../lib/memorizedAyahs';
 import { lastRevisedDay } from '../../lib/recency';
 import { CalendarMonth } from './CalendarMonth';
@@ -184,7 +185,9 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
   );
   // All time reads from the account's first day (its creation; the items go back that far).
   const accountStart = useMemo(() => journalFirstDay(user, []), [user]);
-  const rangeFrom = [shiftDays(today, -daysToLoad(range, today, accountStart)), ...shown].sort()[0];
+  // Consistency's own page (ACT-43) reads a year of weeks whatever the range: its weeks chart offers a year.
+  const loadDays = section === 'consistency' ? Math.max(daysToLoad(range, today, accountStart), CONSISTENCY_LOAD_DAYS) : daysToLoad(range, today, accountStart);
+  const rangeFrom = [shiftDays(today, -loadDays), ...shown].sort()[0];
   const rangeTo = [today, ...shown].sort().reverse()[0];
   const load = useCallback(
     () =>
