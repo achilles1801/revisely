@@ -119,6 +119,8 @@ export const activity = {
     memorizationDetail: 'Pages memorized each month',
     /** Revisely Dev (MEM-10): the chart by day, its pills, the day picked, and the section's Edit row. */
     memorizationDetailDays: 'Pages memorized each day',
+    /** A chart with nothing in its range (ACT-41): one line, never an empty frame. */
+    chartEmpty: 'Nothing here yet in this range',
     byMonth: 'Month',
     byDay: 'Day',
     pagesOnDay_one: 'page on {{day}}',

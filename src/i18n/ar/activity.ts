@@ -151,6 +151,7 @@ export const activity: NonNullable<ArStrings['activity']> = {
     memorization: 'الحفظ',
     memorizationDetail: 'الصفحات المحفوظة كل شهر',
     memorizationDetailDays: 'الصفحات المحفوظة كل يوم',
+    chartEmpty: 'لا شيء هنا بعد في هذه المدة',
     byMonth: 'شهر',
     byDay: 'يوم',
     pagesOnDay_zero: 'صفحة في {{day}}',
