@@ -4,7 +4,12 @@
 
 import { useState } from 'react';
 import { Alert } from 'react-native';
-import { applyPendingChanges, applyPendingSurahChanges, pruneCustomPlanForMemorized, type PageStatus } from '../lib/memorizationChanges';
+import {
+  applyPendingChanges,
+  applyPendingSurahChanges,
+  pruneCustomPlanForMemorized,
+  type PageStatus,
+} from '../lib/memorizationChanges';
 import { defaultWhen, memorizationChangeSet, type WhenMemorized } from '../lib/memorizationLog';
 import { queueChange } from '../lib/offline/queue';
 import { getRevisionDayForUser } from '../lib/fajrBoundary';
@@ -32,7 +37,12 @@ export function useSaveMemorization() {
         await updatePages(updatedPages, changedPageNumbers);
       }
       if (when === 'today' && marked.length > 0 && user) {
-        await queueChange({ kind: 'memorization.mark', day: getRevisionDayForUser(user), pages: marked, at: Date.now() });
+        await queueChange({
+          kind: 'memorization.mark',
+          day: getRevisionDayForUser(user),
+          pages: marked,
+          at: Date.now(),
+        });
       }
       if (unmarked.length > 0) {
         await queueChange({ kind: 'memorization.unmark', pages: unmarked });
