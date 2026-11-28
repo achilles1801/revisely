@@ -11,7 +11,6 @@
 // The store app's Insights keep ACT-28's section (GapsSection).
 
 import React, { useMemo, useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { typeV2 } from '../../theme/v2';
@@ -37,7 +36,8 @@ import {
 } from '../../lib/insightsGaps';
 import { missedPattern } from '../../lib/insightsRange';
 import { pushBackLine } from '../../lib/gapsCycle';
-import { GapsDaysSwitch, GapsLastRevisedLink, GapsRevision, useGapsInDays } from './GapsParts';
+import { GapsDaysSwitch, GapsLastRevisedLink, useGapsInDays } from './GapsParts';
+import { InsightAdvice, InsightCard, InsightHero } from './InsightPageParts';
 import type { GapsSectionProps } from './GapsSection';
 
 /** The day grid: columns for the range's length, the gap between cells, and the largest a cell grows (a young account's
@@ -101,25 +101,26 @@ export function GapsPage({ view, revised, today, window, firstDay, knownSince, l
         </View>
       ) : null}
 
-      <View style={styles.hero} testID="insights-gaps-hero">
-        <ChromeText style={[styles.big, { color: palette.text }]} numberOfLines={1}>
-          {String(count)}
-        </ChromeText>
-        <ChromeText style={[styles.heroWords, { color: palette.secondary }]}>{t('insights.gaps.heroCount', { count, range: inWords })}</ChromeText>
-        {before && before.count !== count ? (
-          <View style={[styles.pill, { backgroundColor: palette.fill }]} testID="insights-gaps-trend">
-            <Ionicons name={count < before.count ? 'arrow-down' : 'arrow-up'} size={12} color={count < before.count ? palette.good : palette.text} />
-            <ChromeText style={[typeV2.meta, styles.pillText, { color: count < before.count ? palette.good : palette.text }]}>
-              {t('insights.gaps.trendFrom', { count: before.count })}
-            </ChromeText>
-          </View>
-        ) : null}
-      </View>
-      <ChromeText style={[typeV2.meta, styles.heroLine, { color: palette.secondary }]} testID="insights-gaps-hero-line">
-        {count > 0
-          ? t('insights.gaps.heroLine', { revised: view.revisedDays, days: marks.length })
-          : t('insights.gaps.heroLineNone', { revised: view.revisedDays, days: marks.length })}
-      </ChromeText>
+      <InsightHero
+        value={String(count)}
+        unit={t('insights.gaps.heroCount', { count, range: inWords })}
+        trend={
+          before && before.count !== count
+            ? {
+                text: t('activity.insights.trendFrom', { value: before.count }),
+                up: count > before.count,
+                good: count < before.count,
+                label: t(count > before.count ? 'activity.insights.trendUp' : 'activity.insights.trendDown', { value: before.count, before: props.before ?? '' }),
+              }
+            : null
+        }
+        line={
+          count > 0
+            ? t('insights.gaps.heroLine', { revised: view.revisedDays, days: marks.length })
+            : t('insights.gaps.heroLineNone', { revised: view.revisedDays, days: marks.length })
+        }
+        testID="insights-gaps-hero"
+      />
 
       {tiles.length > 0 ? (
         <View style={[styles.tiles, stacked && styles.tilesStacked]} testID="insights-gaps-tiles">
@@ -129,11 +130,7 @@ export function GapsPage({ view, revised, today, window, firstDay, knownSince, l
         </View>
       ) : null}
 
-      <View style={[styles.card, { backgroundColor: palette.fill }]} testID="insights-gaps-days">
-        <View style={styles.cardHead}>
-          <ChromeText style={[typeV2.name, styles.flex, { color: palette.text }]}>{t('insights.gaps.everyDay', { range: props.lastWords })}</ChromeText>
-          {count > 0 ? <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{t('insights.gaps.tapGap')}</ChromeText> : null}
-        </View>
+      <InsightCard title={t('insights.gaps.everyDay', { range: props.lastWords })} hint={count > 0 ? t('insights.gaps.tapGap') : null} testID="insights-gaps-days">
         {gap ? (
           <Tap
             onPress={
@@ -166,19 +163,28 @@ export function GapsPage({ view, revised, today, window, firstDay, knownSince, l
           {marks.some((m) => m.mark === 'missed') ? <Legend kind="missed" label={t('insights.gaps.legendMissed')} /> : null}
           {count > 0 ? <Legend kind="gap" label={t('insights.gaps.legendGap')} /> : null}
         </View>
-      </View>
+      </InsightCard>
 
       {weekday || trend ? (
         <View style={styles.patterns} testID="insights-gaps-patterns">
           <ChromeText style={[typeV2.meta, styles.patternsHead, { color: palette.secondary }]} accessibilityRole="header">
             {t('insights.gaps.patterns').toLocaleUpperCase()}
           </ChromeText>
-          {weekday ? <Pattern icon="calendar-outline" title={weekday} testID="insights-gaps-weekday" /> : null}
-          {trend ? <Pattern icon={trend.better ? 'trending-down' : 'trending-up'} title={trend.title} detail={trend.detail} testID="insights-gaps-trend-row" /> : null}
+          {weekday ? <InsightAdvice icon="calendar-outline" title={weekday} testID="insights-gaps-weekday" /> : null}
+          {trend ? <InsightAdvice icon={trend.better ? 'trending-down' : 'trending-up'} title={trend.title} detail={trend.detail} testID="insights-gaps-trend-row" /> : null}
         </View>
       ) : null}
 
-      {revision ? <GapsRevision revision={revision} onOpenLastRevised={onOpenLastRevised} /> : null}
+      {revision ? (
+        <InsightAdvice
+          icon={revision.late ? 'refresh' : 'checkmark'}
+          title={revision.title}
+          detail={revision.detail}
+          onPress={onOpenLastRevised ? () => onOpenLastRevised('waiting') : undefined}
+          hint={onOpenLastRevised ? t('insights.lastRevised.linkHint') : undefined}
+          testID="insights-gaps-revision"
+        />
+      ) : null}
       {onOpenLastRevised ? <GapsLastRevisedLink onOpen={onOpenLastRevised} /> : null}
     </View>
   );
@@ -270,37 +276,14 @@ function Legend({ kind, label }: { kind: 'revised' | 'missed' | 'gap'; label: st
   );
 }
 
-function Pattern({ icon, title, detail, testID }: { icon: React.ComponentProps<typeof Ionicons>['name']; title: string; detail?: string; testID: string }) {
-  const { palette } = useTheme();
-  return (
-    <View style={[styles.pattern, { borderTopColor: palette.separator }]} testID={testID}>
-      <View style={[styles.patternMark, { backgroundColor: palette.bubble }]}>
-        <Ionicons name={icon} size={16} color={palette.text} />
-      </View>
-      <View style={styles.flex}>
-        <ChromeText style={[typeV2.name, { color: palette.text }]}>{title}</ChromeText>
-        {detail ? <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{detail}</ChromeText> : null}
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   page: { paddingTop: 8, paddingBottom: 18, paddingHorizontal: PAGE_PAD },
   switchRow: { flexDirection: 'row', justifyContent: 'flex-end' },
-  hero: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 6, rowGap: 4, marginTop: 6 },
-  big: { fontSize: 40, lineHeight: 46, fontWeight: '700', letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
-  heroWords: { fontSize: 20, lineHeight: 25, fontWeight: '600' },
-  pill: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, alignSelf: 'center' },
-  pillText: { fontWeight: '600' },
-  heroLine: { marginTop: 4 },
   tiles: { flexDirection: 'row', gap: TILE_GAP, marginTop: 16 },
   tilesStacked: { flexDirection: 'column' },
   tile: { flex: 1, borderRadius: 14, paddingHorizontal: TILE_PAD, paddingVertical: 10, minWidth: 0 },
   tileValue: { fontSize: 20, lineHeight: 25, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  card: { borderRadius: 16, padding: 16, marginTop: 12 },
-  cardHead: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
   pickedLine: { marginTop: 2, marginBottom: 12 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   cell: {},
@@ -309,6 +292,4 @@ const styles = StyleSheet.create({
   swatch: { width: 10, height: 10, borderRadius: 3 },
   patterns: { marginTop: 20 },
   patternsHead: { fontWeight: '600', marginBottom: 6 },
-  pattern: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  patternMark: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
 });
