@@ -51,10 +51,12 @@ async function revisedOn(uid: string, day: string, pages: number[]): Promise<voi
   for (const p of pages) await setServerDoc(`users/${uid}/pages/${p}`, { lastRevisedAt: timestamp(at) });
 }
 
-/** Activity in Revisely Dev: the one tab (ACT-35), with Gaps' reading of the plan (gapsInsightsEnabled). */
+/** Activity in Revisely Dev: the one tab (ACT-35), Gaps' reading of the plan (gapsInsightsEnabled) and #1066's Memorization. */
 function devActivity(mods: Booted) {
   mods.require<{ default: { expoConfig: { extra: Record<string, unknown> } } }>('expo-constants').default.expoConfig.extra.variant = 'dev';
   mods.require<{ setActivityOneTabForTests: (on: boolean) => void }>('src/lib/release/activityOneTab').setActivityOneTabForTests(true);
+  // Memorization as #1066 built it (MEM-10).
+  mods.require<{ setMemorizedInSettingsForTests: (on: boolean) => void }>('src/lib/release/memorizedInSettings').setMemorizedInSettingsForTests(true);
   return activityStack(mods);
 }
 
@@ -112,5 +114,35 @@ it('[ACT-38] Coverage’s page starts from its point: the share that came round 
   await tap(app, 'insights-plan-them');
   await app.until(() => shows(app, 'insights-plan-them-done'), 'First tomorrow ✓');
   expect(text(app, 'insights-plan-them-done')).toMatch(/First tomorrow/);
+  await app.close();
+});
+
+/** Pages memorized on `day` (a Memorized item, as the day's + writes). */
+async function memorizedOn(uid: string, day: string, pages: number[]): Promise<void> {
+  await setServerDoc(`users/${uid}/memorizations/m-${day}`, { id: `m-${day}`, uid, day, pages, minutes: null });
+}
+
+it('[MEM-11] Memorization’s page says when the juz in progress is done at this pace', async () => {
+  setZone(ZONES.chicago);
+  // An account since July: Juz 30 and the last 11 pages of Juz 29 memorized, 9 of Juz 29 to go.
+  setNow('2026-07-01 20:00');
+  const phone = new Phone();
+  const first = await newAccount(phone, { memorized: pagesRange(571, 604), user: { dailyPageCapacity: 5 } });
+  const uid = first.uid;
+  await first.close();
+  await markPreviewTester(uid);
+
+  // Those 11 pages of Juz 29 memorized over the last three months: about 4 a month.
+  await memorizedOn(uid, ago(80), [571, 572, 573]);
+  await memorizedOn(uid, ago(50), [574, 575, 576]);
+  await memorizedOn(uid, ago(10), [577, 578, 579, 580, 581]);
+
+  setNow(`${TODAY} 09:00`);
+  const app = await openSection(phone, 'insights-row-memorization');
+  await app.until(() => shows(app, 'insights-memorization-bars-month'), 'Memorization’s chart (MEM-10)');
+
+  // Under #1066's chart, the one addition: 9 pages at 11 in 90 days take 74 days, to 10 February.
+  await app.until(() => shows(app, 'insights-memorization-done-by'), 'the line on when Juz 29 is done');
+  expect(text(app, 'insights-memorization-done-by')).toBe('[flag-outline] At this pace, Juz 29 is done in early February 2027 9 pages to go, at about 4 a month.');
   await app.close();
 });

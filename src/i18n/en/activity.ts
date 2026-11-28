@@ -75,6 +75,14 @@ export const activity = {
     slippingAges: '{{ages}}.',
     planThem: 'Plan them',
     planJuzTwo: 'Plan Juz {{a}} and Juz {{b}}',
+    /** Memorization's page (MEM-11): "At this pace, Juz 29 is done in mid-January" over "11 pages to go, at about 10 a month." */
+    doneBy: 'At this pace, Juz {{juz}} is done in {{when}}',
+    doneByDetail_one: '{{count}} page to go, at about {{perMonth}} a month.',
+    doneByDetail_other: '{{count}} pages to go, at about {{perMonth}} a month.',
+    /** "early January", "mid-January 2028": the month comes with its year when it isn't this one. */
+    monthEarly: 'early {{month}}',
+    monthMid: 'mid-{{month}}',
+    monthLate: 'late {{month}}',
     notRevisedSpan: 'Not revised {{span}}',
     everyOtherRevised: 'Every other memorized page was revised {{span}}.',
     /** A count that starts on the account's first day: "since 8 November". */

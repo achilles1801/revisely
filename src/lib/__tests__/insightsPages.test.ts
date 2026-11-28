@@ -1,6 +1,6 @@
 import { getPagesForJuz } from '../quranData';
 import { juzTiles } from '../insightsView';
-import { coverageBefore, slippingJuz, slippingWords } from '../insightsPages';
+import { coverageBefore, doneByWords, juzDoneBy, partOfMonth, slippingJuz, slippingWords } from '../insightsPages';
 
 const TODAY = '2026-11-28';
 const ago = (n: number) => {
@@ -77,5 +77,44 @@ describe('The juz slipping out of rotation (ACT-38)', () => {
     expect(slippingWords(slippingJuz(juzTiles(memorized, new Set(), never, TODAY)), 15).detail).toBe(
       'Juz 21 never revised · Juz 4 41 days ago; your plan goes round every 15 days.',
     );
+  });
+});
+
+describe('When the juz in progress is done (MEM-11)', () => {
+  // Juz 30 memorized, Juz 29 (20 pages) all but its first 11; 3 pages memorized in each of the last three months.
+  const j29 = juz(29);
+  const memorized = new Set([...juz(30), ...j29.slice(11)]);
+  const memorizations = [
+    { day: ago(80), pages: j29.slice(11, 14) },
+    { day: ago(50), pages: j29.slice(14, 17) },
+    { day: ago(10), pages: j29.slice(17) },
+  ];
+
+  it('the juz the latest memorization went into, at the pace of the last 90 days', () => {
+    const done = juzDoneBy({ memorized, memorizations, today: TODAY, firstDay: ago(400) });
+    expect(j29).toHaveLength(20);
+    // 9 pages in 90 days: 3 a month, so 11 pages take 110 days.
+    expect(done).toEqual({ juz: 29, left: 11, perMonth: 3, day: '2027-03-18' });
+  });
+
+  it('reads as the part of the month, with the year when it is not this one', () => {
+    expect(partOfMonth('2026-12-05', TODAY)).toBe('early December');
+    expect(partOfMonth('2027-01-15', TODAY)).toBe('mid-January 2027');
+    expect(partOfMonth('2026-12-28', TODAY)).toBe('late December');
+    const done = { juz: 29, left: 11, perMonth: 10, day: '2026-12-15' };
+    expect(doneByWords(done, TODAY)).toEqual({ title: 'At this pace, Juz 29 is done in mid-December', detail: '11 pages to go, at about 10 a month.' });
+  });
+
+  it('counts from the account’s first day when it is younger than 90 days (30 days at least)', () => {
+    const young = juzDoneBy({ memorized, memorizations: [{ day: ago(10), pages: j29.slice(14) }], today: TODAY, firstDay: ago(20) });
+    // 6 pages since an account 21 days old, over 30 days at least: 6 a month.
+    expect(young?.perMonth).toBe(6);
+  });
+
+  it('says nothing with no juz in progress, under a page a month, or two years away', () => {
+    expect(juzDoneBy({ memorized: new Set(juz(30)), memorizations: [{ day: ago(5), pages: juz(30) }], today: TODAY, firstDay: ago(400) })).toBeNull();
+    expect(juzDoneBy({ memorized, memorizations: [{ day: ago(200), pages: j29.slice(11) }], today: TODAY, firstDay: ago(400) })).toBeNull();
+    // One page in 90 days: a third of a page a month.
+    expect(juzDoneBy({ memorized, memorizations: [{ day: ago(5), pages: [j29[19]] }], today: TODAY, firstDay: ago(400) })).toBeNull();
   });
 });
