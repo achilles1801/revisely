@@ -1,0 +1,4 @@
+{
+  "_comment": "The store app's Google Play package, the one value app.config.js (android.package), the app (storeIds.ts, variant.ts) and scripts/play.js read. Its own package since the Play app moved to Revisely LLC's organization account (handbook/android.md). Changing it moves the store app's fingerprints (iOS too: they hash the whole app config), so it changes only in the release owner's native PR.",
+  "playPackage": "app.revisely"
+}

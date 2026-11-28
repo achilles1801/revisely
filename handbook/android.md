@@ -4,7 +4,13 @@ Moved from CLAUDE.md word for word on Nov 22 2026. CLAUDE.md keeps the rules eve
 
 ## Android (Google Play)
 
-Package `com.revisionbuddy.app`, the same as the iOS bundle id (permanent). `versionCode` comes from
+The store app's package is its own: `src/lib/storeIds.json` (`playPackage`), the one value `app.config.js`, the
+app's Play links, Sentry's Android release names and `scripts/play.js` read. Until the new Play app in Revisely LLC's
+organization account it was `com.revisionbuddy.app`, the iOS bundle id, in Majd's personal account: Play keeps an app
+in the account it was made in, and an app made in a personal account keeps the 12-tester, 14-day closed test even
+after a transfer (Google Play support, Nov 26 2026). Changing the package moves both store fingerprints, iOS too.
+Revisely Dev keeps `com.revisionbuddy.app.dev`, and E2E builds keep the iOS id (one Maestro `appId` for both
+platforms). The day-one steps and the listing pack: `~/Documents/revisely-android/new-play-app.md`. `versionCode` comes from
 EAS (`appVersionSource: remote`, `autoIncrement`), counted apart from iOS build numbers; the version
 string is the same `version` in app.config.js. Target SDK 36, min 24; every native library is 16 KB
 aligned (checked on an API 37 16 KB-page emulator). `store/android/` holds the listing, Data safety

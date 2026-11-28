@@ -11,6 +11,14 @@ const DEV = process.env.APP_VARIANT === 'dev';
 const MIC_TEXT =
   "Revisely uses the microphone to record your recitation, follow along and mark your mistakes as you recite, and search the Quran by voice. Following along and marking mistakes send your recitation's audio to Revisely's server; voice search stays on this iPhone.";
 const BUNDLE_ID = DEV ? "com.revisionbuddy.app.dev" : "com.revisionbuddy.app";
+// The store app's package on Google Play: its own since the Play app moved to Revisely LLC's organization account
+// (handbook/android.md, "A new Play app"). Play keeps an app in the account it was made in, and one made in a personal
+// account keeps the 12-tester, 14-day closed test even after a transfer. One value for the build, the app and
+// scripts/play.js: src/lib/storeIds.json, read only for the store app, so Revisely Dev's config and fingerprints don't
+// change (it keeps com.revisionbuddy.app.dev). E2E builds (EXPO_PUBLIC_E2E, .maestro/) keep the iOS id, so each
+// Maestro flow's one appId drives both platforms.
+const ANDROID_PACKAGE =
+  DEV || process.env.EXPO_PUBLIC_E2E === "1" ? BUNDLE_ID : require("./src/lib/storeIds.json").playPackage;
 const APP_GROUP = DEV ? "group.com.revisionbuddy.app.dev" : "group.com.revisionbuddy.app";
 const SCHEME = DEV ? "revisely-dev" : "revisely";
 // The Dev icon's ground (assets/dev/, assets/brand/dev/): amber, so it never passes for the store app.
@@ -93,7 +101,7 @@ export default {
       color: "#624BD5"
     },
     android: {
-      package: BUNDLE_ID,
+      package: ANDROID_PACKAGE,
       // Expo adds these by default. The app never draws over other apps (only the dev menu
       // did) and stores files in its own folders (no storage permission since Android 10);
       // Play lists every permission on the store page.

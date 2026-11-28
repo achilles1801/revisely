@@ -81,7 +81,8 @@ const clip = (s, n) => {
   return t.length > n ? `${t.slice(0, n - 1)}…` : t;
 };
 
-const shortRelease = (r) => safe(r, 'release').replace(/^com\.revisionbuddy\.app@/, '');
+// Without the app id before the @ (the bundle id on iPhone, the store app's own Play package on Android).
+const shortRelease = (r) => safe(r, 'release').replace(/^[A-Za-z0-9._-]+@/, '');
 
 function issueTitle(issue) {
   return clip(`[Sentry] ${safe(issue.shortId, 'shortId', 'issue')}: ${sanitize(issue.title, { max: 150 })}`, 180);
