@@ -805,7 +805,10 @@ describe('Home in the new design (a feed)', () => {
   it('the percentage: of the 604 pages, one decimal; 0% and 100% at the ends', () => {
     expect(formatPercent(166 / 604)).toBe('27.5%');
     expect(formatPercent(108 / 604)).toBe('17.9%');
-    expect(formatPercent(1 / 604)).toBe('0.2%');
+    // Under 1%: "under 1%" (Majd, Nov 27 2026: no decimals below 1).
+    expect(formatPercent(1 / 604)).toBe('under 1%');
+    expect(formatPercent(6 / 604)).toBe('under 1%');
+    expect(formatPercent(7 / 604)).toBe('1.2%');
     expect(formatPercent(603 / 604)).toBe('99.8%');
     expect(formatPercent(0)).toBe('0%');
     expect(formatPercent(1)).toBe('100%');

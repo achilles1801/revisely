@@ -48,7 +48,7 @@ describe('Home for every kind of user (USER-MATRIX.md)', () => {
     await app.close();
   });
 
-  it('[USER-1] [MEM-4] a single ayah memorized: today starts at it, and the memorized line says 0.1%, never 0%', async () => {
+  it('[USER-1] [MEM-4] a single ayah memorized: today starts at it, and the memorized line says under 1%, never 0%', async () => {
     setZone(ZONES.london);
     setNow('2026-11-03 09:00');
     const phone = new Phone();
@@ -61,8 +61,8 @@ describe('Home for every kind of user (USER-MATRIX.md)', () => {
     const { app, home } = await openHome(phone);
     await app.until(() => plain(home.title()).startsWith('Starts at Al-Fatihah'), 'today to start at Al-Fatihah');
     expect(home.cta()).toBe('Start revision');
-    // A seventh of a page is 0.02% of the Qur'an: it read "0% of the Quran memorized" (USER-1).
-    expect(home.memorized()).toMatch(/^0\.1% of the Quran memorized/);
+    // A seventh of a page is 0.02% of the Qur'an: it read "0% of the Quran memorized"; under 1% reads "under 1%" (USER-1).
+    expect(home.memorized()).toMatch(/^under 1% of the Quran memorized/);
     expect(home.today()).not.toContain('Mark memorized pages');
     expectWhole(home);
     // The session holds that one page, and finishes on the end card; Home then says Done.

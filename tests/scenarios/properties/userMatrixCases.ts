@@ -296,6 +296,60 @@ export function homeFor(b: Built): HomeToday {
 }
 
 // ---------------------------------------------------------------------------
+// A flight: the same account, later, with the phone in another zone (the saved place for Fajr stays where it was).
+
+/** Zones a flight lands in: either side of the date line, and big jumps east and west. */
+export const FLIGHT_ZONES = [
+  'Pacific/Kiritimati', // UTC+14
+  'Etc/GMT+12', // UTC−12 (Baker Island)
+  'Pacific/Apia', // UTC+13, west of the date line's kink
+  'Pacific/Pago_Pago', // UTC−11, Samoa's neighbour across it
+  'Pacific/Fiji',
+  'Pacific/Honolulu',
+  'Pacific/Auckland',
+  'Asia/Tokyo',
+  'America/Los_Angeles',
+  'Europe/London',
+] as const;
+
+export type Flight = { zone: string; hours: number };
+export const flightArb: fc.Arbitrary<Flight> = fc.record({
+  zone: fc.constantFrom(...FLIGHT_ZONES),
+  // Hours after the account's moment: a short hop to a long haul with a stop.
+  hours: fc.integer({ min: 0, max: 30 }),
+});
+
+/** The account `b` after the flight: its moment moved on, the phone's zone changed, its revision day read there. */
+export function landed(b: Built, f: Flight): Built {
+  useZone(f.zone);
+  const now = new Date(b.now.getTime() + f.hours * 3_600_000);
+  return { ...b, now, day: getRevisionDayForUser(b.user, now), date: getRevisionDateForUser(b.user, now) };
+}
+
+/** The widget's days and the reminders run forward from now, each day once (DAY-8), wherever the phone is. */
+export function checkForward(b: Built): void {
+  const widget = buildWidgetSnapshot({ signedIn: true, user: b.user, onboardingComplete: true, pages: b.pages, logs: b.logs, quranData: QURAN, accent: 'indigo', now: b.now, history: b.history });
+  const days = widget.days.map((d) => d.day);
+  expect(new Set(days).size).toBe(days.length);
+  for (let i = 1; i < widget.days.length; i++) {
+    expect(widget.days[i].day > widget.days[i - 1].day).toBe(true);
+    expect(widget.days[i].startsAt).toBe(widget.days[i - 1].endsAt);
+  }
+  for (const d of widget.days) expect(d.endsAt).toBeGreaterThan(d.startsAt);
+  const planned = planRevisionReminders({ now: b.now, user: { ...b.user, notificationsEnabled: true }, name: '', pages: b.pages, logs: b.logs, history: b.history, quranData: QURAN, place: null, settings: { method: 'NorthAmerica' } as never, laterDays: 6 });
+  const ids = planned.map((r) => r.id);
+  if (new Set(ids).size !== ids.length) {
+    const at = (h: number) => new Date(b.now.getTime() + h * 3_600_000);
+    const days = Array.from({ length: 13 }, (_, i) => `${at(i * 6).toString().slice(0, 21)} → ${getRevisionDayForUser(b.user, at(i * 6))} (next change ${getNextRevisionDayStart(b.user, at(i * 6)).toString().slice(0, 21)})`);
+    throw new Error(`reminders planned twice: ${JSON.stringify(planned.map((r) => [r.id, r.at.toString().slice(0, 21), getRevisionDayForUser(b.user, r.at)]))} (zone ${Intl.DateTimeFormat().resolvedOptions().timeZone}, fajr ${b.user.fajrBoundaryEnabled} ${JSON.stringify(b.user.locationCoords)} ${b.user.fajrCalculationMethod}, now ${b.now.toString().slice(0, 21)})\n${days.join('\n')}`);
+  }
+  for (const r of planned) expect(r.at.getTime()).toBeGreaterThan(b.now.getTime());
+  // At most one day's reminders per revision day, and the days in order.
+  const reminderDays = [...new Set(planned.map((r) => r.day))];
+  expect([...reminderDays].sort()).toEqual(reminderDays);
+}
+
+// ---------------------------------------------------------------------------
 // The rules
 
 const BROKEN = /NaN|undefined|\bnull\b|Infinity|\[object|\{\{|\}\}/;
@@ -313,6 +367,7 @@ export function describe_(c: Case, b: Built, home: HomeToday): string {
     plan: c.plan.kind === 'custom' ? { custom: Array.isArray(c.plan.days) ? `${c.plan.days.length} days` : c.plan.days, startsIn: c.plan.startsIn } : c.plan,
     day: b.day,
     today: c.today,
+    fajr: c.fajr,
     past: c.past,
     status: home.snapshot.status,
     pages: home.assignment.pages.length,
@@ -336,6 +391,8 @@ export function checkHome(home: HomeToday, where: string): void {
     // With pages memorized, the memorized line never says 0%; short of the whole Qur'an, never 100%.
     expect(home.memorized.body).not.toBe(t('home.today.memorized', { percent: formatPercent(0) }));
     if (home.memorized.fraction < 1) expect(home.memorized.body).not.toBe(t('home.today.memorized', { percent: formatPercent(1) }));
+    // Under 1%: "under 1%", no decimals (Majd, Nov 27 2026).
+    if (home.memorized.fraction < 0.01) expect(home.memorized.body).toBe(t('home.today.memorized', { percent: t('common.underOnePercent') }));
   } else {
     // Nothing memorized: the new account's state, and nothing else.
     expect(lines.title.text).toBe(t('lib.today.nothingTitle'));

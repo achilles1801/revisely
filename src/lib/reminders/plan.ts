@@ -20,12 +20,7 @@
 // on came back no more often than those without.
 
 import { generateDailyAssignment } from '../algorithm';
-import {
-  getFajrTimeFor,
-  getNextRevisionDayStart,
-  getRevisionDateForUser,
-  getRevisionDayForUser,
-} from '../fajrBoundary';
+import { getNextRevisionDayStart, getRevisionDateForUser, getRevisionDayForUser } from '../fajrBoundary';
 import type { Place } from '../prayer/prefs';
 import { dayTimes, type CalcSettings } from '../prayer/times';
 import { streakFromLogs } from '../streak';
@@ -102,12 +97,29 @@ const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDat
 const dayKey = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-/** The revision day that holds `instant`, with its span (fajr or midnight to the next). */
-function revisionAt(user: User, instant: Date): Revision {
+/**
+ * When the revision day holding `instant` began: the last time the day changed at or before it (Fajr or midnight, read
+ * from where the phone is, DAY-8). Not "Fajr on its date": with the saved place far from the phone (a flight, USER-2)
+ * that Fajr can be a day off, and the days' spans overlapped, so one 3 PM was planned for two days (the user-matrix
+ * sweep, Nov 27 2026).
+ */
+function revisionDayStart(user: User, instant: Date): Date {
+  let t = new Date(instant.getTime() - 36 * HOUR_MS);
+  let start = t;
+  for (let i = 0; i < 4; i++) {
+    const next = getNextRevisionDayStart(user, t);
+    if (next.getTime() <= t.getTime() || next.getTime() > instant.getTime()) break;
+    start = next;
+    t = next;
+  }
+  return start;
+}
+
+/** The revision day that holds `instant`, with its span: from `start` (when it began) to the next change. */
+function revisionAt(user: User, instant: Date, start: Date = revisionDayStart(user, instant)): Revision {
   const day = getRevisionDayForUser(user, instant);
   const date = getRevisionDateForUser(user, instant);
-  const fajr = user.fajrBoundaryEnabled && user.locationCoords ? getFajrTimeFor(date, user) : null;
-  return { day, date, start: fajr ?? date, end: getNextRevisionDayStart(user, instant) };
+  return { day, date, start, end: getNextRevisionDayStart(user, instant) };
 }
 
 function dayOrdinal(day: string): number {
@@ -143,8 +155,12 @@ function slotsFor(rev: Revision, input: PlanReminderInput): Slot[] {
   const evening = new Date(rev.end.getTime() - HOUR_MS);
   if (inDay(evening)) slots.push({ kind: 'evening', at: evening });
 
+  // One of each a day (REMIND-1), the first: a revision day can be longer than a day of the clock (with the saved place
+  // far from the phone, a day with no Fajr there turns at midnight and the next at Fajr), and it planned two mornings
+  // under one id, the second replacing the first (the user-matrix sweep, Nov 27 2026).
+  const byTime = slots.sort((a, b) => a.at.getTime() - b.at.getTime());
+  const sorted = byTime.filter((s, i) => byTime.findIndex((o) => o.kind === s.kind) === i);
   // Two due within 30 minutes become one: the earlier is dropped.
-  const sorted = slots.sort((a, b) => a.at.getTime() - b.at.getTime());
   return sorted.filter(
     (s, i) => !(i + 1 < sorted.length && sorted[i + 1].at.getTime() - s.at.getTime() <= MERGE_WITHIN_MS),
   );
@@ -153,7 +169,8 @@ function slotsFor(rev: Revision, input: PlanReminderInput): Slot[] {
 export function planRevisionReminders(input: PlanReminderInput): PlannedReminder[] {
   const { user, now } = input;
   const today = revisionAt(user, now);
-  const tomorrow = revisionAt(user, today.end);
+  // Each day begins where the one before it ends, so no two days' reminders overlap (DAY-8, USER-2).
+  const tomorrow = revisionAt(user, today.end, today.end);
   const pagesOf = (rev: Revision) => generateDailyAssignment(input.pages, input.quranData, user, rev.date).pages;
   const todayPages = pagesOf(today);
   const tomorrowPages = pagesOf(tomorrow);
@@ -236,7 +253,7 @@ export function planRevisionReminders(input: PlanReminderInput): PlannedReminder
   // The days after (REMIND-2): one each, never more than one a day. A day with no pages, or already revised ahead, gets none.
   let later = tomorrow;
   for (let n = 0; n < (input.laterDays ?? 0); n++) {
-    later = revisionAt(user, later.end);
+    later = revisionAt(user, later.end, later.end);
     const pages = pagesOf(later);
     if (pages.length === 0) continue;
     // A day already revised ahead needs no reminder (USER-2).

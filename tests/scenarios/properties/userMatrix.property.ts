@@ -10,7 +10,8 @@
 import fc from 'fast-check';
 import { i18n } from '../../../src/i18n';
 import { restoreZone, runs } from './fixtures';
-import { build, caseArb, checkHome, checkReminders, checkRevo, checkWidget, describe_, homeFor } from './userMatrixCases';
+import { build, caseArb, checkForward, checkHome, checkReminders, checkRevo, checkWidget, describe_, flightArb, homeFor, landed } from './userMatrixCases';
+import { scheduleStartingByToday } from '../../../src/lib/algorithm';
 
 // Revisely Dev or the store app, per generated account (lib/variant).
 jest.mock('../../../src/lib/variant', () => ({ ...jest.requireActual('../../../src/lib/variant'), isDevVariant: () => mockApp.dev }));
@@ -80,5 +81,32 @@ describe('Every kind of user (USER-MATRIX.md)', () => {
     } finally {
       await i18n.changeLanguage('en');
     }
+  });
+
+  it('[USER-1] [USER-2] [DAY-8] after a flight across the date line or any big jump, every screen still agrees, and the days run forward', () => {
+    fc.assert(
+      fc.property(caseArb, flightArb, (c, f) => {
+        mockApp.dev = c.dev;
+        const before = build(c);
+        const b = landed(before, f);
+        // Home as it first draws, then once it has moved a plan that starts after today to start today (DashboardScreen's
+        // repair): both must hold.
+        const repaired = scheduleStartingByToday(b.user, b.date);
+        for (const at of repaired ? [b, { ...b, user: repaired }] : [b]) {
+          const home = homeFor(at);
+          try {
+            checkHome(home, `after a flight to ${f.zone}`);
+            checkWidget(at, home);
+            checkReminders(at, home);
+            checkRevo(at, home);
+            checkForward(at);
+          } catch (err) {
+            const where = (err as Error).stack?.split('\n').find((l) => l.includes('userMatrixCases')) ?? '';
+            throw new Error(`${(err as Error).message}\n${where.trim()}\nflight ${JSON.stringify(f)} from ${before.day} to ${at.day}${at === b ? '' : ' (repaired)'}\n${describe_(c, at, home)}`);
+          }
+        }
+      }),
+      { numRuns: runs(250) },
+    );
   });
 });

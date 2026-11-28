@@ -2,6 +2,8 @@
 // somewhere ("Done" as a status, not a button) gets its own key in that folder's file.
 export const common = {
   back: 'Back',
+  /** Anything memorized under 1% of the Qur'an (Majd, Nov 27 2026: "should just be under 1%, i feel like decimal under 1 is too demotivating"). */
+  underOnePercent: 'under 1%',
   cancel: 'Cancel',
   close: 'Close',
   delete: 'Delete',

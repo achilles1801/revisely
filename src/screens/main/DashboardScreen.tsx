@@ -245,7 +245,9 @@ export default function DashboardScreen() {
       cancelled = true;
       reloadHistory.current = () => undefined;
     };
-  }, [user, revisionDay, logs.length]);
+    // Read again when the outbox changes too: a hand-logged page taken off in the session (HAND_LOGGED_UNCHECK) counts
+    // while its change waits, and once it is sent the items must hold it, or Home went back to the old count (USER-2).
+  }, [user, revisionDay, logs.length, pendingChanges]);
 
   // Today as Home shows it (lib/todaySnapshot): its pages, how far they've got, done or not, and the
   // streak. Revo's context is built from the same function, so the two never disagree.

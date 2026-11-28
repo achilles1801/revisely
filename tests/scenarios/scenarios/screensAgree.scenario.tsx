@@ -9,7 +9,7 @@ import { newAccount, pagesRange } from '../harness/account';
 import { allowNotifications, pendingNotifications, type Scheduled } from '../harness/notifications';
 import { ActivityDayView, Home, Review, homeStack } from '../harness/screens';
 import { AddToDay } from '../harness/addToDay';
-import { setServerDoc } from '../harness/serverDocs';
+import { listServerDocs, setServerDoc } from '../harness/serverDocs';
 import { Phone, type OpenApp } from '../harness/phone';
 
 // 5 pages a day of pages 1–20 from Monday Nov 2 2026: Monday 1–5, Tuesday 6–10, Wednesday 11–15.
@@ -180,7 +180,7 @@ describe('Home, the widget and the reminders agree about a day (USER-2)', () => 
     return { app, home };
   }
 
-  it('[SESS-9] [USER-2] 3 of Tuesday’s 5 pages logged by hand: Continue opens where Home says, the 4th page, with them checked and kept checked', async () => {
+  it('[SESS-9] [USER-2] 3 of Tuesday’s 5 pages logged by hand: Continue opens where Home says, the 4th page, with them checked; unchecking one takes it off', async () => {
     const { app, home } = await loggedByHand([6, 7, 8]);
     await app.until(() => /3 of 5/.test(home.today()), 'Home to count the pages logged by hand');
     const session = await home.startSession();
@@ -189,19 +189,23 @@ describe('Home, the widget and the reminders agree about a day (USER-2)', () => 
       expect(session.current()).toBe(9);
       await session.goTo(6);
       expect(await session.isChecked()).toBe(true);
-      // Logged by hand, it stays checked here (HAND_LOGGED_UNCHECK 'locked'): it comes off in Activity.
+      // Unchecked, it comes off its hand-logged entry (Majd, Nov 27 2026: "it means the user didn't revise that page
+      // therefore it should be removed"): Home counts 2 of 5.
       await session.uncheck();
-      expect(await session.isChecked()).toBe(true);
+      expect(await session.isChecked()).toBe(false);
       await session.back();
       await app.untilSynced();
-      // The session took none of them into its own record (ACT-14).
+      await app.until(() => /2 of 5/.test(home.today()), 'Home to count 2 of 5');
+      // The session took none of the others into its own record (ACT-14); the entry keeps 7 and 8.
       expect(app.app.logs.filter((l) => l.date === TUESDAY).flatMap((l) => l.pagesRevised)).toEqual([]);
+      const items = await listServerDocs(`users/${app.uid}/revisions`);
+      expect(items.filter((d) => String(d.id).startsWith('manual-')).flatMap((d) => d.pages as number[]).sort()).toEqual([7, 8]);
     } finally {
       await app.close();
     }
   });
 
-  it('[SESS-4] [USER-2] all of Tuesday logged by hand: Review session holds the 5 pages Home counts as Done, all checked', async () => {
+  it('[SESS-4] [USER-2] all of Tuesday logged by hand: Review session holds the 5 pages Home counts as Done, all checked; unchecking one takes it off', async () => {
     const { app, home } = await loggedByHand(pagesRange(6, 10));
     await app.until(() => (home.title() ?? '').startsWith('Done · 5 pages'), 'Home to say Tuesday is done');
     try {
@@ -209,13 +213,12 @@ describe('Home, the widget and the reminders agree about a day (USER-2)', () => 
       expect(await home.openReview()).toEqual(pagesRange(6, 10));
       const review = new Review(app);
       expect(Object.values(await review.checks()).every(Boolean)).toBe(true);
-      // Logged by hand, a page stays checked here (HAND_LOGGED_UNCHECK 'locked').
-      const { fireEvent } = app.mods.rtl;
-      await app.act(async () => {
-        fireEvent.press(app.screen.getByLabelText('Unmark current page'));
-      });
-      await app.idle(50);
-      expect(review.isChecked()).toBe(true);
+      // Unchecked and closed, it comes off its hand-logged entry: Home counts 4 of 5.
+      await review.toggle();
+      expect(review.isChecked()).toBe(false);
+      await review.close();
+      await app.untilSynced();
+      await app.until(() => /4 of 5/.test(home.today()), 'Home to count 4 of 5');
     } finally {
       await app.close();
     }

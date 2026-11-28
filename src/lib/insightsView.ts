@@ -342,7 +342,9 @@ export function quranShare(pages: number): string | null {
     [3 / 4, t('lib.insights.threeQuarters')],
   ];
   for (const [v, w] of words) if (Math.abs(f - v) <= 0.02) return w;
-  return t('lib.insights.percentQuran', { percent: Math.max(1, Math.round(f * 100)) });
+  // Under 1%: "under 1% of the Quran", as Home says it (Majd, Nov 27 2026).
+  if (f < 0.01) return t('lib.insights.underOneQuran');
+  return t('lib.insights.percentQuran', { percent: Math.round(f * 100) });
 }
 
 // ── Pace ─────────────────────────────────────────────────────────────────

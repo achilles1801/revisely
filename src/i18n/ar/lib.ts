@@ -233,6 +233,7 @@ export const lib: NonNullable<ArStrings['lib']> = {
     twoThirds: 'ثلثا القرآن',
     threeQuarters: 'ثلاثة أرباع القرآن',
     percentQuran: '{{percent}}٪ من القرآن',
+    underOneQuran: 'أقل من ١٪ من القرآن',
     reviseFirst: 'راجع {{what}} أولًا غدًا',
     reviseTheseFirst: 'راجع مواضع الضعف هذه أولًا غدًا',
     juz: 'الجزء {{n}}',

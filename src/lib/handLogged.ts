@@ -15,8 +15,11 @@ import type { OutboxOp } from './offline/ops';
 
 export type HandLoggedUncheck = 'locked' | 'remove';
 
-/** Majd's call (pending): until he answers, a page logged by hand stays checked in the session and the review. */
-export const HAND_LOGGED_UNCHECK: HandLoggedUncheck = 'locked';
+/**
+ * Majd, Nov 27 2026: "i mean it should be removed right? it means the user didn't revise that page therefore it should be
+ * removed". Unchecking a page logged by hand takes it off its entry.
+ */
+export const HAND_LOGGED_UNCHECK: HandLoggedUncheck = 'remove';
 
 /** Of `pages`, those logged by hand for `day`, in the Activity items (with those still waiting on the phone). */
 export function handLoggedOn(history: readonly HistoryItem[] | null | undefined, day: string, pages: readonly number[]): number[] {

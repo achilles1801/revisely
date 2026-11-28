@@ -37,10 +37,12 @@ export function scheduleAmount(user: User, days: number[][], edited = false): st
 }
 
 /** The two lines, or null with nothing memorized or no days (Edit schedule says why). */
-export function scheduleSummary(user: User, memorizedPages: UserPage[], revisionDate: Date): { perDay: string; repeats: string } | null {
+export function scheduleSummary(user: User, memorizedPages: UserPage[], revisionDate: Date): { perDay: string; repeats: string | null } | null {
   if (memorizedPages.length === 0) return null;
   const { days } = liveScheduleDays(user, memorizedPages, revisionDate);
   if (days.length === 0) return null;
+  // A plan of rest days alone: "Rest days only", and no page comes round (Majd, Nov 27 2026).
+  if (days.every((d) => d.length === 0)) return { perDay: t('plan.edit.restDaysOnly'), repeats: null };
   return {
     perDay: t('plan.edit.perDay', { amount: scheduleAmount(user, days) }),
     repeats: t('plan.edit.everyPage', { count: days.length }),
