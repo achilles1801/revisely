@@ -354,8 +354,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [cacheChecked, setCacheChecked] = useState<string | null>(null);
   const [waitedOut, setWaitedOut] = useState(false);
   const [netIsOffline, setNetIsOffline] = useState(false);
-  // From the user document's listener: false while Firestore can't reach the server.
+  // From the user document's listener: false while Firestore answers from its own memory, not the server.
   const [serverReachable, setServerReachable] = useState<boolean | null>(null);
+  // That memory answering is not being offline (SYNC-7): every sign-in reads the user document once (AuthContext), so
+  // the listener's first answer is from Firestore's memory while it is still connecting, and the app showed "Connect to
+  // the internet to set up" (with no copy on the phone yet) or "Offline" until the server's answer came. The server
+  // counts as unreachable once it has stayed silent this long after such an answer; NetInfo's "offline" counts at once.
+  const [serverLate, setServerLate] = useState(false);
+  useEffect(() => {
+    if (serverReachable !== false) {
+      setServerLate(false);
+      return;
+    }
+    const timer = setTimeout(() => setServerLate(true), SERVER_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [serverReachable]);
   const [error, setError] = useState<string | null>(null);
   // Bumped to subscribe the listeners again (one ended in an error, or "Try again").
   const [listenEpoch, setListenEpoch] = useState(0);
@@ -817,7 +830,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const userKnown = !!forThisUid && forThisUid.user !== undefined;
   const ready = userKnown && (forThisUid!.user === null || forThisUid!.pages !== undefined || forThisUid!.pagesSettled);
-  const offline = netIsOffline || serverReachable === false;
+  const offline = netIsOffline || serverLate;
   const connectionNeeded = !!uid && cacheChecked === uid && !userKnown && (waitedOut || offline);
   const loading = !!uid && !connectionNeeded && (cacheChecked !== uid || !ready);
 

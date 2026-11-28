@@ -214,6 +214,7 @@ describe('cold start offline', () => {
     await keepCopyOnPhone();
     view();
     await settle();
+    goOffline();
     expect(app.loading).toBe(false);
     expect(app.connectionNeeded).toBe(false);
     expect(app.onboardingComplete).toBe(true);
@@ -241,6 +242,7 @@ describe('cold start offline', () => {
     view();
     await settle();
     expect(app.loading).toBe(true);
+    goOffline();
     act(() => mockListeners.user!(null, { fromCache: true }));
     expect(app.connectionNeeded).toBe(true);
     expect(app.loading).toBe(false);
@@ -275,6 +277,48 @@ describe('cold start offline', () => {
     expect(app.connectionNeeded).toBe(true);
     // NetInfo saying "offline" shows it at once, too (checked in the next test).
   });
+
+  // SYNC-7 (Majd, Nov 28 2026: "everyone i login for a split second i get the no wifi / disconnected "error" screen"):
+  // every sign-in reads the user document once, so Firestore's first answer comes from its memory while it connects.
+  it.each([
+    ['no copy (a sign-in on this phone)', false],
+    ['a copy on the phone', true],
+  ])(
+    '[SYNC-7] online, Firestore answering from its memory first is not offline (%s): no connect screen, no "Offline"; the server silent 6 s is',
+    async (_, copy) => {
+      jest.useFakeTimers();
+      if (copy) await keepCopyOnPhone();
+      view();
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(100);
+      });
+      act(() => mockListeners.user!(fsUser, { fromCache: true }));
+      expect(app.connectionNeeded).toBe(false);
+      expect(app.offline).toBe(false);
+      // The server answers a moment later: never offline.
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(800);
+      });
+      act(() => {
+        mockListeners.user!(fsUser, { fromCache: false });
+        mockListeners.pages!(fsPages, { fromCache: false });
+        mockListeners.sessions!([yesterday], { fromCache: false });
+      });
+      expect(app.connectionNeeded).toBe(false);
+      expect(app.offline).toBe(false);
+      expect(app.user?.name).toBe('Asiyah');
+      // Later the connection drops without NetInfo noticing: Firestore's memory again, and after 6 s of silence, "Offline".
+      act(() => mockListeners.user!(fsUser, { fromCache: true }));
+      expect(app.offline).toBe(false);
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(SERVER_WAIT_MS);
+      });
+      expect(app.offline).toBe(true);
+      // The server back: not offline.
+      act(() => mockListeners.user!(fsUser, { fromCache: false }));
+      expect(app.offline).toBe(false);
+    },
+  );
 
   it('NetInfo offline with no copy: the connect screen straight away', async () => {
     view();
@@ -482,6 +526,7 @@ describe('the review’s cases', () => {
   it('"Try again" subscribes again at once', async () => {
     view();
     await settle();
+    goOffline();
     act(() => mockListeners.user!(null, { fromCache: true }));
     expect(app.connectionNeeded).toBe(true);
     const before = mockListeners.subscribed;
