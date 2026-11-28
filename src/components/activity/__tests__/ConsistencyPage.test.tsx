@@ -222,6 +222,9 @@ describe('[ACT-43] Consistency’s page on young accounts and little data: never
     expect(text('consistency-revising-hero-value')).toBe(String(n));
     expect(screen.getAllByTestId(/^consistency-weeks-chart-bar-/)).toHaveLength(1);
     expect(screen.getAllByTestId('consistency-weeks-chart-slot-empty')).toHaveLength(MIN_SLOTS - 1);
+    // The first empty slot names its week, six before this one (ACT-41's timeline): its Sunday's day of the month.
+    const first = shiftDay(screen.getAllByTestId(/^consistency-weeks-chart-bar-/)[0].props.testID.replace('consistency-weeks-chart-bar-', ''), -7 * (MIN_SLOTS - 1));
+    expect(text('consistency-weeks-chart-label-first')).toBe(String(Number(first.slice(8))));
     const fill = StyleSheet.flatten(screen.getByTestId(/^consistency-weeks-chart-fill-/).props.style);
     expect(fill.width).toBeLessThanOrEqual(MAX_BAR_WIDTH);
     // No trend on an account younger than the range and as long before it.

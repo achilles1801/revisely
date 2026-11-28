@@ -49,6 +49,7 @@ import {
   type WeekBar,
 } from '../../lib/consistencyView';
 import { formatNumber, t } from '../../i18n';
+import { shiftDay } from '../../lib/dayKeys';
 
 /**
  * The trend as Insights' pages show it (InsightPageParts): more days is better on every figure here, so up is green and
@@ -215,7 +216,16 @@ function WeeksCard({
           {lineOf(lit)}
         </ChromeText>
       ) : null}
-      <TapChart bars={bars} picked={picked} onPick={setPicked} colours={[palette.primary]} max={7} testID={`${testID}-chart`} />
+      <TapChart
+        bars={bars}
+        picked={picked}
+        onPick={setPicked}
+        colours={[palette.primary]}
+        max={7}
+        // A short history reads as a timeline (ACT-41): the first empty slot is named by its week's first day ("16").
+        slotLabel={weeks.length > 0 ? (before) => weekLabel(shiftDay(weeks[0].week, -7 * before), weeks.length) : undefined}
+        testID={`${testID}-chart`}
+      />
       <ChartPills options={CHART_SPANS.map((s) => ({ key: s, label: SPAN_LABEL[s]() }))} value={chartSpan} onChange={onSpan} testID={`${testID}-span`} />
     </InsightCard>
   );
