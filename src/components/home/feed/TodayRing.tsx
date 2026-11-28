@@ -274,7 +274,6 @@ export function TodayRing({
               title={lines.cta}
               onPress={onPrimary}
               variant={lines.solid ? 'solid' : 'outline'}
-              size="lg"
               style={styles.cta}
               testID="today-cta"
             />
@@ -333,7 +332,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 19, lineHeight: 25, fontWeight: '700', letterSpacing: -0.4, textAlign: 'center' },
   center: { textAlign: 'center' },
   centred: { alignSelf: 'center' },
-  cta: { marginTop: 18 },
+  // The board's pill: centred, as wide as its words, a little taller than the post's (PillButton lg stretches).
+  cta: { marginTop: 18, minHeight: 44, paddingHorizontal: 28 },
   quiet: { marginTop: 14, alignSelf: 'stretch' },
   add: { fontWeight: '600' },
   separator: { height: StyleSheet.hairlineWidth },
