@@ -5,6 +5,7 @@
 
 import { formatDate, t, weekdayName } from '../i18n';
 import { dayNumber, daysBetween, shiftDay } from './dayKeys';
+import { memorizedItemShare, type MemorizationItemLike } from './memorizedAyahs';
 
 
 export type InsightsRange = 7 | 30 | 90 | 'all';
@@ -188,12 +189,18 @@ export function missedPattern(active: Set<string>, today: string, range: number,
   return null;
 }
 
-/** Pages memorized in the range ("+9 in 30 days"). */
-export function memorizedIn(items: { day: string; pages: number[] }[], today: string, range: number): number {
-  return items.filter((i) => {
-    const age = daysBetween(i.day, today);
-    return age >= 0 && age < range;
-  }).reduce((n, i) => n + i.pages.length, 0);
+/**
+ * Pages memorized in the range ("+9 in 30 days"), by page share to one decimal (MEM-2), as Memorization's bars count them:
+ * counting each page an item touched as one, the figure read "+75 in 7 days" over a month's bar of 74 (MEM-12).
+ */
+export function memorizedIn(items: readonly MemorizationItemLike[], today: string, range: number): number {
+  const sum = items
+    .filter((i) => {
+      const age = daysBetween(i.day, today);
+      return age >= 0 && age < range;
+    })
+    .reduce((n, i) => n + memorizedItemShare(i), 0);
+  return Math.round(sum * 10) / 10;
 }
 
 /**

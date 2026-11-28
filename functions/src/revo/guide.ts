@@ -377,7 +377,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     // lib/release/memorizedInSettings is on. These lines replace, in Revisely Dev, the main guide's Home line and its
     // "Home → … of the Quran memorized ›" and "Settings → Revision → “Memorized pages”, tap the pencil first" path.
     title: 'Memorized pages',
-    covers: ['MEM-9', 'MEM-10'],
+    covers: ['MEM-9', 'MEM-10', 'MEM-12'],
     routes: ['Settings', 'Memorization', 'ActivitySection'],
     text: lines(
       '- Home shows no memorized line or juz dots. Settings → “Memorized pages” (under “Revision”, e.g. "104 pages") opens them ready to edit: “Show by” “Surahs”, “Juz” or “Hizb”; a row’s circle marks it all, the row opens it (“Whole juz”, then its surahs’ pages, numbered within each surah). A change shows “Cancel” and e.g. "Save 2 changes".',

@@ -1953,6 +1953,17 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   - A bar picks its month or day: the figure becomes it ("3 pages on 25 November"), and what was memorized then is listed
     under the bars, each opening its day. The same bar again clears it.
 
+- **MEM-12.** (Revisely Dev) Memorization's chart always reads as a chart, whatever the account has (Majd, Nov 28 2026, on
+  one month drawn as one bar the width of the screen: "plz ensure something like this never happens (garbage ui)").
+  - A bar is at most 28pt wide by month, 14pt by day. The axis has at least 6 slots by month and 7 by day, with now at the
+    right edge, so one, two or three bars stand where they fall in time. The empty slots before them have no bar and no
+    label.
+  - Under two months with something memorized, it opens on Day (a few weeks read as a chart); from three, on Month. A
+    person's own pick of Month or Day holds.
+  - The figure's "+N in 7 days" counts pages by their share, as the bars do (MEM-2), so it is never more than the bar of
+    the month that holds those days. Counting each page an entry touched as one, it read "+75 in 7 days" over November's
+    74.
+
 ## Help
 
 - **HELP-1.** Screens that need explaining have a ?. Home's sits at the right of the Today
