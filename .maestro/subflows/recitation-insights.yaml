@@ -35,12 +35,24 @@ appId: com.revisionbuddy.app
     direction: DOWN
     centerElement: true
     timeout: 45000
-- assertVisible:
-    id: insights-recitation-slip-78-9
+# The trend and the chart under it.
+- scrollUntilVisible:
+    element:
+      id: insights-recitation-bars
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
 - runFlow:
     file: shot.yaml
     env:
       NAME: ${NAME}
+# The passage that slips most, under Fixed and still slipping.
+- scrollUntilVisible:
+    element:
+      id: insights-recitation-slip-78-9
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
 - scrollUntilVisible:
     element:
       id: insights-recitation-see-all

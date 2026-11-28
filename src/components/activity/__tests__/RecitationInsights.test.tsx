@@ -120,11 +120,15 @@ describe('Insights: Recitation’s page (ACT-44, RINS-2)', () => {
     const bars = kindBars(records, TODAY, '4w', words);
     expect(bars.map((b) => b.key)).toEqual(['2026-10-26', '2026-11-02', '2026-11-09', '2026-11-16']);
     expect(text('insights-recitation-chart')).toContain('Your mistakes, week by week | a page | Wrong or skipped words | Hesitations | Harakat and letters');
-    // Nothing recited this week yet: the lit bar (the newest) says so.
-    expect(text('insights-recitation-pick')).toBe('This week · no takes');
-    // Last week (9–15 Nov): Al-Kahf on Wednesday and Saturday, Al-Baqarah on Saturday and Sunday.
+    // Nothing recited this week yet: the chart opens on the newest week with takes, last week (9–15 Nov: Al-Kahf on
+    // Wednesday and Saturday, Al-Baqarah on Saturday and Sunday), as its board does.
     const last = bars[2];
     expect(last.takes).toBe(4);
+    expect(text('insights-recitation-pick')).toBe(`Week of 9 Nov · ${perPageText(last.mistakes / last.pages)} a page`);
+    expect(screen.getByTestId('insights-recitation-bars-bar-2026-11-09').props.accessibilityState).toEqual({ selected: true });
+    // A tap on it clears it: the newest week is lit, and says it has no takes. Another tap picks it again.
+    await act(async () => fireEvent.press(screen.getByTestId('insights-recitation-bars-bar-2026-11-09')));
+    expect(text('insights-recitation-pick')).toBe('This week · no takes');
     await act(async () => fireEvent.press(screen.getByTestId('insights-recitation-bars-bar-2026-11-09')));
     expect(text('insights-recitation-pick')).toBe(`Week of 9 Nov · ${perPageText(last.mistakes / last.pages)} a page`);
     // Its kinds stacked: wrong or skipped words (4) and a harakat slip, no hesitation.

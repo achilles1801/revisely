@@ -1565,8 +1565,8 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   - Then the mistakes a page by kind on Insights' one chart (ACT-41), stacked: wrong or skipped words, hesitations (an
     extra word), harakat and letters. 4 weeks or 3 months draw a bar a week (from its Monday, this week last), a year a
     bar a month; the range sets which it opens on, and the pills change it. Every week or month of the span has its
-    slot, so a young account's chart is never one wide block. The line above names the lit bar ("Week of 2 Nov · 0.7 a
-    page", "… · no mistakes", "… · no takes"); a tap on a kind shows it alone, its line and bars that kind's. Takes
+    slot, so a young account's chart is never one wide block. It opens on the newest week or month with takes, picked;
+    the line above names the lit bar ("Week of 2 Nov · 0.7 a page", "… · no mistakes", "… · no takes"); a tap on a kind shows it alone, its line and bars that kind's. Takes
     without a mistake in the span say so in place of empty bars; none, "No takes in the last 4 weeks".
   - Fixed and still slipping: the words fixed (said right on 2 days, never by Clear now; a word still marked in another
     way isn't fixed) and how many in the range, against the words still marked on the page, in how many passages and how

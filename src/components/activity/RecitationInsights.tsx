@@ -131,7 +131,9 @@ function RecitationPage({ records, words, today, window, inWords, span, smartTra
   const alone = useSectionAlone();
   const range = span ?? { lastWords: inWords, inTheLast: inWords, before: null, all: false };
   const [chartSpan, setChartSpan] = useState<ChartSpan>(() => spanForRange(window, range.all));
-  const [picked, setPicked] = useState<string | null>(null);
+  // The bar picked: undefined until a tap (the chart opens on the newest week or month with takes, as its board does),
+  // null once a tap clears it (the newest lit).
+  const [chosen, setChosen] = useState<string | null | undefined>(undefined);
   const [kindAlone, setKindAlone] = useState<KindKey | null>(null);
   const [allPassages, setAllPassages] = useState(false);
 
@@ -166,6 +168,9 @@ function RecitationPage({ records, words, today, window, inWords, span, smartTra
   });
   const anyTakes = bars.some((b) => b.takes > 0);
   const anyMistakes = chartBars.some((b) => b.value > 0);
+  const newestWithTakes = [...bars].reverse().find((b) => b.takes > 0);
+  const opening = newestWithTakes && newestWithTakes !== bars[bars.length - 1] ? newestWithTakes.key : null;
+  const picked = chosen === undefined ? opening : chosen;
   const pickedAt = picked ? bars.findIndex((b) => b.key === picked) : -1;
   const litAt = pickedAt >= 0 ? pickedAt : bars.length - 1;
 
@@ -255,7 +260,7 @@ function RecitationPage({ records, words, today, window, inWords, span, smartTra
         value={chartSpan}
         onChange={(k) => {
           setChartSpan(k);
-          setPicked(null);
+          setChosen(undefined);
         }}
         testID="insights-recitation-span"
       />
@@ -296,7 +301,7 @@ function RecitationPage({ records, words, today, window, inWords, span, smartTra
               <TapChart
                 bars={chartBars}
                 picked={picked}
-                onPick={setPicked}
+                onPick={setChosen}
                 colours={kinds.map((k) => colours[k])}
                 height={110}
                 minSlots={chartBars.length}
