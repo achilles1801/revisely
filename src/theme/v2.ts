@@ -198,6 +198,11 @@ export interface PaletteV2 extends AccentTokens {
    */
   premium: readonly [string, string];
   onPremium: string;
+  /**
+   * "Continue with Google" (sign-in B, Revisely Dev): Google's own button colours from its branding guidelines, the same
+   * whatever the accent. Light: a white pill with a grey edge and near-black text; dark: near-black with a lighter edge.
+   */
+  google: { fill: string; edge: string; text: string };
 }
 
 type Base = Omit<PaletteV2, keyof AccentTokens | 'accent'>;
@@ -241,6 +246,7 @@ const BASE_LIGHT: Base = {
   markCorrectedFirm: '#94D0B2',
   premium: ['#7C3AED', '#DB2777'],
   onPremium: '#FFFFFF',
+  google: { fill: '#FFFFFF', edge: '#747775', text: '#1F1F1F' },
 };
 
 const BASE_DARK: Base = {
@@ -282,6 +288,7 @@ const BASE_DARK: Base = {
   markCorrectedFirm: '#3D7560',
   premium: ['#A78BFA', '#F472B6'],
   onPremium: '#000000',
+  google: { fill: '#131314', edge: '#8E918F', text: '#E3E3E3' },
 };
 
 /**
