@@ -150,8 +150,8 @@ describe('Revo’s guide names what the app has', () => {
     // million); the 4,000 characters added are about $0.0001 and $0.003 of that. Trim repeats before raising it again.
     // Nov 27 2026: 16,500, for MEM-9 and MEM-10 (Memorized pages off Home), at 15,991 with nothing left to trim that wasn't
     // another feature's knowledge; about $0.00001 a question cached.
-    // Nov 28 2026: 17,000, for PATH-1 and BEGIN-1 to BEGIN-5 (the beginner path, ~330 characters in one line), at about
-    // 16,800; about $0.00001 a question cached.
+    // Nov 28 2026: 17,000, for PATH-1 and BEGIN-1 to BEGIN-8 (the beginner path and Learn, ~500 characters in two lines),
+    // at about 16,980; about $0.00001 a question cached.
     expect(DEV_GUIDE.length).toBeLessThan(17_000);
     expect(DEV_GUIDE).not.toMatch(/\b[A-Z]+-\d+\b/);
   });

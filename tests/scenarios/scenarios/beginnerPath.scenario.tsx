@@ -61,6 +61,7 @@ function devHome(mods: Booted): ReactElement {
         { screenOptions: { headerShown: false, animation: 'none' } },
         h(Stack.Screen, { name: 'Dashboard', component: req<any>('src/screens/main/DashboardScreen').default }),
         h(Stack.Screen, { name: 'YourSurahs', component: req<any>('src/screens/main/YourSurahsScreen').default }),
+        h(Stack.Screen, { name: 'LearnSurah', component: req<any>('src/screens/main/LearnSurahScreen').default }),
         ...['ActiveRevision', 'Settings', 'Activity', 'ActivityDay', 'PlanEdit', 'PlanDayEdit', 'Memorization', 'ActivityAll', 'Insights', 'QuranReader'].map(
           (name) => h(Stack.Screen, { key: name, name, component: Elsewhere }),
         ),
@@ -149,6 +150,7 @@ async function openHome(phone: Phone): Promise<OpenApp> {
 function expectTodaysHome(app: OpenApp): void {
   expect(has(app, 'beginner-mark')).toBe(false);
   expect(has(app, 'beginner-add')).toBe(false);
+  expect(has(app, 'learn-next')).toBe(false);
   expect(text(app, 'today-detail')).not.toMatch(/about \d+ min/);
   expect(has(app, 'home-ayah-translation')).toBe(false);
 }
@@ -262,19 +264,21 @@ describe('the beginner path (Revisely Dev)', () => {
     await app.close();
   });
 
-  it('[BEGIN-2] a beginner with nothing memorized: Start with Al-Fatihah, Open Al-Fatihah at its first ayah, Mark them', async () => {
+  it('[BEGIN-2] a beginner with nothing memorized: Start with Al-Fatihah, Learn Al-Fatihah, Mark them', async () => {
     const phone = await account([], true);
     const app = await openHome(phone);
     expect(text(app, 'today-title')).toBe('Start with Al-Fatihah');
-    expect(text(app, 'today-detail')).toBe('Hold an ayah to hear it and see its meaning. Mark it once you know it.');
-    expect(text(app, 'today-cta')).toBe('Open Al-Fatihah');
+    expect(text(app, 'today-detail')).toBe('Listen to it ayah by ayah, with its meaning. Mark it once you know it.');
+    expect(text(app, 'today-cta')).toBe('Learn Al-Fatihah');
     expect(has(app, 'today-ring-start')).toBe(true);
     expect(app.screen.queryByText('Mark memorized pages')).toBeNull();
     expect(text(app, 'beginner-mark')).toBe('Know some surahs already? Mark them');
+    // The start is Learn itself: no Learn next under it (BEGIN-6).
+    expect(has(app, 'learn-next')).toBe(false);
 
     await tap(app, 'today-cta');
-    await app.until(() => route(app)?.name === 'QuranReader', 'Al-Fatihah in the reader');
-    expect(route(app).params).toEqual({ pageNumber: 1, highlight: { sura: 1, ayah: 1 } });
+    await app.until(() => route(app)?.name === 'LearnSurah', 'Learn');
+    expect(route(app).params).toEqual({ sura: 1 });
     await app.act(async () => app.mods.require<{ navigation: { current: any } }>('./navRef').navigation.current.goBack());
     await tap(app, 'beginner-mark');
     await app.until(() => has(app, 'your-surahs'), 'Your surahs');
@@ -337,6 +341,68 @@ describe('the beginner path (Revisely Dev)', () => {
     expect(items.map((i) => [i.id, i.pages, i.verses])).toEqual([[DAY, [604], last.verses]]);
     // Home names the last page by its memorized ayahs (MEM-4) and offers its time.
     await app.until(() => /about \d+ min/.test(text(app, 'today-detail') ?? ''), 'Home with the new surahs');
+    await app.close();
+  });
+
+  it('[BEGIN-6] Learn next: the next surah on the path, its ayahs and how far along, opening Learn on it', async () => {
+    const phone = await account([1], true);
+    const app = await openHome(phone);
+    await app.until(() => has(app, 'learn-next'), 'Learn next');
+    expect(text(app, 'learn-next-name')).toBe('An-Nas');
+    expect(text(app, 'learn-next-meta')).toBe('Learn next · 6 ayahs');
+    expect(text(app, 'learn-next-learned')).toBe('1 of 38 learned');
+    await tap(app, 'learn-next-cta');
+    await app.until(() => route(app)?.name === 'LearnSurah', 'Learn');
+    expect(route(app).params).toEqual({ sura: 114 });
+    await app.close();
+  });
+
+  it('[BEGIN-7] [BEGIN-8] Learn: an ayah at a time with its meaning, the three steps; I can recite it memorizes it, logs it, and names the next', async () => {
+    serveWhole('english_saheeh');
+    const phone = await account([1], true);
+    const app = await openHome(phone);
+    // The app's own Qur'an text, as the phone reads it from its asset.
+    const fixture = jest.requireActual<typeof import('../../../src/lib/recite/__fixtures__/quranWords')>('../../../src/lib/recite/__fixtures__/quranWords');
+    app.mods.require<typeof import('../../../src/lib/recite/quranWords')>('src/lib/recite/quranWords').setQuranWordsForTests(fixture.wordsData());
+    await tap(app, 'learn-next-cta');
+    await app.until(() => has(app, 'learn-arabic'), 'An-Nas’s first ayah');
+    expect(text(app, 'learn-hint')).toBe('Ayah 1 of 6 · Hear it three times, slowly.');
+    expect(text(app, 'learn-arabic')).toMatch(/^قُلْ أَعُوذُ/);
+    await app.until(() => has(app, 'learn-meaning'), 'its meaning');
+    expect(text(app, 'learn-meaning')).toBe('english_saheeh 114:1');
+    expect(text(app, 'learn-credit')).toBe('Saheeh International');
+    expect(text(app, 'learn-voice')).toMatch(/Mu'allim, slowly, three times each$/);
+    // The rest of the surah below, a tap going to it.
+    await tap(app, 'learn-ayah-3');
+    expect(text(app, 'learn-hint')).toBe('Ayah 3 of 6 · Hear it three times, slowly.');
+    await tap(app, 'learn-next-ayah');
+    expect(text(app, 'learn-hint')).toMatch(/^Ayah 4 of 6/);
+    await tap(app, 'learn-step-repeat');
+    expect(text(app, 'learn-hint')).toBe('Ayah 4 of 6 · Say it after the reciter: a pause follows each time.');
+    // Without looking: hidden until shown.
+    await tap(app, 'learn-step-recall');
+    expect(has(app, 'learn-arabic')).toBe(false);
+    await tap(app, 'learn-show');
+    expect(has(app, 'learn-arabic')).toBe(true);
+
+    await tap(app, 'learn-recite');
+    await app.until(() => has(app, 'learn-learned'), 'Learned');
+    await app.untilSynced();
+    expect(text(app, 'learn-learned-title')).toBe('An-Nas is memorized');
+    expect(text(app, 'learn-learned-body')).toBe('It’s part of your revision now. You know 2 surahs.');
+    expect(text(app, 'learn-learned-path')).toBe('2 of 38 learned');
+    expect(text(app, 'learn-learned-next-name')).toBe('Al-Falaq · 5 ayahs');
+    const last = app.app.pages.find((p) => p.pageNumber === 604)!;
+    expect(last.verses).toEqual([1, 2, 3, 4, 5, 6].map((a) => 114000 + a));
+    // Logged on today by its ayahs, as Your surahs' Today does.
+    const items = await listServerDocs(`users/${app.uid}/memorizations`);
+    expect(items.map((i) => [i.id, i.verses])).toEqual([[DAY, last.verses]]);
+
+    // Done: Home, where Learn next has moved on.
+    await tap(app, 'learn-done');
+    await app.until(() => route(app)?.name === 'Dashboard', 'Home');
+    await app.until(() => text(app, 'learn-next-name') === 'Al-Falaq', 'Learn next on Al-Falaq');
+    expect(text(app, 'learn-next-learned')).toBe('2 of 38 learned');
     await app.close();
   });
 });

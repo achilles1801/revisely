@@ -152,9 +152,9 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         icon: 'leaf-outline',
         title: 'Starting out',
         text:
-          'Start with Al-Fatihah: hold an ayah to hear it and see its meaning. ' +
-          'Learned another surah? Tap {{Add it}} under today and it joins your revision.',
-        covers: ['BEGIN-2', 'BEGIN-3', 'BEGIN-5'],
+          '{{Learn}} plays a surah ayah by ayah, slowly, with its meaning; {{I can recite it}} adds it to your revision. ' +
+          'Learned one elsewhere? Tap {{Add it}} under today.',
+        covers: ['BEGIN-2', 'BEGIN-3', 'BEGIN-5', 'BEGIN-6', 'BEGIN-7', 'BEGIN-8'],
         when: 'beginner',
       },
       {

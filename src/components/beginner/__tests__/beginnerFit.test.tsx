@@ -105,7 +105,7 @@ describe('[BEGIN-2] [BEGIN-3] the ring’s beginner lines fit their two lines on
   it('Start with Al-Fatihah: its words, never shrunk past what the ring allows', () => {
     const ring = beginnerRing({ lines: nothing, status: 'not_started', minutes: 0, onStart: () => undefined, onSurahs: () => undefined });
     expect(ring.lines.title.text).toBe('Start with Al-Fatihah');
-    expect(ring.lines.cta).toBe('Open Al-Fatihah');
+    expect(ring.lines.cta).toBe('Learn Al-Fatihah');
     expect(ring.onPrimary).toBeDefined();
     // At the largest text the line shrinks to fit (adjustsFontSizeToFit), but never below 0.7 of it: it must fit there.
     expect(bodyWidth(ring.lines.brief) * RING_MAX_SCALE * RING_MIN_SCALE).toBeLessThanOrEqual(room);

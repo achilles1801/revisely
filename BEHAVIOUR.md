@@ -86,9 +86,9 @@ essentially it SHOULD be beginner path, middle path (what we have now), and hafz
   not logged, and the plan is 10 pages a day. "Know a whole juz (one of the Quran's 30 parts)? Choose by juz" goes to
   today's juz grid, which is today's path. The last answer saves the plan and the beginner's path, and setup is done.
 - **BEGIN-2.** (Revisely Dev) A beginner's Home with nothing memorized is the ring dashed with "Start here", "Start with
-  Al-Fatihah", "Hold an ayah to hear it and see its meaning. Mark it once you know it.", and "Open Al-Fatihah", which
-  opens its page in the reader with the first ayah highlighted. Under it, "Know some surahs already? Mark them" opens Your
-  surahs (BEGIN-5). Never "Nothing to revise yet" or "Mark memorized pages".
+  Al-Fatihah", "Listen to it ayah by ayah, with its meaning. Mark it once you know it.", and "Learn Al-Fatihah", which
+  opens Learn on it (BEGIN-7). Under it, "Know some surahs already? Mark them" opens Your surahs (BEGIN-5). Never
+  "Nothing to revise yet" or "Mark memorized pages".
 - **BEGIN-3.** (Revisely Dev) A beginner's Home with surahs memorized is today's ring and lines (HOME-10), with about
   how long the pages still to revise take after the second line ("about 4 min": two minutes a page of text, a partly
   memorized page by its ayahs' share, the first two pages as half pages), none once today is done or on a rest day. Under
@@ -100,6 +100,21 @@ essentially it SHOULD be beginner path, middle path (what we have now), and hafz
   Ticking others shows "Save N surahs", which asks "When did you memorize these?": Today memorizes them by the ayah and
   logs them on today (the day's Memorized block), Before memorizes them without a log. They come into the revision
   (MEM-4) and Home names them by their ayahs.
+- **BEGIN-6.** (Revisely Dev) Once a beginner's Home isn't the start (BEGIN-2), Learn next sits under today's ring: the
+  next surah on the path not yet memorized (Al-Fatihah, then An-Nas back to An-Naba), "Learn next · 3 ayahs", how far
+  along the path ("7 of 38 learned") and "Learn", which opens Learn on it, as does the row. With all 38 memorized it
+  goes. An account on today's path never has it.
+- **BEGIN-7.** (Revisely Dev) Learn shows a surah one ayah at a time ("Ayah 1 of 3"): the Arabic in the mushaf's script
+  (the app's own text, on the phone), its meaning under it (Saheeh International, in English), the rest of the surah
+  quieter below, a tap on one going to it. "Listen" plays the ayah three times at 0.75× in Al-Husary's Mu'allim
+  recitation, "Repeat" the same with a pause as long as it after each play, and "Without looking" hides the ayahs until
+  "Show the ayah". Another ayah or step stops what was playing, and leaving gives the player back as it was (the reader's
+  Audio Options and reciter).
+- **BEGIN-8.** (Revisely Dev) "I can recite it" memorizes the surah by the ayah (MEM-1) and logs it on today, then
+  Learned: "Al-Kawthar is memorized", how many surahs they know, how far along the path, and the next surah on it, which
+  opens Learn on that one; with the path done, "That's every surah on the path. Keep revising them." "Done" returns
+  Home, where it is revised with the rest (MEM-4). Learning isn't revising: the day and the streak still count revision
+  alone (USER-2).
 - Every screen of the beginner path keeps its words whole on an iPhone SE and a Pro Max, at the largest text, in light,
   dark and Arabic: surah names wrap and never clip or push the Arabic name off the row.
 

@@ -38,7 +38,7 @@ export interface BeginnerRing {
 
 /**
  * A beginner's Home (BEGIN-2, BEGIN-3; Revisely Dev), drawn with Home's ring (HOME-10). With nothing memorized: "Start with
- * Al-Fatihah", how (hold an ayah to hear it and see its meaning, mark it once known), "Open Al-Fatihah", and "Know some
+ * Al-Fatihah", how (ayah by ayah with its meaning, marked once known), "Learn Al-Fatihah" (Learn, BEGIN-7), and "Know some
  * surahs already? Mark them". With surahs: today's ring and lines as for anyone, about how long what's left takes after
  * the second line, and "Learned another surah? Add it". Both quiet lines open Your surahs (BEGIN-5).
  */

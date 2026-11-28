@@ -56,7 +56,8 @@ import { HomeGround } from '../../components/home/HomeGround';
 import { HomeAyah } from '../../components/home/feed/HomeAyah';
 import { BeginnerAyah } from '../../components/beginner/BeginnerAyah';
 import { beginnerRing } from '../../components/beginner/BeginnerToday';
-import { minutesFor } from '../../lib/beginner/surahs';
+import { LearnNextRow } from '../../components/beginner/LearnNextRow';
+import { BEGINNER_SURAHS, knownSurahs, minutesFor, nextSurahOnPath } from '../../lib/beginner/surahs';
 import { isBeginner } from '../../lib/paths';
 import { useHomeBackground } from '../../lib/homeBackground';
 import { RamadanHome, WithCrescent } from '../../components/ramadan';
@@ -647,10 +648,14 @@ export default function DashboardScreen() {
           lines: home.lines,
           status: todayStatus.status,
           minutes: minutesFor(assignment.pages.filter((p) => !donePagesToday.has(p)), partial),
-          onStart: () => navigation.navigate('QuranReader', { pageNumber: 1, highlight: { sura: 1, ayah: 1 } }),
+          onStart: () => navigation.navigate('LearnSurah', { sura: BEGINNER_SURAHS[0] }),
           onSurahs: () => navigation.navigate('YourSurahs'),
         })
       : null;
+  // Learn next (BEGIN-6): the next surah on the path, once the ring isn't the beginner's start (which is Learn itself);
+  // none once all of the path is known.
+  const beginnerKnown = beginnerHome && !(home.lines.empty && !home.lines.rest) ? knownSurahs(pages) : null;
+  const learnNext = beginnerKnown ? nextSurahOnPath(beginnerKnown) : null;
   return (
     <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       {homeV3 ? <HomeGround background={background} ramadan={ramadan} bottom={tabBar} /> : <HeroGlow />}
@@ -711,7 +716,15 @@ export default function DashboardScreen() {
             lines={beginnerHome?.lines ?? home.lines}
             footer={beginnerHome?.footer}
           />
-        ) : (
+        ) : null}
+        {homeRing && beginnerKnown && learnNext != null ? (
+          <LearnNextRow
+            sura={learnNext}
+            learned={BEGINNER_SURAHS.filter((sura) => beginnerKnown.has(sura)).length}
+            onLearn={() => navigation.navigate('LearnSurah', { sura: learnNext })}
+          />
+        ) : null}
+        {homeRing ? null : (
           <TodayPost
             name={userName}
             initial={avatarInitial(userName, firebaseUser?.email)}
