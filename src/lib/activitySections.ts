@@ -91,12 +91,23 @@ export const DEFAULT_SECTIONS: SectionsLayout = {
   insights: { order: [...INSIGHTS_SECTIONS], hidden: [] },
 };
 
+/** The longest section name at 1× in the bar's 17 pt semibold, with room ("Memorization", 109 pt; sectionBar.test measures each). */
+export const LONGEST_SECTION_NAME = 112;
+/** The bar's title may shrink to this before it would be cut (BarTitle `fit`). */
+export const SECTION_NAME_SHRINK = 0.8;
+
 /**
- * Each side of a section page's top bar (ActivitySectionScreen): room for the range chip ("3 months ⌄", about 112 pt at 1×),
- * whose label grows with the text up to ChoiceChip's 1.4×. Back and help, on the other side, need less.
+ * A section page's top bar (ActivitySectionScreen): Back and help on one side, the range chip on the other, the name
+ * between, the sides equal so it stays centred. The chip's side is its room ("3 months ⌄", about 112 pt at 1×, its label
+ * growing with the text to ChoiceChip's 1.4×; the bar's name stops at 1.4× too). Where the longest name wouldn't fit
+ * beside the chip even shrunk (an SE at 1.2×, any iPhone at 1.4×), the chip goes to the top of the page and each side is
+ * Back and help's 84 pt (icons don't grow with the text). Nothing in the bar is ever cut (Majd: nothing clips).
  */
-export function sectionBarSide(fontScale: number): number {
-  return Math.ceil(116 + 70 * (Math.min(Math.max(fontScale, 1), 1.4) - 1));
+export function sectionBar(width: number, fontScale: number, gutter = 16): { chipInBar: boolean; side: number } {
+  const scale = Math.min(Math.max(fontScale, 1), 1.4);
+  const withChip = Math.ceil(116 + 70 * (scale - 1));
+  const fits = width - 2 * gutter - 2 * withChip >= LONGEST_SECTION_NAME * scale * SECTION_NAME_SHRINK;
+  return fits ? { chipInBar: true, side: withChip } : { chipInBar: false, side: 84 };
 }
 
 export const activitySectionsKey = (uid: string) => `@revisely_activity_sections:v1:${uid}`;

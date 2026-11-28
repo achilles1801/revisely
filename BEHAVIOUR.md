@@ -1437,7 +1437,8 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   them, "Your revision" with the range chip (ACT-22), then the sections in ACT-29's order as quiet rows: the name, one grey
   line, the figure at the end and ›, the whole row one button that opens the section on a page of its own: its name and the
   range chip in the top bar (one range: a change there is the list's too; Back and help on the other side, so the name has
-  the middle and is never cut at 1× on any iPhone, shrinking to 80% before it would be), then the section as Insights drew it, starting at
+  the middle; it shrinks to 80% before it would be cut, and where even that wouldn't fit beside the chip, with large text,
+  the chip goes to the top of the page: the name is never cut, on any iPhone at any text size), then the section as Insights drew it, starting at
   its figure with no title or subtitle of its own (board A4); its own controls (Ask, Days) stay. A section with nothing
   to say yet has no row: Gaps until a gap can be measured, Weak spots until a page is rated weak (none without Smart
   Tracking), Recitation until a take, Memorization until a page was memorized in the last twelve months, Pace until ten timed
