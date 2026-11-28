@@ -138,8 +138,8 @@ describe('[ACT-43] Consistency’s page: what it says', () => {
     expect(text('consistency-weeks-line')).toBe('Week of 18 Oct · 6 of 7 days');
     fireEvent.press(screen.getByTestId('consistency-weeks-chart-bar-2026-10-18'));
     expect(text('consistency-weeks-line')).toBe('This week · 6 of 6 days so far');
-    fireEvent.press(screen.getByTestId('consistency-weeks-span-1y'));
-    expect(screen.getAllByTestId(/^consistency-weeks-chart-bar-/)).toHaveLength(52);
+    // One range, the header's: the chart has no span of its own (Nov 28 2026).
+    expect(screen.queryByTestId('consistency-weeks-span')).toBeNull();
     // When you revise: the busiest hours, and a tap on an hour (never a hold) for its minutes.
     expect(text('consistency-hours-line')).toBe('Mostly 5–6 AM');
     const hour = screen.getByTestId('consistency-hour-bars-bar-21');
@@ -148,6 +148,19 @@ describe('[ACT-43] Consistency’s page: what it says', () => {
     expect(text('consistency-hours-line')).toMatch(/^9–10 PM · /);
     fireEvent.press(screen.getByTestId('consistency-hour-bars-bar-21'));
     expect(text('consistency-hours-line')).toBe('Mostly 5–6 AM');
+  });
+
+  it.each([
+    [7, 4],
+    [30, 4],
+    [90, 13],
+    ['all', 52],
+  ] as const)('the weeks chart spans the header’s range, the page’s one range: %s → %i weeks', (range, weeks) => {
+    at(PRO_MAX, 1);
+    const days = everyDay('2025-11-01', [6]);
+    open(account({ revised: days, firstDay: '2025-11-01', range }));
+    expect(screen.getAllByTestId(/^consistency-weeks-chart-bar-/)).toHaveLength(weeks);
+    expect(screen.queryByTestId('consistency-weeks-span')).toBeNull();
   });
 
   it('full cycles: each cycle’s days against the plan’s, the late ones by how many days', () => {
