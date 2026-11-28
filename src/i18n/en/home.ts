@@ -74,11 +74,10 @@ export const home = {
   },
   /** Today's ayah at the foot of Home (HOME-7). */
   ayah: {
-    /** Where it is: "Al-Qamar (54:17)". */
-    place: '{{surah}} ({{sura}}:{{ayah}})',
-    withSaheeh: '{{place}} · Saheeh International',
+    /** Where it is, under the Arabic: "Al-Qamar 54:17". */
+    place: '{{surah}} {{sura}}:{{ayah}}',
     label: 'Today’s ayah, {{place}}',
-    hint: 'Opens its page in the mushaf',
+    hint: 'Opens its page in the mushaf, with the ayah highlighted',
   },
   /** screens/main/DashboardScreen: Home itself. */
   screen: {

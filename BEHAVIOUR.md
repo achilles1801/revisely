@@ -504,16 +504,18 @@ current basic sounds". October 2026's version was removed for the voices it offe
   tab bar: the string lights' amber with the Ramadan theme, else the accent's) and "Glow and an ayah" (Glow, with today's
   ayah, HOME-7), the default. With the Ramadan theme the falling light falls the whole way down. The hairline under the
   Today post shows only when a post follows it (Al-Kahf). Grey text reads at 4.5:1 or more anywhere on the wash.
-- **HOME-7.** (Revisely Dev) "Glow and an ayah" shows one ayah at the foot of Home: one a day from a short list chosen for
-  people who revise (the Qur'an and its remembrance, patience, ease, du'a; whole ayahs, none cut), in order, the same all
-  day (the revision day) and the next the day after. The Arabic in the mushaf's script, then in English Saheeh
-  International once that surah is on the phone (word for word; a verse with a footnote shows the Arabic alone), then
-  where it is, "Al-Qamar (54:17)". It sits under the posts, pushed to the foot of the screen when there is room and after
-  them when there isn't, so it never covers them, at any text size, in either direction. A tap opens its page in the
-  reader over Home, and back, the swipe or the button, comes back to Home (Majd, Nov 26 2026: "clicking on the verse of
-  the day on the homepage takes me to the page which is correct, but then when I swipe out of the page, it should
-  actually take me back to the homepage, not to the third tab"). The Read tab stays as it was. (Before: the page opened
-  in the Read tab, and back went to its surah list.)
+- **HOME-7.** (Revisely Dev) "Glow and an ayah" shows one ayah at the foot of Home: one a day from a short list chosen
+  for people who revise (the Qur'an and its remembrance, patience, ease, du'a; whole ayahs, none cut), in order, the
+  same all day (the revision day) and the next the day after. It is one quiet line (Majd, Nov 27 2026: "one quiet line",
+  once Home's ring left no room for more on an iPhone SE): the Arabic in the mushaf's script, small, then where it is,
+  "Al-Qamar 54:17", with no translation. It sits under the posts, pushed to the foot of the screen when there is room
+  and after them when there isn't, so it never covers them, at any text size, in either direction. A tap opens its page
+  in the reader over Home with the ayah highlighted (holding it there gives its meaning), and back, the swipe or the
+  button, comes back to Home (Majd, Nov 26 2026: "clicking on the verse of the day on the homepage takes me to the page
+  which is correct, but then when I swipe out of the page, it should actually take me back to the homepage, not to the
+  third tab"). The Read tab stays as it was. (Before: the page opened in the Read tab, and back went to its surah list.)
+  (Before: Saheeh International's English under the Arabic once the surah was on the phone, then "Al-Qamar (54:17) ·
+  Saheeh International".)
 - **HOME-9.** Home never asks to mark memorized pages while any page is marked memorized. A day with no pages to
   revise (a rest day in the plan) reads "Rest day", then where the next revision day starts ("Tomorrow starts at
   Al-Kahf"), with "Revise ahead" as an outline that opens that day; with no next day, "Nothing is scheduled today." and
@@ -538,7 +540,7 @@ current basic sounds". October 2026's version was removed for the voices it offe
 - **HOME-8.** On a cold start, Home's first frame draws what the phone already knows, without waiting for Firebase Auth
   to check the saved sign-in or for the server: the account's picture (its photo, kept on the phone with its link, or the
   first letter), the latest badge on it (ACCOUNT-7, from the pages revised last worked out here), Friday's Al-Kahf card
-  (read or not, as last known here for this Friday) and today's ayah with its English (HOME-7). Each is then refreshed
+  (read or not, as last known here for this Friday) and today's ayah (HOME-7). Each is then refreshed
   quietly from the account and the server: a new photo replaces the old only once it is on the phone, never with a blank
   or the letter in between; a photo removed elsewhere goes; a card known here for this Friday changes only if the server
   says otherwise. Before anything is known here (a first start, another Friday), they wait as before (KAHF-2: no prompt

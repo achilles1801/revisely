@@ -122,10 +122,10 @@ describe('Home’s background (Revisely Dev)', () => {
     expect(has(app, 'home-ground-floor')).toBe(false);
     expect(has(app, 'today-post-separator')).toBe(false);
 
-    // Today's, in the mushaf's script, then where it is ("Al-Qamar (54:17)"; Saheeh's English only once it's on the phone).
+    // Today's, in the mushaf's script, then where it is ("Al-Qamar 54:17").
     const thursday = ayahForDay(THURSDAY);
     expect(text(app, 'home-ayah-arabic')).toBe(thursday.arabic);
-    expect(text(app, 'home-ayah-reference')).toMatch(new RegExp(`^${surahNameIn(thursday.sura)} \\(${thursday.sura}:${thursday.ayah}\\)`));
+    expect(text(app, 'home-ayah-reference')).toBe(`${surahNameIn(thursday.sura)} ${thursday.sura}:${thursday.ayah}`);
     // After the posts in Home's scroll: it never sits over them.
     const order = app.mods.rtl
       .within(app.screen.getByTestId('home-v2'))
@@ -170,4 +170,26 @@ describe('Home’s background (Revisely Dev)', () => {
     expect(has(app, 'today-post-separator')).toBe(false);
     await app.close();
   });
+});
+
+it('[HOME-7] today’s ayah is one quiet line, with no translation; a tap opens its page with the ayah highlighted', async () => {
+  const phone = await account();
+  const { app } = await openHome(phone, `${THURSDAY} 10:00`);
+  const { ayahForDay } = app.mods.require<typeof import('../../../src/lib/homeAyah')>('src/lib/homeAyah');
+  const { surahNameIn } = app.mods.require<typeof import('../../../src/lib/passages')>('src/lib/passages');
+  const { pageOfVerse } = app.mods.require<typeof import('../../../src/lib/verses')>('src/lib/verses');
+  await app.until(() => has(app, 'home-ayah'), 'today’s ayah');
+  const { sura, ayah } = ayahForDay(THURSDAY);
+  // Two pieces only: the Arabic and where it is (Majd, Nov 27 2026: "one quiet line"); the English is gone from Home.
+  expect(text(app, 'home-ayah-reference')).toBe(`${surahNameIn(sura)} ${sura}:${ayah}`);
+  expect(has(app, 'home-ayah-translation')).toBe(false);
+  expect(app.screen.getByTestId('home-ayah').props.accessibilityLabel).toBe(`Today’s ayah, ${surahNameIn(sura)} ${sura}:${ayah}`);
+
+  await app.act(async () => {
+    app.mods.rtl.fireEvent.press(app.screen.getByTestId('home-ayah'));
+  });
+  const nav = app.mods.require<{ navigation: { current: any } }>('./navRef').navigation.current;
+  await app.until(() => nav.getCurrentRoute()?.name === 'QuranReader', 'its page in the reader');
+  expect(nav.getCurrentRoute().params).toEqual({ pageNumber: pageOfVerse({ sura, ayah }), highlight: { sura, ayah } });
+  await app.close();
 });
