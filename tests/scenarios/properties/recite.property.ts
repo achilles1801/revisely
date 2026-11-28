@@ -59,10 +59,10 @@ import { meanScore } from '../../../src/lib/reciteInsights/insights';
 import { passageTakes } from '../../../src/lib/reciteMemory/progress';
 import { orphanTakes } from '../../../src/lib/reciteMemory/apart';
 import type { RecordingMeta } from '../../../src/lib/recordings';
-import { markFill } from '../../../src/components/reciteLive/markColours';
+import { colourGroup, markFill } from '../../../src/components/reciteLive/markColours';
 import { markTitle } from '../../../src/lib/reciteLive/describe';
 import { coverHighlights, NOTHING_SHOWN, revealAyah, revealNextWord, wordShown } from '../../../src/lib/reciteLive/view';
-import { createMistakeCue, cuesMark, CUE_GAP_MS } from '../../../src/lib/reciteLive/mistakeCue';
+import { createMistakeCue, cuesMark, cueSoundOf, CUE_GAP_MS, type CueSound } from '../../../src/lib/reciteLive/mistakeCue';
 import { linesRecited, pickTest, testFinished, testStarts } from '../../../src/lib/reciteLive/testMe';
 import { TEST_LENGTHS } from '../../../src/lib/reciteLive/testLength';
 import { recordFromTake } from '../../../src/lib/reciteMemory/fromTake';
@@ -1275,12 +1275,12 @@ describe('[RECITE-15] a sound and a tap on each new mistake', () => {
         pageArb.chain((p) => fc.array(fc.tuple(markArb(p), fc.integer({ min: 0, max: 2000 }), fc.boolean()), { maxLength: 20 })),
         (steps) => {
           let now = 0;
-          let sounds = 0;
+          const sounds: CueSound[] = [];
           let taps = 0;
-          const cue = createMistakeCue({ now: () => now, sound: () => sounds++, tap: () => taps++ });
+          const cue = createMistakeCue({ now: () => now, sound: (which) => sounds.push(which), tap: () => taps++ });
           const seen = new Set<string>();
           let last = -Infinity;
-          let expected = 0;
+          const expected: CueSound[] = [];
           for (const [m, gap, on] of steps) {
             now += gap;
             const fired = cue.mark(m, on);
@@ -1290,16 +1290,84 @@ describe('[RECITE-15] a sound and a tap on each new mistake', () => {
             expect(fired).toBe(should);
             if (should) {
               last = now;
-              expected++;
+              // A red mark's sound for a word wrong, skipped or added; an amber mark's for a wrong haraka or letter.
+              expected.push(m.kind === 'word' || m.kind === 'skipped' || m.kind === 'added' ? 'word' : 'slip');
             }
             if (fired) expect(countsAsMistake(m) && !isUnclear(m)).toBe(true);
           }
-          expect(sounds).toBe(expected);
-          expect(taps).toBe(expected);
+          expect(sounds).toEqual(expected);
+          expect(taps).toBe(expected.length);
         },
       ),
       { numRuns: runs(250) },
     );
+  });
+
+  it('a mark sounds as the colour it shows: red’s sound for a red mark, amber’s for an amber one', () => {
+    fc.assert(
+      fc.property(
+        pageArb.chain((p) => markArb(p)),
+        fc.boolean(),
+        (m, corrected) => {
+          const mark: Mark = corrected ? { ...m, corrected: true as const } : m;
+          const which = cueSoundOf(mark);
+          if (!cuesMark(mark)) expect(which).toBeNull();
+          else expect(which).toBe(colourGroup(mark) === 'word' ? 'word' : 'slip');
+          if (which) expect(colourGroup(mark)).toBe(which);
+        },
+      ),
+      { numRuns: runs(200) },
+    );
+  });
+
+  it('the two sounds: under half a second, near full scale, bright enough for the earpiece, and plainly different', () => {
+    // Majd, Nov 27 2026: "SUPER quiet i can barely hear it even with my max volume on". While iOS records, the sound comes
+    // from the earpiece, which gives little below about 1 kHz; the old sound (780 Hz then 520 Hz at -16 dBFS) sat there.
+    const fs = require('fs') as typeof import('fs');
+    const path = require('path') as typeof import('path');
+    const read = (name: string) => {
+      const buf: Buffer = fs.readFileSync(path.join(__dirname, '../../../assets/audio', name));
+      const sr = buf.readUInt32LE(24);
+      expect(buf.readUInt16LE(22)).toBe(1); // mono
+      expect(buf.readUInt16LE(34)).toBe(16);
+      const n = buf.readUInt32LE(40) / 2;
+      const x = Array.from({ length: n }, (_, i) => buf.readInt16LE(44 + i * 2) / 32768);
+      return { x, sr };
+    };
+    /** The notes: each onset (the level jumping up) and the strongest frequency just after it, by zero crossings. */
+    const notes = ({ x, sr }: { x: number[]; sr: number }) => {
+      const win = Math.round(0.005 * sr);
+      const env: number[] = [];
+      for (let i = 0; i + win <= x.length; i += win) env.push(Math.max(...x.slice(i, i + win).map(Math.abs)));
+      const onsets = env.flatMap((v, i) => (i === 0 ? (v > 0.05 ? [0] : []) : v > env[i - 1] * 1.6 && v > 0.1 ? [i * win] : []));
+      return onsets.map((at) => {
+        const seg = x.slice(at + win, at + win + Math.round(0.03 * sr));
+        let crossings = 0;
+        for (let i = 1; i < seg.length; i++) if (seg[i - 1] < 0 !== seg[i] < 0) crossings++;
+        return (crossings / 2) * (sr / seg.length);
+      });
+    };
+    const word = read('mistake-word.wav');
+    const slip = read('mistake-slip.wav');
+    for (const s of [word, slip]) {
+      expect(s.x.length / s.sr).toBeLessThan(0.5);
+      const peak = Math.max(...s.x.map(Math.abs));
+      expect(20 * Math.log10(peak)).toBeGreaterThan(-6);
+      // It starts and ends quietly: no click.
+      expect(Math.abs(s.x[0])).toBeLessThan(0.01);
+      expect(Math.abs(s.x[s.x.length - 1])).toBeLessThan(0.01);
+    }
+    const red = notes(word);
+    const amber = notes(slip);
+    // Red: two notes, falling. Amber: one note, higher than red's last.
+    expect(red.length).toBe(2);
+    expect(red[1]).toBeLessThan(red[0] * 0.85);
+    expect(amber.length).toBe(1);
+    expect(amber[0]).toBeGreaterThan(red[1] * 1.2);
+    for (const f of [...red, ...amber]) {
+      expect(f).toBeGreaterThan(1000);
+      expect(f).toBeLessThan(2500);
+    }
   });
 });
 

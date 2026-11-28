@@ -290,7 +290,7 @@ export const settings = {
     showPast: 'Show past mistakes',
     showPastSub: 'Lightly, until each is said right on 2 different days',
     mistakeSound: 'Sound on a mistake',
-    mistakeSoundSub: 'A short tone and a tap as a mistake is marked',
+    mistakeSoundSub: 'A tap and a sound: two notes for a wrong word, one for a wrong haraka or letter',
     /** For every account that recites: Revisely Dev's, and the store app's once released (RECITE-26, lib/release/trainingTakes). */
     keep: 'Help improve mistake detection',
     keepSub: 'Your recitations and their results help train it. Software checks them; nobody listens.',
