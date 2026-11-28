@@ -112,7 +112,8 @@ export function InsightAdvice({
   hint,
   testID,
 }: {
-  icon: React.ComponentProps<typeof Ionicons>['name'];
+  /** The mark at the start; a plain row without one. */
+  icon?: React.ComponentProps<typeof Ionicons>['name'];
   title: string;
   detail?: string | null;
   action?: React.ReactNode;
@@ -123,9 +124,11 @@ export function InsightAdvice({
   const { palette } = useTheme();
   const body = (
     <>
-      <View style={[styles.mark, { backgroundColor: palette.fill }]}>
-        <Ionicons name={icon} size={16} color={palette.text} />
-      </View>
+      {icon ? (
+        <View style={[styles.mark, { backgroundColor: palette.fill }]}>
+          <Ionicons name={icon} size={16} color={palette.text} />
+        </View>
+      ) : null}
       <View style={styles.flex}>
         <ChromeText style={[typeV2.name, { color: palette.text }]}>{title}</ChromeText>
         {detail ? <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{detail}</ChromeText> : null}

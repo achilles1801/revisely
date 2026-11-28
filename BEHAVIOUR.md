@@ -1438,6 +1438,18 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   (ACT-22's words) and, against the range before, "Gaps are rarer and shorter" (or rarer, shorter, "More gaps than
   before") with what it compares. Then the full revision against the plan and "When did I last revise…?", as in ACT-28.
   With no gap: "0 gaps", no tiles, every day revised or one day missed. The store app keeps ACT-28's section.
+- **ACT-39.** (Revisely Dev) Weak spots' own page (ACT-35) starts from its point, "Which pages are weak now, and are they
+  getting stronger?" (Majd, Nov 27 2026: "yes build all seven screens"; board
+  `~/Documents/revisely-today-mocks/insights-v2/board-rest.png`). First the memorized pages weak now (last rated 1–2), "4
+  weak pages", with the trend against how many were weak as the range began ("↓ from 9", green when fewer; none over All
+  time or with no session before the range on record) and "Pages you rated weak in your last session of them". Then a
+  card, "Weak and moderate, week by week" (the range's weeks, 4 at least and 26 at most), each week's bar stacked weak
+  (red) under moderate (amber): the pages weak and moderate at that week's end, a page's rating then being its last session
+  rating by then (a page rated only later counts as strong then). The line over the chart is the newest week ("This week ·
+  4 weak · 7 moderate"), or the week tapped (ACT-41). Then the page rated weak most often in the range, at least twice
+  ("Al-Hashr, last page" over "weak in 3 sessions in the last 30 days"), which opens it in the reader, and "Revise the 4
+  weak pages first tomorrow" (ACT-24; then "First tomorrow ✓"). Ask stays at the top and "See all pages by strength" at
+  the foot. Without Smart Tracking it is ACT-12's line, as before.
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
   strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
   stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,
