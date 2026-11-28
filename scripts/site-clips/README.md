@@ -140,3 +140,9 @@ clock line painted out. The section's first set came from runs 43997254931 (ligh
 `python3 scripts/site-clips/stills.py` puts the App Store Home screenshot
 (`store/screenshots/01-home.png`) into the phone in `docs/assets/img/og.png`, the link preview. Run
 it again whenever that screenshot is retaken.
+
+The words on its left are part of the picture. Since Nov 28 2026 they are the app's line (Majd: "yes lock it in"):
+"Even one verse counts." with "counts." in Indigo (#624BD5), and "Closer to the Qur’an, every day. Free on iPhone."
+They were drawn in Chrome with the system font (SF Pro), at the old words' size and place, over the old words cleared
+to the ground: the headline 68 px bold, line height 65 px, letter spacing −0.06em, its top at 362 px; the line under it
+24.5 px, #6B7280, its top at 518 px; both starting 86–88 px from the left. Draw them the same way if they change.
