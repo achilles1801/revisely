@@ -485,6 +485,9 @@ current basic sounds". October 2026's version was removed for the voices it offe
   Continue with Apple (only where the phone offers Sign in with Apple), Continue with Google and Continue with email, and
   "By continuing you agree to the Terms", whose Terms opens them. AUTH-2's line shows under the app's line. An Apple or
   Google sign-in that fails says why above the buttons and leaves the welcome as it was; one cancelled says nothing.
+  The welcome and the email page are static (Majd, Nov 28 2026: "the sign in shouldn't be scrollable it should be
+  static"): neither scrolls, and everything fits on one screen from an SE to a Pro Max, at the largest text size and in
+  Arabic, because each text grows only so far with the phone's text size.
 - **AUTH-4.** (Revisely Dev) Continue with email opens the email page, ‹ back to the welcome: "Create your account"
   (Name, Email, Password; "At least 8 characters."; Create account) or "Sign in with email" (Email, Password; Sign in;
   Forgot password?). It opens on creating, or on signing in after AUTH-2's sign-out. The line at its foot switches
@@ -492,7 +495,8 @@ current basic sounds". October 2026's version was removed for the voices it offe
   password?; an email that already has an account says "This email already has an account." with Sign in instead, which
   switches to signing in with the email and password still typed. The fields' group turns red, and so does the label of
   the field at fault. ACCOUNT-2 holds: a failed attempt keeps the page, its mode and what's typed. The fields and the
-  button stay above the keyboard, on an SE too.
+  button stay above the keyboard, on an SE too: there the title moves into the row with ‹ while the keyboard is up. A tap
+  outside the fields puts the keyboard away.
 - **AUTH-5.** (Revisely Dev) Forgot password? opens a sheet over the email page, "Reset your password", with the email
   already typed. Send link sends the reset email and says so ("Check your email"); one that fails keeps the email and
   says why. Closing the sheet leaves the email page as it was.

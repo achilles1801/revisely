@@ -22,6 +22,8 @@ import { t } from '../../../i18n';
 
 /** Every button's height and its round ends (the board's 50 pt pills). */
 export const BUTTON_HEIGHT = 50;
+/** How far a button's words grow with the phone's text size: one line still fits in BUTTON_HEIGHT. */
+export const CAP_BUTTON = 1.2;
 const RADIUS = BUTTON_HEIGHT / 2;
 
 /**
@@ -149,8 +151,8 @@ function Pill({
         ) : (
           <Ionicons name="mail-outline" size={20} color={ink} />
         )}
-        {/* Never cut: at the largest text the pill grows rather than shortening its words. */}
-        <Text style={[typeV2.button, styles.label, { color: ink }]} maxFontSizeMultiplier={1.4} testID={`${testID}-label`}>
+        {/* Capped so the welcome never scrolls (CAP_BUTTON), and never cut: a longer label wraps and the pill grows. */}
+        <Text style={[typeV2.button, styles.label, { color: ink }]} maxFontSizeMultiplier={CAP_BUTTON} testID={`${testID}-label`}>
           {label}
         </Text>
       </View>

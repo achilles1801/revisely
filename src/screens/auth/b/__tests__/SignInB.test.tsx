@@ -1,7 +1,7 @@
 // Sign-in B (Revisely Dev, AUTH-3–5): the welcome, the email page and the Forgot password sheet, in the navigator they run
 // in, with AuthContext stood in. Board: ~/Documents/revisely-auth-mocks/v2/png/B1–B6.
 import React from 'react';
-import { Dimensions } from 'react-native';
+import { Dimensions, Keyboard } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
@@ -45,7 +45,6 @@ import { DesignProvider } from '../../../../design/DesignContext';
 import { ThemeProvider } from '../../../../context/ThemeContext';
 import { DEFAULT_ACCENT, paletteV2 } from '../../../../theme/v2';
 import { arabicLines, clippedArabic } from '../../../../../jest/arabicLines';
-import { touchHandlingAncestor } from '../../../../../jest/scrollable';
 import { openWebPage } from '../../../../lib/openWebPage';
 import { signInWithGoogle as triggerGoogle } from '../../../../lib/googleAuth';
 import { TERMS_URL } from '../SignInWelcomeScreen';
@@ -198,14 +197,15 @@ describe('[AUTH-3] sign-in B’s welcome', () => {
     expect(mockAuth.signInWithGoogle).toHaveBeenCalledWith('test-id-token');
   });
 
-  it('at the largest text, on an SE: the words scroll, nothing is cut, the Arabic keeps its marks', async () => {
+  it('at the largest text, on an SE: static (no scroll view), every text capped, nothing cut, the Arabic keeps its marks', async () => {
+    // How it fits is SignInB.fit.test's; here, that it never scrolls and each text has its cap (Majd, Nov 28 2026).
     textSize(3.1);
     await open();
-    const scroll = screen.getByTestId('signin-welcome-scroll');
-    expect(touchHandlingAncestor(scroll as never)).toBeNull();
-    for (const id of ['signin-slogan', 'signin-brand', 'signin-google-label', 'signin-email-label']) {
+    expect(screen.UNSAFE_root.findAll((n: any) => n.type === 'RCTScrollView')).toEqual([]);
+    for (const id of ['signin-slogan', 'signin-brand', 'signin-google-label', 'signin-email-label', 'signin-agree']) {
       expect(screen.getByTestId(id).props.numberOfLines).toBeUndefined();
       expect(screen.getByTestId(id).props.adjustsFontSizeToFit).toBeFalsy();
+      expect(screen.getByTestId(id).props.maxFontSizeMultiplier).toBeLessThanOrEqual(1.3);
     }
     expect(arabicLines(screen.UNSAFE_root as never).length).toBeGreaterThan(0);
     expect(clippedArabic(screen.UNSAFE_root as never)).toEqual([]);
@@ -325,7 +325,7 @@ describe('[AUTH-4] sign-in B’s email page', () => {
     expect(styleOf('field-group').borderColor).toBe(light.fill);
   });
 
-  it('at the largest text: labels sit over their fields, nothing is cut, a long name and email stay whole', async () => {
+  it('at the largest text: each label beside its field and capped, nothing is cut, a long name and email stay whole', async () => {
     textSize(3.1);
     await open();
     await toEmail();
@@ -334,7 +334,9 @@ describe('[AUTH-4] sign-in B’s email page', () => {
     type('field-name', name);
     type('field-email', email);
     for (const f of ['field-name', 'field-email', 'field-password']) {
-      expect(styleOf(`${f}-row`).flexDirection).toBe('column');
+      expect(styleOf(`${f}-row`).flexDirection).toBe('row');
+      expect(screen.getByTestId(`${f}-label`).props.maxFontSizeMultiplier).toBe(1.25);
+      expect(screen.getByTestId(f).props.maxFontSizeMultiplier).toBe(1.25);
       expect(screen.getByTestId(`${f}-label`).props.numberOfLines).toBeUndefined();
       expect(screen.getByTestId(f).props.maxLength).toBeUndefined();
       expect(screen.getByTestId(f).props.numberOfLines).toBeUndefined();
@@ -349,27 +351,41 @@ describe('[AUTH-4] sign-in B’s email page', () => {
     await open();
     await toEmail();
     expect(styleOf('field-email-row').flexDirection).toBe('row');
-    expect(styleOf('field-email-label').width).toBe(96);
+    expect(styleOf('field-email-label').width).toBe(120);
     expect(screen.getByTestId('field-email-label').props.numberOfLines).toBeUndefined();
   });
 
-  it('with the keyboard up (an SE): the page lifts and scrolls, taps go through to the fields and the button', async () => {
-    textSize(1, 375, 667);
-    await open();
-    await toEmail();
-    const scroll = screen.getByTestId('email-scroll');
-    expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
-    expect(touchHandlingAncestor(scroll as never)).toBeNull();
-    // The scroll is inside the keyboard's lift, and holds the fields and the button.
-    let node: any = scroll.parent;
-    let lifted = false;
-    while (node) {
-      if (node.props?.behavior === 'padding' || node.props?.behavior === 'height') lifted = true;
-      node = node.parent;
+  it('with the keyboard up on an SE: the page lifts and never scrolls; the title moves into ‹’s row; a tap outside puts the keyboard away', async () => {
+    const listeners: Record<string, () => void> = {};
+    const add = jest.spyOn(Keyboard, 'addListener').mockImplementation(((event: string, cb: () => void) => {
+      listeners[event] = cb;
+      return { remove: () => undefined };
+    }) as never);
+    const dismiss = jest.spyOn(Keyboard, 'dismiss');
+    try {
+      textSize(1, 375, 667);
+      await open();
+      await toEmail();
+      expect(screen.UNSAFE_root.findAll((n: any) => n.type === 'RCTScrollView')).toEqual([]);
+      // Inside the keyboard's lift.
+      let node: any = screen.getByTestId('email-content').parent;
+      let lifted = false;
+      while (node) {
+        if (node.props?.behavior === 'padding' || node.props?.behavior === 'height') lifted = true;
+        node = node.parent;
+      }
+      expect(lifted).toBe(true);
+      expect(styleOf('email-title').fontSize).toBe(28);
+      await act(async () => listeners.keyboardWillShow?.());
+      expect(styleOf('email-title').fontSize).toBe(17);
+      fireEvent.press(screen.getByTestId('email-content'));
+      expect(dismiss).toHaveBeenCalled();
+      await act(async () => listeners.keyboardWillHide?.());
+      expect(styleOf('email-title').fontSize).toBe(28);
+    } finally {
+      add.mockRestore();
+      dismiss.mockRestore();
     }
-    expect(lifted).toBe(true);
-    expect(scroll.findAll((n: any) => n.props?.testID === 'email-submit').length).toBeGreaterThan(0);
-    expect(scroll.findAll((n: any) => n.props?.testID === 'field-password').length).toBeGreaterThan(0);
   });
 });
 

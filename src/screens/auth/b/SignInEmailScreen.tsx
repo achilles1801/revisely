@@ -2,9 +2,14 @@
 // "Sign in with email" on one page, the link at its foot switching between them with everything typed kept. A wrong
 // password or an email that already has an account says so in the board's words, turns the field red and offers the way
 // on. Forgot password? opens ResetPasswordSheet (AUTH-5).
+//
+// Static (Majd, Nov 28 2026: "the sign in shouldn't be scrollable it should be static"): no scroll view. Text grows with
+// the phone's text size only up to CAP, so the page fits on an SE at the largest size. With the keyboard up on a short
+// phone the title moves into the row with ‹ (`compact`), so the fields and the button stay above the keyboard (AUTH-4).
+// SignInB.fit.test measures both.
 
 import React, { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -27,6 +32,26 @@ export type EmailMode = 'create' | 'signIn';
 
 /** A new account's password: at least this many characters (the board's "At least 8 characters."). */
 export const MIN_PASSWORD = 8;
+
+/** How far each kind of text grows with the phone's text size, so the page never needs to scroll. */
+export const CAP = { title: 1.2, line: 1.3 } as const;
+
+/** Below this window height (an SE is 667 pt), the keyboard leaves too little room for the big title. */
+export const COMPACT_BELOW = 750;
+
+/** Whether the keyboard is up (it takes the page's lower part; KeyboardAvoidingView lifts what's above it). */
+function useKeyboardUp(): boolean {
+  const [up, setUp] = useState(false);
+  useEffect(() => {
+    const ios = Platform.OS === 'ios';
+    const subs = [
+      Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', () => setUp(true)),
+      Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setUp(false)),
+    ];
+    return () => subs.forEach((sub) => sub.remove());
+  }, []);
+  return up;
+}
 
 type Field = 'name' | 'email' | 'password';
 /** What a failed attempt says, the field at fault, and the way on it offers. */
@@ -68,6 +93,9 @@ export default function SignInEmailScreen() {
   // AuthContext's error is shown here only for this page's own attempt (not a reset's, nor Apple's or Google's).
   const [ownAttempt, setOwnAttempt] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
+  const keyboardUp = useKeyboardUp();
+  const { height } = useWindowDimensions();
+  const compact = keyboardUp && height < COMPACT_BELOW;
 
   // Leaving the page takes its error with it, so the welcome starts clean.
   useEffect(() => () => clearError(), []);
@@ -162,27 +190,31 @@ export default function SignInEmailScreen() {
   return (
     <ScreenSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]} testID="email-page">
       <HeroGlow />
-      {/* The fields and the button stay above the keyboard, on an SE too (AUTH-4): the page lifts and scrolls. */}
+      {/* The fields and the button stay above the keyboard, on an SE too (AUTH-4): the page lifts, it never scrolls. A tap
+          outside the fields puts the keyboard away. */}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
-        <ScrollView
-          style={styles.flex}
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
-          testID="email-scroll"
-        >
-          <View style={styles.back}>
-            <IconButton icon={backIcon()} onPress={() => navigation.goBack()} label={t('common.back')} size={26} testID="email-back" />
+        <Pressable style={styles.content} onPress={Keyboard.dismiss} accessible={false} testID="email-content">
+          <View style={[styles.head, compact && styles.headCompact]}>
+            <View style={styles.back}>
+              <IconButton icon={backIcon()} onPress={() => navigation.goBack()} label={t('common.back')} size={26} testID="email-back" />
+            </View>
+            {compact ? (
+              <Text style={[typeV2.barTitle, styles.headTitle, { color: palette.text }]} accessibilityRole="header" maxFontSizeMultiplier={CAP.title} testID="email-title">
+                {creating ? t('auth.b.createTitle') : t('auth.b.signInTitle')}
+              </Text>
+            ) : null}
           </View>
-          <Text style={[typeV2.largeTitle, styles.title, { color: palette.text }]} accessibilityRole="header" maxFontSizeMultiplier={1.6} testID="email-title">
-            {creating ? t('auth.b.createTitle') : t('auth.b.signInTitle')}
-          </Text>
+          {compact ? null : (
+            <Text style={[typeV2.largeTitle, styles.title, { color: palette.text }]} accessibilityRole="header" maxFontSizeMultiplier={CAP.title} testID="email-title">
+              {creating ? t('auth.b.createTitle') : t('auth.b.signInTitle')}
+            </Text>
+          )}
 
           <FieldGroup fields={fields} wrong={problem?.field ?? null} testID="field-group" />
 
           {problem ? (
             <View
-              style={styles.problem}
+              style={[styles.problem, compact && styles.problemCompact]}
               accessible
               accessibilityRole="alert"
               accessibilityLiveRegion="polite"
@@ -190,7 +222,7 @@ export default function SignInEmailScreen() {
               testID="email-error"
             >
               <Ionicons name="alert-circle" size={18} color={palette.red} style={styles.problemIcon} />
-              <Text style={[typeV2.body, styles.problemText, { color: palette.red }]} maxFontSizeMultiplier={1.6} testID="email-error-text">
+              <Text style={[typeV2.body, styles.problemText, { color: palette.red }]} maxFontSizeMultiplier={CAP.line} testID="email-error-text">
                 {problem.text}
                 {problem.action ? ' ' : ''}
                 {problem.action ? (
@@ -207,7 +239,7 @@ export default function SignInEmailScreen() {
               </Text>
             </View>
           ) : creating ? (
-            <Text style={[typeV2.meta, styles.hint, { color: palette.secondary }]} maxFontSizeMultiplier={1.6} testID="email-hint">
+            <Text style={[typeV2.meta, styles.hint, { color: palette.secondary }]} maxFontSizeMultiplier={CAP.line} testID="email-hint">
               {t('auth.b.passwordHint')}
             </Text>
           ) : null}
@@ -218,25 +250,25 @@ export default function SignInEmailScreen() {
             onPress={submit}
             busy={submitting}
             disabled={busy && !submitting}
-            style={[styles.submit, !problem && !creating && styles.submitAfterGroup]}
+            style={[styles.submit, (compact || (!problem && !creating)) && styles.submitAfterGroup]}
             testID="email-submit"
           />
 
           {!creating && problem?.action !== 'forgot' ? (
             <Tap onPress={openReset} style={styles.link} accessibilityRole="button" testID="email-forgot">
-              <Text style={[typeV2.name, styles.centered, { color: palette.link }]} maxFontSizeMultiplier={1.6}>
+              <Text style={[typeV2.name, styles.centered, { color: palette.link }]} maxFontSizeMultiplier={CAP.line}>
                 {t('auth.b.forgot')}
               </Text>
             </Tap>
           ) : null}
 
           <Tap onPress={() => switchTo(creating ? 'signIn' : 'create')} style={styles.link} accessibilityRole="button" testID="email-switch">
-            <Text style={[typeV2.menu, styles.centered, { color: palette.secondary }]} maxFontSizeMultiplier={1.6}>
+            <Text style={[typeV2.menu, styles.centered, { color: palette.secondary }]} maxFontSizeMultiplier={CAP.line}>
               {creating ? t('auth.b.haveAccount') : t('auth.b.newHere')}
               <Text style={[typeV2.menu, styles.strong, { color: palette.link }]}>{creating ? t('auth.b.signIn') : t('auth.b.createLink')}</Text>
             </Text>
           </Tap>
-        </ScrollView>
+        </Pressable>
       </KeyboardAvoidingView>
 
       <ResetPasswordSheet visible={resetOpen} initialEmail={email.trim()} onClose={() => setResetOpen(false)} />
@@ -247,13 +279,17 @@ export default function SignInEmailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   flex: { flex: 1 },
-  content: { flexGrow: 1, paddingHorizontal: layoutV2.gutter, paddingBottom: 24 },
-  back: { marginStart: -8, marginTop: 4, alignSelf: 'flex-start' },
-  title: { marginTop: 12, marginBottom: 24 },
+  content: { flex: 1, paddingHorizontal: layoutV2.gutter, paddingBottom: 16 },
+  head: { flexDirection: 'row', alignItems: 'center', minHeight: 44, marginTop: 4, marginBottom: 8, gap: 4 },
+  back: { marginStart: -8 },
+  headCompact: { marginBottom: 4 },
+  headTitle: { flex: 1 },
+  title: { marginTop: 4, marginBottom: 20 },
   centered: { textAlign: 'center' },
   hint: { marginTop: 12, marginStart: 4 },
   problem: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 14 },
   problemIcon: { marginTop: 1 },
+  problemCompact: { marginTop: 10 },
   problemText: { flex: 1 },
   submit: { marginTop: 16, minHeight: BUTTON_HEIGHT, borderRadius: BUTTON_HEIGHT / 2 },
   submitAfterGroup: { marginTop: 12 },
