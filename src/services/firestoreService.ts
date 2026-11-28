@@ -355,6 +355,8 @@ export function userUpdateFields(updates: UpdateUserInput): Record<string, unkno
     'recordingBackup',
     'recordingBackupCellular',
     'reciter',
+    // The path setup put the account on (PATH-1); null clears it.
+    'path',
   ] as const;
   for (const k of keys) {
     if (updates[k] !== undefined) fields[k] = updates[k];

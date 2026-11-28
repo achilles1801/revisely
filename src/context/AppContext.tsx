@@ -80,6 +80,8 @@ function firestoreUserToLocal(fsUser: FirestoreUser): User {
     recordingBackupCellular: fsUser.recordingBackupCellular,
     previewTester: fsUser.previewTester === true,
     whatsNewSeen: typeof fsUser.whatsNewSeen === 'string' ? fsUser.whatsNewSeen : undefined,
+    // Set only by setup's first answer (PATH-1); anything else, or none, is today's path.
+    ...(fsUser.path === 'beginner' || fsUser.path === 'hafiz' ? { path: fsUser.path } : {}),
   };
 }
 
@@ -325,6 +327,8 @@ function userFields(updatedUser: User): Record<string, unknown> {
     ...(updatedUser.recordingBackupCellular !== undefined && {
       recordingBackupCellular: updatedUser.recordingBackupCellular,
     }),
+    // Sent only once set (PATH-1): an account never on another path writes nothing new. Null clears it.
+    ...(updatedUser.path !== undefined && { path: updatedUser.path }),
   });
 }
 

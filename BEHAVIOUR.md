@@ -67,6 +67,42 @@ How the tests are made: `tests/scenarios/README.md`.
   `whatsNewSeen`, and no system prompt for location or notifications. ✕, or the last answer, returns to Settings with the
   account as it was.
 
+## Paths (Revisely Dev)
+
+Majd, Nov 28 2026: "this whole new "path" is treated completely independent of the normal current existing path.
+essentially it SHOULD be beginner path, middle path (what we have now), and hafz path". Boards:
+`~/Documents/revisely-onboarding-mocks/beginners-v1/` (C, then A). The switch: `src/lib/release/beginnerPath.ts`.
+
+- **PATH-1.** (Revisely Dev) Setup's first question has an answer per path: "None yet, or a few surahs" (the beginner
+  path), then "Part of it" and "All of it" (today's path, the hafiz path to come under "All of it"). Today's answers go on
+  exactly as before (ONBOARD-3, ONBOARD-4). Only the first answer makes an account a beginner's: setup's last question
+  saves it on the account, and nothing else does, so an account set up before the beginner path, or with today's answers,
+  is never on it and its Home, plan and document are as they were. Setting up again with today's answers takes a
+  beginner off it. The store app keeps two answers.
+- **BEGIN-1.** (Revisely Dev) The beginner path asks four questions: how much is memorized, which surahs, when the day
+  starts and a daily reminder. "Which surahs do you know?" lists Al-Fatihah, then An-Nas back to An-Naba, each with its
+  ayahs; none chosen is fine ("None yet? That's fine. You'll start with Al-Fatihah."), and Continue always goes on,
+  waiting only for a chosen surah's pages to load (as ONBOARD-1). The surahs chosen are memorized by the ayah (MEM-1),
+  not logged, and the plan is 10 pages a day. "Know a whole juz (one of the Quran's 30 parts)? Choose by juz" goes to
+  today's juz grid, which is today's path. The last answer saves the plan and the beginner's path, and setup is done.
+- **BEGIN-2.** (Revisely Dev) A beginner's Home with nothing memorized is the ring dashed with "Start here", "Start with
+  Al-Fatihah", "Hold an ayah to hear it and see its meaning. Mark it once you know it.", and "Open Al-Fatihah", which
+  opens its page in the reader with the first ayah highlighted. Under it, "Know some surahs already? Mark them" opens Your
+  surahs (BEGIN-5). Never "Nothing to revise yet" or "Mark memorized pages".
+- **BEGIN-3.** (Revisely Dev) A beginner's Home with surahs memorized is today's ring and lines (HOME-10), with about
+  how long the pages still to revise take after the second line ("about 4 min": two minutes a page of text, a partly
+  memorized page by its ayahs' share, the first two pages as half pages), none once today is done or on a rest day. Under
+  it, "Learned another surah? Add it" opens Your surahs.
+- **BEGIN-4.** (Revisely Dev) Today's ayah on a beginner's Home (HOME-7) keeps its meaning: Saheeh International's
+  English under the Arabic, in English, once that surah is on the phone (an ayah with a footnote shows the Arabic alone),
+  then "Al-Qamar 54:17 · Saheeh International". Everyone else's stays the one quiet line.
+- **BEGIN-5.** (Revisely Dev) Your surahs lists the beginner path's surahs, those already memorized ticked and fixed.
+  Ticking others shows "Save N surahs", which asks "When did you memorize these?": Today memorizes them by the ayah and
+  logs them on today (the day's Memorized block), Before memorizes them without a log. They come into the revision
+  (MEM-4) and Home names them by their ayahs.
+- Every screen of the beginner path keeps its words whole on an iPhone SE and a Pro Max, at the largest text, in light,
+  dark and Arabic: surah names wrap and never clip or push the Arabic name off the row.
+
 ## The schedule
 
 - **SCHED-1.** Pages plan: N pages a day in page order, from the plan's first day, wrapping round the

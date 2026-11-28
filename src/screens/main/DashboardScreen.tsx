@@ -54,6 +54,10 @@ import { RunningTimerChip } from '../../components/timer/RunningTimerChip';
 import { HeroGlow } from '../../components/v2/HeroGlow';
 import { HomeGround } from '../../components/home/HomeGround';
 import { HomeAyah } from '../../components/home/feed/HomeAyah';
+import { BeginnerAyah } from '../../components/beginner/BeginnerAyah';
+import { beginnerRing } from '../../components/beginner/BeginnerToday';
+import { minutesFor } from '../../lib/beginner/surahs';
+import { isBeginner } from '../../lib/paths';
 import { useHomeBackground } from '../../lib/homeBackground';
 import { RamadanHome, WithCrescent } from '../../components/ramadan';
 import { RamadanIntro } from '../../components/ramadan/RamadanIntro';
@@ -635,6 +639,18 @@ export default function DashboardScreen() {
   const onAhead = () =>
     aheadNext &&
     navigation.navigate('ActiveRevision', { aheadDay: aheadNext.plan.day, ...(aheadNext.plan.round ? { round: true } : {}) });
+  // A beginner's Home (PATH-1, BEGIN-2, BEGIN-3; Revisely Dev): the ring with the beginner's lines and quiet line. Only an
+  // account setup put on the beginner path gets it (lib/paths); everyone else's ring is exactly today's.
+  const beginnerHome =
+    homeRing && isBeginner(user)
+      ? beginnerRing({
+          lines: home.lines,
+          status: todayStatus.status,
+          minutes: minutesFor(assignment.pages.filter((p) => !donePagesToday.has(p)), partial),
+          onStart: () => navigation.navigate('QuranReader', { pageNumber: 1, highlight: { sura: 1, ayah: 1 } }),
+          onSurahs: () => navigation.navigate('YourSurahs'),
+        })
+      : null;
   return (
     <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       {homeV3 ? <HomeGround background={background} ramadan={ramadan} bottom={tabBar} /> : <HeroGlow />}
@@ -683,7 +699,7 @@ export default function DashboardScreen() {
             done={donePagesToday}
             streak={calculatedStreak}
             streakGrace={streakNow?.grace ?? null}
-            onPrimary={handleCtaPress}
+            onPrimary={beginnerHome?.onPrimary ?? handleCtaPress}
             onJump={() => setJumpOpen(true)}
             catchUp={home.catchUp}
             onCarryOver={handleCarryOver}
@@ -692,7 +708,8 @@ export default function DashboardScreen() {
             ahead={aheadNext ? { lead: aheadNext.lead, first: aheadNext.plan.pages[0] } : null}
             onAhead={onAhead}
             help={<HelpButton screen="home" size={20} color={palette.secondary} maxFontSizeMultiplier={HEADER_MAX_SCALE} />}
-            lines={home.lines}
+            lines={beginnerHome?.lines ?? home.lines}
+            footer={beginnerHome?.footer}
           />
         ) : (
           <TodayPost
@@ -766,7 +783,8 @@ export default function DashboardScreen() {
           // sits over them.
           <>
             <View style={styles.grow} />
-            <HomeAyah day={revisionDay} onOpen={openAyah} />
+            {/* A beginner's keeps its meaning under it (BEGIN-4). */}
+            {beginnerHome ? <BeginnerAyah day={revisionDay} onOpen={openAyah} /> : <HomeAyah day={revisionDay} onOpen={openAyah} />}
           </>
         ) : null}
       </ScrollView>

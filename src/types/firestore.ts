@@ -194,6 +194,8 @@ export interface FirestoreUser {
   accent?: 'indigo' | 'crimson' | 'jade';
   /** The last "What's new" release this account finished, or set up on (lib/help/whatsNew). */
   whatsNewSeen?: string;
+  /** The path setup put the account on (PATH-1): 'beginner' (Revisely Dev); absent: today's path. */
+  path?: 'beginner' | 'hafiz' | null;
   /** Pages carried into one revision day (see User.carryOver). */
   /** Who put the pages there: 'insights' for "Revise these first tomorrow" (absent: the schedule's own). */
   carryOver?: {
@@ -262,6 +264,8 @@ export interface UpdateUserInput {
   accent?: 'indigo' | 'crimson' | 'jade';
   /** The last "What's new" release this account finished, or set up on (lib/help/whatsNew). */
   whatsNewSeen?: string;
+  /** The path setup put the account on (PATH-1): 'beginner' (Revisely Dev); absent: today's path. */
+  path?: 'beginner' | 'hafiz' | null;
   /** Who put the pages there: 'insights' for "Revise these first tomorrow" (absent: the schedule's own). */
   carryOver?: {
     day: string;

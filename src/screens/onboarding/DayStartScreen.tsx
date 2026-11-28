@@ -4,7 +4,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '../../navigation/OnboardingNavigator';
 import { ChoiceList, ChoiceRow } from '../../components/onboarding/ChoiceRow';
-import { QuestionScreen } from '../../components/onboarding/QuestionScreen';
+import { BEGINNER_QUESTIONS, QuestionScreen } from '../../components/onboarding/QuestionScreen';
 import { useHaptics } from '../../design/haptics';
 import { t } from '../../i18n';
 import { type Coords, useOnboardingAccess } from './onboardingAccess';
@@ -58,7 +58,13 @@ export default function DayStartScreen() {
   };
 
   return (
-    <QuestionScreen step={4} title={t('onboarding.dayStart.title')} onBack={() => navigation.goBack()} testID="day-start">
+    // The beginner path asks four questions, this the third (BEGIN-1); today's path, five.
+    <QuestionScreen
+      {...(route.params.path === 'beginner' ? { step: 3, total: BEGINNER_QUESTIONS } : { step: 4 })}
+      title={t('onboarding.dayStart.title')}
+      onBack={() => navigation.goBack()}
+      testID="day-start"
+    >
       <ChoiceList>
         <ChoiceRow
           icon="moon-outline"

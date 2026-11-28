@@ -154,6 +154,9 @@ service cloud.firestore {
         // The last "What's new" walkthrough this account finished (a release id,
         // lib/whatsNew), set by onboarding too so new accounts never see it.
         'whatsNewSeen',
+        // The path setup's first answer put the account on (PATH-1, src/lib/paths):
+        // 'beginner' (Revisely Dev); absent is today's path, null clears it.
+        'path',
         // Stat fields — currently client-written; will move server-side later.
         'streak', 'totalMemorizedPages', 'totalLearningPages',
         'totalSessionsCompleted', 'totalPagesRevisedAllTime', 'lastRevisionDate',
@@ -285,6 +288,8 @@ service cloud.firestore {
                          incomingData().translationId.size() <= 40)) &&
                        (!hasField('accent') ||
                         incomingData().accent in ['indigo', 'crimson', 'jade']) &&
+                       (!hasField('path') || incomingData().path == null ||
+                        incomingData().path in ['beginner', 'hafiz']) &&
                        (!hasField('whatsNewSeen') ||
                         (incomingData().whatsNewSeen is string &&
                          incomingData().whatsNewSeen.matches('^[a-z0-9.-]{1,20}$'))) &&

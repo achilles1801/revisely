@@ -78,7 +78,8 @@ describe('the help in Arabic', () => {
     try {
       expect(helpTitle('home')).toBe(HELP_TITLES_AR.home?.title);
       const home = topicsFor('home', { smartTracking: true });
-      expect(home.map((t) => t.id)).toEqual(HELP.home.topics.map((t) => t.id));
+      // Every topic but the beginner path's (an account on today's path never sees it).
+      expect(home.map((t) => t.id)).toEqual(HELP.home.topics.filter((t) => t.when !== 'beginner').map((t) => t.id));
       expect(home[0].text).toBe(HELP_TOPICS_AR['home.today'].text);
       // VoiceOver says the icons in Arabic.
       expect(helpPlainText('[[mic]] {{متابعة التلاوة}}')).toBe('الميكروفون متابعة التلاوة');

@@ -31,6 +31,7 @@ Each dimension below varies independently. The property test draws one value fro
 | The clock | any zone from UTC−12 to UTC+14 (half-hour and 45-minute ones) · the Fajr boundary on or off · between midnight and Fajr · DST days · travel (zone changed, place kept) · the year's end |
 | Settings | Smart Tracking on or off · reminders on or off (phone allows or not) · Friday Al-Kahf card on or off · prayer times on or off · Home background |
 | App | store app or Revisely Dev · tester or not (previewTester) · English or Arabic (RTL, Dev only) · Ramadan theme (Dev) · offline with changes in the outbox · two phones · a cold start before Auth answers (HOME-8) |
+| Path (PATH-1, Dev) | today's (every account set up before, and Part of it or All of it) · the beginner's (None yet, or a few surahs: nothing, Al-Fatihah, a few short surahs by their ayahs) · a beginner set up again on today's path · the switch off (the store app) |
 
 ## The screens that describe them
 
@@ -55,6 +56,8 @@ is checked on Home, the widget, the reminders and Revo at once (USER-1, USER-2),
 | User | Home | Session / ahead | Activity | Reminders | Widget | Revo |
 | --- | --- | --- | --- | --- | --- | --- |
 | New account, nothing memorized | S ONBOARD-3, UT, UM | n/a | S | S REMIND-4, UM | UM (noPlan) | UM |
+| Beginner, nothing memorized (Dev) | S BEGIN-2, PATH-1 | n/a | — | — | — | — |
+| Beginner with a few short surahs (Dev) | S BEGIN-3, BEGIN-4, BEGIN-5; U | as anyone's (MEM-4) | S BEGIN-5 (logged by the ayah) | as anyone's | as anyone's | as anyone's |
 | 1 page memorized | UM | — | — | UM | UM | UM |
 | Part of a page (ayahs only) | S MEM-4, UT, UM | S MEM-4, UT (session and end card) | S MEM-1, UT (Revised elsewhere) | UM | P MEM-4, UM | P MEM-1, UM |
 | One juz / scattered / a run / most | S many, UM | S many | S many | S REMIND-1, UM | U, UM | P REVO, UM |

@@ -1,0 +1,58 @@
+// Arabic for src/i18n/en/beginner.ts. Words and forms: src/i18n/ar-glossary.md.
+import type { ArStrings } from './types';
+
+export const beginner: NonNullable<ArStrings['beginner']> = {
+  journey: {
+    title: 'لا شيء بعد، أو بضع سور',
+    detail: 'ابدأ بالسور القصيرة التي تصلّي بها',
+  },
+  surahs: {
+    title: 'ما السور التي تحفظها؟',
+    subtitle: 'لا بأس إن لم تحفظ شيئًا بعد. يبدأ أكثر الناس بهذه السور.',
+    ayahs_zero: 'لا توجد آيات',
+    ayahs_one: 'آية واحدة',
+    ayahs_two: 'آيتان',
+    ayahs_few: '{{count}} آيات',
+    ayahs_many: '{{count}} آية',
+    ayahs_other: '{{count}} آية',
+    rowLabel: '{{surah}}، {{ayahs}}',
+    chosen_zero: 'لم تُختر أي سورة',
+    chosen_one: 'اخترت سورة واحدة',
+    chosen_two: 'اخترت سورتين',
+    chosen_few: 'اخترت {{count}} سور',
+    chosen_many: 'اخترت {{count}} سورة',
+    chosen_other: 'اخترت {{count}} سورة',
+    none: 'لا شيء بعد؟ لا بأس، ستبدأ بسورة {{surah}}.',
+    byJuz: 'تحفظ جزءًا كاملًا (القرآن ثلاثون جزءًا)؟ اختر بالأجزاء',
+  },
+  home: {
+    startTitle: 'ابدأ بسورة {{surah}}',
+    startBrief: 'اضغط مطولًا على آية لتسمعها وتقرأ معناها، ثم حدّدها محفوظة متى حفظتها.',
+    startCta: 'فتح سورة {{surah}}',
+    markLead: 'تحفظ بعض السور؟',
+    mark: 'حدّدها',
+    minutes_zero: 'نحو دقيقة',
+    minutes_one: 'نحو دقيقة',
+    minutes_two: 'نحو دقيقتين',
+    minutes_few: 'نحو {{count}} دقائق',
+    minutes_many: 'نحو {{count}} دقيقة',
+    minutes_other: 'نحو {{count}} دقيقة',
+    addLead: 'حفظت سورة أخرى؟',
+    add: 'أضفها',
+  },
+  yours: {
+    title: 'سورك',
+    subtitle: 'حدّد السور التي تستطيع تلاوتها من حفظك.',
+    known: 'محفوظة',
+    save_zero: 'حفظ',
+    save_one: 'حفظ سورة واحدة',
+    save_two: 'حفظ سورتين',
+    save_few: 'حفظ {{count}} سور',
+    save_many: 'حفظ {{count}} سورة',
+    save_other: 'حفظ {{count}} سورة',
+    saveFailed: 'تعذّر الحفظ',
+  },
+  ayah: {
+    withSaheeh: '{{place}} · صحيح إنترناشونال',
+  },
+};

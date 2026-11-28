@@ -12,6 +12,7 @@ import {
   buildInitialPendingSurahsForJourney,
 } from '../../lib/memorizationChanges';
 import { logger } from '../../lib/logger';
+import { beginnerPathEnabled } from '../../lib/release/beginnerPath';
 import { TOTAL_QURAN_PAGES } from '../../types/firestore';
 import { t } from '../../i18n';
 import { useOnboardingAccess } from './onboardingAccess';
@@ -55,6 +56,22 @@ export default function JourneySelectScreen() {
   return (
     <QuestionScreen step={1} title={t('onboarding.journey.title')} onBack={() => navigation.goBack()} testID="journey-select">
       <ChoiceList>
+        {beginnerPathEnabled() ? (
+          // The beginner path (PATH-1, Revisely Dev): its own setup and Home. The two answers under it are today's path,
+          // unchanged.
+          <ChoiceRow
+            icon="leaf-outline"
+            title={t('beginner.journey.title')}
+            detail={t('beginner.journey.detail')}
+            onPress={() => {
+              if (inFlight.current) return;
+              setSavingAll(false);
+              haptics.selection();
+              navigation.navigate('BeginnerSurahs');
+            }}
+            testID="journey-beginner"
+          />
+        ) : null}
         <ChoiceRow
           icon="flame-outline"
           title={t('onboarding.journey.part')}

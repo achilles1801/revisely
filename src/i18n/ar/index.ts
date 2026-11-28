@@ -3,6 +3,7 @@
 import { account } from './account';
 import { activity } from './activity';
 import { auth } from './auth';
+import { beginner } from './beginner';
 import { coach } from './coach';
 import { common } from './common';
 import { help } from './help';
@@ -47,6 +48,7 @@ export const ar: ArStrings = {
   account,
   activity,
   auth,
+  beginner,
   coach,
   common,
   help,
