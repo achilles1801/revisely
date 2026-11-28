@@ -10,7 +10,6 @@ import { textWidth } from '../../../../jest/textWidth';
 import { CHROME_MAX_SCALE, STACK_AT_SCALE } from '../ChromeText';
 import { chartLayout, LABEL_WIDTH, LABELS_ALL_UP_TO, MAX_BAR_WIDTH, MIN_SLOTS } from '../TapChart';
 import { InsightsView, type InsightsData } from '../InsightsView';
-import { HERO_MAX_SCALE } from '../InsightHero';
 import { setActivityOneTabForTests } from '../../../lib/release/activityOneTab';
 import { paletteV2 } from '../../../theme/v2';
 import { shiftDay } from '../../../lib/dayKeys';
@@ -81,9 +80,9 @@ function everyDay(from: string, but: number[] = []): string[] {
 
 const SE = 320;
 const PRO_MAX = 440;
-/** The page's gutters and a card's padding (16 each side). */
+/** The page's gutters (16 each side) and a card's padding (InsightCard: 14). */
 const pageWidth = (w: number) => w - 32;
-const cardWidth = (w: number) => w - 64;
+const cardWidth = (w: number) => w - 32 - 28;
 
 let dims: jest.SpyInstance | null = null;
 function at(width: number, fontScale: number) {
@@ -129,7 +128,8 @@ describe('[ACT-43] Consistency’s page: what it says', () => {
     open(account({ revised: days, firstDay: '2025-11-01', range: 90 }));
     expect(text('consistency-revising-hero-value')).toBe('82');
     expect(text('consistency-revising-hero-unit')).toBe('of 90 days');
-    expect(text('consistency-revising-hero-trend')).toBe('↑ from 77');
+    expect(text('consistency-revising-hero-trend')).toBe('from 77');
+    expect(screen.getByTestId('consistency-revising-hero').props.accessibilityLabel).toBe('82 of 90 days, Up from 77 the 3 months before');
     expect(text('consistency-revising-hero-line')).toBe('6 or 7 days most weeks · The last 3 months against the 3 before');
     // The weeks: 3 months by default at 3 months, this week lit; a tap on a week makes the line that week.
     expect(text('consistency-weeks-line')).toBe('This week · 6 of 6 days so far');
@@ -175,6 +175,30 @@ describe('[ACT-43] Consistency’s page: what it says', () => {
   });
 });
 
+describe('[ACT-43] the trend: green when better, ink when worse (never red), no pill when the same', () => {
+  const pill = () => StyleSheet.flatten(screen.getByTestId('consistency-revising-hero-trend').props.style).backgroundColor;
+  it.each([false, true])('dark %s', (dark) => {
+    mockDark = dark;
+    at(PRO_MAX, 1);
+    const p = paletteV2(dark, 'crimson');
+    // Better: every day of the last 30, every other day of the 30 before.
+    const better = [...everyDay('2026-10-29'), ...everyDay('2026-09-29').filter((d, i) => d < '2026-10-29' && i % 2 === 0)];
+    open(account({ revised: better, firstDay: '2026-06-01' }));
+    expect(pill()).toBe(p.goodSubtle);
+    screen.unmount();
+    // Worse: the other way round.
+    const worse = [...everyDay('2026-09-29').filter((d) => d < '2026-10-29'), ...everyDay('2026-10-29').filter((_, i) => i % 2 === 0)];
+    open(account({ revised: worse, firstDay: '2026-06-01' }));
+    expect(pill()).toBe(p.fill);
+    expect(pill()).not.toBe(p.redSubtle);
+    screen.unmount();
+    // The same: no pill.
+    open(account({ revised: everyDay('2026-06-01'), firstDay: '2026-06-01' }));
+    expect(screen.queryByTestId('consistency-revising-hero-trend')).toBeNull();
+    screen.unmount();
+  });
+});
+
 describe('[ACT-43] Consistency’s page on young accounts and little data: never an empty frame, never one block', () => {
   it('a new account with nothing yet: 0 of 1 day, no trend, the chart’s one line, no hours, and the other two say so', () => {
     at(SE, 1);
@@ -205,9 +229,16 @@ describe('[ACT-43] Consistency’s page on young accounts and little data: never
   });
 });
 
-/** The figure and its words, side by side, at this text size. */
-function heroWidth(value: string, unit: string, scale: number): number {
-  return textWidth(value, 'figure@20', (34 / 20) * Math.min(scale, HERO_MAX_SCALE)) + 6 + textWidth(unit, 'meta@13', (15 / 13) * scale);
+/**
+ * The figure, its words and the trend pill (InsightPageParts' hero: a 34 pt number, 17 pt words, a 13 pt pill with its
+ * arrow): one row below 1.2× text, so they must fit side by side or the words wrap; from 1.2× the row wraps, so each must
+ * fit on its own.
+ */
+function heroFits(value: string, unit: string, trend: string | null, scale: number, room: number): boolean {
+  const number = textWidth(value, 'figure@20', (34 / 20) * scale);
+  const words = textWidth(unit, 'meta@13', (17 / 13) * scale);
+  const pill = trend ? 4 + 16 + 12 + 3 + textWidth(trend, 'meta@13', scale) * 1.05 : 0;
+  return scale < STACK_AT_SCALE ? number + 6 + words + (trend ? 6 + pill : 0) <= room : Math.max(number, words, pill) <= room;
 }
 /** A cycle's name (15 pt semibold, from 17 pt semibold's widths) and its detail (13 pt). */
 const nameWidth = (s: string, scale: number) => textWidth(s, 'title@17', (15 / 17) * scale);
@@ -242,12 +273,10 @@ describe('[ACT-43] nothing wraps, clips or collapses: the longest values, an SE 
               const hero = k === 'revising' ? 'consistency-revising-hero' : k === 'cycles' ? 'consistency-cycles-hero' : 'consistency-reading-hero';
               const value = text(`${hero}-value`);
               if (value != null) {
-                // The figure and its words: one line, within the page.
-                const said = `${k}: "${value}" "${text(`${hero}-unit`)}"`;
-                expect({ said, fits: heroWidth(value, text(`${hero}-unit`)!, s) <= pageWidth(width) }).toEqual({ said, fits: true });
-                // The trend chip is one short line of its own.
-                const trend = text(`${hero}-trend`);
-                if (trend) expect(metaWidth(trend, s) + 16).toBeLessThanOrEqual(pageWidth(width));
+                // The figure, its words and the pill: side by side, or each on its own line from 1.2×, never a wrapped word.
+                const trend = text(`${hero}-trend`) || null;
+                const said = `${k}: "${value}" "${text(`${hero}-unit`)}" "${trend ?? ''}"`;
+                expect({ said, fits: heroFits(value, text(`${hero}-unit`)!, trend, s, pageWidth(width)) }).toEqual({ said, fits: true });
               }
               // A cycle's name and its detail: each one line within the card (side by side when both fit, else the detail under
               // the name: the row wraps, never the words).

@@ -108,7 +108,7 @@ describe('Consistency’s own page', () => {
   });
 
   it('[ACT-43] Revising: the days revised against the 30 before, most weeks, week by week tapped (a year too), the hours tapped, never held', async () => {
-    const calendar = open();
+    open();
     // The page reads a year of weeks, whatever the range.
     await waitFor(() => expect(firestoreService.getActivityItemsBetween).toHaveBeenCalled());
     const from = (firestoreService.getActivityItemsBetween as jest.Mock).mock.calls[0][0] as string;
@@ -116,11 +116,9 @@ describe('Consistency’s own page', () => {
     await waitFor(() => expect(text('consistency-revising-hero-value')).toBe('30'));
     expect(text('consistency-revising-hero-unit')).toBe('of 30 days');
     // 26 of the 30 days before: their four Saturdays missed.
-    expect(text('consistency-revising-hero-trend')).toBe('↑ from 26');
+    expect(text('consistency-revising-hero-trend')).toBe('from 26');
+    expect(screen.getByTestId('consistency-revising-hero').props.accessibilityLabel).toBe('30 of 30 days, Up from 26 the month before');
     expect(text('consistency-revising-hero-line')).toBe('7 days most weeks · The last 30 days against the 30 before');
-    // The figure opens the calendar at this month.
-    fireEvent.press(screen.getByTestId('consistency-revising-hero'));
-    expect(calendar).toHaveBeenCalledWith('2026-11', undefined);
 
     // Week by week: 4 weeks at 30 days, this week lit; a tap on a week makes the line that week, the same week clears it.
     expect(screen.getAllByTestId(/^consistency-weeks-chart-bar-/)).toHaveLength(4);

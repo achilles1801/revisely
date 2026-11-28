@@ -18,7 +18,7 @@ import { typeV2 } from '../../theme/v2';
 import { PillTabs } from '../v2/PillTabs';
 import { ChromeText } from './ChromeText';
 import { ChartPills, TapChart, type ChartBar } from './TapChart';
-import { InsightHero, type HeroTrend } from './InsightHero';
+import { InsightCard, InsightHero, type Trend as HeroTrend } from './InsightPageParts';
 import type { InsightsData } from './InsightsView';
 import { busiestHours, busiestRun, HOURS_FROM_DAYS, minutesByHour, timedDays } from '../../lib/insightsView';
 import { hourDetail, minutesWords } from '../../lib/insightsTaps';
@@ -50,9 +50,19 @@ import {
 } from '../../lib/consistencyView';
 import { formatNumber, t } from '../../i18n';
 
-/** More days is better on every figure here: up is good. */
-const heroTrend = (trend: Trend | null): HeroTrend | null =>
-  trend ? { dir: trend.dir, from: formatNumber(trend.from), good: trend.dir !== 'down' } : null;
+/**
+ * The trend as Insights' pages show it (InsightPageParts): more days is better on every figure here, so up is green and
+ * down is ink, never red; the same as before has no pill.
+ */
+const heroTrend = (trend: Trend | null, before: string | null): HeroTrend | null =>
+  trend && trend.dir !== 'same'
+    ? {
+        text: t('activity.insights.trendFrom', { value: formatNumber(trend.from) }),
+        up: trend.dir === 'up',
+        good: trend.dir === 'up',
+        label: t(trend.dir === 'up' ? 'activity.insights.trendUp' : 'activity.insights.trendDown', { value: formatNumber(trend.from), before: before ?? '' }),
+      }
+    : null;
 
 /** A colour at 45% (the hours outside the busiest): the board's lighter bars. */
 const soft = (colour: string) => (/^#[0-9a-f]{6}$/i.test(colour) ? `${colour}73` : colour);
@@ -63,7 +73,7 @@ const SPAN_LABEL: Record<ChartSpan, () => string> = {
   '1y': () => t('activity.consistency.span1y'),
 };
 
-export function ConsistencyPage({ data, onOpenCalendar }: { data: InsightsData; onOpenCalendar?: (month: string) => void }) {
+export function ConsistencyPage({ data }: { data: InsightsData }) {
   const range = data.range ?? 30;
   const [kind, setKind] = useState<ConsistencyKind>('revising');
   // The weeks chart's own span, opening on the one nearest the range (and following the range when it changes).
@@ -71,20 +81,22 @@ export function ConsistencyPage({ data, onOpenCalendar }: { data: InsightsData; 
   useEffect(() => setChartSpan(spanFor(range)), [range]);
   return (
     <View testID="consistency-page">
-      <PillTabs
-        tone="ink"
-        stretch
-        options={[
-          { value: 'revising', label: t('activity.consistency.revising') },
-          { value: 'cycles', label: t('activity.consistency.cycles') },
-          { value: 'reading', label: t('activity.consistency.reading') },
-        ]}
-        value={kind}
-        onChange={setKind}
-        testID="consistency-kinds"
-      />
+      <View style={styles.kinds}>
+        <PillTabs
+          tone="ink"
+          stretch
+          options={[
+            { value: 'revising', label: t('activity.consistency.revising') },
+            { value: 'cycles', label: t('activity.consistency.cycles') },
+            { value: 'reading', label: t('activity.consistency.reading') },
+          ]}
+          value={kind}
+          onChange={setKind}
+          testID="consistency-kinds"
+        />
+      </View>
       {kind === 'revising' ? (
-        <Revising data={data} chartSpan={chartSpan} onSpan={setChartSpan} onOpenCalendar={onOpenCalendar} />
+        <Revising data={data} chartSpan={chartSpan} onSpan={setChartSpan} />
       ) : kind === 'cycles' ? (
         <Cycles data={data} />
       ) : (
@@ -104,17 +116,7 @@ function sinceOrAgainst(data: InsightsData, sinceStart: string | null, hasTrend:
 
 // ── Revising ─────────────────────────────────────────────────────────────
 
-function Revising({
-  data,
-  chartSpan,
-  onSpan,
-  onOpenCalendar,
-}: {
-  data: InsightsData;
-  chartSpan: ChartSpan;
-  onSpan: (s: ChartSpan) => void;
-  onOpenCalendar?: (month: string) => void;
-}) {
+function Revising({ data, chartSpan, onSpan }: { data: InsightsData; chartSpan: ChartSpan; onSpan: (s: ChartSpan) => void }) {
   const { palette } = useTheme();
   const range = data.range ?? 30;
   const span = rangeSpan(range, data.today, data.firstDay);
@@ -147,11 +149,8 @@ function Revising({
       <InsightHero
         value={String(figure.done)}
         unit={t('activity.consistency.ofDays', { count: figure.of })}
-        trend={heroTrend(trend)}
+        trend={heroTrend(trend, span.before)}
         line={line || null}
-        // The figure opens the calendar at this month (ACT-23, ACT-35).
-        onPress={onOpenCalendar ? () => onOpenCalendar(data.today.slice(0, 7)) : undefined}
-        hint={t('activity.insights.opensCalendar')}
         testID="consistency-revising-hero"
       />
       <WeeksCard
@@ -166,13 +165,7 @@ function Revising({
         testID="consistency-weeks"
       />
       {hoursShown && top > 0 ? (
-        <View style={[styles.card, { backgroundColor: palette.fill }]} testID="consistency-hours">
-          <View style={styles.cardHead}>
-            <ChromeText style={[typeV2.name, styles.flex, { color: palette.text }]} accessibilityRole="header">
-              {t('activity.consistency.hoursTitle')}
-            </ChromeText>
-            {hour == null ? <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{t('activity.consistency.tapAnHour')}</ChromeText> : null}
-          </View>
+        <InsightCard title={t('activity.consistency.hoursTitle')} hint={hour == null ? t('activity.consistency.tapAnHour') : null} testID="consistency-hours">
           <ChromeText style={[typeV2.name, styles.cardLine, { color: palette.text }]} testID="consistency-hours-line">
             {picked ? picked.title : busiestHours(hours)}
           </ChromeText>
@@ -180,7 +173,7 @@ function Revising({
             {picked ? picked.detail : t('activity.insights.minutesByHour', { span: span.lastWords })}
           </ChromeText>
           <TapChart bars={hourBars} picked={hour} onPick={setHour} colours={[palette.primary]} max={top} height={64} testID="consistency-hour-bars" />
-        </View>
+        </InsightCard>
       ) : null}
     </>
   );
@@ -216,10 +209,7 @@ function WeeksCard({
     ? weeks.map((w) => ({ key: w.week, value: w.days, valueText: formatNumber(w.days), label: weekLabel(w.week, weeks.length), spoken: spokenOf(w) }))
     : [];
   return (
-    <View style={[styles.card, { backgroundColor: palette.fill }]} testID={testID}>
-      <ChromeText style={[typeV2.name, { color: palette.text }]} accessibilityRole="header">
-        {title}
-      </ChromeText>
+    <InsightCard title={title} testID={testID}>
       {any && lit ? (
         <ChromeText style={[typeV2.name, styles.cardLine, { color: palette.text }]} testID={`${testID}-line`}>
           {lineOf(lit)}
@@ -227,7 +217,7 @@ function WeeksCard({
       ) : null}
       <TapChart bars={bars} picked={picked} onPick={setPicked} colours={[palette.primary]} max={7} testID={`${testID}-chart`} />
       <ChartPills options={CHART_SPANS.map((s) => ({ key: s, label: SPAN_LABEL[s]() }))} value={chartSpan} onChange={onSpan} testID={`${testID}-span`} />
-    </View>
+    </InsightCard>
   );
 }
 
@@ -263,7 +253,7 @@ function Cycles({ data }: { data: InsightsData }) {
         <InsightHero
           value={String(figure.onTime)}
           unit={t('activity.consistency.cyclesOnTime', { count: finished })}
-          trend={heroTrend(trendOf(figure.onTime, figure.before))}
+          trend={heroTrend(trendOf(figure.onTime, figure.before), span.before)}
           line={plan}
           testID="consistency-cycles-hero"
         />
@@ -276,7 +266,7 @@ function Cycles({ data }: { data: InsightsData }) {
         />
       ) : null}
       {rows.length > 0 ? (
-        <View style={[styles.card, { backgroundColor: palette.fill }]} testID="consistency-cycles">
+        <InsightCard testID="consistency-cycles">
           {rows.map((c, i) => {
             const late = lateBy(c, planDays);
             const name = c.to == null ? t('activity.consistency.thisCycle') : t('activity.consistency.cycleDates', { from: shortDay(c.from), to: shortDay(c.to) });
@@ -309,7 +299,7 @@ function Cycles({ data }: { data: InsightsData }) {
               </View>
             );
           })}
-        </View>
+        </InsightCard>
       ) : null}
     </>
   );
@@ -334,7 +324,7 @@ function Reading({ data, chartSpan, onSpan }: { data: InsightsData; chartSpan: C
       <InsightHero
         value={String(figure.done)}
         unit={t('activity.consistency.ofDaysRead', { count: figure.of })}
-        trend={heroTrend(trendOf(figure.done, figure.before))}
+        trend={heroTrend(trendOf(figure.done, figure.before), span.before)}
         line={line || null}
         testID="consistency-reading-hero"
       />
@@ -359,8 +349,7 @@ function Reading({ data, chartSpan, onSpan }: { data: InsightsData; chartSpan: C
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  card: { borderRadius: 16, padding: 16, marginTop: 16 },
-  cardHead: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  kinds: { marginBottom: 12 },
   cardLine: { marginTop: 2 },
   quiet: { marginTop: 16 },
   cycle: {},

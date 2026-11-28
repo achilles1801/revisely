@@ -1376,8 +1376,8 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   to say yet has no row: Gaps until a gap can be measured, Weak spots until a page is rated weak (none without Smart
   Tracking), Recitation until a take, Memorization until a page was memorized in the last twelve months, Pace until ten timed
   items. While one the account can have is missing, a grey line says the others show once they have something to say. Edit
-  sections is the list's last row (Insights' sections; the week and the day stay). A section's Consistency figure or gap
-  opens the full calendar's page there. Revo's button is on a section's page too, opening as Insights' (Weak spots' as its Ask).
+  sections is the list's last row (Insights' sections; the week and the day stay). A gap opens the full calendar's page
+  there (Consistency's page has its weeks instead, ACT-43). Revo's button is on a section's page too, opening as Insights' (Weak spots' as its Ask).
 - **ACT-36.** After a cold start, Activity (and Insights in it) is filled the moment it shows, with no spinner and no
   outlines: it draws from what the phone kept from its last reads for the account (the timed readings, the daily log, the
   items for its days and Insights' year of memorization), before the server answers or Auth has checked the saved
@@ -1465,11 +1465,11 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   consistency is completing our cycles? or consistency in terms of reading a page ... i can't even click on an hour on that
   chart i need to hold it down like what bro"; "yes build all seven screens" from the Insights v2 boards). One switch,
   Revising | Full cycles | Reading, each from the range (ACT-22). Revising: the days with a revision, out of the range's
-  days ("85" "of 90 days"), with the trend against as many days just before as a chip ("↑ from 76", green up, red down,
-  "Same as before"), none over All time, on an account younger than the two spans or when the items don't reach back;
+  days ("85" "of 90 days"), with the trend against as many days just before as a pill ("↑ from 76": green when up, ink
+  when down, never red; none when the same; Insights' pages' hero, InsightPageParts), none over All time, on an account younger than the two spans or when the items don't reach back;
   under it how many days most weeks (the middle half of the whole weeks: "6 or 7 days most weeks") and what the trend
   compares ("The last 3 months against the 3 before"), or "Since 9 September" when the range is longer than the account.
-  The figure opens the calendar at this month. Then "Days revised, week by week": a bar a week (Sunday first, none before
+  Then "Days revised, week by week": a bar a week (Sunday first, none before
   the account's first week), its line the week tapped, else this one ("Week of 18 Oct · 6 of 7 days", "This week · 3 of 5
   days so far"), with its own pills, 4 weeks, 3 months or a year, opening on the one nearest the range (the page reads a
   year of items for it). Then "When you revise": the 24 hours as bars once timed revisions fall on 3 days (ACT-31), the
@@ -1482,8 +1482,8 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   time or so many days late, a bar of its days against the plan's with the days late in red. Reading: the days read the
   same way ("of 90 days read"), the time read and its busiest hours ("12 h 40 min · mostly 6–7 AM"), and days read week by
   week with their time. Each chart is ACT-41's. Nothing breaks on the data: with nothing in a span the chart's one line,
-  never an empty frame; the figure and its words one line on an SE at the largest text (the 34 pt number grows to 1.15× at
-  most); a cycle's name and detail each one line, side by side when both fit, else the detail under the name. The page's
+  never an empty frame; the figure, its words and the pill side by side on an SE, each on its own line from 1.2× text, no
+  word wrapped; a cycle's name and detail each one line, side by side when both fit, else the detail under the name. The page's
   row on the one tab (ACT-35) counts the days revised, as the page's first figure does, and its line is when they revise.
   Elsewhere Consistency is as ACT-22 and ACT-23 say (the store app's two tabs).
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or

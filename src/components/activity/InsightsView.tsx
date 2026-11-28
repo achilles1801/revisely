@@ -1141,7 +1141,7 @@ function Consistency({
   if (v2 && alone) {
     return (
       <Section title={t('activity.insights.consistency')} detail={t('activity.insights.consistencyDetail')} testID="insights-consistency">
-        <ConsistencyPage data={data} onOpenCalendar={onOpenCalendar} />
+        <ConsistencyPage data={data} />
       </Section>
     );
   }

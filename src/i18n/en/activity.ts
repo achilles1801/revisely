@@ -600,12 +600,6 @@ export const activity = {
     ofDays_other: 'of {{count}} days',
     ofDaysRead_one: 'of {{count}} day read',
     ofDaysRead_other: 'of {{count}} days read',
-    /** The trend against as long before ("↑ from 76"), and as VoiceOver says it. */
-    trendUp: '↑ from {{n}}',
-    trendDown: '↓ from {{n}}',
-    trendSame: 'Same as before',
-    trendUpSpoken: 'up from {{n}}',
-    trendDownSpoken: 'down from {{n}}',
     /** Under the figure: how many days most weeks, then what the trend compares. */
     mostWeeks_one: '{{count}} day most weeks',
     mostWeeks_other: '{{count}} days most weeks',
