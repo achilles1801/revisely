@@ -36,7 +36,7 @@ side-session notes `apply-support.md`.
 - **Deciding:** Revisely Console's Open Door (`handbook/stats-metrics.md`), or `functions/scripts/support-applications.js`; both go through
   `functions/src/support/review.ts`. Approve grants `grants.support` (no end date unless one is given) and deletes the
   answers; decline waits 30 days; revoke takes the grant back and the application becomes `revoked`, also with the
-  30-day wait (the page shows it as declined). Each decision is one transaction with its audit entry
+  30-day wait (the status answer stays `declined` with `revokedAt`, and the pages say "Your free Premium ended on …"). Each decision is one transaction with its audit entry
   (`supportDecisions/<request id>`: who, when, the internal note; never answers; closed; deleted with the account),
   idempotent by the page's request id. The console waits 5 seconds before sending a decision (Undo). A notifier
   ("you've been approved") would hang off new `supportDecisions` documents; no email provider is chosen.

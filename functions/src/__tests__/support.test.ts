@@ -125,6 +125,7 @@ describe('the state the page shows', () => {
     expect(stateOf(pending, null, ACCOUNT, NOW)).toMatchObject({ state: 'pending', appliedAt: NOW - DAY, replyBy: NOW - DAY + REPLY_WITHIN_DAYS * DAY });
     const declined: Application = { ...pending, status: 'declined', decidedAt: NOW, applyAgainFrom: NOW + DAY };
     expect(stateOf(declined, null, ACCOUNT, NOW)).toMatchObject({ state: 'declined', applyAgainFrom: NOW + DAY });
+    expect(stateOf(declined, null, ACCOUNT, NOW)).not.toHaveProperty('revokedAt');
     expect(stateOf(declined, null, ACCOUNT, NOW + 2 * DAY).state).toBe('none');
   });
 
@@ -192,9 +193,9 @@ describe('applying and deciding', () => {
     expect(out.app).toEqual({ ...approved, status: 'revoked', decidedAt: NOW, applyAgainFrom: NOW + REAPPLY_AFTER_DAYS * DAY });
     expect(out.ent.grants.support).toBeUndefined();
     expect(out.ent.premium?.source).toBe('dev');
-    // The page tells them they were declined until then, then they may apply again.
+    // Until then the pages read "declined" with the revoke's date (their free Premium ended), then they may apply again.
     expect(stateOf(out.app, { grants: out.ent.grants, premium: out.ent.premium }, ACCOUNT, NOW).state).toBe('has');
-    expect(stateOf(out.app, null, ACCOUNT, NOW)).toMatchObject({ state: 'declined', applyAgainFrom: NOW + REAPPLY_AFTER_DAYS * DAY });
+    expect(stateOf(out.app, null, ACCOUNT, NOW)).toEqual({ state: 'declined', account: ACCOUNT, applyAgainFrom: NOW + REAPPLY_AFTER_DAYS * DAY, revokedAt: NOW });
     expect(stateOf(out.app, null, ACCOUNT, NOW + 31 * DAY).state).toBe('none');
     expect(decideApply({ app: out.app, ent: null, limits: null }, OK, 'app', ACCOUNT, NOW + DAY).write).toBeUndefined();
     expect(decideApply({ app: out.app, ent: null, limits: null }, OK, 'app', ACCOUNT, NOW + 31 * DAY).write?.app.count).toBe(3);

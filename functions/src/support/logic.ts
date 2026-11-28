@@ -237,6 +237,8 @@ export interface StatusAnswer {
   until?: number | null;
   /** declined */
   applyAgainFrom?: number;
+  /** declined after a revoke: when the free Premium was taken back (the pages say it ended, not "not approved") */
+  revokedAt?: number;
   /** none, after a support grant that has ended */
   endedAt?: number;
   /** status only: the account's Premium (the account page says where it came from), null if none */
@@ -253,9 +255,12 @@ export function stateOf(app: Application | null, ent: Entitlements | null, accou
   if (app?.status === 'pending') {
     return { state: 'pending', account, appliedAt: app.createdAt, replyBy: app.createdAt + REPLY_WITHIN_DAYS * DAY_MS };
   }
-  // A revoked grant waits like a decline; the page says the same ("declined"), so its answer is unchanged.
+  // A revoked grant waits like a decline (state "declined", so older pages still read it), with the revoke's date
+  // for the pages to say the free Premium ended (Majd's option A, Nov 15 2026).
   if ((app?.status === 'declined' || app?.status === 'revoked') && app.applyAgainFrom != null && app.applyAgainFrom > now) {
-    return { state: 'declined', account, applyAgainFrom: app.applyAgainFrom };
+    const answer: StatusAnswer = { state: 'declined', account, applyAgainFrom: app.applyAgainFrom };
+    if (app.status === 'revoked' && app.decidedAt != null) answer.revokedAt = app.decidedAt;
+    return answer;
   }
   const answer: StatusAnswer = { state: 'none', account };
   const support = ent?.grants?.support;

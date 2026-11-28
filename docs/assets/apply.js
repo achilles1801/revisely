@@ -78,7 +78,10 @@ function render(s, justSent) {
     case 'has':
       return status({ ok: true, mark: 'check', title: RV.t('o.hasT'), text: RV.t('o.has') });
     case 'declined':
-      return status({ title: RV.t('o.declinedT'), text: RV.t('o.declined', { date: RV.date(s.applyAgainFrom, true) }) });
+      // A revoked grant waits like a decline, but the person had Premium: say it ended, not "not this time".
+      return s.revokedAt
+        ? status({ title: RV.t('o.revokedT'), text: RV.t('o.revoked', { ended: RV.date(s.revokedAt), date: RV.date(s.applyAgainFrom, true) }) })
+        : status({ title: RV.t('o.declinedT'), text: RV.t('o.declined', { date: RV.date(s.applyAgainFrom, true) }) });
     default:
       return renderForm(s);
   }
