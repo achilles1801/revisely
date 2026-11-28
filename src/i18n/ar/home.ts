@@ -70,10 +70,9 @@ export const home: NonNullable<ArStrings['home']> = {
     delete: 'حذف الجلسة',
   },
   ayah: {
-    place: '{{surah}} ({{sura}}:{{ayah}})',
-    withSaheeh: '{{place}} · ⁨Saheeh International⁩',
+    place: '{{surah}} {{sura}}:{{ayah}}',
     label: 'آية اليوم، {{place}}',
-    hint: 'يفتح صفحتها في المصحف',
+    hint: 'يفتح صفحتها في المصحف مع تظليل الآية',
   },
   screen: {
     loadFailed: 'تعذّر تحميل بياناتك',

@@ -508,8 +508,9 @@ export default function DashboardScreen() {
 
   // Today's ayah and Al-Kahf open the reader over Home, in Home's own stack, so back comes back to Home (HOME-7, KAHF-2;
   // Majd, Nov 26 2026). The Read tab's reader would leave back on the Read tab's surah list.
-  const openAyah = (page: number) => {
-    navigation.navigate('QuranReader', { pageNumber: page });
+  // Today's ayah (HOME-7): its page, with the ayah highlighted until the page is turned (holding it gives its meaning).
+  const openAyah = ({ page, sura, ayah }: { page: number; sura: number; ayah: number }) => {
+    navigation.navigate('QuranReader', { pageNumber: page, highlight: { sura, ayah } });
   };
 
   const openKahf = () => {
