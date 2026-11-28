@@ -1,3 +1,4 @@
+import { i18n } from '../../i18n';
 import { hourDetail, minutesWords, monthOfMemorizing, timedRevisions, uncoveredRows } from '../insightsTaps';
 import { plainText } from '../passages';
 import { getJuzForPage, getPagesForJuz } from '../quranData';
@@ -69,6 +70,16 @@ describe('the hours scrub (i8)', () => {
     expect(hourDetail(items, TODAY, 30, 'in 30 days', 6)).toEqual({ title: '6–7 AM · 1 h 20 min', detail: '2 sessions in 30 days, the last yesterday' });
     expect(hourDetail(items, TODAY, 30, 'in 30 days', 22)).toEqual({ title: '10–11 PM · 20 min', detail: '1 session in 30 days, the last today' });
     expect(hourDetail(items, TODAY, 30, 'in 30 days', 11)).toEqual({ title: '11 AM–12 PM', detail: 'Nothing timed in 30 days' });
+  });
+  it('names the hour in the app’s language: it said "6–7 AM" in Arabic too', async () => {
+    await i18n.changeLanguage('ar');
+    try {
+      const { title } = hourDetail(items, TODAY, 30, 'في ٣٠ يومًا', 6);
+      expect(title).not.toMatch(/[A-Za-z0-9]/);
+      expect(title).toContain('ص');
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
   it('minutes in words', () => {
     expect(minutesWords(54)).toBe('54 min');

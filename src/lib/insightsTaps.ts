@@ -7,6 +7,7 @@ import { formatDayLong } from './activityFormat';
 import { lastRevisedWords } from './recency';
 import { t, weekdayName } from '../i18n';
 import { dayNumber, daysBetween } from './dayKeys';
+import { hourRange } from './insightsView';
 
 // A day, or a timestamp whose first ten characters are its day (a page's record).
 
@@ -133,11 +134,6 @@ export function minutesWords(minutes: number): string {
   return rest > 0 ? t('lib.insights.hoursMinutes', { h, m: rest }) : t('lib.insights.hours', { h });
 }
 
-const hourWord = (h: number) => {
-  const n = h % 12 === 0 ? 12 : h % 12;
-  return { n, p: h < 12 ? 'AM' : 'PM' };
-};
-
 /** One hour held on the bars: "6–7 AM · 5 h 54 min" over "15 sessions in 30 days, the last on Monday". */
 export function hourDetail(
   items: { day: string; occurredAt?: number | null; minutes: number | null }[],
@@ -168,9 +164,8 @@ export function hourDetail(
       days.push(i.day);
     }
   }
-  const a = hourWord(hour);
-  const b = hourWord((hour + 1) % 24);
-  const range = a.p === b.p ? `${a.n}–${b.n} ${b.p}` : `${a.n} ${a.p}–${b.n} ${b.p}`;
+  // In the app's language («٦–٧ ص» in Arabic): it was written "6–7 AM" in every language.
+  const range = hourRange(hour, hour + 1);
   if (sessions === 0) return { title: range, detail: t('lib.insights.nothingTimed', { span: inWords }) };
   const last = days.sort().pop()!;
   const ago = daysBetween(last, today);
