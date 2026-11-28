@@ -1005,7 +1005,7 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   release owner's plan, Nov 22 2026: Recite in a revision session stopped at 15 minutes.)
 
 - **RECITE-24.** (Revisely Dev) A take's summary: a take of 2 pages or more says its mistakes per page beside the count
-  ("3 mistakes · 1.5 a page"; never in the bar), where a % alone hides how many there were. Recitation's page (ACT-42)
+  ("3 mistakes · 1.5 a page"; never in the bar), where a % alone hides how many there were. Recitation's page (ACT-44)
   compares the range's takes of 2 pages or more (as the summary counts them, from its first word's page to its last's)
   with shorter ones, both a page by the share of each page recited. Revo is told the long takes' mistakes a page, pooled
   over their pages as the summary counts them. Each wrong word, haraka or
@@ -1101,7 +1101,7 @@ What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd
   wrong), puts words and similar ayahs before harakat, never calls going back to restart a mistake, and
   names surahs and ayahs, never pages.
 - **RINS-2.** Activity's Insights has a Recitation section for an account that recites, over Insights'
-  range (its own page since Nov 28 2026: ACT-42): the score (each take's own score weighted by the words it
+  range (its own page since Nov 28 2026: ACT-44): the score (each take's own score weighted by the words it
   recited); the passages with words still marked, the most slipped first, each with those words on their
   highlights, opening the reader there; and the similar ayahs gone on with, Not clear never counted. With
   Smart Tracking on, a passage rated strong that still slips is named, and Weak spots say how many words
@@ -1551,7 +1551,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   row on the one tab (ACT-35) counts the days revised, as the page's first figure does, and its line is when they revise.
   Its help topic (the ?) describes this page, with no day circles. Elsewhere Consistency is as ACT-22 and ACT-23 say (the
   store app's two tabs), and so is its help.
-- **ACT-42.** (Revisely Dev) Recitation's own page starts from its point, "Am I getting better at reciting from memory,
+- **ACT-44.** (Revisely Dev) Recitation's own page starts from its point, "Am I getting better at reciting from memory,
   and what do I still need to fix?" (Majd, Nov 27 2026: "the point of the graph is to illustrate a users trend in making
   mistakes categorized by the type of mistake and also taking into account other metrics that are USEFUL like knowing
   what mistakes has the user corrected and doesn't make anymore and which are still slipping all the time and maybe even

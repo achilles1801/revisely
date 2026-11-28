@@ -1,4 +1,4 @@
-// Recitation's own page (BEHAVIOUR.md ACT-42; Majd, Nov 27 2026: "the point of the graph is to illustrate a users trend in
+// Recitation's own page (BEHAVIOUR.md ACT-44; Majd, Nov 27 2026: "the point of the graph is to illustrate a users trend in
 // making mistakes categorized by the type of mistake ... what mistakes has the user corrected and doesn't make anymore and
 // which are still slipping all the time and maybe even length of recitations"). Over generated takes on real ayahs (every
 // kind of mark, Not clear, corrected words, unfinished and forgotten takes, Clear now):
@@ -127,8 +127,8 @@ const accountArb = fc.record({
   window: fc.constantFrom(7, 30, 90, 400),
 });
 
-describe('[ACT-42] Recitation’s page over generated takes', () => {
-  it('[ACT-42] a take’s pages are the shares of the pages it reached, a line at least; its mistakes are the summary’s', () => {
+describe('[ACT-44] Recitation’s page over generated takes', () => {
+  it('[ACT-44] a take’s pages are the shares of the pages it reached, a line at least; its mistakes are the summary’s', () => {
     fc.assert(
       fc.property(accountArb, ({ takes, clears, window }) => {
         const recs = records(takes, clears);
@@ -153,7 +153,7 @@ describe('[ACT-42] Recitation’s page over generated takes', () => {
     );
   });
 
-  it('[ACT-42] the bars: every slot of the span, the last ending today, splitting the span’s takes between them', () => {
+  it('[ACT-44] the bars: every slot of the span, the last ending today, splitting the span’s takes between them', () => {
     fc.assert(
       fc.property(accountArb, ({ takes, clears }) => {
         const recs = records(takes, clears);
@@ -173,7 +173,7 @@ describe('[ACT-42] Recitation’s page over generated takes', () => {
     );
   });
 
-  it('[ACT-42] fixed and still slipping never hold the same word; a word cleared by hand is never fixed', () => {
+  it('[ACT-44] fixed and still slipping never hold the same word; a word cleared by hand is never fixed', () => {
     fc.assert(
       fc.property(accountArb, ({ takes, clears, window }) => {
         const recs = records(takes, clears);
@@ -202,10 +202,10 @@ const inner = (w: number) => w - 2 * 16;
 // Semibold and bold run a little wider than the measured regular and bold styles: 6% for safety.
 const WIDE = 1.06;
 
-describe('[ACT-42] whatever the page shows stays whole, on an SE and a Pro Max, at any text size', () => {
+describe('[ACT-44] whatever the page shows stays whole, on an SE and a Pro Max, at any text size', () => {
   const scaleArb = fc.double({ min: 1, max: 3, noNaN: true }).map((s) => Math.min(s, CHROME_MAX_SCALE));
 
-  it('[ACT-42] the figure, its unit and the trend chip; the figure alone on its line at worst', () => {
+  it('[ACT-44] the figure, its unit and the trend chip; the figure alone on its line at worst', () => {
     fc.assert(
       fc.property(fc.double({ min: 0, max: 99.9, noNaN: true }), fc.double({ min: 0, max: 99.9, noNaN: true }), scaleArb, (now, then, scale) => {
         const figure = textWidth(perPageText(now), 'figure@20', (PAGE_TYPE.figure / 20) * scale) * WIDE;
@@ -222,7 +222,7 @@ describe('[ACT-42] whatever the page shows stays whole, on an SE and a Pro Max, 
     );
   });
 
-  it('[ACT-42] the tiles’ figures: side by side at the usual size, stacked from the size where Insights stacks', () => {
+  it('[ACT-44] the tiles’ figures: side by side at the usual size, stacked from the size where Insights stacks', () => {
     fc.assert(
       fc.property(fc.integer({ min: 0, max: 99_999 }), scaleArb, (count, scale) => {
         const figure = textWidth(formatNumber(count), 'figure@20', (PAGE_TYPE.tileFigure / 20) * scale) * WIDE;
@@ -236,7 +236,7 @@ describe('[ACT-42] whatever the page shows stays whole, on an SE and a Pro Max, 
     );
   });
 
-  it('[ACT-42] each kind fits its chip in the card; the three pills fit one row at the usual size, each its own at any', () => {
+  it('[ACT-44] each kind fits its chip in the card; the three pills fit one row at the usual size, each its own at any', () => {
     for (const scale of [1, 1.2, CHROME_MAX_SCALE]) {
       for (const w of WIDTHS) {
         const card = inner(w) - 28;

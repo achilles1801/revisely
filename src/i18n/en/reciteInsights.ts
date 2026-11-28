@@ -77,7 +77,7 @@ export const reciteInsights = {
   aboutSame: 'About the same as {{ago}}',
   upFromAgo: 'Up from {{from}} {{ago}}',
   downFromAgo: 'Down from {{from}} {{ago}}',
-  /** Recitation's own page (Revisely Dev, ACT-42): mistakes a page, by kind week by week, fixed and still slipping. */
+  /** Recitation's own page (Revisely Dev, ACT-44): mistakes a page, by kind week by week, fixed and still slipping. */
   page: {
     /** After the figure ("0.5 mistakes a page"); the figure is to a tenth. */
     unit: 'mistakes a page',

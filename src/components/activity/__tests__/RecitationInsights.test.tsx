@@ -1,4 +1,4 @@
-// Insights' Recitation (Revisely Dev, ACT-42 and RINS-2), through InsightsView: the trend first (mistakes a page against
+// Insights' Recitation (Revisely Dev, ACT-44 and RINS-2), through InsightsView: the trend first (mistakes a page against
 // the period before), mistakes by kind week by week on the one chart (a tap on a week, a tap on a kind), the words fixed
 // against those still slipping with the worst passage and See all (its similar ayahs and, with Smart Tracking, passages
 // rated strong), your takes' length, and each row opening the reader at its ayahs. The page with 0, 1, a few and many
@@ -98,10 +98,10 @@ beforeEach(async () => {
   (openRevo as jest.Mock).mockClear();
 });
 
-describe('Insights: Recitation’s page (ACT-42, RINS-2)', () => {
+describe('Insights: Recitation’s page (ACT-44, RINS-2)', () => {
   const inRange = () => liveTakes(records).filter((r) => r.day >= day(-29));
 
-  it('[ACT-42] starts from the trend: mistakes a page in the range, against the month before', async () => {
+  it('[ACT-44] starts from the trend: mistakes a page in the range, against the month before', async () => {
     await open(data());
     const section = text('insights-recitation');
     expect(section).toContain('Recitation');
@@ -114,7 +114,7 @@ describe('Insights: Recitation’s page (ACT-42, RINS-2)', () => {
     expect(text('insights-recitation-line')).toMatch(/^5 takes · \d+\.\d% of words said right · last 30 days, against the month before$/);
   });
 
-  it('[ACT-42] mistakes by kind, a bar a week: a tap on a week sets the line, a tap on a kind shows it alone', async () => {
+  it('[ACT-44] mistakes by kind, a bar a week: a tap on a week sets the line, a tap on a kind shows it alone', async () => {
     await open(data());
     // 30 days opens on 4 weeks: a bar a week from its Monday, this week last (16 Nov 2026 is a Monday).
     const bars = kindBars(records, TODAY, '4w', words);
@@ -145,7 +145,7 @@ describe('Insights: Recitation’s page (ACT-42, RINS-2)', () => {
     expect(screen.getAllByTestId(/^insights-recitation-bars-bar-/)).toHaveLength(12);
   });
 
-  it('[ACT-42] fixed and still slipping: the words still marked, the share fixed, the worst passage and See all', async () => {
+  it('[ACT-44] fixed and still slipping: the words still marked, the share fixed, the worst passage and See all', async () => {
     await open(data());
     expect(text('insights-recitation-fixed-tile')).toBe('0 | words fixed so far: a word is fixed once it’s said right on 2 days');
     // Al-Kahf 22–23's three (the Not clear letter remembered like a slip, RMEM-2) and Al-Baqarah 48's one.
@@ -162,7 +162,7 @@ describe('Insights: Recitation’s page (ACT-42, RINS-2)', () => {
     expect(screen.queryByTestId('insights-recitation-strong-18-22')).toBeNull();
   });
 
-  it('[ACT-42] a word said right on 2 days is fixed, and leaves the words still slipping', async () => {
+  it('[ACT-44] a word said right on 2 days is fixed, and leaves the words still slipping', async () => {
     const right = (offset: number) => take(offset, KAHF, [mark(w23 + 1, 'letter', { sure: 'likely' })], 0.99);
     // Al-Kahf 22 said right on the next two revision days after its last slip; 23's harakat too.
     await open(data({ recitation: { records: [...records, right(0)].concat([take(-1, KAHF, [mark(w23 + 1, 'letter', { sure: 'likely' })], 0.99)]), words } }));
@@ -171,7 +171,7 @@ describe('Insights: Recitation’s page (ACT-42, RINS-2)', () => {
     expect(text('insights-recitation-fixed')).toContain('2 of the 4 words you’ve slipped on are fixed');
   });
 
-  it('[ACT-42] your takes: the usual length and time, the longest, long takes against short ones', async () => {
+  it('[ACT-44] your takes: the usual length and time, the longest, long takes against short ones', async () => {
     await open(data());
     const l = takeLengths(records, TODAY, 30, words)!;
     expect(text('insights-recitation-takes-title')).toBe(plainText(takesTitle(l)));
@@ -218,7 +218,7 @@ describe('Insights: Recitation’s page (ACT-42, RINS-2)', () => {
     for (const c of chips) expect(harakatClip(c.props.style)).toBeNull();
   });
 
-  it('[ACT-42] no takes in the range: it says so, and still shows what slips', async () => {
+  it('[ACT-44] no takes in the range: it says so, and still shows what slips', async () => {
     const old = records.map((r) => (r.kind === 'take' ? { ...r, day: day(-40), createdAt: r.createdAt - 40 * 86_400_000 } : r));
     await open(data({ recitation: { records: old, words } }));
     expect(text('insights-recitation-figure')).toBe('No takes in 30 days');
@@ -227,7 +227,7 @@ describe('Insights: Recitation’s page (ACT-42, RINS-2)', () => {
     expect(screen.queryByTestId('insights-recitation-takes')).toBeNull();
   });
 
-  it('[ACT-42] takes kept without their final answer only: the takes, no rate', async () => {
+  it('[ACT-44] takes kept without their final answer only: the takes, no rate', async () => {
     const unfinished = [{ ...take(-3, KAHF, [mark(w22, 'word')], 0.98), unfinished: true as const }];
     await open(data({ recitation: { records: unfinished, words } }));
     expect(screen.queryByTestId('insights-recitation-rate')).toBeNull();
@@ -235,7 +235,7 @@ describe('Insights: Recitation’s page (ACT-42, RINS-2)', () => {
     expect(text('insights-recitation-line')).toBe('1 take · last 30 days');
   });
 
-  it('[ACT-42] takes without a mistake say so in place of empty bars', async () => {
+  it('[ACT-44] takes without a mistake say so in place of empty bars', async () => {
     const clean = [take(-3, KAHF, [], 1), take(-1, BAQ, [], 1)];
     await open(data({ recitation: { records: clean, words } }));
     expect(text('insights-recitation-rate')).toBe('0');
@@ -249,7 +249,7 @@ describe('Insights: Recitation’s page (ACT-42, RINS-2)', () => {
   });
 });
 
-describe('Recitation’s chart never collapses (ACT-42)', () => {
+describe('Recitation’s chart never collapses (ACT-44)', () => {
   const many = (): MemoryRecord[] => {
     const out: MemoryRecord[] = [];
     for (let i = 0; i < 160; i++) {
@@ -266,7 +266,7 @@ describe('Recitation’s chart never collapses (ACT-42)', () => {
     ['a few takes', () => records.slice(0, 3)],
     ['a young account (this week only)', () => [take(0, KAHF, [mark(w22, 'word')], 0.98), take(0, BAQ, [mark(w48, 'harakat')], 0.98)]],
     ['many takes', many],
-  ])('[ACT-42] %s: every slot of the span, the bars with mistakes drawn', async (_name, make) => {
+  ])('[ACT-44] %s: every slot of the span, the bars with mistakes drawn', async (_name, make) => {
     const recs = (make as () => MemoryRecord[])();
     for (const [range, slots] of [[30, 4], [90, 13], ['all', 12]] as const) {
       await open(data({ range, firstDay: '2026-01-01', recitation: { records: recs, words } }));

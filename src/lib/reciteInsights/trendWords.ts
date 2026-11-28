@@ -1,4 +1,4 @@
-// What Recitation's own page says (pure; Revisely Dev, ACT-42): mistakes a page to a tenth, its trend against the period
+// What Recitation's own page says (pure; Revisely Dev, ACT-44): mistakes a page to a tenth, its trend against the period
 // before, a bar's line, fixed against still slipping, and how long the takes are, in words people use ("Usually 1½ pages,
 // about 6 minutes"). Strings: src/i18n/en/reciteInsights.ts, `page`.
 

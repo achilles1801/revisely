@@ -1,4 +1,4 @@
-// Insights' Recitation (Revisely Dev): as a row on the one Activity tab (ACT-35), and as its own page from its point (ACT-42;
+// Insights' Recitation (Revisely Dev): as a row on the one Activity tab (ACT-35), and as its own page from its point (ACT-44;
 // Majd, Nov 27 2026: "the point of the graph is to illustrate a users trend in making mistakes categorized by the type of
 // mistake and also taking into account other metrics that are USEFUL like knowing what mistakes has the user corrected and
 // doesn't make anymore and which are still slipping all the time and maybe even length of recitations etc ... we always

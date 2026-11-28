@@ -1,4 +1,4 @@
-// What Recitation's own page shows (pure; Revisely Dev, ACT-42), from its point: "Am I getting better at reciting from
+// What Recitation's own page shows (pure; Revisely Dev, ACT-44), from its point: "Am I getting better at reciting from
 // memory, and what do I still need to fix?" (Majd, Nov 27 2026: "the point of the graph is to illustrate a users trend in
 // making mistakes categorized by the type of mistake and also taking into account other metrics that are USEFUL like
 // knowing what mistakes has the user corrected and doesn't make anymore and which are still slipping all the time and

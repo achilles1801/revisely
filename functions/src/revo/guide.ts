@@ -502,7 +502,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     // Majd's Nov 20 2026 asks, in Revisely Dev until the next release (Not clear's line too: the store app has it, and
     // the release's re-record brings it to the main guide).
     title: 'Mistakes on a hidden page, Not clear, the mistake sound, Your recitation, and how highlights look',
-    covers: ['RECITE-13', 'RECITE-15', 'RECITE-16', 'RECITE-17', 'RECITE-18', 'RECITE-19', 'RECITE-20', 'RECITE-21', 'RECITE-24', 'ACT-42'],
+    covers: ['RECITE-13', 'RECITE-15', 'RECITE-16', 'RECITE-17', 'RECITE-18', 'RECITE-19', 'RECITE-20', 'RECITE-21', 'RECITE-24', 'ACT-44'],
     routes: ['QuranReader', 'ActiveRevision', 'Settings'],
     text: lines(
       '- With the page hidden (the eye) and no take running, a word with a mistake keeps its highlight on its place, the word still hidden: the take’s marks in their colour after it, and past mistakes lighter (with “Show past mistakes” on), so they know where they tend to slip. During a take nothing is drawn on a word still hidden, past mistakes included; each shows once its word does. A tap on a highlighted place opens that word’s card, as on a shown page (it shows the word).',
