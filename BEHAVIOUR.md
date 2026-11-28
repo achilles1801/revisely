@@ -66,6 +66,10 @@ How the tests are made: `tests/scenarios/README.md`.
   welcome, on a blank account of its own, and saves nothing: no pages, plan, reminder, location, `onboardingComplete` or
   `whatsNewSeen`, and no system prompt for location or notifications. ✕, or the last answer, returns to Settings with the
   account as it was.
+- **ONBOARD-6.** Setup's last answer keeps the surahs chosen as surahs earlier in setup: those ticked in "Choose by surah
+  instead", and every one with "All of it". Later, taking a surah off in Memorized pages keeps a page it shares with one
+  of them (Al-Ikhlas chosen in setup keeps the last page when An-Nas is taken off). (Before: the last answer saved a new
+  account's empty list over them, so that page went too.)
 
 ## Paths (Revisely Dev)
 
