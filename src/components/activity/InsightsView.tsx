@@ -69,7 +69,7 @@ import {
 } from '../../lib/coverageViews';
 import { PaceSheet } from './PaceSheet';
 import { AdviceButton, InsightAdvice, InsightCard, InsightHero, type Trend } from './InsightPageParts';
-import { coverageBefore, slippingJuz, slippingWords } from '../../lib/insightsPages';
+import { coverageBefore, doneByWords, juzDoneBy, slippingJuz, slippingWords } from '../../lib/insightsPages';
 import { GapsSection } from './GapsSection';
 import type { PushBack } from '../../lib/gapsCycle';
 import { gapsView } from '../../lib/insightsGaps';
@@ -1462,6 +1462,12 @@ function MemorizationUpgraded({ data, onOpenDay, onEditMemorized }: { data: Insi
     setChosen(u);
     setPicked(null);
   };
+  // When the juz in progress is done at this pace (MEM-11): the one addition to #1066's page.
+  const doneBy = useMemo(
+    () => juzDoneBy({ memorized: data.memorized, memorizations: data.memorizations, today: data.today, firstDay: data.firstDay }),
+    [data.memorized, data.memorizations, data.today, data.firstDay],
+  );
+  const doneWords = doneBy ? doneByWords(doneBy, data.today) : null;
   return (
     <Section
       title={t('activity.insights.memorization')}
@@ -1577,6 +1583,7 @@ function MemorizationUpgraded({ data, onOpenDay, onEditMemorized }: { data: Insi
           ) : null}
         </View>
       ) : null}
+      {doneWords ? <InsightAdvice icon="flag-outline" title={doneWords.title} detail={doneWords.detail} testID="insights-memorization-done-by" /> : null}
     </Section>
   );
 }

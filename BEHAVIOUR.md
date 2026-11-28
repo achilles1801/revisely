@@ -1986,6 +1986,14 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
     memorized. Pages count by their share (MEM-2). With nothing memorized in the span, no chart.
   - A bar picks its month or day: the figure becomes it ("3 pages on 25 November"), and what was memorized then is listed
     under the bars, each opening its day. The same bar again clears it.
+- **MEM-11.** (Revisely Dev) Memorization's page (MEM-10, otherwise as #1066 built it) answers its point, "Am I keeping my
+  pace with new pages?" (Majd, Nov 27 2026: "yes build all seven screens"; board
+  `~/Documents/revisely-today-mocks/insights-v2/board-rest.png`): under the chart, when the juz in progress is done at this
+  pace, "At this pace, Juz 29 is done in mid-January" over "11 pages to go, at about 10 a month." The juz in progress is
+  the one the latest memorization went into that isn't all memorized; the pace is the pages memorized over the last 90
+  days, or since the account began when that is shorter (30 days at least). The day reads as early, mid- or late in its
+  month, with the year when it isn't this one. No line with no juz in progress, under a page a month, or two years or more
+  away.
 
 - **MEM-12.** (Revisely Dev) Memorization's chart always reads as a chart, whatever the account has (Majd, Nov 28 2026, on
   one month drawn as one bar the width of the screen: "plz ensure something like this never happens (garbage ui)").

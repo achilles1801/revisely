@@ -377,11 +377,11 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     // lib/release/memorizedInSettings is on. These lines replace, in Revisely Dev, the main guide's Home line and its
     // "Home → … of the Quran memorized ›" and "Settings → Revision → “Memorized pages”, tap the pencil first" path.
     title: 'Memorized pages',
-    covers: ['MEM-9', 'MEM-10', 'MEM-12'],
+    covers: ['MEM-9', 'MEM-10', 'MEM-11', 'MEM-12'],
     routes: ['Settings', 'Memorization', 'ActivitySection'],
     text: lines(
       '- Home shows no memorized line or juz dots. Settings → “Memorized pages” (under “Revision”) opens them ready to edit: “Show by” “Surahs”, “Juz” or “Hizb”; a row’s circle marks it all, the row opens it (“Whole juz”, then its surahs’ pages, numbered within each surah). A change shows “Cancel” and e.g. "Save 2 changes".',
-      '- Activity → “Memorization”: “Edit memorized pages”, then the chart by “Month” or “Day”, from the first month or day memorized.',
+      '- Activity → “Memorization”: “Edit memorized pages”, the chart by “Month” or “Day” (from the first memorized), and when the juz in progress is done at this pace.',
     ),
   },
   {
@@ -413,7 +413,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['Settings'],
     text: lines(
       '- The revision reminders: today’s and tomorrow’s, then one each morning for the rest of the week after the app was last open (naming where that day’s revision starts), then none until it is opened again. There is no setting for how many.',
-      '- Settings → Testing → “Scheduled reminders” lists the reminders this phone will show and when; “Show the next one in 5 seconds” shows the next as a real notification.',
+      '- Settings → Testing → “Scheduled reminders” lists what this phone will show and when, and can show the next in 5 seconds.',
       '- Settings → Reminders → “Revision reminders” is off while the phone refuses Revisely’s notifications, and says so; turning it on then offers “Open Settings”.',
     ),
   },
@@ -437,7 +437,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- “Test me” here is one spot test: a random verse, the page hidden but for it. How far, where from and “Show progress” are in Settings → Mushaf and Recite → Spot tests; it finishes a surah ending near. It ends with “Hasbuk”, or “Stopped early”.',
       '- Settings → Mushaf and Recite → “Help improve mistake detection” (on by default) keeps each take and its result to train it; software checks them, nobody listens. Every account that recites has it. Settings → Testing → “Premium” turns Premium off to see Mark mistakes locked.',
       '- Settings → About → “Licences”: the recitation model’s licence (Quran Muaalem License), offline.',
-      '- Settings → Testing → “Mistake detection model”: the checker’s model; tap to ask again.',
+      '- Settings → Testing → “Mistake detection model”: the model the checker runs.',
       '- Settings → Appearance → “Language”: “Phone’s language”, English or العربية (Arabic). It restarts Revisely (“Restart”, or “Not now”). In Arabic, Revo answers in Arabic too. Untranslated text shows in English. In Arabic the mushaf turns as a printed one does.',
       '- Settings → Help and support → “Rate Revisely” opens the store’s review page. After a day’s revision with a streak of 7 days or more, the end card may show “Enjoying Revisely? Rate it”: at most 3 times, four months apart, never in an account’s first week or after a tap or dismissal. Nothing is given for rating.',
     ),
@@ -474,7 +474,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['QuranReader', 'ActivityDay', 'ActivityAll'],
     text: lines(
       '- A take shown on its page (from a day’s “Recited”, “Recitations”, “This passage” or “Your takes here”) has its card at the bottom, “Your take · …”, with ▶ and Done. A tap on the card opens that take’s summary again as it ended: when, score, each mistake (a tap shows its card), similar ayahs, words peeked, marks called Not a mistake with Put back, words cleared, “This passage” and “Your progress here”; “Its day in Activity” and ⋯ “Delete this take”. No Recite again.',
-      '- Takes before Nov 22 2026 don’t show their peeked words or marks called Not a mistake (not kept then).',
+      '- Takes before Nov 22 2026 don’t show their peeked words or marks called Not a mistake.',
     ),
   },
   {
