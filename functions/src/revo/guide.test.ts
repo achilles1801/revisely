@@ -145,7 +145,9 @@ describe('Revo’s guide names what the app has', () => {
     // (a feature has taken 400 to 900 characters). At 16,000 (about 4,450 tokens) on Sonnet 5.5 the block costs about
     // $0.00045 a question when cached (cache read $0.10 per million tokens) and $0.011 on a cache miss (write $2.50 per
     // million); the 4,000 characters added are about $0.0001 and $0.003 of that. Trim repeats before raising it again.
-    expect(DEV_GUIDE.length).toBeLessThan(16_000);
+    // Nov 27 2026: 16,500, for MEM-9 and MEM-10 (Memorized pages off Home), at 15,991 with nothing left to trim that wasn't
+    // another feature's knowledge; about $0.00001 a question cached.
+    expect(DEV_GUIDE.length).toBeLessThan(16_500);
     expect(DEV_GUIDE).not.toMatch(/\b[A-Z]+-\d+\b/);
   });
 });

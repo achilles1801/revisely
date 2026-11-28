@@ -24,6 +24,28 @@ export const memorization = {
     pageState: 'Page {{page}}, {{state}}',
     pageOpenedState: 'Page {{page}}, in the entry you opened, {{state}}',
   },
+  /** screens/main/MemorizedPagesScreen, components/memorization/MemorizedEditor (Revisely Dev, MEM-9): Settings' style. */
+  editor: {
+    title: 'Memorized pages',
+    /** Beside the count: "17.2% of the Quran". */
+    ofQuran: '{{percent}} of the Quran',
+    showBy: 'Show by',
+    /** A row's value when every page of it is memorized. */
+    all: 'All',
+    opensHint: 'Opens its pages',
+    footerJuz: 'Tap a circle to mark a whole juz. Open a juz for its surahs and pages.',
+    footerHizb: 'Tap a circle to mark a whole hizb. Open a hizb for its surahs and pages.',
+    footerSurahs: 'Tap a circle to mark a whole surah. Open a surah for its pages.',
+    wholeJuz: 'Whole juz',
+    wholeHizb: 'Whole hizb',
+    wholeSurah: 'Whole surah',
+    marksAll_one: 'Marks its {{count}} page',
+    marksAll_other: 'Marks all {{count}} pages',
+    /** A page cell, for VoiceOver: "Qaf, 1st page, memorized". */
+    pageCell: '{{name}}, {{state}}',
+    saveChanges_one: 'Save {{count}} change',
+    saveChanges_other: 'Save {{count}} changes',
+  },
   /** screens/main/MemorizationScreen: the memorized pages, and editing them. */
   screen: {
     title: 'Memorization',

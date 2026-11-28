@@ -1,38 +1,36 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { TopSafeAreaView } from '../../components/SafeAreaView';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MemorizationBrowser } from '../../components/MemorizationBrowser';
-import {
-  PageStatus,
-  applyPendingChanges,
-  applyPendingSurahChanges,
-  pruneCustomPlanForMemorized,
-} from '../../lib/memorizationChanges';
+import type { PageStatus } from '../../lib/memorizationChanges';
 import { ActionBar, useTabBarFootprint } from '../../navigation/TabBar';
 import { ProgressBar } from '../../components/ProgressBar';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
 import { PillButton } from '../../components/v2/PillButton';
 import { Sheet } from '../../components/v2/Sheet';
 import { computeMemorizationStats, formatFractional } from '../../lib/memorizationStats';
-import { defaultWhen, memorizationChangeSet, type WhenMemorized } from '../../lib/memorizationLog';
-import { queueChange } from '../../lib/offline/queue';
-import { getRevisionDayForUser } from '../../lib/fajrBoundary';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
-import type { User } from '../../types';
-import { revisablePages } from '../../lib/memorizedAyahs';
 import { t } from '../../i18n';
+import { useSaveMemorization } from '../../hooks/useSaveMemorization';
+import { memorizedInSettingsEnabled } from '../../lib/release/memorizedInSettings';
+import MemorizedPagesScreen from './MemorizedPagesScreen';
 
 type NavigationProp = NativeStackNavigationProp<HomeStackParamList, 'Memorization'>;
 
+/** The memorized pages: the Settings-style editor in Revisely Dev (MEM-9), the store app's Memorization otherwise. */
 export default function MemorizationScreen() {
+  return memorizedInSettingsEnabled() ? <MemorizedPagesScreen /> : <MemorizationClassic />;
+}
+
+function MemorizationClassic() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProp<HomeStackParamList, 'Memorization'>>();
-  const { user, pages, updatePages, saveUser } = useApp();
+  const { user, pages } = useApp();
   const { palette } = useTheme();
   const barFootprint = useTabBarFootprint();
   // "Schedule needs review" opens once the save sheet has gone (iOS can't
@@ -59,7 +57,7 @@ export default function MemorizationScreen() {
     Map<number, PageStatus>
   >(new Map());
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const { save, saving, hasCustomPlan } = useSaveMemorization();
   const [reviewPromptOpen, setReviewPromptOpen] = useState(false);
 
   // The tab bar is hidden here (HIDE_TAB_BAR_ON in navigation/MainNavigator).
@@ -72,79 +70,15 @@ export default function MemorizationScreen() {
     setMarkMode(false);
   };
 
-  // Saves the manager's changes. Pages newly marked are logged for Today (one dated memorization
-  // item for the day) or not logged (Before). Unmarked pages come out of the items that hold them.
-  const commit = async (when: WhenMemorized | null) => {
-    setSaving(true);
-    try {
-      const { updatedPages, changedPageNumbers } = applyPendingChanges(
-        pages,
-        pendingChanges,
-      );
-      const { marked, unmarked } = memorizationChangeSet(pages, pendingChanges);
-      if (changedPageNumbers.length > 0) {
-        await updatePages(updatedPages, changedPageNumbers);
-      }
-      if (when === 'today' && marked.length > 0 && user) {
-        await queueChange({ kind: 'memorization.mark', day: getRevisionDayForUser(user), pages: marked, at: Date.now() });
-      }
-      if (unmarked.length > 0) {
-        await queueChange({ kind: 'memorization.unmark', pages: unmarked });
-      }
-
-      if (user) {
-        const userUpdates: Partial<User> = {};
-        if (pendingSurahChanges.size > 0) {
-          userUpdates.memorizedSurahs = applyPendingSurahChanges(
-            user.memorizedSurahs ?? [],
-            pendingSurahChanges,
-          );
-        }
-        // Strip un-memorized pages from the custom plan so the schedule
-        // doesn't surface pages the user no longer knows. We don't auto-add
-        // newly-memorized pages — the user slots those in the plan editor.
-        if (user.customPlan) {
-          const memorizedNumbers = revisablePages(updatedPages).map((p) => p.pageNumber);
-          const { plan } = pruneCustomPlanForMemorized(
-            user.customPlan,
-            memorizedNumbers,
-          );
-          userUpdates.customPlan = plan;
-        }
-        if (Object.keys(userUpdates).length > 0) {
-          await saveUser({ ...user, ...userUpdates });
-        }
-      }
-
-      const hadAnyChange = changedPageNumbers.length > 0 || pendingSurahChanges.size > 0;
+  // Saves the manager's changes (useSaveMemorization): "When did you memorize these?" for pages newly marked.
+  const handleSave = () =>
+    save({ pages: pendingChanges, surahs: pendingSurahChanges }, (changed) => {
       setPendingChanges(new Map());
       setPendingSurahChanges(new Map());
       setMarkMode(false);
       setConfirmOpen(false);
-
-      if (hadAnyChange && user?.customPlan) {
-        reviewAfterSave.current = true;
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSave = () => {
-    const { marked } = memorizationChangeSet(pages, pendingChanges);
-    if (marked.length === 0) {
-      void commit('before');
-      return;
-    }
-    const today = { text: t('common.today'), onPress: () => void commit('today') };
-    const before = { text: t('memorization.screen.before'), onPress: () => void commit('before') };
-    const cancel = { text: t('common.cancel'), style: 'cancel' as const };
-    Alert.alert(
-      t('memorization.screen.whenTitle'),
-      t('memorization.screen.marked', { count: marked.length }),
-      defaultWhen(marked) === 'today' ? [today, before, cancel] : [before, today, cancel],
-    );
-  };
+      if (changed && hasCustomPlan) reviewAfterSave.current = true;
+    });
 
   const handleReviewSchedule = () => {
     setReviewPromptOpen(false);

@@ -767,6 +767,14 @@ describe('Home in the new design (a feed)', () => {
     expect(screen.getByTestId('today-dots')).toBeTruthy();
   });
 
+  it('[MEM-9] Revisely Dev: no memorized line and no juz dots on the post (memorized pages are in Settings and Activity)', async () => {
+    post({ memorized: memorizedText([]), memorizedLine: false });
+    await act(async () => {});
+    expect(screen.queryByTestId('today-memorized')).toBeNull();
+    expect(screen.queryByTestId('today-dots')).toBeNull();
+    expect(screen.queryByText(/of the Quran memorized/)).toBeNull();
+  });
+
   it('juz dots: thirty, each lit by its juz’s share (half a juz, half a dot); no words, read by VoiceOver', async () => {
     const juz = Array(30).fill(0);
     juz[29] = 1;

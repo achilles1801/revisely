@@ -19,6 +19,7 @@ import {
   formatPace,
   juzTiles,
   memorizationMonths,
+  memorizationSeries,
   HOURS_FROM_DAYS,
   minutesByHour,
   monthCount,
@@ -45,6 +46,10 @@ import { hourDetail, minutesWords, monthOfMemorizing, uncoveredRows, type Uncove
 import { COVERAGE_LABELS, coverageLook, fillLook } from './coverageLook';
 import { CoverageFill } from './CoverageFill';
 import { PillTabs } from '../v2/PillTabs';
+import { PillButton } from '../v2/PillButton';
+import { JuzDots } from '../v2/JuzDots';
+import { LinearGradient } from 'expo-linear-gradient';
+import { memorizedInSettingsEnabled } from '../../lib/release/memorizedInSettings';
 import { coverageRecency } from '../../lib/recency';
 import {
   COVERAGE_OPEN_KEY,
@@ -89,7 +94,7 @@ import {
   weeksGrid,
   type InsightsRange,
 } from '../../lib/insightsRange';
-import { t, weekdayLetters, formatNumeral, formatPercentage, formatNumber } from '../../i18n';
+import { t, weekdayLetters, formatNumeral, formatPercentage, formatNumber, formatDate } from '../../i18n';
 import { chevron, forwardIcon } from '../../i18n/direction';
 
 /** Consistency's weeks grid: the gap between cells, and the largest a cell gets (3 months on a wide phone). */
@@ -109,6 +114,8 @@ export interface InsightsData {
   read: { day: string; pages: number[]; minutes: number | null; occurredAt: number | null }[];
   /** Twelve months of memorization items. */
   memorizations: { day: string; pages: number[] }[];
+  /** Each juz's memorized share (Memorization's juz dots, MEM-10). */
+  memorizedJuz?: number[];
   /** The plan's pages a day (Pace's "A 20-page day"). */
   capacity: number;
   /** Revo's Ask on Weak spots (REVO-1: testers who can use Revo). */
@@ -180,6 +187,7 @@ export function InsightsView({
   sections = DEFAULT_SECTIONS.insights,
   onEditSections,
   onOpenLastRevised,
+  onEditMemorized,
   mode = 'page',
   onOpenSection,
   alone = false,
@@ -207,6 +215,8 @@ export function InsightsView({
   onEditSections?: () => void;
   /** When each surah, juz, hizb or page was last revised (Gaps' link: ACT-30). */
   onOpenLastRevised?: (sort?: 'waiting') => void;
+  /** Memorization's "Edit memorized pages" (MEM-10, Revisely Dev): the memorized pages, ready to edit. */
+  onEditMemorized?: () => void;
   /**
    * 'rows' (the one Activity tab, ACT-35): each section a quiet row, its name, one grey line and its figure, that opens it on
    * a page of its own (`onOpenSection`); a section with nothing to say yet has no row. 'page': the sections drawn in full.
@@ -291,7 +301,7 @@ export function InsightsView({
           />
         ) : null;
       case 'memorization':
-        return <Memorization data={data} onOpenDay={onOpenDay} />;
+        return <Memorization data={data} onOpenDay={onOpenDay} onEditMemorized={onEditMemorized} />;
       case 'pace':
         return <Pace data={data} onOpenDay={onOpenDay} />;
     }
@@ -1323,7 +1333,191 @@ function WeakSpots({
 
 // ── Memorization ─────────────────────────────────────────────────────────
 
-function Memorization({ data, onOpenDay, row, last }: { data: InsightsData; onOpenDay?: (day: string) => void } & AsRow) {
+function Memorization({ data, onOpenDay, onEditMemorized, row, last }: { data: InsightsData; onOpenDay?: (day: string) => void; onEditMemorized?: () => void } & AsRow) {
+  // Revisely Dev (MEM-10): the section opens the memorized pages, and its chart goes by month or by day.
+  if (!row && memorizedInSettingsEnabled()) return <MemorizationUpgraded data={data} onOpenDay={onOpenDay} onEditMemorized={onEditMemorized} />;
+  return <MemorizationClassic data={data} onOpenDay={onOpenDay} row={row} last={last} />;
+}
+
+/**
+ * Memorization in Revisely Dev (MEM-10; Majd, Nov 27 2026: "i kinda like the new ui/chart for the memorized stuff its way
+ * cleaner ... not necessarily having to show a bunch of empty previous months of no memorization especially if someone just
+ * joined revisely and also having a daily view"). The figure, the juz dots and "Edit memorized pages", then the chart, Month
+ * or Day: from the first month (or day) with a page memorized, never a run of empty ones before it. A bar picks its month or
+ * day and lists what was memorized then, each opening its day.
+ */
+function MemorizationUpgraded({ data, onOpenDay, onEditMemorized }: { data: InsightsData; onOpenDay?: (day: string) => void; onEditMemorized?: () => void }) {
+  const { palette } = useTheme();
+  const [unit, setUnit] = useState<'month' | 'day'>('month');
+  const [picked, setPicked] = useState<string | null>(null);
+  const series = useMemo(() => memorizationSeries(data.memorizations, data.today, unit), [data.memorizations, data.today, unit]);
+  const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
+  const added = memorizedIn(data.memorizations, data.today, span.window);
+  const share = quranShare(data.memorized.size);
+  const top = Math.max(unit === 'month' ? 10 : 3, ...series.map((b) => b.pages));
+  const few = series.length <= 7;
+  const lit = picked ?? series[series.length - 1]?.key ?? null;
+  const [a, b] = palette.ring;
+  const label = (key: string, i: number) => {
+    if (unit === 'month') return monthLabel(key, few || i === 0 || i === series.length - 1 || key === picked);
+    const showAll = series.length <= 10;
+    return showAll || i === 0 || i === series.length - 1 || key === picked ? formatNumber(Number(key.slice(8))) : '';
+  };
+  const items = picked
+    ? (unit === 'month'
+        ? monthOfMemorizing(data.memorizations, picked).items
+        : monthOfMemorizing(data.memorizations, picked.slice(0, 7)).items.filter((it) => it.day === picked))
+    : [];
+  const pickedPages = picked ? series.find((x) => x.key === picked)?.pages ?? 0 : 0;
+  const choose = (u: 'month' | 'day') => {
+    setUnit(u);
+    setPicked(null);
+  };
+  return (
+    <Section
+      title={t('activity.insights.memorization')}
+      detail={unit === 'month' ? t('activity.insights.memorizationDetail') : t('activity.insights.memorizationDetailDays')}
+      testID="insights-memorization"
+    >
+      {picked ? (
+        <Figure
+          value={String(pickedPages)}
+          text={unit === 'month'
+            ? t('activity.insights.pagesInMonth', { count: pickedPages, month: monthName(picked) })
+            : t('activity.insights.pagesOnDay', { count: pickedPages, day: dayAndMonth(picked) })}
+          right={<ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{t('activity.insights.inAll', { n: data.memorized.size })}</ChromeText>}
+          testID="insights-memorization-figure"
+        />
+      ) : (
+        <Figure
+          value={String(data.memorized.size)}
+          text={[t('activity.insights.pagesWord', { count: data.memorized.size }), share].filter(Boolean).join(' · ')}
+          right={added > 0 ? <ChromeText style={[typeV2.name, { color: palette.good }]}>{`+${formatNumber(added)} ${span.inWords}`}</ChromeText> : undefined}
+          testID="insights-memorization-figure"
+        />
+      )}
+      {data.memorizedJuz ? (
+        <View style={styles.memDots}>
+          <JuzDots juz={data.memorizedJuz} progress={data.memorized.size / 604} label={share ?? ''} testID="insights-memorization-dots" />
+        </View>
+      ) : null}
+      {onEditMemorized ? (
+        <Tap
+          onPress={onEditMemorized}
+          accessibilityRole="button"
+          style={[styles.memEdit, { borderTopColor: palette.separator, borderBottomColor: palette.separator }]}
+          testID="insights-edit-memorized"
+        >
+          <Ionicons name="create-outline" size={24} color={palette.text} />
+          <ChromeText style={[typeV2.body, styles.flex, { color: palette.text }]}>{t('activity.insights.editMemorized')}</ChromeText>
+          <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
+        </Tap>
+      ) : null}
+      {series.length > 0 ? (
+        <>
+          <View style={styles.memUnits}>
+            {(['month', 'day'] as const).map((u) => (
+              <PillButton
+                key={u}
+                title={u === 'month' ? t('activity.insights.byMonth') : t('activity.insights.byDay')}
+                size="sm"
+                variant={u === unit ? 'solid' : 'outline'}
+                onPress={() => choose(u)}
+                testID={`insights-memorization-${u}`}
+              />
+            ))}
+          </View>
+          <View style={[styles.memBars, { gap: series.length > 14 ? 2 : 6 }]} testID={`insights-memorization-bars-${unit}`}>
+            {series.map((x) => {
+              const on = x.key === lit;
+              const h = x.pages > 0 ? Math.max(4, Math.round((72 * x.pages) / top)) : 0;
+              return (
+                <Tap
+                  key={x.key}
+                  onPress={() => setPicked(picked === x.key ? null : x.key)}
+                  style={styles.memCol}
+                  accessibilityRole="button"
+                  accessibilityLabel={unit === 'month'
+                    ? t('activity.insights.monthPages', { month: monthName(x.key), count: x.pages })
+                    : t('activity.insights.dayPages', { day: dayAndMonth(x.key), count: x.pages })}
+                  accessibilityState={{ selected: picked === x.key }}
+                  testID={`insights-memorization-bar-${x.key}`}
+                >
+                  {x.pages > 0 && (few || on) ? (
+                    <ChromeText style={[typeV2.meta, styles.monthValue, styles.memValue, { color: on ? palette.text : palette.secondary }]} numberOfLines={1}>
+                      {`+${formatNumber(x.pages)}`}
+                    </ChromeText>
+                  ) : null}
+                  {h > 0 ? <LinearGradient colors={[b, a]} style={[styles.memBar, { height: h, opacity: on || !picked ? 1 : 0.45 }]} /> : null}
+                </Tap>
+              );
+            })}
+          </View>
+          {unit === 'day' && series.length > 10 ? (
+            // Too many days for a label each: the first and the last, with their month ("6 Oct", "3 Nov").
+            <View style={styles.memEnds}>
+              {[series[0].key, series[series.length - 1].key].map((key) => (
+                <ChromeText key={key} style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1}>
+                  {formatDate(new Date(`${key}T00:00:00Z`), { day: 'numeric', month: 'short', timeZone: 'UTC' })}
+                </ChromeText>
+              ))}
+            </View>
+          ) : (
+            <View style={[styles.monthLabels, { gap: series.length > 14 ? 2 : 6 }]}>
+              {series.map((x, i) => (
+                <ChromeText
+                  key={x.key}
+                  style={[typeV2.meta, styles.monthLabel, { color: x.key === picked ? palette.text : palette.secondary, fontWeight: x.key === picked ? '600' : '400' }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
+                >
+                  {label(x.key, i)}
+                </ChromeText>
+              ))}
+            </View>
+          )}
+        </>
+      ) : null}
+      {picked ? (
+        <View style={styles.monthList} testID="insights-memorization-items">
+          {items.map((it, i) => (
+            <Tap
+              key={it.day}
+              onPress={onOpenDay ? () => onOpenDay(it.day) : undefined}
+              disabled={!onOpenDay}
+              accessibilityRole="button"
+              accessibilityLabel={`${spokenText(it.label)}, ${it.when}`}
+              accessibilityHint={t('activity.insights.opensDay')}
+              style={[styles.uncoveredRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }, i === 0 && styles.monthListFirst]}
+              testID={`insights-memorization-item-${it.day}`}
+            >
+              <View style={[styles.uncoveredMark, { backgroundColor: palette.bubble }]}>
+                <Ionicons name="leaf-outline" size={18} color={palette.text} />
+              </View>
+              <View style={styles.flex}>
+                <ChromeText style={[typeV2.name, { color: palette.text }]} numberOfLines={2} maxFontSizeMultiplier={1.4}>
+                  {it.label}
+                </ChromeText>
+                <ChromeText style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={1.4}>
+                  {it.when}
+                </ChromeText>
+              </View>
+              <Ionicons name={forwardIcon()} size={16} color={palette.secondary} />
+            </Tap>
+          ))}
+          {items.length === 0 ? (
+            <ChromeText style={[typeV2.meta, styles.none, { color: palette.secondary }]}>
+              {unit === 'month' ? t('activity.insights.nothingMemorizedIn', { month: monthName(picked) }) : t('activity.insights.nothingMemorizedOn', { day: dayAndMonth(picked) })}
+            </ChromeText>
+          ) : null}
+        </View>
+      ) : null}
+    </Section>
+  );
+}
+
+function MemorizationClassic({ data, onOpenDay, row, last }: { data: InsightsData; onOpenDay?: (day: string) => void } & AsRow) {
   const { palette } = useTheme();
   // A month's bar (i10): the figure becomes that month and its memorizations list under the bars;
   // the same bar again clears it.
@@ -1643,6 +1837,16 @@ const styles = StyleSheet.create({
   linkText: { flexShrink: 1 },
   outlinePill: { alignSelf: 'flex-start', minHeight: 36, borderRadius: 18, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 6, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   monthBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 72 + 21, marginTop: 10 },
+  // Memorization in Revisely Dev (MEM-10): the dots, Edit memorized pages, Month | Day, and the gradient bars.
+  memDots: { marginTop: 10 },
+  memEdit: { flexDirection: 'row', alignItems: 'center', gap: 16, minHeight: 52, paddingVertical: 12, marginTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
+  memUnits: { flexDirection: 'row', gap: 6, marginTop: 14 },
+  memBars: { flexDirection: 'row', alignItems: 'flex-end', height: 72 + 21, marginTop: 10 },
+  memCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
+  memBar: { alignSelf: 'stretch', borderRadius: 5 },
+  // A bar's value may be wider than a day's thin bar: it spills over its neighbours rather than being cut.
+  memValue: { width: 48, textAlign: 'center' },
+  memEnds: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
   monthCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
   monthValue: { fontWeight: '600', marginBottom: 3 },
   monthBar: { alignSelf: 'stretch', borderRadius: 5 },

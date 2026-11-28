@@ -87,6 +87,16 @@ export const activity = {
     seeAllByStrength: 'See all pages by strength',
     memorization: 'Memorization',
     memorizationDetail: 'Pages memorized each month',
+    /** Revisely Dev (MEM-10): the chart by day, its pills, the day picked, and the section's Edit row. */
+    memorizationDetailDays: 'Pages memorized each day',
+    byMonth: 'Month',
+    byDay: 'Day',
+    pagesOnDay_one: 'page on {{day}}',
+    pagesOnDay_other: 'pages on {{day}}',
+    dayPages_one: '{{day}}, {{count}} page',
+    dayPages_other: '{{day}}, {{count}} pages',
+    nothingMemorizedOn: 'Nothing memorized on {{day}}',
+    editMemorized: 'Edit memorized pages',
     /** After the month's number: "6 | pages in November". */
     pagesInMonth_one: 'page in {{month}}',
     pagesInMonth_other: 'pages in {{month}}',

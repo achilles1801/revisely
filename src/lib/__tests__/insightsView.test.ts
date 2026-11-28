@@ -6,6 +6,7 @@ import {
   hourRange,
   juzTiles,
   memorizationMonths,
+  memorizationSeries,
   minutesByHour,
   monthCount,
   monthLabel,
@@ -297,5 +298,34 @@ describe('formatPace', () => {
     expect(formatPace(6)).toBe('6');
     expect(formatPace(5.97)).toBe('6');
     expect(formatPace(12.4)).toBe('12');
+  });
+});
+
+describe('memorizationSeries (MEM-10): the chart from the first month or day memorized', () => {
+  const items = [
+    { day: '2026-09-14', pages: [600] },
+    { day: '2026-11-02', pages: [561, 562] },
+    { day: '2026-11-05', pages: [560] },
+  ];
+
+  it('by month: from the first month with a page, no empty months before it, up to this month', () => {
+    expect(memorizationSeries(items, '2026-11-27', 'month')).toEqual([
+      { key: '2026-09', pages: 1 },
+      { key: '2026-10', pages: 0 },
+      { key: '2026-11', pages: 3 },
+    ]);
+  });
+
+  it('by day: the 30 days up to today, from the first day with a page', () => {
+    const days = memorizationSeries(items, '2026-11-07', 'day');
+    expect(days.map((d) => d.key)).toEqual(['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07']);
+    expect(days.map((d) => d.pages)).toEqual([2, 0, 0, 1, 0, 0]);
+  });
+
+  it('a new account: only what it has, and nothing when nothing was memorized in the span', () => {
+    expect(memorizationSeries([{ day: '2026-11-27', pages: [1] }], '2026-11-27', 'month')).toEqual([{ key: '2026-11', pages: 1 }]);
+    expect(memorizationSeries([{ day: '2026-11-27', pages: [1] }], '2026-11-27', 'day')).toEqual([{ key: '2026-11-27', pages: 1 }]);
+    expect(memorizationSeries([], '2026-11-27', 'month')).toEqual([]);
+    expect(memorizationSeries([{ day: '2026-09-01', pages: [5] }], '2026-11-27', 'day')).toEqual([]);
   });
 });

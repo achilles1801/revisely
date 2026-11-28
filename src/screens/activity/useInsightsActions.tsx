@@ -67,6 +67,8 @@ export function useInsightsActions(bottomInset: number) {
     onSeeAllPages: () => navigation.navigate('PagesByStrength'),
     onOpenLastRevised: (sort?: 'waiting') => navigation.navigate('LastRevised', sort ? { sort } : undefined),
     onTurnOnSmartTracking: () => navigation.navigate('Settings', { section: 'revision' }),
+    // Memorization's "Edit memorized pages" (MEM-10, Revisely Dev): the memorized pages, ready to edit.
+    onEditMemorized: () => navigation.navigate('Memorization'),
   };
 
   const toast = (
