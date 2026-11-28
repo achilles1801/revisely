@@ -69,6 +69,9 @@ export const beginner = {
     voice: '{{voice}}, slowly, three times each',
     /** The translation under each ayah, credited as TRANS rules ask. */
     credit: 'Saheeh International',
+    /** Under the ayah while its meaning loads, and offline before its surah is on the phone (BEGIN-7). */
+    meaningLoading: 'Loading its meaning…',
+    meaningOffline: 'Its meaning shows once you’re online.',
     recite: 'I can recite it',
     loadFailed: 'Couldn’t load the ayahs.',
     learnedTitle: '{{surah}} is memorized',

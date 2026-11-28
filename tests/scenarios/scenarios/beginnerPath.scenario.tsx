@@ -8,7 +8,11 @@ import { setNow, setZone, ZONES } from '../harness/clock';
 import { newAccount, pagesRange } from '../harness/account';
 import { createAccountPartWay, memorizedOnServer } from '../harness/admin';
 import { getServerDoc, listServerDocs } from '../harness/serverDocs';
-import { installQuranEnc, resetQuranEnc, serveWhole } from '../harness/quranenc';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { holdFrom, installQuranEnc, releaseHeld, resetQuranEnc, serveWhole } from '../harness/quranenc';
+import { setPhoneFolder } from '../harness/fileSystem';
 import { Home, Onboarding, flatText, onboardingFlow } from '../harness/screens';
 import { Phone, type Booted, type OpenApp, ramadanIntroSeen, revoMomentSeen } from '../harness/phone';
 
@@ -358,7 +362,6 @@ describe('the beginner path (Revisely Dev)', () => {
   });
 
   it('[BEGIN-7] [BEGIN-8] Learn: an ayah at a time with its meaning, the three steps; I can recite it memorizes it, logs it, and names the next', async () => {
-    serveWhole('english_saheeh');
     const phone = await account([1], true);
     const app = await openHome(phone);
     // The app's own Qur'an text, as the phone reads it from its asset.
@@ -369,7 +372,8 @@ describe('the beginner path (Revisely Dev)', () => {
     expect(text(app, 'learn-hint')).toBe('Ayah 1 of 6 · Hear it three times, slowly.');
     expect(text(app, 'learn-arabic')).toMatch(/^قُلْ أَعُوذُ/);
     await app.until(() => has(app, 'learn-meaning'), 'its meaning');
-    expect(text(app, 'learn-meaning')).toBe('english_saheeh 114:1');
+    // QuranEnc's own Saheeh International (recorded, harness/quranenc).
+    expect(app.screen.getByTestId('learn-meaning').props.accessibilityLabel).toBe('Say, "I seek refuge in the Lord of mankind,');
     expect(text(app, 'learn-credit')).toBe('Saheeh International');
     expect(text(app, 'learn-voice')).toMatch(/Mu'allim, slowly, three times each$/);
     // The rest of the surah below, a tap going to it.
@@ -404,5 +408,64 @@ describe('the beginner path (Revisely Dev)', () => {
     await app.until(() => text(app, 'learn-next-name') === 'Al-Falaq', 'Learn next on Al-Falaq');
     expect(text(app, 'learn-next-learned')).toBe('2 of 38 learned');
     await app.close();
+  });
+
+  /** A meaning as one line (its accessibility label: the text with its footnote numbers raised in place). */
+  const meaning = (app: OpenApp, testID: string): string | null =>
+    app.screen.queryByTestId(testID, HIDDEN)?.props.accessibilityLabel ?? null;
+
+  /** The app's Qur'an text on this phone, as it reads it from its asset. */
+  function quranText(app: OpenApp): void {
+    const fixture = jest.requireActual<typeof import('../../../src/lib/recite/__fixtures__/quranWords')>('../../../src/lib/recite/__fixtures__/quranWords');
+    app.mods.require<typeof import('../../../src/lib/recite/quranWords')>('src/lib/recite/quranWords').setQuranWordsForTests(fixture.wordsData());
+  }
+
+  it('[BEGIN-7] every ayah has its meaning, footnotes and all: Al-Fatihah in QuranEnc’s own Saheeh International', async () => {
+    // Majd, Nov 28 2026: "there's no translation for some of these verses" (Al-Fatihah's first, second and fourth, whose
+    // meanings carry footnotes).
+    const phone = await account([], true);
+    const app = await openHome(phone);
+    quranText(app);
+    await tap(app, 'today-cta');
+    await app.until(() => has(app, 'learn-meaning'), 'Al-Fatihah’s first meaning');
+    expect(meaning(app, 'learn-meaning')).toBe('In the name of Allāh,² the Entirely Merciful, the Especially Merciful.³');
+    expect(text(app, 'learn-meaning-footnotes')).toMatch(/^² Allāh is a proper name/);
+    // The rest of the surah below, each with its meaning: the second and fourth too.
+    expect(meaning(app, 'learn-ayah-2-meaning')).toBe('[All] praise is [due] to Allāh, Lord⁴ of the worlds -');
+    expect(meaning(app, 'learn-ayah-4-meaning')).toBe('Sovereign of the Day of Recompense.⁵');
+    for (const n of [3, 5, 6, 7]) expect(meaning(app, `learn-ayah-${n}-meaning`)).toBeTruthy();
+    // Each ayah in turn, as the one shown.
+    for (let n = 2; n <= 7; n++) {
+      await tap(app, 'learn-next-ayah');
+      expect(text(app, 'learn-hint')).toMatch(new RegExp(`^Ayah ${n} of 7`));
+      expect((meaning(app, 'learn-meaning') ?? '').length).toBeGreaterThan(10);
+    }
+    await app.close();
+  });
+
+  it('[BEGIN-7] a meaning still loading says so, and offline before its surah is on the phone, says when it shows', async () => {
+    // A phone that has never read Saheeh International.
+    setPhoneFolder(fs.mkdtempSync(path.join(os.tmpdir(), 'revisely-phone-')));
+    const phone = await account([], true);
+    const app = await openHome(phone);
+    quranText(app);
+    holdFrom('english_saheeh', 1);
+    await tap(app, 'today-cta');
+    await app.until(() => has(app, 'learn-meaning-loading'), 'the loading line');
+    expect(text(app, 'learn-meaning-loading')).toBe('Loading its meaning…');
+    releaseHeld();
+    await app.until(() => has(app, 'learn-meaning'), 'the meaning, once it arrives');
+    await app.close();
+
+    // Offline, on a phone that never read it.
+    setPhoneFolder(fs.mkdtempSync(path.join(os.tmpdir(), 'revisely-phone-')));
+    const offline = await account([], true);
+    const again = await openHome(offline);
+    quranText(again);
+    await offline.goOffline();
+    await tap(again, 'today-cta');
+    await again.until(() => has(again, 'learn-meaning-offline'), 'the offline line');
+    expect(text(again, 'learn-meaning-offline')).toBe('Its meaning shows once you’re online.');
+    await again.close();
   });
 });

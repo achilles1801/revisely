@@ -77,6 +77,8 @@ export const beginner: NonNullable<ArStrings['beginner']> = {
     nextAyah: 'الآية التالية',
     voice: '{{voice}}، على مهل، ثلاث مرات لكل آية',
     credit: 'صحيح إنترناشونال',
+    meaningLoading: 'جارٍ تحميل معناها…',
+    meaningOffline: 'يظهر معناها عند الاتصال بالإنترنت.',
     recite: 'أستطيع تلاوتها',
     loadFailed: 'تعذّر تحميل الآيات.',
     learnedTitle: 'حفظت سورة {{surah}}',
