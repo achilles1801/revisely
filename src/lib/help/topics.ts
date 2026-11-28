@@ -45,7 +45,7 @@ export type HelpScreen =
  * sessions, on a phone and print that have it) or only without it, only where Insights has Gaps and Last revised
  * (`devApp`: gapsInsightsEnabled, everyone's from 1.0.5), or only where Activity's sections can be arranged.
  */
-export type HelpWhen = 'smartTracking' | 'noSmartTracking' | 'liveRecite' | 'noLiveRecite' | 'devApp' | 'sections';
+export type HelpWhen = 'smartTracking' | 'noSmartTracking' | 'liveRecite' | 'noLiveRecite' | 'devApp' | 'sections' | 'oneTab' | 'twoTabs';
 
 /** What decides which topics an account sees (HELP-3). */
 export interface HelpOpts {
@@ -53,6 +53,8 @@ export interface HelpOpts {
   liveRecite?: boolean;
   devApp?: boolean;
   sections?: boolean;
+  /** Activity as one tab (ACT-35): its sections' own pages, Consistency's as ACT-43 draws it. */
+  oneTab?: boolean;
 }
 
 /** Why a Recite topic has no rule to cover: RECITE-1 to RECITE-8 (BEHAVIOUR.md) don't describe that part of it yet. */
@@ -515,6 +517,16 @@ export const HELP: Readonly<Record<HelpScreen, HelpEntry>> = {
         title: 'Consistency',
         text: 'The days you revised or read, and the hours you usually do it. Tap a day’s circle to open that day.',
         covers: ['ACT-4', 'ACT-23'],
+        when: 'twoTabs',
+      },
+      {
+        // Consistency's own page on the one Activity tab (ACT-43): no day circles there.
+        id: 'insights.consistencyPage',
+        icon: 'ellipse-outline',
+        title: 'Consistency',
+        text: 'How steady you are: the days you revised, week by week, against the days before. Switch to Full cycles or Reading. Tap a week or an hour to see it.',
+        covers: ['ACT-43'],
+        when: 'oneTab',
       },
       {
         id: 'insights.weak',
@@ -643,6 +655,8 @@ export function topicsFor(screen: HelpScreen, opts: HelpOpts): HelpTopic[] {
     if (t.when === 'noLiveRecite') return opts.liveRecite !== true;
     if (t.when === 'devApp') return opts.devApp === true;
     if (t.when === 'sections') return opts.sections === true;
+    if (t.when === 'oneTab') return opts.oneTab === true;
+    if (t.when === 'twoTabs') return opts.oneTab !== true;
     return true;
   }).map(inLanguage);
 }

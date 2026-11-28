@@ -91,12 +91,13 @@ describe('the help names what the app has', () => {
 });
 
 describe('the help stays short and plain', () => {
-  // Every account's kind: Smart Tracking, Recite, Revisely Dev and arranging sections, each on or off.
+  // Every account's kind: Smart Tracking, Recite, Revisely Dev, arranging sections and Activity as one tab, each on or off.
   const accounts: HelpOpts[] = [];
   for (const smartTracking of [true, false])
     for (const liveRecite of [true, false])
       for (const devApp of [true, false])
-        for (const sections of [true, false]) accounts.push({ smartTracking, liveRecite, devApp, sections });
+        for (const sections of [true, false])
+          for (const oneTab of [true, false]) accounts.push({ smartTracking, liveRecite, devApp, sections, oneTab });
 
   it(`shows at most ${MAX_TOPICS} topics a sheet, for every kind of account; a screen's own sheet is never empty`, () => {
     for (const s of screens) {

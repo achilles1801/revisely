@@ -20,6 +20,7 @@ import {
 } from '../../lib/help/topics';
 import { reciteLiveForAccount } from '../../lib/reciteLive/availability';
 import { gapsInsightsEnabled } from '../../lib/insightsGaps';
+import { activityOneTabEnabled } from '../../lib/release/activityOneTab';
 import { activitySectionsEnabled } from '../../lib/activitySections';
 import { t } from '../../i18n';
 import { forwardIcon } from '../../i18n/direction';
@@ -118,6 +119,7 @@ export function HelpSheet({
     liveRecite: liveRecite ?? reciteLiveForAccount(user),
     devApp: gapsInsightsEnabled(user),
     sections: activitySectionsEnabled(user),
+    oneTab: activityOneTabEnabled(),
   };
   const topics = topicsFor(shown, opts);
   const links = linksFor(shown, opts);

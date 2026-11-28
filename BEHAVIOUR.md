@@ -1485,7 +1485,8 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   never an empty frame; the figure, its words and the pill side by side on an SE, each on its own line from 1.2× text, no
   word wrapped; a cycle's name and detail each one line, side by side when both fit, else the detail under the name. The page's
   row on the one tab (ACT-35) counts the days revised, as the page's first figure does, and its line is when they revise.
-  Elsewhere Consistency is as ACT-22 and ACT-23 say (the store app's two tabs).
+  Its help topic (the ?) describes this page, with no day circles. Elsewhere Consistency is as ACT-22 and ACT-23 say (the
+  store app's two tabs), and so is its help.
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
   strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
   stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,
