@@ -98,8 +98,9 @@ essentially it SHOULD be beginner path, middle path (what we have now), and hafz
   memorized page by its ayahs' share, the first two pages as half pages), none once today is done or on a rest day. Under
   it, "Learned another surah? Add it" opens Your surahs.
 - **BEGIN-4.** (Revisely Dev) Today's ayah on a beginner's Home (HOME-7) keeps its meaning: Saheeh International's
-  English under the Arabic, in English, once that surah is on the phone (an ayah with a footnote shows the Arabic alone),
-  then "Al-Qamar 54:17 · Saheeh International". Everyone else's stays the one quiet line.
+  English under the Arabic, in English, once that surah is on the phone, exactly as given (TRANS-1: a footnote's number
+  raised and the footnote under it), then "Al-Qamar 54:17 · Saheeh International". Everyone else's stays the one quiet
+  line. (Before: an ayah with a footnote showed the Arabic alone.)
 - **BEGIN-5.** (Revisely Dev) Your surahs lists the beginner path's surahs, those already memorized ticked and fixed.
   Ticking others shows "Save N surahs", which asks "When did you memorize these?": Today memorizes them by the ayah and
   logs them on today (the day's Memorized block), Before memorizes them without a log. They come into the revision
@@ -110,7 +111,11 @@ essentially it SHOULD be beginner path, middle path (what we have now), and hafz
   goes. An account on today's path never has it.
 - **BEGIN-7.** (Revisely Dev) Learn shows a surah one ayah at a time ("Ayah 1 of 3"): the Arabic in the mushaf's script
   (the app's own text, on the phone), its meaning under it (Saheeh International, in English), the rest of the surah
-  quieter below, a tap on one going to it. "Listen" plays the ayah three times at 0.75× in Al-Husary's Mu'allim
+  quieter below, a tap on one going to it. Every ayah has its meaning, exactly as given (TRANS-1: a footnote's number
+  raised, the footnote under it); while it loads the ayah says "Loading its meaning…", and offline before its surah is on
+  the phone "Its meaning shows once you're online", never nothing. (Before: an ayah whose meaning has a footnote showed
+  none: Al-Fatihah's first, second and fourth, and 161 of the path's 571; Majd, Nov 28 2026: "there's no translation for
+  some of these verses".) "Listen" plays the ayah three times at 0.75× in Al-Husary's Mu'allim
   recitation, "Repeat" the same with a pause as long as it after each play, and "Without looking" hides the ayahs until
   "Show the ayah". Another ayah or step stops what was playing, and leaving gives the player back as it was (the reader's
   Audio Options and reciter).

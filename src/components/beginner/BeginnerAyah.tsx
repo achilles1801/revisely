@@ -8,6 +8,8 @@ import { getSaheehVerse, peekSaheehVerse, type SaheehVerse } from '../../lib/sah
 import { pageOfVerse } from '../../lib/verses';
 import { arabicFullV2, typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
+import { meaningOf, meaningText } from '../../lib/beginner/learn';
+import { MeaningText } from './MeaningText';
 
 /** The Arabic's size: as today's ayah's, small (HOME-7). It grows with Dynamic Type, as reading text does. */
 const ARABIC_SIZE = 16;
@@ -16,9 +18,9 @@ const SIDE = 72;
 
 /**
  * Today's ayah on a beginner's Home (BEGIN-4, Revisely Dev): HOME-7's ayah, with its meaning under it for someone who
- * can't read the Arabic yet. Saheeh International's English, in English, once that surah is on the phone (never changed:
- * an ayah with a footnote shows the Arabic alone), then where it is. Everyone else's Home keeps the one quiet line
- * (HomeAyah). A tap opens its page with the ayah highlighted, as HOME-7's does.
+ * can't read the Arabic yet. Saheeh International's English, in English, once that surah is on the phone (exactly as
+ * given: a footnote's number raised and the footnote under it, TRANS-1), then where it is. Everyone else's Home keeps the
+ * one quiet line (HomeAyah). A tap opens its page with the ayah highlighted, as HOME-7's does.
  */
 export function BeginnerAyah({
   day,
@@ -47,7 +49,9 @@ export function BeginnerAyah({
     };
   }, [english, sura, ayah]);
 
-  const translation = english && verse && !verse.footnotes.trim() ? verse.text.trim() : null;
+  // Every ayah's, its footnotes with it (TRANS-1). (Before: one with a footnote showed the Arabic alone.)
+  const meaning = english ? meaningOf(verse) : null;
+  const translation = meaning ? meaningText(meaning) : null;
   const place = t('home.ayah.place', { surah: surahNameIn(sura), sura, ayah });
 
   return (
@@ -66,10 +70,8 @@ export function BeginnerAyah({
       >
         {arabic}
       </Text>
-      {translation ? (
-        <Text style={[typeV2.meta, styles.center, styles.translation, { color: palette.text }]} testID="home-ayah-translation">
-          {translation}
-        </Text>
+      {meaning ? (
+        <MeaningText meaning={meaning} style={[typeV2.meta, styles.center, styles.translation, { color: palette.text }]} testID="home-ayah-translation" />
       ) : null}
       <Text style={[typeV2.meta, styles.center, styles.reference, { color: palette.secondary }]} testID="home-ayah-reference">
         {translation ? t('beginner.ayah.withSaheeh', { place }) : place}

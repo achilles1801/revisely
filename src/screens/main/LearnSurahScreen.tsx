@@ -13,7 +13,8 @@ import { useHaptics } from '../../design/haptics';
 import { currentLanguage, t } from '../../i18n';
 import { backIcon, forwardIcon } from '../../i18n/direction';
 import { ayahCount } from '../../lib/ayahKeys';
-import { LEARN_STEPS, LEARN_VOICE, learnOptions, surahText, type LearnStep } from '../../lib/beginner/learn';
+import { LEARN_STEPS, LEARN_VOICE, learnOptions, meaningOf, surahText, type LearnStep, type Meaning } from '../../lib/beginner/learn';
+import { MeaningText } from '../../components/beginner/MeaningText';
 import { saveSurahAyahs } from '../../lib/beginner/save';
 import { BEGINNER_SURAHS, knownSurahs, nextSurahOnPath, surahChoiceChanges } from '../../lib/beginner/surahs';
 import { getRevisionDayForUser } from '../../lib/fajrBoundary';
@@ -34,24 +35,31 @@ const OWNER = 'learn-surah';
 const ARABIC = 28;
 const PLAY = 64;
 
-/** Saheeh International's English for each ayah, in English, as each arrives (null: none, or a footnote). */
-function useMeanings(sura: number, ayahs: number): (string | null)[] {
+/**
+ * Each ayah's meaning (BEGIN-7): Saheeh International's English, in English, every verse (its footnote numbers raised, its
+ * footnotes kept), "loading" until its surah is read from the phone or fetched, "offline" when it can't be (not on the
+ * phone and no connection), and null in another language (no English shown there).
+ */
+type MeaningState = Meaning | 'loading' | 'offline' | null;
+
+function useMeanings(sura: number, ayahs: number): MeaningState[] {
   const english = currentLanguage() === 'en';
   const read = useCallback(
-    () =>
+    (failed: boolean): MeaningState[] =>
       Array.from({ length: ayahs }, (_, i) => {
-        const v = english ? peekSaheehVerse(sura, i + 1) : null;
-        return v && !v.footnotes.trim() ? v.text.trim() : null;
+        if (!english) return null;
+        return meaningOf(peekSaheehVerse(sura, i + 1)) ?? (failed ? 'offline' : 'loading');
       }),
     [english, sura, ayahs],
   );
-  const [meanings, setMeanings] = useState(read);
+  const [meanings, setMeanings] = useState(() => read(false));
   useEffect(() => {
     if (!english) return undefined;
     let live = true;
-    Promise.all(Array.from({ length: ayahs }, (_, i) => getSaheehVerse(sura, i + 1).catch(() => null)))
-      .then(() => {
-        if (live) setMeanings(read());
+    setMeanings(read(false));
+    Promise.all(Array.from({ length: ayahs }, (_, i) => getSaheehVerse(sura, i + 1).then(() => true, () => false)))
+      .then((got) => {
+        if (live) setMeanings(read(got.some((ok) => !ok)));
       })
       .catch(() => undefined);
     return () => {
@@ -60,6 +68,7 @@ function useMeanings(sura: number, ayahs: number): (string | null)[] {
   }, [english, sura, ayahs, read]);
   return meanings;
 }
+
 
 /**
  * Learn (BEGIN-7, Revisely Dev), from a beginner's Home: a surah one ayah at a time. Listen plays the ayah three times,
@@ -163,6 +172,7 @@ export default function LearnSurahScreen() {
 
   const hint = step === 'listen' ? t('beginner.learn.listenHint') : step === 'repeat' ? t('beginner.learn.repeatHint') : t('beginner.learn.recallHint');
   const hidden = step === 'recall' && !shown;
+  const current = meanings[index];
   const ayahs = Array.isArray(text) ? text : null;
 
   return (
@@ -197,11 +207,18 @@ export default function LearnSurahScreen() {
               >
                 {ayahs?.[index]}
               </Text>
-              {meanings[index] ? (
+              {current === 'loading' || current === 'offline' ? (
+                // Never a silent blank: while it loads, or offline before its surah is on the phone, it says so.
+                <Text style={[typeV2.meta, styles.center, styles.meaning, { color: palette.secondary }]} testID={`learn-meaning-${current}`}>
+                  {current === 'loading' ? t('beginner.learn.meaningLoading') : t('beginner.learn.meaningOffline')}
+                </Text>
+              ) : current ? (
                 <>
-                  <Text style={[typeV2.menu, styles.center, styles.meaning, { color: palette.text }]} testID="learn-meaning">
-                    {meanings[index]}
-                  </Text>
+                  <MeaningText
+                    meaning={current}
+                    style={[typeV2.menu, styles.center, styles.meaning, { color: palette.text }]}
+                    testID="learn-meaning"
+                  />
                   <Text style={[typeV2.meta, styles.center, { color: palette.secondary }]} maxFontSizeMultiplier={1.6} testID="learn-credit">
                     {t('beginner.learn.credit')}
                   </Text>
@@ -256,8 +273,12 @@ export default function LearnSurahScreen() {
                   <Text style={[arabicFullV2(20), styles.center, { color: palette.secondary, writingDirection: 'rtl' }]} accessibilityLanguage="ar">
                     {step === 'recall' ? '' : arabic}
                   </Text>
-                  {meanings[i] && step !== 'recall' ? (
-                    <Text style={[typeV2.body, styles.center, { color: palette.secondary }]}>{meanings[i]}</Text>
+                  {step !== 'recall' && meanings[i] && typeof meanings[i] === 'object' ? (
+                    <MeaningText
+                      meaning={meanings[i] as Meaning}
+                      style={[typeV2.body, styles.center, { color: palette.secondary }]}
+                      testID={`learn-ayah-${i + 1}-meaning`}
+                    />
                   ) : null}
                 </Tap>
               ),
