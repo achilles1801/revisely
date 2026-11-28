@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-11-27T21:28:10.239Z",
+  "recordedAt": "2026-11-28T00:23:53.331Z",
   "how": "functions/scripts/record-anthropic.js",
   "request": {
     "model": "claude-sonnet-5-5",
@@ -7,19 +7,19 @@
     "thinking": {
       "type": "between_tools"
     },
-    "systemSha256": "d5881c7ba17322e3945634145ac06333f402f98549be3d5b10b9856ad172c9ea",
+    "systemSha256": "2e88b33a8282cd61cbd97562385201b5177228608b7299882bee9a05b6bc8738",
     "outputSchemaSha256": "ca725b35345fa9d4316a6e08e45b7f3a3c7c7833def4ea0b669b4c4d39dfba1e"
   },
   "status": 200,
   "body": {
     "model": "claude-sonnet-5-5",
-    "id": "msg_011ChU9DL3foHVzWBxZJvDRn",
+    "id": "msg_011ChUNcgdKgE3oM2Fq4PvkL",
     "type": "message",
     "role": "assistant",
     "content": [
       {
         "type": "text",
-        "text": "{\"text\":\"You've kept to your plan on four of the last six days, and revised most of every day, even Thursday with 9 of 10 pages. Saturday was the only day missed, and yesterday's whole plan keeps your streak going.\",\"chart\":{\"kind\":\"weeks\",\"title\":\"Your last weeks, day by day\",\"weeks\":4},\"textAfter\":\"Today still has 6 pages to go, starting from Al-Infitar.\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"6 pages left, from Al-Infitar to Al-Ghashiyah\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Why do I keep missing Saturdays?\",\"Which pages are weakest?\",\"How is my streak?\"]}"
+        "text": "{\"text\":\"You revised on every day this week but Saturday, finishing the whole plan on four of them. Today is 4 of 10 pages in, so six pages remain; Al-Infitar to Al-Ghashiyah is next.\",\"chart\":{\"kind\":\"dailyPages\",\"title\":\"Pages revised, last 7 days\",\"days\":7},\"textAfter\":\"Tonight, pick up where today left off:\",\"action\":{\"kind\":\"startRevision\",\"title\":\"Continue today's revision\",\"detail\":\"6 pages left, starting at Al-Infitar\"},\"remember\":[],\"title\":\"How my week went\",\"chips\":[\"Which pages are weakest?\",\"Why did I miss Saturday?\",\"How is my month?\"]}"
       }
     ],
     "container": null,
@@ -28,13 +28,13 @@
     "stop_details": null,
     "usage": {
       "input_tokens": 551,
-      "cache_creation_input_tokens": 19801,
+      "cache_creation_input_tokens": 19799,
       "cache_read_input_tokens": 0,
       "cache_creation": {
-        "ephemeral_5m_input_tokens": 19801,
+        "ephemeral_5m_input_tokens": 19799,
         "ephemeral_1h_input_tokens": 0
       },
-      "output_tokens": 248,
+      "output_tokens": 226,
       "output_tokens_details": {
         "thinking_tokens": 0
       },

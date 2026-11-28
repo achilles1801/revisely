@@ -149,12 +149,12 @@ describe('Start day at fajr in the new design', () => {
 });
 
 describe('the Friday Al-Kahf card in the new design', () => {
-  it('is the feed post: no card, Read solid, Mark as read an outline pill', async () => {
+  it('is one quiet row: Read ends its grey line, a ring marks it read, no buttons (HOME-5)', async () => {
     const onRead = jest.fn();
     await renderV2(<KahfPost state="prompt" onRead={onRead} onMarkRead={jest.fn()} onDismiss={jest.fn()} />);
     expect(screen.getByTestId('kahf-post')).toBeTruthy();
-    expect(flat(screen.getByTestId('kahf-read').props.style).backgroundColor).toBe(palette.primary);
-    expect(flat(screen.getByTestId('kahf-mark').props.style)).toMatchObject({ borderWidth: 1 });
+    expect(flat(screen.getByTestId('kahf-read').props.style).backgroundColor).toBeUndefined();
+    expect(flat(screen.getByTestId('kahf-mark').props.style)).toMatchObject({ borderWidth: 1.5 });
     expect(flat(screen.getByTestId('kahf-mark').props.style).backgroundColor).toBeUndefined();
     fireEvent.press(screen.getByTestId('kahf-read'));
     expect(onRead).toHaveBeenCalled();
