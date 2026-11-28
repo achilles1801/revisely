@@ -93,7 +93,7 @@ import {
   weeksGrid,
   type InsightsRange,
 } from '../../lib/insightsRange';
-import { t, weekdayLetters, formatNumeral, formatPercentage, formatNumber } from '../../i18n';
+import { t, weekdayLetters, formatNumeral, formatPercentage, formatNumber, formatDate } from '../../i18n';
 import { chevron, forwardIcon } from '../../i18n/direction';
 
 /** Consistency's weeks grid: the gap between cells, and the largest a cell gets (3 months on a wide phone). */
@@ -1443,7 +1443,7 @@ function MemorizationUpgraded({ data, onOpenDay, onEditMemorized }: { data: Insi
                   testID={`insights-memorization-bar-${x.key}`}
                 >
                   {x.pages > 0 && (few || on) ? (
-                    <ChromeText style={[typeV2.meta, styles.monthValue, { color: on ? palette.text : palette.secondary }]} numberOfLines={1}>
+                    <ChromeText style={[typeV2.meta, styles.monthValue, styles.memValue, { color: on ? palette.text : palette.secondary }]} numberOfLines={1}>
                       {`+${formatNumber(x.pages)}`}
                     </ChromeText>
                   ) : null}
@@ -1452,19 +1452,30 @@ function MemorizationUpgraded({ data, onOpenDay, onEditMemorized }: { data: Insi
               );
             })}
           </View>
-          <View style={[styles.monthLabels, { gap: series.length > 14 ? 2 : 6 }]}>
-            {series.map((x, i) => (
-              <ChromeText
-                key={x.key}
-                style={[typeV2.meta, styles.monthLabel, { color: x.key === picked ? palette.text : palette.secondary, fontWeight: x.key === picked ? '600' : '400' }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.6}
-              >
-                {label(x.key, i)}
-              </ChromeText>
-            ))}
-          </View>
+          {unit === 'day' && series.length > 10 ? (
+            // Too many days for a label each: the first and the last, with their month ("6 Oct", "3 Nov").
+            <View style={styles.memEnds}>
+              {[series[0].key, series[series.length - 1].key].map((key) => (
+                <ChromeText key={key} style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1}>
+                  {formatDate(new Date(`${key}T00:00:00Z`), { day: 'numeric', month: 'short', timeZone: 'UTC' })}
+                </ChromeText>
+              ))}
+            </View>
+          ) : (
+            <View style={[styles.monthLabels, { gap: series.length > 14 ? 2 : 6 }]}>
+              {series.map((x, i) => (
+                <ChromeText
+                  key={x.key}
+                  style={[typeV2.meta, styles.monthLabel, { color: x.key === picked ? palette.text : palette.secondary, fontWeight: x.key === picked ? '600' : '400' }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
+                >
+                  {label(x.key, i)}
+                </ChromeText>
+              ))}
+            </View>
+          )}
         </>
       ) : null}
       {picked ? (
@@ -1832,6 +1843,9 @@ const styles = StyleSheet.create({
   memBars: { flexDirection: 'row', alignItems: 'flex-end', height: 72 + 21, marginTop: 10 },
   memCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
   memBar: { alignSelf: 'stretch', borderRadius: 5 },
+  // A bar's value may be wider than a day's thin bar: it spills over its neighbours rather than being cut.
+  memValue: { width: 48, textAlign: 'center' },
+  memEnds: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
   monthCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
   monthValue: { fontWeight: '600', marginBottom: 3 },
   monthBar: { alignSelf: 'stretch', borderRadius: 5 },
