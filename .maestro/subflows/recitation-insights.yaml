@@ -1,5 +1,6 @@
-# From Home: Activity → Insights at 30 days, scrolled to the Recitation section (RINS-2). Screenshots <NAME> (its top)
-# and <NAME>-end (its last line). Stays on Insights.
+# From Home: Activity → Insights at 30 days, scrolled to the Recitation section (ACT-44, RINS-2). Screenshots <NAME> (its
+# trend and chart), then See all opened (the passages, the similar ayahs and, with Smart Tracking, those rated strong) and
+# <NAME>-end (Your takes, its last line). Stays on Insights.
 #   env NAME
 appId: com.revisionbuddy.app
 ---
@@ -34,15 +35,35 @@ appId: com.revisionbuddy.app
     direction: DOWN
     centerElement: true
     timeout: 45000
-- assertVisible:
-    id: insights-recitation-slip-78-9
+# The trend above the range pills, and the chart under them.
+- scrollUntilVisible:
+    element:
+      id: insights-recitation-span-pills
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
 - runFlow:
     file: shot.yaml
     env:
       NAME: ${NAME}
+# The passage that slips most, under Fixed and still slipping.
 - scrollUntilVisible:
     element:
-      id: insights-recitation-quiet
+      id: insights-recitation-slip-78-9
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: insights-recitation-see-all
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: insights-recitation-see-all
+- scrollUntilVisible:
+    element:
+      id: insights-recitation-takes
     direction: DOWN
     centerElement: true
     timeout: 20000

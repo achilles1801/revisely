@@ -7,7 +7,7 @@
 # Then Insights' Recitation section (Revisely Dev, RINS-2) for an account that recites: takes kept by Recite's memory
 # (scripts/seed-recite-takes.js: An-Naba 1–16 slipping at ayahs 9 and 14, Al-Infitar 14 going on with Al-Mutaffifin
 # 23, Al-Falaq 3 ended as ayah 5 ends, then cleared), the Dev UI on with `e2e/recite-live`. Screenshots
-# 09-activity-recitation-*: the section's top and end, Smart Tracking on in light and dark, then off in dark (no strength:
+# 09-activity-recitation-*: the page's trend and chart, then its end with See all open, Smart Tracking on in light and dark, then off in dark (no strength:
 # rows say when a passage was last recited). Its rules: RecitationInsights.test.tsx and reciteInsights.property.ts.
 # It was at the end of 09-insights-history, which it took past iOS's 20 minutes (#663's run 43842097868); here it sits
 # beside what Revo makes of the same takes.
@@ -101,8 +101,12 @@ appId: com.revisionbuddy.app
     file: ../subflows/recitation-insights.yaml
     env:
       NAME: 09-activity-recitation-light
-- assertVisible:
-    id: insights-recitation-strong-82-14
+# See all lists the passages rated strong that still slip (Smart Tracking on), above Your takes.
+- scrollUntilVisible:
+    element:
+      id: insights-recitation-strong-82-14
+    direction: UP
+    timeout: 20000
 - runFlow: ../subflows/back-home.yaml
 - runFlow:
     file: ../subflows/theme.yaml

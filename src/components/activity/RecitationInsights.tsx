@@ -1,8 +1,15 @@
-// Insights' Recitation section (Revisely Dev, RINS-2): what the takes with Mark mistakes show over Insights' range. The
-// score and its weeks, the passages that keep slipping (their words still marked, on their highlights; a tap opens the
-// reader there, where the marks show), the similar ayahs gone on with, and one quiet line of words cleared and the
-// kinds, words first. Smart Tracking on adds "Rated strong, but slips"; off, nothing about strength (rows say when the
-// passage was last recited). Board: ~/Documents/revisely-recite-mocks/insights/board-insights-v1.png.
+// Insights' Recitation (Revisely Dev): as a row on the one Activity tab (ACT-35), and as its own page from its point (ACT-44;
+// Majd, Nov 27 2026: "the point of the graph is to illustrate a users trend in making mistakes categorized by the type of
+// mistake and also taking into account other metrics that are USEFUL like knowing what mistakes has the user corrected and
+// doesn't make anymore and which are still slipping all the time and maybe even length of recitations etc ... we always
+// need to keep in mind, what is the POINT or benefit of this screen"). The point: "Am I getting better at reciting from
+// memory, and what do I still need to fix?" Board: ~/Documents/revisely-today-mocks/insights-v2/board-recitation.png.
+//   - Mistakes a page over Insights' range, with its trend against the period before (Apple Fitness's Trends).
+//   - Mistakes by kind week by week (a year: month by month), on Insights' one chart (TapChart, ACT-41): a tap on a week
+//     sets the line above it, a tap on a kind shows it alone.
+//   - The words fixed (said right on 2 days) against those still slipping, the share fixed, the worst passage and "See
+//     all", which also lists the similar ayahs gone on with and, with Smart Tracking, passages rated strong that slip.
+//   - Your takes: how long they usually are, the longest, and whether long takes go better than short ones.
 
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -21,42 +28,75 @@ import { formatAccuracy } from '../../lib/reciteLive/score';
 import type { QuranWords } from '../../lib/recite/quranWords';
 import type { MemoryRecord } from '../../lib/reciteMemory/record';
 import { recitationInsights, type SlippingPassage } from '../../lib/reciteInsights/insights';
+import { passageName, scoreLine, similarNote, similarTitle, slipNote, strongNote } from '../../lib/reciteInsights/describe';
 import {
-  clearedLine,
-  kindsLine,
-  passageName,
-  perPageLine,
-  scoreLine,
-  similarNote,
-  similarTitle,
-  slipNote,
-  strongNote,
-  weekLabel,
-  weeksSpoken,
-  weeksTakeaway,
-  weeksToDraw,
-} from '../../lib/reciteInsights/describe';
+  CHART_SPANS,
+  fixedAndSlipping,
+  KINDS,
+  kindBars,
+  perPage,
+  rangeTrend,
+  spanForRange,
+  takeLengths,
+  type ChartSpan,
+  type KindKey,
+} from '../../lib/reciteInsights/trend';
+import {
+  barLabel,
+  barLine,
+  barSpoken,
+  barValue,
+  chartTitle,
+  fixedTile,
+  heroLine,
+  kindName,
+  perPageText,
+  shareLine,
+  slippingTile,
+  spanIn,
+  spanLabel,
+  takesLine,
+  takesTitle,
+  trendChip,
+} from '../../lib/reciteInsights/trendWords';
 import { markFill } from '../reciteLive/markColours';
 import { WordChip } from '../reciteLive/WordChip';
+import { ChartPills, TapChart, type ChartBar } from './TapChart';
+import { InsightCard, InsightHero } from './InsightPageParts';
 import { useFirstSection, useSectionAlone } from './sectionPlace';
-import { t } from '../../i18n';
-import { chevron, forwardIcon } from '../../i18n/direction';
+import { formatNumber, t } from '../../i18n';
+import { forwardIcon } from '../../i18n/direction';
+import type { RangeSpan } from '../../lib/insightsRange';
 
-/** Rows shown before "See all". */
-const FIRST_ROWS = 3;
-/** Words shown on a row's highlights. */
+/**
+ * The page's figures' sizes, for the fit checks (tests/scenarios/properties/recitationPage.property.ts): the hero's are
+ * Insights' pages' hero's (InsightPageParts `InsightHero`), the tiles' this page's own.
+ */
+export const PAGE_TYPE = { figure: 34, unit: 17, tileFigure: 28 } as const;
+
+/**
+ * Whether the two tiles stack: from the text size where Insights stacks its figures, or with a figure of 1,000 or more on
+ * a phone under 400 pt wide (an SE's tile holds about four characters at that size), or of 100,000 anywhere.
+ */
+export function tilesStack(longestChars: number, width: number, fontScale: number): boolean {
+  return fontScale >= STACK_AT_SCALE || longestChars >= (width < 400 ? 5 : 7);
+}
+
+/** Words shown on a passage's highlights. */
 const MAX_CHIPS = 6;
 /** A strong rating (Smart Tracking: 4 or 5). */
 const STRONG = 4;
 
 export interface RecitationInsightsProps {
   records: readonly MemoryRecord[];
-  /** The word data, for the words' Arabic on their highlights (none until loaded). */
+  /** The word data: the words' Arabic on their highlights, and each take's pages (an average page's words until loaded). */
   words: QuranWords | null;
   today: string;
   /** Insights' range (ACT-22): its days, and in words ("in 30 days"). */
   window: number;
   inWords: string;
+  /** The range's other words (lib/insightsRange `rangeSpan`): "last 30 days", "in the last 30 days", the period before. */
+  span?: Pick<RangeSpan, 'lastWords' | 'inTheLast' | 'before' | 'all'>;
   smartTracking: boolean;
   /** A page's rating (Smart Tracking on), for "Rated strong, but slips". */
   rating: (page: number) => number | undefined;
@@ -69,25 +109,10 @@ export interface RecitationInsightsProps {
   last?: boolean;
 }
 
-export function RecitationInsights({ records, words, today, window, inWords, smartTracking, rating, revo, onOpenAyahs, row, last }: RecitationInsightsProps) {
-  const { palette } = useTheme();
-  // First on Insights (ACT-29): no hairline above it.
-  const first = useFirstSection();
-  const alone = useSectionAlone();
-  const [allSlipping, setAllSlipping] = useState(false);
-  const ins = useMemo(() => recitationInsights(records, today, window, words), [records, today, window, words]);
-  const strong = useMemo(
-    () => (smartTracking ? ins.slipping.filter((p) => (rating(pageOfVerse({ sura: p.sura, ayah: p.from })) ?? 0) >= STRONG) : []),
-    [smartTracking, ins.slipping, rating],
-  );
-  const slipping = allSlipping ? ins.slipping : ins.slipping.slice(0, FIRST_ROWS);
-  // The weeks are drawn once two had takes; their line then says how the score moved, and the figure gives the takes.
-  const weeksDrawn = ins.weeks.filter((w) => w.score !== null).length >= 2;
-  const quiet = [clearedLine(ins.cleared.length), ins.takes > 0 ? kindsLine(ins) : null].filter(Boolean) as string[];
-  // The long takes' mistakes a page, beside the % and in words (RECITE-24; Majd, Nov 22 2026: "we should aim to keep it
-  // clean"): one quiet line, only once the range has a take of 2 pages or more and the word data has loaded.
-  const perPage = perPageLine(ins.perPage);
-  if (row) {
+export function RecitationInsights(props: RecitationInsightsProps) {
+  const { records, today, window, inWords, row, last } = props;
+  const ins = useMemo(() => (row ? recitationInsights(records, today, window, null) : null), [row, records, today, window]);
+  if (row && ins) {
     return (
       <SectionRow
         title={t('activity.recitation.title')}
@@ -99,63 +124,207 @@ export function RecitationInsights({ records, words, today, window, inWords, sma
       />
     );
   }
+  return <RecitationPage {...props} />;
+}
+
+function RecitationPage({ records, words, today, window, inWords, span, smartTracking, rating, revo, onOpenAyahs }: RecitationInsightsProps) {
+  const { palette } = useTheme();
+  const { width, fontScale } = useWindowDimensions();
+  // First on Insights (ACT-29): no hairline above it.
+  const first = useFirstSection();
+  const alone = useSectionAlone();
+  const range = span ?? { lastWords: inWords, inTheLast: inWords, before: null, all: false };
+  const [chartSpan, setChartSpan] = useState<ChartSpan>(() => spanForRange(window, range.all));
+  // The bar picked: undefined until a tap (the chart opens on the newest week or month with takes, as its board does),
+  // null once a tap clears it (the newest lit).
+  const [chosen, setChosen] = useState<string | null | undefined>(undefined);
+  const [kindAlone, setKindAlone] = useState<KindKey | null>(null);
+  const [allPassages, setAllPassages] = useState(false);
+
+  const trend = useMemo(() => rangeTrend(records, today, window, range.all, words), [records, today, window, range.all, words]);
+  const bars = useMemo(() => kindBars(records, today, chartSpan, words), [records, today, chartSpan, words]);
+  const fromDay = useMemo(() => {
+    const d = new Date(`${today}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - (window - 1));
+    return d.toISOString().slice(0, 10);
+  }, [today, window]);
+  const fixed = useMemo(() => fixedAndSlipping(records, fromDay, today), [records, fromDay, today]);
+  const lengths = useMemo(() => takeLengths(records, today, window, words), [records, today, window, words]);
+  const ins = useMemo(() => recitationInsights(records, today, window, words), [records, today, window, words]);
+  const strong = useMemo(
+    () => (smartTracking ? ins.slipping.filter((p) => (rating(pageOfVerse({ sura: p.sura, ayah: p.from })) ?? 0) >= STRONG) : []),
+    [smartTracking, ins.slipping, rating],
+  );
+
+  const colours: Record<KindKey, string> = { words: palette.red, hesitations: palette.markWordFirm, slips: palette.markSlipFirm };
+  const kinds = kindAlone ? [kindAlone] : KINDS;
+  const chartBars: ChartBar[] = bars.map((b, i) => {
+    const lastBar = i === bars.length - 1;
+    const v = barValue(b, kindAlone);
+    return {
+      key: b.key,
+      value: v ?? 0,
+      parts: b.pages > 0 ? kinds.map((k) => b.kinds[k] / b.pages) : undefined,
+      valueText: v !== null && v > 0 ? perPageText(v) : undefined,
+      label: barLabel(b, lastBar),
+      spoken: barSpoken(b, lastBar, kindAlone),
+    };
+  });
+  const anyTakes = bars.some((b) => b.takes > 0);
+  const anyMistakes = chartBars.some((b) => b.value > 0);
+  const newestWithTakes = [...bars].reverse().find((b) => b.takes > 0);
+  const opening = newestWithTakes && newestWithTakes !== bars[bars.length - 1] ? newestWithTakes.key : null;
+  const picked = chosen === undefined ? opening : chosen;
+  const pickedAt = picked ? bars.findIndex((b) => b.key === picked) : -1;
+  const litAt = pickedAt >= 0 ? pickedAt : bars.length - 1;
+
+  const rate = perPage(trend.now);
+  const chip = trendChip(trend.now, trend.before, range.before);
+  const line = heroLine(trend.takes, trend.score !== null ? formatAccuracy(trend.score) : null, range.lastWords, chip ? range.before : null);
+  const slipping = allPassages ? ins.slipping : ins.slipping.slice(0, 1);
+  const total = fixed.fixed + fixed.slipping;
+
   return (
     <View style={[styles.section, !first && !alone && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]} testID="insights-recitation">
-      <View style={styles.head}>
-        {/* Alone on its own page (ACT-35): the top bar names it. */}
-        {alone ? (
-          <View style={styles.flex} />
-        ) : (
-        <View style={styles.flex}>
-          <ChromeText style={[styles.title, { color: palette.text }]} accessibilityRole="header">
-            {t('activity.recitation.title')}
-          </ChromeText>
-          <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{t('activity.recitation.detail', { span: inWords })}</ChromeText>
-        </View>
-        )}
-        {revo ? (
-          <Tap
-            onPress={() => openRevo({ attach: insightAttachment('recitation') })}
-            accessibilityRole="button"
-            accessibilityLabel={t('activity.recitation.askRevo')}
-            style={[styles.ask, { borderColor: palette.outline }]}
-            testID="insights-recitation-ask"
-          >
-            <Ionicons name="sparkles-outline" size={16} color={palette.accentText} />
-            <ChromeText style={[typeV2.name, { color: palette.text }]}>{t('activity.insights.ask')}</ChromeText>
-          </Tap>
-        ) : null}
-      </View>
-
-      <View style={styles.figure} testID="insights-recitation-figure">
-        {ins.score !== null ? (
-          <ChromeText style={[styles.big, { color: palette.text }]} numberOfLines={1}>
-            {formatAccuracy(ins.score)}
-          </ChromeText>
-        ) : null}
-        <ChromeText style={[typeV2.body, styles.flex, { color: palette.secondary }]}>{scoreLine(ins, inWords, !weeksDrawn)}</ChromeText>
-      </View>
-      {perPage ? (
-        <ChromeText style={[typeV2.meta, styles.perPage, { color: palette.secondary }]} testID="insights-recitation-per-page">
-          {perPage}
-        </ChromeText>
-      ) : null}
-      {weeksDrawn ? <WeekBars weeks={ins.weeks} /> : null}
-
-      {ins.slipping.length > 0 ? (
-        <>
-          <View style={styles.subHead}>
-            <ChromeText style={[typeV2.name, styles.flex, { color: palette.text }]} accessibilityRole="header">
-              {t('activity.recitation.keepsSlipping')}
-            </ChromeText>
-            {ins.slipping.length > FIRST_ROWS ? (
-              <Tap onPress={() => setAllSlipping((v) => !v)} accessibilityRole="button" hitSlop={8} testID="insights-recitation-see-all">
-                <ChromeText style={[typeV2.meta, styles.strong, { color: palette.text }]}>
-                  {allSlipping ? t('activity.recitation.showFewer') : `${t('activity.recitation.seeAll', { count: ins.slipping.length })} ${chevron()}`}
+      {!alone || revo ? (
+        <View style={styles.head}>
+          {/* Alone on its own page (ACT-35): the top bar names it. */}
+          <View style={styles.flex}>
+            {alone ? null : (
+              <>
+                <ChromeText style={[styles.title, { color: palette.text }]} accessibilityRole="header">
+                  {t('activity.recitation.title')}
                 </ChromeText>
-              </Tap>
-            ) : null}
+                <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{t('activity.recitation.detail', { span: inWords })}</ChromeText>
+              </>
+            )}
           </View>
+          {revo ? (
+            <Tap
+              onPress={() => openRevo({ attach: insightAttachment('recitation') })}
+              accessibilityRole="button"
+              accessibilityLabel={t('activity.recitation.askRevo')}
+              style={[styles.ask, { borderColor: palette.outline }]}
+              testID="insights-recitation-ask"
+            >
+              <Ionicons name="sparkles-outline" size={16} color={palette.accentText} />
+              <ChromeText style={[typeV2.name, { color: palette.text }]}>{t('activity.insights.ask')}</ChromeText>
+            </Tap>
+          ) : null}
+        </View>
+      ) : null}
+
+      {/* The trend first: mistakes a page in the range, against the period before (Insights' pages' hero). */}
+      <View testID="insights-recitation-figure">
+        {trend.takes > 0 && rate !== null ? (
+          <InsightHero value={perPageText(rate)} unit={t('reciteInsights.page.unit')} trend={chip} line={line} testID="insights-recitation-hero" />
+        ) : (
+          // No takes in the range; or takes kept without their final answer only (RECITE-11): no rate, the line alone.
+          <ChromeText
+            style={[trend.takes > 0 ? typeV2.meta : typeV2.body, styles.heroLine, { color: palette.secondary }]}
+            testID="insights-recitation-hero-line"
+          >
+            {trend.takes > 0 ? line : t('reciteInsights.noTakes', { when: inWords })}
+          </ChromeText>
+        )}
+      </View>
+
+      {/* Mistakes by kind, week by week. */}
+      <ChartPills
+        options={CHART_SPANS.map((k) => ({ key: k, label: spanLabel(k) }))}
+        value={chartSpan}
+        onChange={(k) => {
+          setChartSpan(k);
+          setChosen(undefined);
+        }}
+        testID="insights-recitation-span"
+      />
+      <InsightCard title={chartTitle(chartSpan)} hint={t('reciteInsights.page.aPage')} testID="insights-recitation-chart">
+        {anyTakes ? (
+          <>
+            <View style={styles.legend}>
+              {KINDS.map((k) => {
+                const on = kindAlone === k;
+                const dim = kindAlone !== null && !on;
+                return (
+                  <Tap
+                    key={k}
+                    onPress={() => setKindAlone(on ? null : k)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    style={[styles.kind, { borderColor: on ? palette.text : palette.outline, opacity: dim ? 0.5 : 1 }]}
+                    testID={`insights-recitation-kind-${k}`}
+                  >
+                    <View style={[styles.dot, { backgroundColor: colours[k] }]} />
+                    <ChromeText style={[typeV2.meta, styles.strong, { color: palette.text }]} numberOfLines={1}>
+                      {kindName(k)}
+                    </ChromeText>
+                  </Tap>
+                );
+              })}
+            </View>
+            <ChromeText style={[typeV2.name, styles.pick, { color: palette.text }]} testID="insights-recitation-pick">
+              {barLine(bars[litAt], litAt === bars.length - 1, kindAlone)}
+            </ChromeText>
+            {anyMistakes ? (
+              <TapChart
+                bars={chartBars}
+                picked={picked}
+                onPick={setChosen}
+                colours={kinds.map((k) => colours[k])}
+                height={110}
+                minSlots={chartBars.length}
+                testID="insights-recitation-bars"
+              />
+            ) : (
+              <ChromeText style={[typeV2.meta, styles.clean, { color: palette.secondary }]} testID="insights-recitation-clean">
+                {t('reciteInsights.page.allClean')}
+              </ChromeText>
+            )}
+            {anyMistakes ? (
+              <ChromeText style={[typeV2.meta, styles.hint, { color: palette.secondary }]}>
+                {t(chartSpan === '1y' ? 'reciteInsights.page.hintMonths' : 'reciteInsights.page.hintWeeks')}
+              </ChromeText>
+            ) : null}
+          </>
+        ) : (
+          <ChromeText style={[typeV2.meta, styles.clean, { color: palette.secondary }]} testID="insights-recitation-no-takes">
+            {t('reciteInsights.noTakes', { when: spanIn(chartSpan) })}
+          </ChromeText>
+        )}
+      </InsightCard>
+
+      {/* What you've put right, and what still slips. */}
+      {total > 0 ? (
+        <View testID="insights-recitation-fixed">
+          <ChromeText style={[typeV2.meta, styles.caps, { color: palette.secondary }]} accessibilityRole="header">
+            {t('reciteInsights.page.fixedHead')}
+          </ChromeText>
+          <View style={tilesStack(Math.max(formatNumber(fixed.fixed).length, formatNumber(fixed.slipping).length), width, fontScale) ? styles.tilesStacked : styles.tiles}>
+            <View style={[styles.tile, { backgroundColor: palette.fill }]} testID="insights-recitation-fixed-tile">
+              <ChromeText style={[styles.tileFigure, { color: palette.good }]} numberOfLines={1}>
+                {formatNumber(fixed.fixed)}
+              </ChromeText>
+              <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{fixedTile(fixed, range.inTheLast)}</ChromeText>
+            </View>
+            <View style={[styles.tile, { backgroundColor: palette.fill }]} testID="insights-recitation-slipping-tile">
+              <ChromeText style={[styles.tileFigure, { color: palette.red }]} numberOfLines={1}>
+                {formatNumber(fixed.slipping)}
+              </ChromeText>
+              <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{slippingTile(fixed, range.inTheLast)}</ChromeText>
+            </View>
+          </View>
+          <View
+            style={[styles.share, { backgroundColor: palette.markWordFirm }]}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            testID="insights-recitation-share"
+          >
+            <View style={{ flex: fixed.fixed, backgroundColor: palette.good }} />
+            <View style={{ flex: fixed.slipping }} />
+          </View>
+          <ChromeText style={[typeV2.meta, styles.shareLine, { color: palette.secondary }]}>{shareLine(fixed)}</ChromeText>
+
           {slipping.map((p, i) => (
             <PassageRow
               key={`${p.sura}:${p.from}`}
@@ -167,56 +336,79 @@ export function RecitationInsights({ records, words, today, window, inWords, sma
               testID={`insights-recitation-slip-${p.sura}-${p.from}`}
             />
           ))}
-        </>
+          {ins.slipping.length > 1 || ins.similar.length > 0 || strong.length > 0 ? (
+            <Tap
+              onPress={() => setAllPassages((v) => !v)}
+              accessibilityRole="button"
+              style={[styles.row, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.separator }]}
+              testID="insights-recitation-see-all"
+            >
+              <ChromeText style={[typeV2.name, styles.flex, { color: palette.text }]}>
+                {allPassages
+                  ? t('activity.recitation.showFewer')
+                  : t('reciteInsights.page.seeAll', { count: ins.slipping.length, n: formatNumber(ins.slipping.length) })}
+              </ChromeText>
+              <Ionicons name={allPassages ? 'chevron-up' : forwardIcon()} size={16} color={palette.secondary} />
+            </Tap>
+          ) : null}
+          {allPassages && ins.similar.length > 0 ? (
+            <>
+              <ChromeText style={[typeV2.name, styles.subHead, { color: palette.text }]} accessibilityRole="header">
+                {t('activity.recitation.similarAyahs')}
+              </ChromeText>
+              {ins.similar.map((s, i) => (
+                <PassageRow
+                  key={`${s.from.join(':')}>${s.into.join(':')}${s.ending ? 'e' : ''}`}
+                  first={i === 0}
+                  title={similarTitle(s)}
+                  note={similarNote(s, today)}
+                  onPress={() => onOpenAyahs(s.from[0], s.from[1], s.from[1])}
+                  testID={`insights-recitation-similar-${s.from[0]}-${s.from[1]}`}
+                />
+              ))}
+            </>
+          ) : null}
+          {allPassages && strong.length > 0 ? (
+            <>
+              <ChromeText style={[typeV2.name, styles.subHead, { color: palette.text }]} accessibilityRole="header">
+                {t('activity.recitation.strongButSlips')}
+              </ChromeText>
+              {strong.map((p, i) => (
+                <PassageRow
+                  key={`${p.sura}:${p.from}`}
+                  first={i === 0}
+                  title={passageName(p.sura, p.from, p.to)}
+                  note={strongNote(p)}
+                  onPress={() => onOpenAyahs(p.sura, p.from, p.to)}
+                  testID={`insights-recitation-strong-${p.sura}-${p.from}`}
+                />
+              ))}
+            </>
+          ) : null}
+        </View>
       ) : null}
 
-      {ins.similar.length > 0 ? (
-        <>
-          <View style={styles.subHead}>
-            <ChromeText style={[typeV2.name, styles.flex, { color: palette.text }]} accessibilityRole="header">
-              {t('activity.recitation.similarAyahs')}
-            </ChromeText>
+      {/* How long you usually recite, and whether long takes go better. */}
+      {lengths ? (
+        <View testID="insights-recitation-takes">
+          <ChromeText style={[typeV2.meta, styles.caps, { color: palette.secondary }]} accessibilityRole="header">
+            {t('reciteInsights.page.takesHead')}
+          </ChromeText>
+          <View style={styles.takes}>
+            <View style={[styles.icon, { backgroundColor: palette.fill }]}>
+              <Ionicons name="stopwatch-outline" size={16} color={palette.secondary} />
+            </View>
+            <View style={styles.flex}>
+              <ChromeText style={[typeV2.name, { color: palette.text }]} testID="insights-recitation-takes-title">
+                {takesTitle(lengths)}
+              </ChromeText>
+              {takesLine(lengths, today) ? (
+                <ChromeText style={[typeV2.meta, { color: palette.secondary }]} testID="insights-recitation-takes-line">
+                  {takesLine(lengths, today)}
+                </ChromeText>
+              ) : null}
+            </View>
           </View>
-          {ins.similar.slice(0, FIRST_ROWS).map((s, i) => (
-            <PassageRow
-              key={`${s.from.join(':')}>${s.into.join(':')}${s.ending ? 'e' : ''}`}
-              first={i === 0}
-              title={similarTitle(s)}
-              note={similarNote(s, today)}
-              onPress={() => onOpenAyahs(s.from[0], s.from[1], s.from[1])}
-              testID={`insights-recitation-similar-${s.from[0]}-${s.from[1]}`}
-            />
-          ))}
-        </>
-      ) : null}
-
-      {strong.length > 0 ? (
-        <>
-          <View style={styles.subHead}>
-            <ChromeText style={[typeV2.name, styles.flex, { color: palette.text }]} accessibilityRole="header">
-              {t('activity.recitation.strongButSlips')}
-            </ChromeText>
-          </View>
-          {strong.slice(0, FIRST_ROWS).map((p, i) => (
-            <PassageRow
-              key={`${p.sura}:${p.from}`}
-              first={i === 0}
-              title={passageName(p.sura, p.from, p.to)}
-              note={strongNote(p)}
-              onPress={() => onOpenAyahs(p.sura, p.from, p.to)}
-              testID={`insights-recitation-strong-${p.sura}-${p.from}`}
-            />
-          ))}
-        </>
-      ) : null}
-
-      {quiet.length > 0 ? (
-        <View style={[styles.quiet, { backgroundColor: palette.fill }]} testID="insights-recitation-quiet">
-          {quiet.map((line, i) => (
-            <ChromeText key={i} style={[i === 0 ? typeV2.body : typeV2.meta, { color: i === 0 ? palette.text : palette.secondary }]}>
-              {line}
-            </ChromeText>
-          ))}
         </View>
       ) : null}
     </View>
@@ -273,101 +465,32 @@ function Chips({ passage, words }: { passage: SlippingPassage; words: QuranWords
   );
 }
 
-/** Bars' room: the tallest bar, and the shortest a week with takes gets. */
-const BAR_MAX = 52;
-const BAR_MIN = 6;
-
-/**
- * The score week by week, as bars (Majd, Nov 16 2026: the bare line "isn't intuitive, it's hard to tell what it's
- * telling me"): a line saying how it moved, then a bar a week with its score over it and the week under it, this week
- * in full colour as Memorization's month is. From the first week with takes; four weeks at large text.
- */
-function WeekBars({ weeks }: { weeks: readonly { to: string; score: number | null }[] }) {
-  const { palette } = useTheme();
-  const large = useWindowDimensions().fontScale >= STACK_AT_SCALE;
-  const shown = weeksToDraw(weeks, large ? 4 : 8);
-  const scores = shown.map((w) => w.score).filter((x): x is number => x !== null);
-  // Bars start a point under the lowest week (and at 95% at most), so a change of a point shows.
-  const lo = Math.max(0, Math.min(0.95, Math.floor((Math.min(...scores) - 0.01) * 100) / 100));
-  const height = (score: number) => BAR_MIN + Math.round(((BAR_MAX - BAR_MIN) * (score - lo)) / (1 - lo));
-  const takeaway = weeksTakeaway(shown);
-  return (
-    <View
-      style={styles.weeks}
-      accessible
-      accessibilityRole="image"
-      accessibilityLabel={`${takeaway ? `${takeaway}. ` : ''}${weeksSpoken(shown)}`}
-      testID="insights-recitation-weeks"
-    >
-      {takeaway ? (
-        <ChromeText style={[typeV2.name, { color: palette.text }]} testID="insights-recitation-weeks-takeaway">
-          {takeaway}
-        </ChromeText>
-      ) : null}
-      <View style={styles.bars}>
-        {shown.map((w, i) => {
-          const last = i === shown.length - 1;
-          return (
-            <View key={w.to} style={styles.col}>
-              <ChromeText
-                style={[styles.small, styles.value, { color: last ? palette.text : palette.secondary }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.7}
-              >
-                {w.score === null ? '–' : formatAccuracy(w.score)}
-              </ChromeText>
-              <View
-                style={[
-                  styles.bar,
-                  w.score === null
-                    ? { height: 2, backgroundColor: palette.separator }
-                    : { height: height(w.score), backgroundColor: palette.primary, opacity: last ? 1 : 0.4 },
-                ]}
-              />
-            </View>
-          );
-        })}
-      </View>
-      <View style={styles.labels}>
-        {shown.map((w, i) => (
-          <ChromeText
-            key={w.to}
-            style={[styles.small, styles.label, { color: i === shown.length - 1 ? palette.text : palette.secondary }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.7}
-          >
-            {weekLabel(w.to, i === shown.length - 1)}
-          </ChromeText>
-        ))}
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  // As Insights' other sections (InsightsView's section, sectionHead, sectionTitle, figure, big, ask).
+  // As Insights' other sections (InsightsView's section, sectionHead, sectionTitle, ask).
   section: { paddingTop: 18, paddingBottom: 18, paddingHorizontal: 16 },
-  head: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  head: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 6 },
   title: { fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.3 },
-  figure: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 12, flexWrap: 'wrap', rowGap: 4 },
-  perPage: { marginTop: 4 },
-  big: { fontSize: 28, lineHeight: 32, fontWeight: '700', letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
   ask: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32, borderRadius: 16, borderWidth: 1, paddingHorizontal: 12 },
-  weeks: { marginTop: 14 },
-  bars: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: BAR_MAX + 22, marginTop: 10 },
-  col: { flex: 1, alignItems: 'stretch', justifyContent: 'flex-end' },
-  bar: { borderRadius: 5 },
-  small: { fontSize: 12, lineHeight: 16 },
-  value: { fontWeight: '600', textAlign: 'center', marginBottom: 4 },
-  labels: { flexDirection: 'row', gap: 6, marginTop: 6 },
-  label: { flex: 1, textAlign: 'center' },
-  subHead: { flexDirection: 'row', alignItems: 'baseline', marginTop: 18, marginBottom: 2 },
   strong: { fontWeight: '600' },
+  heroLine: { marginTop: 4 },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
+  kind: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 14, paddingHorizontal: 10, minHeight: 28, maxWidth: '100%' },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  pick: { marginTop: 12 },
+  clean: { marginTop: 10 },
+  hint: { marginTop: 8, alignSelf: 'flex-end' },
+  caps: { marginTop: 22, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: '600' },
+  tiles: { flexDirection: 'row', gap: 10 },
+  tilesStacked: { flexDirection: 'column', gap: 10 },
+  tile: { flex: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, gap: 2 },
+  tileFigure: { fontSize: PAGE_TYPE.tileFigure, lineHeight: 34, fontWeight: '700', letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
+  share: { flexDirection: 'row', height: 6, borderRadius: 3, overflow: 'hidden', marginTop: 12 },
+  shareLine: { marginTop: 6, marginBottom: 4 },
+  subHead: { marginTop: 14 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   chips: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 6, marginTop: 6 },
   more: { alignSelf: 'center' },
-  quiet: { marginTop: 16, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14, gap: 4 },
+  takes: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  icon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
 });

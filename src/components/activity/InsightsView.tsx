@@ -302,6 +302,7 @@ export function InsightsView({
             today={data.today}
             window={span.window}
             inWords={span.inWords}
+            span={span}
             smartTracking={data.smartTracking !== false}
             rating={data.rating}
             revo={data.revo}
