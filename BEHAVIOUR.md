@@ -520,6 +520,18 @@ current basic sounds". October 2026's version was removed for the voices it offe
   no button. "Nothing to revise yet" and "Mark memorized pages" are for an account with nothing memorized (Majd, Nov 27
   2026, on a rest day of his plan: "telling me to mark memorized pages when i already have memorized pages marked?").
   (Before: any day with no pages showed the new account's words and button.)
+- **HOME-10.** (Revisely Dev) Home's today section is a ring (Majd, Nov 27 2026, his pick of the Home revision boards:
+  "home direction C"). Under the name line (the picture, the streak and ?, as before), centred: a ring of today's pages,
+  where today starts and the rest of the day in two short lines, the one button, and the catch-up or the next day as a
+  quiet line. The ring holds today's count ("20 pages today") and fills as its pages are revised ("6 of 20 pages"); once
+  today is done it is full in the done colour with a check, and the line under it reads "Done for today". On a rest day
+  (HOME-9) it is dashed with "Rest", and with nothing memorized dashed with "Start here". The two lines are the Today
+  post's (HOME-3, NAME-1) without the page count, which the ring holds: "Starts at Al-Mulk" over "to Al-Mursalat · Juz
+  29 · Change" ("then Al-Fatihah" or "4 from yesterday first" on those days); once started "Continue at …", the page's
+  first words and the day's juz; done, the surahs and juz it covered. "Change" ends the second line and opens Jump to,
+  and a tap on the lines does too. The button is the post's (HOME-5), and "Add to today" and "Tomorrow starts at …" stay
+  quiet lines under it (CARRY-1). The ring is a picture: VoiceOver reads the lines. (Before: the Today post's lines
+  beside the picture, with its button under them.)
 
 ## Sheets and updates
 

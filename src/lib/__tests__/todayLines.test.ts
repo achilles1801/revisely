@@ -159,3 +159,19 @@ describe('Today’s lines with a partly memorized page (MEM-4)', () => {
     expect(todayLines('not_started', range(542, 561), new Set(), 0, 0, partial)).toEqual(todayLines('not_started', range(542, 561), new Set()));
   });
 });
+
+describe('Home’s ring (HOME-10): the line without the page count', () => {
+  const brief = (...args: Parameters<typeof todayLines>) => plain(todayLines(...args).brief);
+  it('not started: to where and the juz; across the cycle’s end, then where; with carried pages, those first', () => {
+    expect(brief('not_started', range(542, 561), new Set())).toBe('to At-Tahrim · Juz 28');
+    expect(brief('not_started', [...range(595, 604), ...range(1, 10)], new Set())).toBe('then Al-Fatihah');
+    expect(brief('not_started', range(538, 561), new Set(), 4)).toBe('4 from yesterday first');
+  });
+  it('one surah and juz: the juz alone; started: the day’s juz; done and rest: their detail as it is', () => {
+    expect(brief('not_started', range(3, 5), new Set())).toBe('Juz 1');
+    expect(brief('partial', range(542, 561), new Set(range(542, 547)))).toBe('Juz 28');
+    const done = todayLines('completed', range(522, 541), new Set(range(522, 541)));
+    expect(done.brief).toBe(done.detail.kind === 'text' ? done.detail.text : '');
+    expect(brief('not_started', [], new Set(), 0, 0, undefined, 0, { memorized: true })).toBe('Nothing is scheduled today.');
+  });
+});

@@ -69,6 +69,13 @@ export interface TodayLines {
   words?: string;
   /** Line 2: grey words, or how far today is (a thin bar and "6 of 20"). */
   detail: { kind: 'text'; text: string } | { kind: 'progress'; done: number; total: number };
+  /**
+   * Line 2 for Home's ring (HOME-10, Revisely Dev), where the ring holds how many pages: the detail without the count
+   * ("to Al-Mursalat · Juz 29", "then Al-Fatihah", "4 from yesterday first"; once started, the day's juz). May be empty.
+   */
+  brief: string;
+  /** How many pages today has, in the session (0 on a rest day or with nothing memorized): the ring's count (HOME-10). */
+  total: number;
   /** Both lines, in words (VoiceOver). */
   label: string;
   /** Nothing to revise yet, or a rest day: no pages today, so no "Change". */
@@ -172,6 +179,8 @@ export function todayLines(
     return {
       title: { text: title, dot: false, chevron: false },
       detail: { kind: 'text', text: detail },
+      brief: detail,
+      total,
       label: spoken(t('lib.today.titleDetail', { title, detail })),
       empty: true,
       rest: true,
@@ -185,6 +194,8 @@ export function todayLines(
     return {
       title: { text: title, dot: false, chevron: false },
       detail: { kind: 'text', text: detail },
+      brief: detail,
+      total,
       label: spoken(t('lib.today.titleDetail', { title, detail })),
       empty: true,
       cta: t('lib.today.markCta'),
@@ -206,6 +217,8 @@ export function todayLines(
     return {
       title: { text: title, dot: true, chevron: false },
       detail: { kind: 'text', text: detail },
+      brief: detail,
+      total,
       label: spoken(t('lib.today.titleDetail', { title, detail })),
       empty: false,
       // Today is done, and pages added from earlier days are still to revise (SESS-6, SESS-7:
@@ -222,6 +235,8 @@ export function todayLines(
       title: { text: title, dot: false, chevron: true },
       words: wordsOf(next, partial),
       detail: { kind: 'progress', done: doneHere, total },
+      brief: juzSpan(ordered) ?? '',
+      total,
       label: spoken(t('lib.today.progressLabel', { title, done: doneHere, total })),
       empty: false,
       cta: t('lib.today.continueCta'),
@@ -232,6 +247,7 @@ export function todayLines(
   const start = ordered[0];
   const title = t('lib.today.startsAt', { place: placeOf(start, partial) });
   let detail: string;
+  let brief: string;
   if (carried > 0) {
     // "2 from Insights first", "4 from yesterday first", or both: "2 from Insights, 5 from yesterday first".
     const insights = Math.min(carriedInsights, carried);
@@ -243,16 +259,22 @@ export function todayLines(
           ? t('lib.today.fromInsights', { count: carried })
           : t('lib.today.fromBoth', { insights, left });
     detail = t('lib.today.first', { pages: pages(total), from });
+    brief = t('lib.today.firstOnly', { from });
   } else if (runs.length > 1) {
     detail = t('lib.today.then', { pages: pages(total), place: placeOf(runs[1].first, partial) });
+    brief = t('lib.today.thenOnly', { place: placeOf(runs[1].first, partial) });
   } else {
     const end = lastSurah(ordered[total - 1], partial);
-    detail = [pages(total), end !== firstSurah(start, partial) ? t('lib.today.toEnd', { end }) : null, juzSpan(ordered)].filter(Boolean).join(' · ');
+    const rest = [end !== firstSurah(start, partial) ? t('lib.today.toEnd', { end }) : null, juzSpan(ordered)].filter(Boolean);
+    detail = [pages(total), ...rest].join(' · ');
+    brief = rest.join(' · ');
   }
   return {
     title: { text: title, dot: false, chevron: true },
     words: wordsOf(start, partial),
     detail: { kind: 'text', text: detail },
+    brief,
+    total,
     label: spoken(t('lib.today.titleDetail', { title, detail })),
     empty: false,
     cta: t('lib.today.startCta'),

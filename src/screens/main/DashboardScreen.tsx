@@ -48,6 +48,8 @@ import { KahfPost } from '../../components/home/feed/KahfPost';
 import { RecentSection } from '../../components/activity/ActivityItemRow';
 import { useHomeV3 } from '../../lib/release/homeV3';
 import { memorizedInSettingsEnabled } from '../../lib/release/memorizedInSettings';
+import { homeRingEnabled } from '../../lib/release/homeRing';
+import { TodayRing } from '../../components/home/feed/TodayRing';
 import { RunningTimerChip } from '../../components/timer/RunningTimerChip';
 import { HeroGlow } from '../../components/v2/HeroGlow';
 import { HomeGround } from '../../components/home/HomeGround';
@@ -125,6 +127,8 @@ export default function DashboardScreen() {
   const { day: revisionDay, date: revisionDate } = useRevisionDay(user);
   // Home, version 3 (Revisely Dev): today alone, one solid button (HOME-4, HOME-5).
   const homeV3 = useHomeV3();
+  // Today as a ring (HOME-10, Revisely Dev): Home v3's today section, Majd's pick of the Home revision boards.
+  const homeRing = homeV3 && homeRingEnabled();
 
   const homePrefs = useHomePrefs();
   // Room for the tab bar (and the mini player) and for Revo's button.
@@ -615,6 +619,21 @@ export default function DashboardScreen() {
     </Text>
   );
 
+
+  // The account's picture on today's post or ring (ACCOUNT-7), and Revise ahead's target (the next revision day).
+  const picture = accountV2 ? (
+    <ProfilePicture
+      size={premiumNow.has ? 35 : 40}
+      photoUrl={photoUrl}
+      initial={avatarInitial(userName, firebaseUser?.email)}
+      premium={premiumNow.has}
+      badge={latestBadge ?? null}
+      testID="today-picture-mark"
+    />
+  ) : undefined;
+  const onAhead = () =>
+    aheadNext &&
+    navigation.navigate('ActiveRevision', { aheadDay: aheadNext.plan.day, ...(aheadNext.plan.round ? { round: true } : {}) });
   return (
     <TopSafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
       {homeV3 ? <HomeGround background={background} ramadan={ramadan} bottom={tabBar} /> : <HeroGlow />}
@@ -652,51 +671,61 @@ export default function DashboardScreen() {
         {prayerEnabled && prayerPrefs.homeLine && prayerTimes.next ? (
           <NextPrayerLine times={prayerTimes} onPress={() => openPrayer('times')} />
         ) : null}
-        <TodayPost
-          name={userName}
-          initial={avatarInitial(userName, firebaseUser?.email)}
-          picture={
-            accountV2 ? (
-              <ProfilePicture
-                size={premiumNow.has ? 35 : 40}
-                photoUrl={photoUrl}
-                initial={avatarInitial(userName, firebaseUser?.email)}
-                premium={premiumNow.has}
-                badge={latestBadge ?? null}
-                testID="today-picture-mark"
-              />
-            ) : undefined
-          }
-          onPicture={() => navigation.navigate('Settings', { page: 'account' })}
-          status={todayStatus.status}
-          pages={assignment.pages}
-          partial={partial}
-          done={donePagesToday}
-          carried={carriedToday}
-          carriedInsights={snapshot?.carriedInsights ?? 0}
-          carriedLeft={carriedLeft}
-          streak={calculatedStreak}
-          streakGrace={streakNow?.grace ?? null}
-          memorized={memorized}
-          onPrimary={handleCtaPress}
-          onMemorization={() => navigation.navigate('Memorization', { edit: true })}
-          // Revisely Dev (MEM-9): memorized pages are in Settings under Revision and in Activity, not on Home.
-          memorizedLine={!memorizedInSettingsEnabled()}
-          onJump={() => setJumpOpen(true)}
-          catchUp={home.catchUp}
-          onCarryOver={handleCarryOver}
-          carrying={carrying}
-          quietCatchUp={homeV3}
-          // Home v3: the hairline only when a post follows (Al-Kahf); with nothing under Today, the ground runs on.
-          separator={!homeV3 || showKahfCard}
-          ahead={aheadNext ? { lead: aheadNext.lead, first: aheadNext.plan.pages[0] } : null}
-          onAhead={() =>
-            aheadNext &&
-            navigation.navigate('ActiveRevision', { aheadDay: aheadNext.plan.day, ...(aheadNext.plan.round ? { round: true } : {}) })
-          }
-          help={<HelpButton screen="home" size={20} color={palette.secondary} maxFontSizeMultiplier={HEADER_MAX_SCALE} />}
-          lines={home.lines}
-        />
+        {homeRing ? (
+          <TodayRing
+            name={userName}
+            initial={avatarInitial(userName, firebaseUser?.email)}
+            picture={picture}
+            onPicture={() => navigation.navigate('Settings', { page: 'account' })}
+            status={todayStatus.status}
+            partial={partial}
+            done={donePagesToday}
+            streak={calculatedStreak}
+            streakGrace={streakNow?.grace ?? null}
+            onPrimary={handleCtaPress}
+            onJump={() => setJumpOpen(true)}
+            catchUp={home.catchUp}
+            onCarryOver={handleCarryOver}
+            carrying={carrying}
+            separator={showKahfCard}
+            ahead={aheadNext ? { lead: aheadNext.lead, first: aheadNext.plan.pages[0] } : null}
+            onAhead={onAhead}
+            help={<HelpButton screen="home" size={20} color={palette.secondary} maxFontSizeMultiplier={HEADER_MAX_SCALE} />}
+            lines={home.lines}
+          />
+        ) : (
+          <TodayPost
+            name={userName}
+            initial={avatarInitial(userName, firebaseUser?.email)}
+            picture={picture}
+            onPicture={() => navigation.navigate('Settings', { page: 'account' })}
+            status={todayStatus.status}
+            pages={assignment.pages}
+            partial={partial}
+            done={donePagesToday}
+            carried={carriedToday}
+            carriedInsights={snapshot?.carriedInsights ?? 0}
+            carriedLeft={carriedLeft}
+            streak={calculatedStreak}
+            streakGrace={streakNow?.grace ?? null}
+            memorized={memorized}
+            onPrimary={handleCtaPress}
+            onMemorization={() => navigation.navigate('Memorization', { edit: true })}
+            // Revisely Dev (MEM-9): memorized pages are in Settings under Revision and in Activity, not on Home.
+            memorizedLine={!memorizedInSettingsEnabled()}
+            onJump={() => setJumpOpen(true)}
+            catchUp={home.catchUp}
+            onCarryOver={handleCarryOver}
+            carrying={carrying}
+            quietCatchUp={homeV3}
+            // Home v3: the hairline only when a post follows (Al-Kahf); with nothing under Today, the ground runs on.
+            separator={!homeV3 || showKahfCard}
+            ahead={aheadNext ? { lead: aheadNext.lead, first: aheadNext.plan.pages[0] } : null}
+            onAhead={onAhead}
+            help={<HelpButton screen="home" size={20} color={palette.secondary} maxFontSizeMultiplier={HEADER_MAX_SCALE} />}
+            lines={home.lines}
+          />
+        )}
 
         {showKahfCard && (
           <KahfPost
