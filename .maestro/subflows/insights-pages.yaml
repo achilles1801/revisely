@@ -5,8 +5,21 @@
 #   env THEME: the screenshots' names' last part (light, dark, young-light, young-dark)
 appId: com.revisionbuddy.app
 ---
-- tapOn:
-    id: tab-ActivityTab
+# The tab, again if the tap was lost (a touch start, then a cancel: run 46129448756's retry). A tab stays on screen, so
+# not tap-to-open.yaml; a second tap on Activity only scrolls it to the top.
+- repeat:
+    while:
+      notVisible:
+        id: activity-sections-list
+    times: 3
+    commands:
+      - tapOn:
+          id: tab-ActivityTab
+      - extendedWaitUntil:
+          visible:
+            id: activity-sections-list
+          timeout: 10000
+          optional: true
 - extendedWaitUntil:
     visible:
       id: activity-sections-list

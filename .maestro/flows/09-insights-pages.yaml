@@ -34,6 +34,8 @@ appId: com.revisionbuddy.app
     file: ../subflows/insights-pages.yaml
     env:
       THEME: light
+# Home first: theme.yaml opens Settings from Home, and the pass ends on Activity.
+- runFlow: ../subflows/back-home.yaml
 - runFlow:
     file: ../subflows/theme.yaml
     env:
