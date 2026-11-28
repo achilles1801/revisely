@@ -2632,6 +2632,8 @@ describe('Majd’s Nov 20 asks: the mistake sound, and mistakes on a hidden page
     await startTake('check');
     await event({ type: 'mark', mark: wrong(UTIYAT) as never });
     expect(cue.playCueSound).toHaveBeenCalledTimes(1);
+    // A red mark (a wrong word): red's sound.
+    expect(cue.playCueSound).toHaveBeenLastCalledWith('word');
     expect(cue.playCueTap).toHaveBeenCalledTimes(1);
     // The same mark again (a resume), Not clear, and a tajweed note: nothing.
     await act(async () => {
@@ -2644,6 +2646,15 @@ describe('Majd’s Nov 20 asks: the mistake sound, and mistakes on a hidden page
     // A second mistake: its own sound.
     await event({ type: 'mark', mark: wrong(A23 + 9) as never });
     expect(cue.playCueSound).toHaveBeenCalledTimes(2);
+    // An amber mark (a wrong haraka, heard clearly): amber's sound, not red's (Majd, Nov 27 2026: "different mistakes
+    // should have different sounds like red vs yellow").
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 750));
+    });
+    await event({ type: 'mark', mark: { id: 'h', w: A23 + 10, ayah: [27, 23], kind: 'harakat', sure: 'clear', slip: { expected: 'ٍ', heard: 'ٌ' } } as never });
+    expect(cue.playCueSound).toHaveBeenCalledTimes(3);
+    expect(cue.playCueSound).toHaveBeenLastCalledWith('slip');
+    expect(cue.playCueTap).toHaveBeenCalledTimes(3);
   });
 
   it('[RECITE-15] off in Settings → Recite: no sound and no tap; Recite alone (no marks) has none either', async () => {

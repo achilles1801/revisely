@@ -848,9 +848,14 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   color should be highlighted immediately and should stay that way".)
 - **RECITE-15.** (Revisely Dev) Each new mistake that counts (a word wrong, skipped or added, a wrong haraka or letter)
   plays a short sound and a tap as it is marked during a take: never for Not clear or a tajweed note, never twice for
-  one mark (a resume sends marks again), and at most one every 0.7 s. It plays in silent mode, at the volume the
-  buttons set, and Settings → Mushaf and Recite → Sound on a mistake turns it off. (Majd, Nov 20 2026: "there should be some like
-  error sound ... so I know I just made a mistake".)
+  one mark (a resume sends marks again), and at most one every 0.7 s (a burst sounds once, as its first mark). A red
+  mark (a word wrong, skipped or added) and an amber one (a wrong haraka or letter) sound different: two bell notes
+  falling for red, one lighter, higher note for amber, each under half a second. It is loud enough to hear over one's
+  own recitation from the iPhone's earpiece at full volume: made at 1.2–1.8 kHz, near full scale, and played at full
+  volume. It plays in silent mode, at the volume the buttons set, and Settings → Mushaf and Recite → Sound on a mistake
+  turns it off. (Majd, Nov 20 2026: "there should be some like error sound ... so I know I just made a mistake"; Nov 27:
+  "the error sounds when making mistakes are SUPER quiet i can barely hear it even with my max volume on. also different
+  mistakes should have different sounds like red vs yellow".)
 - **RECITE-16.** (Revisely Dev) Pause keeps the take open however long the pause lasts: nothing ends it or opens its
   summary until Stop, ✕ or leaving the app, and Resume carries on the same take. A checker that let a paused take go
   anyway is reconnected to, never taken as the take's end. (Majd, Nov 21 2026: a session's take, paused with nothing
