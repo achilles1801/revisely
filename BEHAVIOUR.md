@@ -1512,8 +1512,9 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   getting stronger?" (Majd, Nov 27 2026: "yes build all seven screens"; board
   `~/Documents/revisely-today-mocks/insights-v2/board-rest.png`). First the memorized pages weak now (last rated 1–2), "4
   weak pages", with the trend against how many were weak as the range began ("↓ from 9", green when fewer; none over All
-  time or with no session before the range on record) and "Pages you rated weak in your last session of them". Then a
-  card, "Weak and moderate, week by week" (the range's weeks, 4 at least and 26 at most), each week's bar stacked weak
+  time or with no session before the range on record) and "Pages you rated weak in your last session of them". Its row on
+  the one Activity tab says the same figure, the pages weak now, never the pages skipped twice as well (its line still
+  names the weak spot first). Then a card, "Weak and moderate, week by week" (the range's weeks, 4 at least and 26 at most), each week's bar stacked weak
   (red) under moderate (amber): the pages weak and moderate at that week's end, a page's rating then being its last session
   rating by then (a page rated only later counts as strong then). The line over the chart is the newest week ("This week ·
   4 weak · 7 moderate"), or the week tapped (ACT-41). Then the page rated weak most often in the range, at least twice

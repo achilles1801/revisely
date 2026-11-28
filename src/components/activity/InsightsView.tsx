@@ -1356,12 +1356,15 @@ function WeakSpots({
     return n > 0 ? `${r.reason} · ${t('activity.insights.stillMarked', { count: n })}` : r.reason;
   };
   if (row) {
+    // The page's own figure, the pages weak now (ACT-39), so the number tapped is the number the page opens on. The rows
+    // also hold pages skipped twice in the range: 6 here against the page's 4 on the Activity seed (iOS E2E, Nov 28 2026).
+    const weakNow = weakCount({ logs: [], memorized: data.memorized, rating: data.rating, today: data.today, window: null }).now;
     return (
       <SectionRow
         title={t('activity.insights.weakSpots')}
         line={rows.length > 0 ? t('activity.oneTab.weakFirst', { label: rows[0].label }) : null}
-        figure={pagesRow(pages.length).figure}
-        unit={pagesRow(pages.length).unit}
+        figure={pagesRow(weakNow).figure}
+        unit={pagesRow(weakNow).unit}
         onPress={row}
         separator={!last}
         testID="insights-row-weak"
