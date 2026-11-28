@@ -1,6 +1,7 @@
 /**
- * Open Door's review and the console's role changes against the Firebase emulators: the real transactions, queries,
- * cursors and counts (review.ts, console/staff.ts, console/handler.ts). Skipped unless the emulators run:
+ * Open Door's review, the console's role changes and its recitation labels against the Firebase emulators: the real
+ * transactions, queries, cursors and counts (review.ts, console/staff.ts, console/labels.ts, console/handler.ts).
+ * Skipped unless the emulators run:
  *   cd functions && bash ../scripts/emulators.sh exec auth,firestore demo-revisely 'npx jest review.emulator'
  * CI runs it that way (ci.yml, Fast checks).
  */
@@ -9,7 +10,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { Firestore, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { AccountInfo, ConsoleDeps, handleAdminConsole } from '../console/handler';
 import { roleOf } from '../console/roles';
-import { rolesPage, setRole } from '../console/staff';
+import { rolesPage, setRole, staff } from '../console/staff';
 import { applicationFrom, deleteSupportData, entitlementsFrom } from '../support/admin';
 import { REAPPLY_AFTER_DAYS, SupportError, stateOf } from '../support/logic';
 import {
@@ -175,6 +176,8 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
       accounts: async (uids) => new Map(uids.map((uid) => [uid, accounts[uid] ?? { uid, exists: false, email: null, emailHidden: false, providers: [], createdAt: null, lastSignInAt: null, disabled: false }])),
       accountByEmail: async (email) => Object.values(accounts).find((a) => a.email === email) ?? null,
       hasPlan: async (uid) => uid === 'c1',
+      staff: () => staff(getAuth(app)),
+      setRole: (uid, role, by) => setRole(getAuth(app), db, uid, role, by),
       programOpen: true,
       project: PROJECT,
       now: () => NOW,
@@ -197,6 +200,249 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
     expect(after.rows[0]).toMatchObject({ uid: 'c1', last: { by: 'rev@example.com' } });
   });
 
+  it('recitation labels end to end: the queue, a label per labeller, a second label on purpose, the audit trail, the counts', async () => {
+    // As functions/scripts/recite-labels.js writes them (an invented test clip; no real recording).
+    const clip = (id: string, order: number, marks: { id: string; w: number; kind: string }[], extra: Record<string, unknown> = {}) =>
+      db.doc(`reciteLabelClips/${id}`).set({
+        batch: 'test',
+        order,
+        source: { kind: 'own', name: 'Test voice' },
+        audio: { path: `recite-labels/test/${id}.m4a`, type: 'audio/mp4', seconds: 4 },
+        words: [100, 101, 102].map((w) => ({ w, t: 'كلمة', s: 2, a: 3 })),
+        marks: JSON.stringify(marks),
+        times: [{ w: 100, a: 0.2, b: 0.9 }],
+        status: 'open',
+        createdAt: NOW,
+        ...extra,
+      });
+    await clip('b', 2, []);
+    await clip('a', 1, [{ id: '101:word:', w: 101, kind: 'word' }]);
+    await clip('c', 3, []);
+    const read: string[] = [];
+    // A second apart per save, so the audit log's order is the order they happened.
+    let clock = NOW;
+    const deps: ConsoleDeps = {
+      db,
+      accounts: async () => new Map(),
+      accountByEmail: async () => null,
+      hasPlan: async () => false,
+      staff: async () => [],
+      setRole: async () => null,
+      programOpen: true,
+      project: PROJECT,
+      now: () => NOW,
+      log: () => undefined,
+      labels: {
+        db,
+        open: true,
+        audio: async (path) => {
+          read.push(path);
+          return Buffer.from('audio');
+        },
+        now: () => (clock += 1000),
+      },
+    };
+    const majd = { uid: 'staff1', email: 'owner@example.com', role: 'owner' as const };
+    const teacher = { uid: 'teacher1', email: 'teacher@example.com', role: 'labeller' as const };
+    type Next = {
+      clip: { id: string; marks: { id: string }[]; times: number[][]; label: { marks: Record<string, string>; wordNotes?: Record<string, string>; note?: string } | null } | null;
+      audio?: { type: string; data: string };
+    };
+    const next = async (who: typeof majd | typeof teacher, held: string[] = []) =>
+      ((await handleAdminConsole(who, { action: 'labels.next', held }, true, deps)) as Next).clip?.id ?? null;
+
+    const first = (await handleAdminConsole(majd, { action: 'labels.next' }, true, deps)) as Next;
+    expect(first.clip?.id).toBe('a');
+    expect(first.clip?.marks.map((m) => m.id)).toEqual(['101:word:']);
+    expect(first.clip?.times).toEqual([[100, 0.2, 0.9]]);
+    expect(first.clip?.label).toBeNull();
+    expect(first.audio).toEqual({ type: 'audio/mp4', data: Buffer.from('audio').toString('base64') });
+    expect(read).toEqual(['recite-labels/test/a.m4a']);
+    // The page holds `a` (on screen) while it fetches the next.
+    expect(await next(majd, ['a'])).toBe('b');
+
+    await expect(handleAdminConsole(majd, { action: 'labels.save', id: 'a', marks: {} }, true, deps)).rejects.toThrow('One mark has no answer yet.');
+    const actions = [
+      { t: 2100, a: 'mark', id: '101:word:', v: 'no', was: null },
+      { t: 2900, a: 'undo' },
+      { t: 3400, a: 'mark', id: '101:word:', v: 'yes', was: null },
+      { t: 5000, a: 'word', w: 102, v: 'skipped', was: null },
+    ];
+    expect(
+      await handleAdminConsole(
+        majd,
+        { action: 'labels.save', id: 'a', marks: { '101:word:': 'yes' }, words: { 102: 'skipped' }, wordNotes: { 101: 'he said قال' }, note: 'two voices', ms: 9000, actions },
+        true,
+        deps,
+      ),
+    ).toEqual({ saved: true, result: 'mistakes' });
+    expect(await handleAdminConsole(majd, { action: 'labels.save', id: 'b', skip: 'audio', ms: 2000 }, true, deps)).toEqual({ saved: true, result: 'unusable' });
+    const label = (await db.doc('reciteLabelClips/a/labels/staff1').get()).data()!;
+    expect(label).toMatchObject({ by: { uid: 'staff1', email: 'owner@example.com', role: 'owner' }, ms: 9000, marks: { '101:word:': 'yes' }, words: { '102': 'skipped' }, clip: 'mistakes', answers: 2, n: 1, actions });
+    expect(label).toMatchObject({ wordNotes: { '101': 'he said قال' }, note: 'two voices' });
+    expect((await db.doc('reciteLabelClips/a').get()).data()).toMatchObject({ status: 'done', labelledBy: ['staff1'], labelledAt: NOW + 1000 });
+
+    // Labelled clips leave the pool: the teacher gets the next unlabelled one. Then `a` is sent to the teacher as well.
+    expect(await next(teacher)).toBe('c');
+    await db.doc('reciteLabelClips/a').update({ queue: ['teacher1'] });
+    expect(await next(teacher)).toBe('a');
+    expect(await next(majd)).toBe('c');
+    expect(await handleAdminConsole(teacher, { action: 'labels.stats', since: NOW - DAY }, true, deps)).toEqual({ total: 3, labelled: 2, open: 1, queued: 1, today: { clips: 0, answers: 0, ms: 0 } });
+    await handleAdminConsole(teacher, { action: 'labels.save', id: 'a', marks: { '101:word:': 'no' }, ms: 4000 }, true, deps);
+    expect((await db.doc('reciteLabelClips/a').get()).data()).toMatchObject({ status: 'done', labelledBy: ['staff1', 'teacher1'], queue: [] });
+    expect((await db.doc('reciteLabelClips/a/labels/teacher1').get()).data()).toMatchObject({ by: { role: 'labeller' }, marks: { '101:word:': 'no' }, clip: 'fine' });
+    // Majd's label is untouched by the teacher's.
+    expect((await db.doc('reciteLabelClips/a/labels/staff1').get()).get('marks')).toEqual({ '101:word:': 'yes' });
+
+    expect(await handleAdminConsole(majd, { action: 'labels.stats', since: NOW - DAY }, true, deps)).toEqual({ total: 3, labelled: 2, open: 1, queued: 0, today: { clips: 2, answers: 2, ms: 11000 } });
+    // Going back shows the caller's own label, and saving again replaces it.
+    const again = (await handleAdminConsole(majd, { action: 'labels.get', id: 'a' }, true, deps)) as Next;
+    expect(again.clip?.label?.marks).toEqual({ '101:word:': 'yes' });
+    expect(again.clip?.label).toMatchObject({ wordNotes: { '101': 'he said قال' }, note: 'two voices' });
+    // The teacher's view of the same clip has none of Majd's notes.
+    expect(((await handleAdminConsole(teacher, { action: 'labels.get', id: 'a' }, true, deps)) as Next).clip?.label).toMatchObject({ wordNotes: {}, note: '' });
+    await handleAdminConsole(majd, { action: 'labels.save', id: 'a', marks: { '101:word:': 'unsure' }, ms: 1000 }, true, deps);
+    expect((await db.doc('reciteLabelClips/a/labels/staff1').get()).data()).toMatchObject({ marks: { '101:word:': 'unsure' }, words: {}, n: 2 });
+
+    // The audit log: every save, newest first, with its taps; only for audit.read (not a labeller).
+    const audit = (await handleAdminConsole(majd, { action: 'audit.labels' }, true, deps)) as { rows: { clip: string; by: { uid: string }; result: string; relabel: boolean; actions: unknown[]; missed: unknown[] }[] };
+    expect(audit.rows.map((r) => [r.clip, r.by.uid, r.result, r.relabel])).toEqual([
+      ['a', 'staff1', 'fine', true],
+      ['a', 'teacher1', 'fine', false],
+      ['b', 'staff1', 'unusable', false],
+      ['a', 'staff1', 'mistakes', false],
+    ]);
+    expect(audit.rows[3].actions).toEqual(actions);
+    expect(audit.rows[3].missed).toEqual([{ w: 102, label: 'skipped', text: 'كلمة' }]);
+    expect(audit.rows[3]).toMatchObject({ notes: [{ w: 101, text: 'كلمة', note: 'he said قال' }], note: 'two voices' });
+    await expect(handleAdminConsole(teacher, { action: 'audit.labels' }, true, deps)).rejects.toThrow('Your role doesn’t allow this.');
+
+    await handleAdminConsole(teacher, { action: 'labels.save', id: 'c', marks: {} }, true, deps);
+    expect(await next(majd)).toBeNull();
+    expect(await next(teacher)).toBeNull();
+    await expect(handleAdminConsole(majd, { action: 'labels.get', id: 'gone' }, true, deps)).rejects.toThrow('That clip is gone.');
+  });
+
+  it('invites: an email with no account is invited; its first verified sign-in claims the role once; waiting and cancelling', async () => {
+    const roles = new Map<string, string | null>();
+    const set: { uid: string; role: string | null; via: string }[] = [];
+    const accounts = new Map<string, AccountInfo>();
+    const account = (uid: string, email: string): AccountInfo => ({ uid, exists: true, email, emailHidden: false, providers: ['google.com'], createdAt: NOW, lastSignInAt: NOW, disabled: false });
+    accounts.set('old1', account('old1', 'known@example.com'));
+    let clock = NOW;
+    const deps: ConsoleDeps = {
+      db,
+      accounts: async (uids) => new Map(uids.map((uid) => [uid, accounts.get(uid) ?? { uid, exists: false, email: null, emailHidden: false, providers: [], createdAt: null, lastSignInAt: null, disabled: false }])),
+      accountByEmail: async (email) => [...accounts.values()].find((a) => a.email === email.toLowerCase()) ?? null,
+      hasPlan: async () => false,
+      staff: async () => [{ uid: 'staff1', email: 'owner@example.com', role: 'owner' as const }],
+      setRole: async (uid, role, by) => {
+        const from = (roles.get(uid) ?? null) as never;
+        roles.set(uid, role);
+        set.push({ uid, role, via: by.via });
+        return { id: 'r', uid, email: null, from, to: role, at: clock, by };
+      },
+      programOpen: true,
+      project: PROJECT,
+      now: () => (clock += 1000),
+      log: () => undefined,
+      invites: true,
+    };
+    const owner = { uid: 'staff1', email: 'owner@example.com', role: 'owner' as const };
+    type Me = { role: string | null; permissions: string[]; labels: boolean; request?: string; requests?: number };
+    const me = async (uid: string, email: string, emailVerified: boolean, poll = false) =>
+      (await handleAdminConsole(
+        { uid, email, role: (roles.get(uid) ?? null) as never, emailVerified, name: 'Test ' + uid, photo: 'https://example.com/p.png', method: 'google.com' },
+        { action: 'me', ...(poll ? { poll: true } : {}) },
+        false,
+        deps,
+      )) as Me;
+
+    // An account that already exists gets the role at once, as before.
+    expect(await handleAdminConsole(owner, { action: 'staff.set', email: 'known@example.com', role: 'labeller' }, true, deps)).toMatchObject({ changed: true });
+    // No account yet: an invite.
+    const out = (await handleAdminConsole(owner, { action: 'staff.set', email: ' New.Person@Example.com ', role: 'labeller' }, true, deps)) as { invited: boolean; invite: { email: string; role: string } };
+    expect(out).toMatchObject({ changed: false, invited: true, invite: { email: 'new.person@example.com', role: 'labeller' } });
+    await expect(handleAdminConsole(owner, { action: 'staff.set', email: 'nobody@example.com', role: 'none' }, true, deps)).rejects.toThrow('Pick a role to invite them with.');
+    await expect(handleAdminConsole(owner, { action: 'staff.set', email: 'not-an-email', role: 'labeller' }, true, deps)).rejects.toThrow();
+    await expect(handleAdminConsole(owner, { action: 'staff.set', email: 'applereview@revisely.app', role: 'labeller' }, true, deps)).rejects.toThrow('Leave the App Review account alone.');
+    // Only an owner invites or sees invites.
+    const labeller = { uid: 'old1', email: 'known@example.com', role: 'labeller' as const };
+    await expect(handleAdminConsole(labeller, { action: 'staff.set', email: 'x@example.com', role: 'owner' }, true, deps)).rejects.toThrow('Your role doesn’t allow this.');
+
+    // A sign-in with that email, not verified: no role; an access request instead.
+    expect(await me('u-new', 'new.person@example.com', false)).toMatchObject({ role: null, permissions: [], request: 'pending' });
+    let list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as {
+      invites: { email: string }[];
+      requests: { uid: string; verified: boolean; name: string; photo: string; method: string; attempts: number }[];
+    };
+    expect(list.invites.map((i) => i.email)).toEqual(['new.person@example.com']);
+    expect(list.requests).toEqual([expect.objectContaining({ uid: 'u-new', verified: false, name: 'Test u-new', photo: 'https://example.com/p.png', method: 'Google', attempts: 1 })]);
+    // The owner's `me` carries the count, for the header's badge.
+    expect(await handleAdminConsole(owner, { action: 'me' }, false, deps)).toMatchObject({ requests: 1 });
+    // Verified (Google, an email link): the invite's role, once, recorded as from an invite by the owner.
+    expect(await me('u-new', 'New.Person@example.com', true)).toMatchObject({ role: 'labeller', permissions: ['recite.label'], labels: false });
+    expect(set.at(-1)).toEqual({ uid: 'u-new', role: 'labeller', via: 'invite' });
+    expect((await db.doc('consoleInvites/new.person@example.com').get()).data()).toMatchObject({ status: 'used', usedBy: 'u-new' });
+    list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as typeof list;
+    expect(list.invites).toEqual([]);
+    // u-new has a role now, so their old request isn't listed.
+    expect(list.requests).toEqual([]);
+    // Someone else with the same email later claims nothing.
+    expect(await me('u-other', 'new.person@example.com', true)).toMatchObject({ role: null, request: 'pending' });
+
+    // One tap gives the role and marks the request granted.
+    list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as typeof list;
+    expect(list.requests.map((w) => w.uid)).toEqual(['u-other']);
+    accounts.set('u-other', account('u-other', 'new.person@example.com'));
+    await handleAdminConsole(owner, { action: 'staff.set', uid: 'u-other', role: 'labeller' }, true, deps);
+    expect((await db.doc('consoleRequests/u-other').get()).get('status')).toBe('granted');
+    list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as typeof list;
+    expect(list.requests).toEqual([]);
+
+    // Dismiss: off the list; the waiting page's polls don't bring it back, a new sign-in does.
+    await me('u-d', 'd@example.com', true);
+    await handleAdminConsole(owner, { action: 'staff.request', uid: 'u-d', decision: 'dismiss' }, true, deps);
+    expect(await me('u-d', 'd@example.com', true, true)).toMatchObject({ request: 'dismissed' });
+    list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as typeof list;
+    expect(list.requests.map((r) => r.uid)).toEqual([]);
+    expect(await me('u-d', 'd@example.com', true)).toMatchObject({ request: 'pending' });
+    list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as typeof list;
+    expect(list.requests.map((r) => [r.uid, r.attempts])).toEqual([['u-d', 2]]);
+    // Block: off the list for good, whatever they do.
+    await handleAdminConsole(owner, { action: 'staff.request', uid: 'u-d', decision: 'block' }, true, deps);
+    expect(await me('u-d', 'd@example.com', true)).toMatchObject({ role: null, request: 'blocked' });
+    list = (await handleAdminConsole(owner, { action: 'staff.list' }, true, deps)) as typeof list;
+    expect(list.requests).toEqual([]);
+    await expect(handleAdminConsole(owner, { action: 'staff.request', uid: 'nobody', decision: 'block' }, true, deps)).rejects.toThrow('That request is gone.');
+    await expect(handleAdminConsole(labeller, { action: 'staff.request', uid: 'u-d', decision: 'dismiss' }, true, deps)).rejects.toThrow('Your role doesn’t allow this.');
+
+    // Cancelling: the invite no longer gives anything.
+    await handleAdminConsole(owner, { action: 'staff.set', email: 'later@example.com', role: 'admin' }, true, deps);
+    expect(await handleAdminConsole(owner, { action: 'staff.cancelInvite', email: 'later@example.com' }, true, deps)).toEqual({ cancelled: true });
+    expect(await handleAdminConsole(owner, { action: 'staff.cancelInvite', email: 'later@example.com' }, true, deps)).toEqual({ cancelled: false });
+    expect(await me('u-later', 'later@example.com', true)).toMatchObject({ role: null });
+
+    // The audit log's role view shows invites made and cancelled (setRole's own entries are faked here).
+    const page = (await handleAdminConsole(owner, { action: 'audit.roles' }, true, deps)) as { rows: { kind?: string; action?: string; email: string; role?: string }[] };
+    expect(page.rows.filter((r) => r.kind === 'invite').map((r) => [r.action, r.email, r.role])).toEqual([
+      ['cancelled', 'later@example.com', 'admin'],
+      ['created', 'later@example.com', 'admin'],
+      ['created', 'new.person@example.com', 'labeller'],
+    ]);
+    expect(page.rows.filter((r) => r.kind === 'request').map((r) => [r.action, r.email])).toEqual([
+      ['seen', 'later@example.com'],
+      ['blocked', 'd@example.com'],
+      ['dismissed', 'd@example.com'],
+      ['seen', 'd@example.com'],
+      ['granted', 'new.person@example.com'],
+      ['seen', 'new.person@example.com'],
+      // u-new's own request, answered when the invite gave the role
+      ['granted', 'new.person@example.com'],
+      ['seen', 'new.person@example.com'],
+    ]);
+  });
+
   (process.env.FIREBASE_AUTH_EMULATOR_HOST ? it : it.skip)('role changes keep other claims and go to the audit log', async () => {
     const auth = getAuth(app);
     const email = `staff-${Date.now()}@example.com`;
@@ -210,7 +456,7 @@ const BY: Reviewer = { uid: 'staff1', email: 'owner@example.com', role: 'owner',
     await setRole(auth, db, user.uid, null, by, NOW + 2);
     expect(roleOf((await auth.getUser(user.uid)).customClaims)).toBeNull();
     const log = await rolesPage(db, {});
-    expect(log.rows.map((r) => [r.from, r.to])).toEqual([
+    expect(log.rows.map((r) => ('from' in r ? [r.from, r.to] : [r.action, r.email]))).toEqual([
       ['reviewer', null],
       ['owner', 'reviewer'],
     ]);

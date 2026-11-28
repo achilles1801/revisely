@@ -10,6 +10,16 @@
  *   od.revoke        take Premium through Open Door back (review.ts)  openDoor.revoke
  *   audit.decisions  the decisions, newest first                      audit.read
  *   audit.roles      role changes, newest first                       audit.read
+ *   staff.list       who has which role, and what each role may do    roles.manage
+ *   staff.set        give, change or take a role (by email or id); an email
+ *                    with no account yet gets an invite (invites.ts)  roles.manage
+ *   staff.cancelInvite  cancel a pending invite                       roles.manage
+ *   staff.request    dismiss or block an access request               roles.manage
+ *   labels.next      the next recitation clip to label, with its audio  recite.label (labels.ts)
+ *   labels.get       one clip again (going back)                      recite.label
+ *   labels.save      the caller's label on a clip (+ an audit entry)  recite.label
+ *   labels.stats     clips labelled of all, sent to me, today's answers  recite.label
+ *   audit.labels     every saved label, with each tap, newest first   audit.read
  *
  * Every action but `me` needs App Check, and Open Door's need a project with the program (SUPPORT_PAGES), so the
  * production project answers nothing about applications. Nothing here logs an applicant's answers or a note.
@@ -28,8 +38,10 @@ import {
   review,
   summary,
 } from '../support/review';
-import { ConsoleError, Permission, ROLE_NAMES, StaffCaller, permissionsOf, requirePermission } from './roles';
-import { RoleChange, rolesPage } from './staff';
+import { ConsoleError, GRANTS, PERMISSIONS, Permission, ROLES, ROLE_NAMES, Role, StaffCaller, isRole, permissionsOf, requirePermission } from './roles';
+import { RoleActor, RoleChange, StaffMember, roleChangeRefusal, rolesPage } from './staff';
+import { LabelDeps, handleLabels, labelAuditPage } from './labels';
+import { RequestStatus, cancelInvite, claimInvite, createInvite, normalEmail, noteRequest, pendingInvites, pendingRequestCount, pendingRequests, requestStatus, settleRequest } from './invites';
 
 /** Accounts nobody may decide on from the console (the script refuses them too). */
 export const PROTECTED_EMAILS = ['applereview@revisely.app'];
@@ -54,6 +66,10 @@ export interface ConsoleDeps {
   accountByEmail(email: string): Promise<AccountInfo | null>;
   /** whether the account has a Revisely plan (a user document, made in the app) */
   hasPlan(uid: string): Promise<boolean>;
+  /** every account with a console role (staff.ts staff(): a scan of Firebase Auth) */
+  staff(): Promise<StaffMember[]>;
+  /** gives (null: takes) a role, keeping other claims, and records it in consoleAudit (staff.ts setRole) */
+  setRole(uid: string, role: Role | null, by: RoleActor): Promise<RoleChange | null>;
   /** Open Door runs in this project (SUPPORT_PAGES) */
   programOpen: boolean;
   project: string;
@@ -61,6 +77,10 @@ export interface ConsoleDeps {
   metricsEnvs?: { env: string; label: string; here: boolean }[];
   now(): number;
   log(entry: Record<string, unknown>): void;
+  /** the labelling page's clips and audio (labels.ts); absent where it isn't wired */
+  labels?: LabelDeps;
+  /** invites and the waiting list (invites.ts) are on */
+  invites?: boolean;
 }
 
 const UID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -90,6 +110,12 @@ export interface Me {
   openDoor: boolean;
   /** The Overview's environments (only for a role that sees metrics). */
   metricsEnvs: { env: string; label: string; here: boolean }[];
+  /** the labelling page (/label) is here and the role may use it */
+  labels: boolean;
+  /** with no role: the access request's status (pending, or blocked) */
+  request?: RequestStatus;
+  /** for an owner: access requests waiting (the header's badge) */
+  requests?: number;
 }
 
 export type QueueItem = QueueRow & {
@@ -121,20 +147,41 @@ export async function handleAdminConsole(
   const action = str(data, 'action');
 
   if (action === 'me') {
+    let role = caller.role;
+    let request: RequestStatus | undefined;
+    // No role yet: an invite for this verified email gives it now (invites.ts); otherwise an access request, listed on
+    // Staff for the owner.
+    if (!role && deps.invites) {
+      const who = { uid: caller.uid, email: caller.email, emailVerified: !!caller.emailVerified, name: caller.name, photo: caller.photo, method: caller.method };
+      role = await claimInvite(deps.db, who, (uid, r, by) => deps.setRole(uid, r, by), deps.now());
+      if (role) deps.log({ event: 'invite.claimed', uid: caller.uid, role });
+      // `poll`: the waiting page asking again on its own; that isn't a new attempt (and doesn't undo a dismissal).
+      else if (data.poll === true) request = (await requestStatus(deps.db, caller.uid)) ?? (await noteRequest(deps.db, who, deps.now()));
+      else request = await noteRequest(deps.db, who, deps.now());
+    }
+    const permissions = permissionsOf(role);
     const me: Me = {
       uid: caller.uid,
       email: caller.email,
-      role: caller.role,
-      roleName: caller.role ? ROLE_NAMES[caller.role] : null,
-      permissions: permissionsOf(caller.role),
+      role,
+      roleName: role ? ROLE_NAMES[role] : null,
+      permissions,
       project: deps.project,
-      openDoor: deps.programOpen && permissionsOf(caller.role).includes('openDoor.read'),
-      metricsEnvs: permissionsOf(caller.role).includes('metrics.read') ? (deps.metricsEnvs ?? []) : [],
+      openDoor: deps.programOpen && permissions.includes('openDoor.read'),
+      metricsEnvs: permissions.includes('metrics.read') ? (deps.metricsEnvs ?? []) : [],
+      labels: !!deps.labels?.open && permissions.includes('recite.label'),
     };
+    if (request) me.request = request;
+    if (deps.invites && permissions.includes('roles.manage')) me.requests = await pendingRequestCount(deps.db);
     return me;
   }
 
   if (!appCheck) throw new ConsoleError('failed-precondition', 'This page couldn’t prove it is Revisely Console. Reload it.');
+
+  if (action?.startsWith('labels.')) {
+    if (!deps.labels) throw new ConsoleError('failed-precondition', 'Labelling isn’t in this project.');
+    return handleLabels(caller, action, data, deps.labels);
+  }
 
   switch (action) {
     case 'od.summary': {
@@ -240,10 +287,94 @@ export async function handleAdminConsole(
       return { rows: page.rows.map((d) => ({ ...d, email: accounts.get(d.uid)?.email ?? null, exists: accounts.get(d.uid)?.exists ?? false })), next: page.next };
     }
 
+    case 'audit.labels': {
+      requirePermission(caller, 'audit.read');
+      return labelAuditPage(deps.db, { cursor: data.cursor, limit: typeof data.limit === 'number' ? data.limit : undefined });
+    }
+
     case 'audit.roles': {
       requirePermission(caller, 'audit.read');
-      const page: { rows: RoleChange[]; next: string | null } = await rolesPage(deps.db, { cursor: data.cursor, limit: typeof data.limit === 'number' ? data.limit : undefined });
-      return page;
+      return rolesPage(deps.db, { cursor: data.cursor, limit: typeof data.limit === 'number' ? data.limit : undefined });
+    }
+
+    case 'staff.list': {
+      requirePermission(caller, 'roles.manage');
+      const members = await deps.staff();
+      const accounts = await deps.accounts(members.map((m) => m.uid));
+      const order = (r: Role) => ROLES.indexOf(r);
+      const rows = members
+        .map((m) => {
+          const a = accounts.get(m.uid);
+          return { uid: m.uid, email: m.email, role: m.role, lastSignInAt: a?.lastSignInAt ?? null, disabled: a?.disabled ?? false, you: m.uid === caller.uid };
+        })
+        .sort((a, b) => order(a.role) - order(b.role) || String(a.email).localeCompare(String(b.email)));
+      const roles = ROLES.map((role) => ({ role, name: ROLE_NAMES[role], permissions: GRANTS[role].map((p) => PERMISSIONS[p]) }));
+      if (!deps.invites) return { rows, roles, invites: [], requests: [] };
+      const [invites, requests] = await Promise.all([pendingInvites(deps.db), pendingRequests(deps.db)]);
+      const staffUids = new Set(members.map((m) => m.uid));
+      return { rows, roles, invites, requests: requests.filter((r) => !staffUids.has(r.uid)) };
+    }
+
+    case 'staff.set': {
+      const who = requirePermission(caller, 'roles.manage');
+      const raw = data.role;
+      if (!(raw === null || raw === 'none' || isRole(raw))) throw new ConsoleError('invalid-argument', 'Pick a role.');
+      const to: Role | null = raw === null || raw === 'none' ? null : raw;
+      let account: AccountInfo | null = null;
+      if (data.uid != null) account = (await deps.accounts([uidArg(data)])).get(str(data, 'uid')!) ?? null;
+      else {
+        const email = (str(data, 'email') ?? '').trim();
+        if (!email.includes('@')) throw new ConsoleError('invalid-argument', 'Type the account’s email.');
+        account = await deps.accountByEmail(email);
+      }
+      if (!account || !account.exists) {
+        // No account yet: an invite, which gives the role the first time they sign in with this email.
+        if (!deps.invites || data.uid != null) {
+          throw new ConsoleError('not-found', 'No account has this email yet. They sign in once on the console’s sign-in page, then you can give them a role.');
+        }
+        if (!to) throw new ConsoleError('invalid-argument', 'Pick a role to invite them with.');
+        const email = normalEmail(str(data, 'email'));
+        if (PROTECTED_EMAILS.includes(email)) throw new ConsoleError('permission-denied', 'Leave the App Review account alone.');
+        const invite = await createInvite(deps.db, email, to, { uid: who.uid, email: who.email }, deps.now());
+        deps.log({ event: 'invite.created', by: caller.uid, role: to });
+        return { changed: false, invited: true, invite };
+      }
+      const members = await deps.staff();
+      const refusal = roleChangeRefusal({
+        callerUid: caller.uid,
+        targetUid: account.uid,
+        targetEmail: account.email,
+        from: members.find((m) => m.uid === account!.uid)?.role ?? null,
+        to,
+        owners: members.filter((m) => m.role === 'owner').length,
+        protectedEmails: PROTECTED_EMAILS,
+      });
+      if (refusal) throw new ConsoleError(refusal.code, refusal.message);
+      const change = await deps.setRole(account.uid, to, { uid: who.uid, email: who.email, via: 'console' });
+      if (deps.invites && to) await settleRequest(deps.db, account.uid, 'granted', { uid: who.uid, email: who.email }, deps.now(), to);
+      deps.log({ event: 'roles.set', by: caller.uid, uid: account.uid, from: change?.from ?? null, to, changed: !!change });
+      return { changed: !!change, change };
+    }
+
+    case 'staff.request': {
+      const who = requirePermission(caller, 'roles.manage');
+      if (!deps.invites) throw new ConsoleError('failed-precondition', 'Access requests aren’t on in this project.');
+      const uid = uidArg(data);
+      const decision = str(data, 'decision');
+      if (decision !== 'dismiss' && decision !== 'block') throw new ConsoleError('invalid-argument', 'Dismiss or block.');
+      const found = await settleRequest(deps.db, uid, decision === 'dismiss' ? 'dismissed' : 'blocked', { uid: who.uid, email: who.email }, deps.now());
+      if (!found) throw new ConsoleError('not-found', 'That request is gone.');
+      deps.log({ event: `request.${decision}`, by: caller.uid, uid });
+      return { done: true };
+    }
+
+    case 'staff.cancelInvite': {
+      const who = requirePermission(caller, 'roles.manage');
+      if (!deps.invites) throw new ConsoleError('failed-precondition', 'Invites aren’t on in this project.');
+      const email = normalEmail(str(data, 'email'));
+      const cancelled = await cancelInvite(deps.db, email, { uid: who.uid, email: who.email }, deps.now());
+      deps.log({ event: 'invite.cancelled', by: caller.uid, cancelled });
+      return { cancelled };
     }
 
     default:

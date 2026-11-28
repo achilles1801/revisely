@@ -80,7 +80,7 @@ jobs:
       # must not overwrite. Empty it in the change that brings them to develop.
       - name: firebase deploy
         env:
-          HOLD: adminConsole consoleMetrics adminMetrics adminRevo supportApplication deleteUserAccount
+          HOLD: ''
         run: |
           VERSION=$(node -p "require('./tests/scenarios/package.json').devDependencies['firebase-tools'] || require('./tests/scenarios/package.json').dependencies['firebase-tools']")
           npm --prefix functions run build
