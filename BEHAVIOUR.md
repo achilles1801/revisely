@@ -1005,11 +1005,10 @@ Nov 11–16 2026). A revision session has the same mic (Nov 17 2026). The checki
   release owner's plan, Nov 22 2026: Recite in a revision session stopped at 15 minutes.)
 
 - **RECITE-24.** (Revisely Dev) A take's summary: a take of 2 pages or more says its mistakes per page beside the count
-  ("3 mistakes · 1.5 a page"; never in the bar), where a % alone hides how many there were. Insights' Recitation
-  section says it for its range, in one quiet line under the score: the mistakes a page across the range's finished takes
-  of 2 pages or more, pooled ("Takes of 2 pages or more: 1.2 mistakes a page"; "no mistakes"; "under 0.1" rather than
-  none), each take's pages counted as its summary counts them, from its first word's page to its last's, so takes kept
-  before this count too. Revo is told the same. Each wrong word, haraka or
+  ("3 mistakes · 1.5 a page"; never in the bar), where a % alone hides how many there were. Recitation's page (ACT-42)
+  compares the range's takes of 2 pages or more (as the summary counts them, from its first word's page to its last's)
+  with shorter ones, both a page by the share of each page recited. Revo is told the long takes' mistakes a page, pooled
+  over their pages as the summary counts them. Each wrong word, haraka or
   letter slip with what was heard shows two lines, Expected and what was recited, each the phrase around it (two words
   either side, in its ayah), as its card does. (Majd, Nov 22 2026, Tarteel picks 4 and 5: "ur recommended is fine, we
   should aim to keep it clean", "recommended is fine".)
@@ -1102,12 +1101,12 @@ What a user's takes with Mark mistakes show over time, and Revo knowing it (Majd
   wrong), puts words and similar ayahs before harakat, never calls going back to restart a mistake, and
   names surahs and ayahs, never pages.
 - **RINS-2.** Activity's Insights has a Recitation section for an account that recites, over Insights'
-  range: the score (each take's own score weighted by the words it recited) and its weeks; the passages
-  with words still marked, the most slipped first, each with those words on their highlights, opening the
-  reader there; the similar ayahs gone on with; and one line of the words cleared and the kinds, words
-  first, Not clear never counted. With Smart Tracking on, a passage rated strong that still slips is named,
-  and Weak spots say how many words Recite still marks there. Off, nothing about strength: a passage's
-  row says when it was last recited instead of how often it went wrong.
+  range (its own page since Nov 28 2026: ACT-42): the score (each take's own score weighted by the words it
+  recited); the passages with words still marked, the most slipped first, each with those words on their
+  highlights, opening the reader there; and the similar ayahs gone on with, Not clear never counted. With
+  Smart Tracking on, a passage rated strong that still slips is named, and Weak spots say how many words
+  Recite still marks there. Off, nothing about strength: a passage's row says when it was last recited
+  instead of how often it went wrong.
 - **RINS-3.** A take in a day's Recited block that slipped into a similar ayah says so under its line ("You
   went on with Yusuf 90, a similar ayah"; an ending, "You ended Al-Falaq 3 as ayah 5 ends"), two at most.
   Holding the take's passage and lines opens its menu: Show on the page, and Ask Revo about this take while
@@ -1552,6 +1551,32 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   row on the one tab (ACT-35) counts the days revised, as the page's first figure does, and its line is when they revise.
   Its help topic (the ?) describes this page, with no day circles. Elsewhere Consistency is as ACT-22 and ACT-23 say (the
   store app's two tabs), and so is its help.
+- **ACT-42.** (Revisely Dev) Recitation's own page starts from its point, "Am I getting better at reciting from memory,
+  and what do I still need to fix?" (Majd, Nov 27 2026: "the point of the graph is to illustrate a users trend in making
+  mistakes categorized by the type of mistake and also taking into account other metrics that are USEFUL like knowing
+  what mistakes has the user corrected and doesn't make anymore and which are still slipping all the time and maybe even
+  length of recitations"; "yes build all seven screens" from its board).
+  - First, the mistakes a page in Insights' range ("0.5 mistakes a page"), with a chip against the same length before it
+    ("↓ from 0.9", green when fewer, red when more, "same as before" to a tenth; none for All time or with no takes
+    before), and its takes, the words said right and the span ("40 takes · 98.8% of words said right · last 3 months,
+    against the 3 months before"). A page is fair to long and short takes: each page a take reached counts by the share
+    of its words recited, a line at least. Mistakes are the take summary's: never Not clear, a word corrected straight
+    away or a tajweed note; a take kept without its final answer never counts in a rate.
+  - Then the mistakes a page by kind on Insights' one chart (ACT-41), stacked: wrong or skipped words, hesitations (an
+    extra word), harakat and letters. 4 weeks or 3 months draw a bar a week (from its Monday, this week last), a year a
+    bar a month; the range sets which it opens on, and the pills change it. Every week or month of the span has its
+    slot, so a young account's chart is never one wide block. The line above names the lit bar ("Week of 2 Nov · 0.7 a
+    page", "… · no mistakes", "… · no takes"); a tap on a kind shows it alone, its line and bars that kind's. Takes
+    without a mistake in the span say so in place of empty bars; none, "No takes in the last 4 weeks".
+  - Fixed and still slipping: the words fixed (said right on 2 days, never by Clear now; a word still marked in another
+    way isn't fixed) and how many in the range, against the words still marked on the page, in how many passages and how
+    many first went wrong in the range; the share fixed as a bar ("13 of the 37 words you've slipped on are fixed"). Then
+    the passage that slips most (RINS-2's row) and "See all 6 passages", which also lists the similar ayahs gone on with
+    and, with Smart Tracking, passages rated strong that still slip.
+  - Your takes: the usual take's length and time ("Usually 1½ pages, about 6 minutes"; under a page, in lines), the
+    longest, and the mistakes a page of takes of 2 pages or more against shorter ones, when the range has both.
+  - Nothing on it that must stay whole wraps or is cut off, and its chart never collapses: at an SE's width and a Pro
+    Max's, at the largest text (the tiles stack), with 0, 1, a few or many takes and the longest figures.
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
   strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
   stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,

@@ -1,5 +1,6 @@
-# From Home: Activity → Insights at 30 days, scrolled to the Recitation section (RINS-2). Screenshots <NAME> (its top)
-# and <NAME>-end (its last line). Stays on Insights.
+# From Home: Activity → Insights at 30 days, scrolled to the Recitation section (ACT-42, RINS-2). Screenshots <NAME> (its
+# trend and chart), then See all opened (the passages, the similar ayahs and, with Smart Tracking, those rated strong) and
+# <NAME>-end (Your takes, its last line). Stays on Insights.
 #   env NAME
 appId: com.revisionbuddy.app
 ---
@@ -42,7 +43,15 @@ appId: com.revisionbuddy.app
       NAME: ${NAME}
 - scrollUntilVisible:
     element:
-      id: insights-recitation-quiet
+      id: insights-recitation-see-all
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: insights-recitation-see-all
+- scrollUntilVisible:
+    element:
+      id: insights-recitation-takes
     direction: DOWN
     centerElement: true
     timeout: 20000

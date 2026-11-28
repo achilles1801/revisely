@@ -221,7 +221,7 @@ export interface RecitationInsights {
 const latest = (a: string, b: string) => (a > b ? a : b);
 
 /** The day a cleared memory cleared, by Clear now or by its CLEAR_AFTER right days (null if it never opened). */
-function clearedOn(m: WordMemory, clears: readonly ClearRecord[]): ClearedWord | null {
+export function clearedOn(m: WordMemory, clears: readonly ClearRecord[]): ClearedWord | null {
   if (m.open) return null;
   const lastWrong = [...m.attempts].reverse().find((a) => !a.right);
   if (!lastWrong) return null;
@@ -241,7 +241,7 @@ function clearedOn(m: WordMemory, clears: readonly ClearRecord[]): ClearedWord |
 }
 
 /** The words still marked, one a word, its most severe open group other than tajweed. */
-function markedWords(memories: Map<string, WordMemory>): { words: MarkedWord[]; byWord: Map<number, WordMemory[]> } {
+export function markedWords(memories: Map<string, WordMemory>): { words: MarkedWord[]; byWord: Map<number, WordMemory[]> } {
   const best = new Map<number, WordMemory>();
   const byWord = new Map<number, WordMemory[]>();
   for (const m of memories.values()) {

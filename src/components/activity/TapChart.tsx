@@ -319,6 +319,7 @@ const styles = StyleSheet.create({
   labelFree: { position: 'absolute', top: 0 },
   // An empty slot's mark: a short faint line on the baseline, as wide as a bar.
   mark: { height: 3, borderRadius: 1.5 },
-  pills: { flexDirection: 'row', gap: 6, marginTop: 14 },
+  // Wraps rather than run off an SE at the largest text (Recitation's three pills, ACT-42).
+  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 14 },
   empty: { alignItems: 'center', justifyContent: 'center', marginTop: 10, paddingHorizontal: 16 },
 });
