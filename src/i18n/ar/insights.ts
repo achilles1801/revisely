@@ -49,7 +49,6 @@ export const insights: NonNullable<ArStrings['insights']> = {
     heroCount_few: 'فترات انقطاع {{range}}',
     heroCount_many: 'فترة انقطاع {{range}}',
     heroCount_other: 'فترة انقطاع {{range}}',
-    trendFrom: 'من {{count}}',
     heroLine: 'فترة الانقطاع يومان أو أكثر متتاليان دون مراجعة. راجعت في {{revised}} من {{days}} يومًا.',
     heroLineNone: 'راجعت في {{revised}} من {{days}} يومًا.',
     compactWeeks_zero: 'لا أسابيع',

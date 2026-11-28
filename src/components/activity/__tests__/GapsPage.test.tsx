@@ -53,7 +53,7 @@ describe('[ACT-42] Gaps’ own page', () => {
     renderPage([TODAY], 90, TODAY, null);
     expect(within(screen.getByTestId('insights-gaps-hero')).getByText('0')).toBeTruthy();
     expect(screen.queryByTestId('insights-gaps-tiles')).toBeNull();
-    expect(screen.queryByTestId('insights-gaps-trend')).toBeNull();
+    expect(screen.queryByTestId('insights-gaps-hero-trend')).toBeNull();
     expect(screen.queryByTestId('insights-gaps-patterns')).toBeNull();
     layOut(SE);
     expect(cellSize(TODAY)).toBe(CELL_MAX);
@@ -98,7 +98,7 @@ describe('[ACT-42] Gaps’ own page', () => {
     // The 3 months before had four gaps; these 3 months one.
     const before = [100, 101, 120, 121, 140, 141, 160, 161].map((n) => n);
     renderPage(allBut(180, [10, 11, ...before]), 90, dayBefore(400));
-    expect(within(screen.getByTestId('insights-gaps-trend')).getByText('from 4')).toBeTruthy();
+    expect(within(screen.getByTestId('insights-gaps-hero-trend')).getByText('from 4')).toBeTruthy();
     expect(within(screen.getByTestId('insights-gaps-trend-row')).getByText('Gaps are rarer')).toBeTruthy();
   });
 });

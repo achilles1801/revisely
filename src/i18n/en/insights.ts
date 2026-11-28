@@ -41,7 +41,6 @@ export const insights = {
     /** Gaps' own page (ACT-42, Revisely Dev): its hero, tiles, day grid and patterns. */
     heroCount_one: 'gap {{range}}',
     heroCount_other: 'gaps {{range}}',
-    trendFrom: 'from {{count}}',
     heroLine: 'A gap is 2 days or more in a row without revising. You revised on {{revised}} of {{days}} days.',
     heroLineNone: 'You revised on {{revised}} of {{days}} days.',
     compactWeeks_one: '{{count}} wk',
