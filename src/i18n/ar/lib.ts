@@ -162,6 +162,8 @@ export const lib: NonNullable<ArStrings['lib']> = {
     fromBoth: '{{insights}} من الإحصاءات، و{{left}} من الأمس',
     first: '{{pages}} · {{from}} أولًا',
     then: '{{pages}} · ثم {{place}}',
+    firstOnly: '{{from}} أولًا',
+    thenOnly: 'ثم {{place}}',
     toEnd: 'حتى {{end}}',
     startCta: 'بدء المراجعة',
     titleDetail: '{{title}}. {{detail}}',

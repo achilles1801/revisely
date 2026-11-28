@@ -87,6 +87,12 @@ classic default), and a fresh install starts in light.
     surah names, so the › never stands alone and "Al-" never ends a line. Each line is two lines at most (`maxFontSizeMultiplier` 1.6, then it shrinks to
     fit); the name and streak and the sheet's header stop at 1.4, and so does the greeting, which
     also keeps 12pt from the icons (about 1.05 on an iPhone SE).
+  - **Home's ring** (HOME-10, Revisely Dev; Majd's pick of the Home revision boards, Nov 27 2026: "home direction C";
+    `~/Documents/revisely-today-mocks/home-revision-v1/`): with `lib/release/homeRing` on, `home/feed/TodayRing` takes
+    the Today post's place: the name line, then centred a 136pt ring of today's pages (`palette.progress`, full in
+    `palette.done` with a check; dashed on a rest day and with nothing memorized), the lines' title over `brief` (the
+    detail without the count, "Change" ending it), the one button, and the catch-up or the next day as a quiet line. The
+    ring is hidden from VoiceOver: the lines carry the count. Its words come from `todayLines`, as the post's do.
   - **Edit schedule, tidied** (Majd chose option A of the Edit schedule audit, Nov 22 2026: "for edit schedule let's
     do option A (tidy up) for now"; mocks `~/Documents/revisely-schedule-mocks/`, A1): the header says how much a day and
     how often each page comes round (never "Automatic"); Daily amount is the first row; the days don't fold; "Create

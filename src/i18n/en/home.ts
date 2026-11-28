@@ -13,6 +13,17 @@ export const home = {
     addToTodayLabel: '{{line}}. Add to today',
     editMemorizedLabel: '{{line}}. Edit memorized pages',
     changeHint: 'Opens Jump to, to start today somewhere else',
+    /** Home's ring (HOME-10, Revisely Dev): under today's page count, inside the ring. */
+    ringToday_one: 'page today',
+    ringToday_other: 'pages today',
+    /** Under the pages revised so far: "of 20 pages". */
+    ringOf_one: 'of {{count}} page',
+    ringOf_other: 'of {{count}} pages',
+    /** Inside the ring on a rest day, and with nothing memorized yet. */
+    ringRest: 'Rest',
+    ringStart: 'Start here',
+    /** Under the ring once today is done. */
+    ringDone: 'Done for today',
   },
   jump: {
     title: 'Jump to',

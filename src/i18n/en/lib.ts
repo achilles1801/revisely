@@ -142,6 +142,9 @@ export const lib = {
     fromBoth: '{{insights}} from Insights, {{left}} from yesterday',
     first: '{{pages}} · {{from}} first',
     then: '{{pages}} · then {{place}}',
+    /** Home's ring (HOME-10): the line without the page count, which the ring shows. */
+    firstOnly: '{{from}} first',
+    thenOnly: 'then {{place}}',
     toEnd: 'to {{end}}',
     startCta: 'Start revision',
     titleDetail: '{{title}}. {{detail}}',

@@ -364,12 +364,12 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
 export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     title: 'Revised elsewhere, a day’s entry and Home',
-    covers: ['ACT-33', 'ACT-34', 'ACT-35', 'ACT-37', 'HOME-4', 'HOME-5', 'HOME-6', 'HOME-7'],
+    covers: ['ACT-33', 'ACT-34', 'ACT-35', 'ACT-37', 'HOME-4', 'HOME-5', 'HOME-6', 'HOME-7', 'HOME-10'],
     routes: ['Dashboard', 'Activity'],
     text: lines(
       '- A day’s + → “Revised elsewhere”: a search for a surah or juz above the 30 juz. A tap chooses a juz; a hold opens it for its halves or parts. Extra pages never change the day’s schedule.',
-      '- Activity is one tab: “This week” (“Month” opens the calendar), the picked day (tap to open; no note), then “Your revision”: a row per section opening its page (empty ones hidden), “Edit sections” last. Spot tests: own line, block and search filter, “Finished” or “Stopped early”. A note can show under a take or spot test (Note sheet’s Show under, or its menu’s “Add a note”).',
-      '- Home: no “Recent sessions” (Activity has them). “Home background” is in Appearance.',
+      '- Activity is one tab: “This week” (“Month” opens the calendar), the picked day (tap to open; no note), then “Your revision”: a row per section opening its page (empty ones hidden), “Edit sections” last. Spot tests: own line, block and search filter. A note can show under a take or spot test (Note sheet’s Show under, or its menu’s “Add a note”).',
+      '- Home: a ring of today’s pages; no “Recent sessions” (in Activity). “Home background” is in Appearance.',
     ),
   },
   {
