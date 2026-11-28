@@ -1,10 +1,13 @@
 // screens/onboarding and components/onboarding: the welcome, then one question a screen.
 export const onboarding = {
   welcome: {
-    /** "Your Quran, remembered." with "remembered" in the accent, on a new line. */
-    title: 'Your Quran,',
-    accent: 'remembered',
-    body: 'Revise what you have memorized, a little every day.',
+    /**
+     * The app's line (Majd, Nov 27 2026): "Closer to the Quran, one verse at a time.", with "one verse at a time" in the
+     * accent, on a new line.
+     */
+    title: 'Closer to the Quran,',
+    accent: 'one verse at a time',
+    body: 'Revise what you’ve memorized, or read just one verse: each brings you closer.',
     begin: 'Begin',
     note: 'Takes under a minute',
   },

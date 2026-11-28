@@ -3,9 +3,9 @@ import type { ArStrings } from './types';
 
 export const onboarding: NonNullable<ArStrings['onboarding']> = {
   welcome: {
-    title: 'قرآنك،',
-    accent: 'حاضر في حفظك',
-    body: 'راجع ما حفظته، قليلًا كل يوم.',
+    title: 'أقرب إلى القرآن،',
+    accent: 'آيةً بعد آية',
+    body: 'راجع ما حفظته أو اقرأ آيةً واحدة، فكلّ ذلك يقرّبك.',
     begin: 'البدء',
     note: 'في أقل من دقيقة',
   },

@@ -155,7 +155,9 @@ describe('<WelcomeScreen />', () => {
     expect(styleOf('welcome').backgroundColor).toBe(light.bg);
     // Indigo has a glow; it draws behind and takes no touches.
     expect(screen.getByTestId('hero-glow').props.pointerEvents).toBe('none');
-    expect(screen.getByText(/Your Quran,/)).toBeTruthy();
+    // The app's line (Majd, Nov 27 2026): "Closer to the Quran, one verse at a time."
+    expect(screen.getByText(/Closer to the Quran,/)).toBeTruthy();
+    expect(screen.getByTestId('welcome-accent')).toHaveTextContent('one verse at a time');
     expect(styleOf('welcome-accent').color).toBe(light.accentText);
     expect(screen.getByText('Takes under a minute')).toBeTruthy();
     expect(arabicLines(screen.UNSAFE_root as never)).toHaveLength(1);
