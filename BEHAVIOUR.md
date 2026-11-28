@@ -414,6 +414,13 @@ current basic sounds". October 2026's version was removed for the voices it offe
   had, and one rated before them keeps its rating until a session rates it again. (Nov 17 2026: past 100 days of
   sessions, every launch wiped the last revised day, count and rating of each page last revised before them, and
   saved that to the account.)
+- **SYNC-7.** Online, the offline screen never shows: signing in by any method, signing out and in again, or a cold
+  start never shows "Connect to the internet to set up", even for a moment, and Home never says "Offline" (Majd, Nov 28
+  2026: "everyone i login for a split second i get the no wifi / disconnected "error" screen -- this shouldn't be
+  appearing at all"). Firestore answering from its own memory while it connects is not being offline: every sign-in
+  reads the account once, so its first answer was from that memory, and the screen showed until the server's came. The
+  phone is offline when the system says it has no connection (at once), or when the server hasn't answered for 6
+  seconds; then SYNC-2 and the first launch's "Connect to the internet to set up" hold as before.
 - **AUTH-2.** When the app finds the phone signed out at launch, though a sign-in was saved on it (the
   account's sign-ins were ended on the server, or it was disabled or deleted), the sign-in screen says "You were
   signed out. Sign in again to carry on." until the next sign-in, and Sentry hears of it once, with no account

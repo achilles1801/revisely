@@ -51,8 +51,13 @@ for good: it waited for the server to answer for the user document.
   subscribed again after a backoff; "Try again" does it at once. Pull to refresh doesn't read the
   server: the listeners already do, and an older read could roll a newer snapshot back.
 - **First launch offline** (no copy): `connectionNeeded` → `ConnectToSetUp` ("Connect to the internet
-  to set up", Try again, Sign out) when NetInfo or Firestore says offline, or after `SERVER_WAIT_MS`
-  (6 s). It carries on by itself when the server answers. Onboarding never starts without the server.
+  to set up", Try again, Sign out) when NetInfo says offline, or after `SERVER_WAIT_MS` (6 s) without
+  the server. It carries on by itself when the server answers. Onboarding never starts without the server.
+- **What counts as offline** (`offline`, SYNC-7): NetInfo saying so, at once, or the server silent for
+  `SERVER_WAIT_MS` after the user listener answered `fromCache` (`serverLate`). A `fromCache` answer alone
+  is not offline: every sign-in reads the user document once (AuthContext's `getUser`), so the listener's
+  first answer comes from the SDK's memory while it is still connecting, and until Nov 28 2026 that flashed
+  "Connect to the internet to set up" (no copy yet) or "Offline" at every login.
 - **A slow network at launch:** Firebase Auth checks its saved sign-in with the server first (up to
   30 s). After `AUTH_GRACE_MS` (1.5 s) the app opens with the account Auth saved
   (`provisionalUid`, read from Auth's own AsyncStorage entry) and its copy; nothing is sent until Auth

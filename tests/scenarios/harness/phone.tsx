@@ -148,6 +148,11 @@ export interface Booted {
 export class OpenApp {
   private ctx: { app: AppValue | null; auth: AuthValue | null } = { app: null, auth: null };
   readonly renders = { n: 0 };
+  /**
+   * Whether any render so far had the "Connect to the internet to set up" screen (`connectionNeeded`) or Home's Offline
+   * note (`offline`) on: a flash for one render is caught, which polling `app` would miss (SYNC-7).
+   */
+  readonly seen = { connectionNeeded: false, offline: false };
   private view: RTL.RenderResult | null = null;
   private closed = false;
 
@@ -195,10 +200,13 @@ export class OpenApp {
     const { AppProvider, useApp } = req<any>('src/context/AppContext');
     const ctx = app.ctx;
     const renders = app.renders;
+    const seen = app.seen;
     function Probe() {
       renders.n++;
       ctx.auth = useAuth();
       ctx.app = useApp();
+      if (ctx.app?.connectionNeeded) seen.connectionNeeded = true;
+      if (ctx.app?.offline) seen.offline = true;
       return null;
     }
     const metrics = { frame: { x: 0, y: 0, width: 393, height: 852 }, insets: { top: 59, left: 0, right: 0, bottom: 34 } };
