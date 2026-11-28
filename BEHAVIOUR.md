@@ -1475,7 +1475,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   Then "Days revised, week by week": a bar a week (Sunday first, none before
   the account's first week), its line the week tapped, else this one ("Week of 18 Oct · 6 of 7 days", "This week · 3 of 5
   days so far"), with its own pills, 4 weeks, 3 months or a year, opening on the one nearest the range (the page reads a
-  year of items for it). Then "When you revise": the 24 hours as bars once timed revisions fall on 3 days (ACT-31), the
+  year of items for it); a short history's first empty slot is named by its week's first day (ACT-41). Then "When you revise": the 24 hours as bars once timed revisions fall on 3 days (ACT-31), the
   busiest in full colour; a tap on an hour (never a press-and-hold) makes the line that hour's minutes and sessions, the
   same hour again puts back the busiest. Full cycles: a cycle runs from its first day until every page it needs (those
   memorized by then) has been revised once, and the next begins the day after; the hero is those finished in the range on
