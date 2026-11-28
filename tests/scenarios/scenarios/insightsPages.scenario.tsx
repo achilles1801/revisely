@@ -140,6 +140,10 @@ it('[MEM-11] Memorization’s page says when the juz in progress is done at this
   setNow(`${TODAY} 09:00`);
   const app = await openSection(phone, 'insights-row-memorization');
   await app.until(() => shows(app, 'insights-memorization-bars-month'), 'Memorization’s chart (MEM-10)');
+  // A timeline from a young history (ACT-41): September to November in six slots, the three before them marked on the
+  // baseline and the first named by its month.
+  expect(text(app, 'insights-memorization-bars-month-label-first')).toBe('Jun');
+  expect(app.screen.queryAllByTestId('insights-memorization-bars-month-mark')).toHaveLength(3);
 
   // Under #1066's chart, the one addition: 9 pages at 11 in 90 days take 74 days, to 10 February.
   await app.until(() => shows(app, 'insights-memorization-done-by'), 'the line on when Juz 29 is done');

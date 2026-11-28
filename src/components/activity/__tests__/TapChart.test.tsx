@@ -165,5 +165,40 @@ describe('[ACT-41] never one block, never an empty frame (Majd: "plz ensure some
       screen.unmount();
     }
   });
+
+  // A young account's Day view drew one bar at the far right of an empty area with no other labels (Nov 28 2026).
+  it.each([320, 440])('at %i pt: a timeline, never a bar floating alone: each empty slot has a mark, the first and last slots a label', (width) => {
+    dims = jest.spyOn(Dimensions, 'get').mockReturnValue({ width, height: 800, scale: 3, fontScale: 1 });
+    for (const n of [1, 2, 3, 12, 30]) {
+      render(<TapChart bars={bars(n)} picked={null} onPick={jest.fn()} colours={['red']} testID="chart" slotLabel={(before) => `B${before}`} />);
+      const lead = Math.max(0, MIN_SLOTS - n);
+      // Each empty slot holds a faint mark on the baseline, as wide as a bar.
+      const marks = screen.queryAllByTestId('chart-mark');
+      expect(marks).toHaveLength(lead);
+      for (const m of marks) {
+        const style = StyleSheet.flatten(m.props.style);
+        expect(style.width).toBe(chartLayout(n, width - 32).bar);
+        expect(style.backgroundColor).toBe(mockPalette.track);
+      }
+      // The first slot is labelled: the slot before the bars by what it stands for (the first, `lead` slots back), or the
+      // first bar; the last bar too.
+      if (lead > 0) expect(screen.getByTestId('chart-label-first')).toHaveTextContent(`B${lead}`);
+      else {
+        expect(screen.queryByTestId('chart-label-first')).toBeNull();
+        expect(screen.getByTestId('chart-label-w0')).toHaveTextContent('L0');
+      }
+      expect(screen.getByTestId(`chart-label-w${n - 1}`)).toHaveTextContent(`L${n - 1}`);
+      screen.unmount();
+    }
+  });
+
+  it('a bar of nothing keeps its slot as a mark on the baseline, and stays a button', () => {
+    const withZero = bars(3).map((b, i) => (i === 1 ? { ...b, value: 0, valueText: undefined } : b));
+    render(<TapChart bars={withZero} picked={null} onPick={jest.fn()} colours={['red']} testID="chart" />);
+    expect(screen.queryByTestId('chart-fill-w1')).toBeNull();
+    // Four empty slots before the bars and the bar of nothing.
+    expect(screen.queryAllByTestId('chart-mark')).toHaveLength(MIN_SLOTS - 3 + 1);
+    expect(screen.getByTestId('chart-bar-w1').props.accessibilityRole).toBe('button');
+  });
 });
 

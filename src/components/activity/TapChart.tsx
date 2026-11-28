@@ -1,10 +1,13 @@
-// Insights' one chart (ACT-38; Majd, Nov 27 2026: "i can't even click on an hour on that chart i need to hold it down
+// Insights' one chart (ACT-41; Majd, Nov 27 2026: "i can't even click on an hour on that chart i need to hold it down
 // like what bro", and his "yes build all seven screens" from the Insights v2 boards). Bars side by side, each a button:
 // a tap picks it (the screen's line above the chart becomes that bar, the others fade), the same bar again clears it.
 // Nothing needs a press-and-hold. A bar can be stacked (Recitation's mistakes by kind). The value shows above every bar
 // when there are 7 or fewer, otherwise above the lit one only; the labels under them are all shown up to 10 bars, else
 // the two ends and the pick (`labelShown`). Built from Memorization's chart (MEM-10, #1066), which uses it.
 // The range pills (4 weeks, 3 months, a year) and Month | Day are `ChartPills`.
+// A timeline, never a bar floating in an empty area (Nov 28 2026, a young account's Day view: one bar at the far right,
+// nothing else): every empty slot, and every bar of nothing, has a faint mark on the baseline, and the first slot and the
+// last are labelled, the first slot before any bar by `slotLabel`.
 
 import React, { useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -114,6 +117,7 @@ export function TapChart({
   empty,
   maxBar = MAX_BAR_WIDTH,
   minSlots = MIN_SLOTS,
+  slotLabel,
 }: {
   bars: readonly ChartBar[];
   /** The picked bar's key, or none. */
@@ -135,6 +139,11 @@ export function TapChart({
   /** A bar's widest (MEM-12: 28 pt by month, 14 by day) and the fewest slots (6 months, 7 days). */
   maxBar?: number;
   minSlots?: number;
+  /**
+   * The label of an empty slot `before` slots ahead of the first bar (1: just before it): the month, day or week it stands
+   * for. The first slot is labelled with it, so a lone bar reads as a point on a timeline.
+   */
+  slotLabel?: (before: number) => string;
 }) {
   const { palette } = useTheme();
   const { width: window, fontScale } = useWindowDimensions();
@@ -159,7 +168,13 @@ export function TapChart({
   const room = labelRoom(step, labelWidth);
   const top = Math.max(max ?? 0, ...bars.map((b) => b.value), 1e-9);
   const { gap, lead } = layout;
-  const blanks = Array.from({ length: lead }, (_, i) => <View key={`lead-${i}`} style={styles.col} testID={`${testID}-slot-empty`} />);
+  // A faint mark on the baseline where a slot has nothing: an empty slot, or a bar of nothing.
+  const mark = <View style={[styles.mark, { width: layout.bar, backgroundColor: palette.track }]} testID={`${testID}-mark`} />;
+  const blanks = Array.from({ length: lead }, (_, i) => (
+    <View key={`lead-${i}`} style={styles.col} testID={`${testID}-slot-empty`}>
+      {mark}
+    </View>
+  ));
   return (
     <View testID={testID} onLayout={(e) => setMeasured(e.nativeEvent.layout.width)}>
       <View style={[styles.bars, { height: height + 21, gap }]}>
@@ -200,14 +215,32 @@ export function TapChart({
                     )}
                   </View>
                 )
-              ) : null}
+              ) : (
+                mark
+              )}
             </Tap>
           );
         })}
       </View>
       {n <= LABELS_ALL_UP_TO ? (
         <View style={[styles.labels, { gap }]}>
-          {Array.from({ length: lead }, (_, i) => <View key={`lead-${i}`} style={styles.label} />)}
+          {Array.from({ length: lead }, (_, i) =>
+            // The first slot names where the timeline starts; the others stay quiet.
+            i === 0 && slotLabel ? (
+              <ChromeText
+                key="lead-0"
+                style={[typeV2.meta, styles.label, { color: palette.secondary }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.6}
+                testID={`${testID}-label-first`}
+              >
+                {slotLabel(lead)}
+              </ChromeText>
+            ) : (
+              <View key={`lead-${i}`} style={styles.label} />
+            ),
+          )}
           {bars.map((b, i) => (
             <ChromeText
               key={b.key}
@@ -284,6 +317,8 @@ const styles = StyleSheet.create({
   label: { flex: 1, textAlign: 'center' },
   labelsFree: { marginTop: 6 },
   labelFree: { position: 'absolute', top: 0 },
+  // An empty slot's mark: a short faint line on the baseline, as wide as a bar.
+  mark: { height: 3, borderRadius: 1.5 },
   pills: { flexDirection: 'row', gap: 6, marginTop: 14 },
   empty: { alignItems: 'center', justifyContent: 'center', marginTop: 10, paddingHorizontal: 16 },
 });

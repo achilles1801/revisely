@@ -1421,7 +1421,10 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   one full-width bar: "plz ensure something like this never happens (garbage ui)"): a bar is at most 28 pt wide, and the
   chart has at least seven slots, the bars at the end (the newest at the right) and the slots before them empty, on an
   SE and a Pro Max alike. With nothing in its range it says so in one grey line ("Nothing here yet in this range"),
-  never an empty frame.
+  never an empty frame. It reads as a timeline, never a bar floating in an empty area (Nov 28 2026: a young account's Day
+  view drew one bar at the far right with nothing else): each empty slot, and each bar of nothing, has a faint mark on
+  the baseline as wide as a bar, and the first slot and the last are labelled, the first slot before any bar by what it
+  stands for (the month, the day's number, the week's first day).
 - **ACT-42.** (Revisely Dev) Gaps on its own page (the one Activity tab, ACT-35) starts from its point, "do I miss days,
   how badly, and is it getting better?" (Majd, Nov 27 2026, on the page before: "2 days what? is that the longest gap
   i've had? is that the most recent gap? do i usually have this gap? are there patterns here?"; then "yes build all seven
