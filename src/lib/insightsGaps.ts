@@ -314,3 +314,121 @@ export function gapsHaveNatural(v: GapsView): boolean {
     v.gaps.some((g) => naturalDiffers(g.days))
   );
 }
+
+// ---------------------------------------------------------------- Gaps' own page (ACT-42, Revisely Dev)
+// Majd, Nov 27 2026, on the old page: "2 days what? is that the longest gap i've had? is that the most recent gap? do i
+// usually have this gap? are there patterns here?" Board: ~/Documents/revisely-today-mocks/insights-v2/board-gaps.png.
+
+/** A length for a tile, short enough for a third of an SE's width: "2 days", "3 wk", "2 mo", "1 yr"; "60+ days". */
+export function compactDuration(days: number, inDays = false, atLeast = false): string {
+  let text: string;
+  if (inDays || days < NATURAL_FROM_DAYS) text = t('insights.gaps.days', { count: days });
+  else if (days < WEEKS_UNTIL) text = t('insights.gaps.compactWeeks', { count: Math.floor(days / 7) });
+  else if (days < 365) text = t('insights.gaps.compactMonths', { count: Math.max(1, Math.floor(days / MONTH_DAYS)) });
+  else text = t('insights.gaps.compactYears', { count: Math.floor(days / 365) });
+  // A gap of unknown start stays in days ("60+ days"), as its label does.
+  return atLeast ? t('insights.gaps.gapLabelAtLeast', { count: days }) : text;
+}
+
+/** The range just before this one, as long: its gaps, or null when the account (or what was read) doesn't reach it. */
+export function gapsBefore(input: GapsInput, view: GapsView): { count: number; averageDays: number } | null {
+  const start = dayNumber(view.rangeStart);
+  const span = dayNumber(input.today) - start + 1;
+  const prevStart = start - span;
+  if (!input.firstDay || dayNumber(input.firstDay) > prevStart) return null;
+  if (input.knownSince && dayNumber(input.knownSince) > prevStart) return null;
+  const before = gapsView({ ...input, today: dayFromNumber(start - 1), window: span });
+  if (!before) return null;
+  const gaps = before.gaps.filter((g) => !g.atLeast);
+  const averageDays = gaps.length ? gaps.reduce((n, g) => n + g.days, 0) / gaps.length : 0;
+  return { count: gaps.length, averageDays };
+}
+
+export interface GapTile {
+  key: 'longest' | 'recent' | 'both' | 'only' | 'between';
+  value: string;
+  label: string;
+  /** Its days ("9–10 Oct", "24 Nov – today"); none for the time between gaps. */
+  dates?: string;
+  /** The gap still open from 2 weeks: grey, as the figure was (someone coming back is welcomed, not alarmed). */
+  quiet?: boolean;
+}
+
+/**
+ * Up to three tiles, so a length always says which it is: the longest and the most recent (one tile when they are the
+ * same gap, or when there is only one), each with its dates, and the time usually revised between gaps (from two
+ * gaps; "usually" from three). None with no gap.
+ */
+export function gapTiles(view: Pick<GapsView, 'gaps' | 'longest'>, inDays = false): GapTile[] {
+  const gaps = view.gaps;
+  if (gaps.length === 0) return [];
+  const recent = gapsNewestFirst(gaps)[0];
+  const longest = view.longest ?? recent;
+  const tile = (g: Gap, key: GapTile['key'], label: string): GapTile => ({
+    key,
+    value: compactDuration(g.days, inDays, g.atLeast),
+    label,
+    dates: gapDates(g),
+    quiet: g.open && naturalDiffers(g.days),
+  });
+  const tiles: GapTile[] = [];
+  if (gaps.length === 1) tiles.push(tile(recent, 'only', t('insights.gaps.tileOnly')));
+  else if (recent === longest) tiles.push(tile(recent, 'both', t('insights.gaps.tileBoth')));
+  else tiles.push(tile(longest, 'longest', t('insights.gaps.tileLongest')), tile(recent, 'recent', t('insights.gaps.tileRecent')));
+  // Days revised between one gap and the next: the median, so one long stretch doesn't speak for the rest.
+  const ordered = [...gaps].sort((a, b) => a.first.localeCompare(b.first));
+  const between: number[] = [];
+  for (let i = 1; i < ordered.length; i++) between.push(dayNumber(ordered[i].first) - dayNumber(ordered[i - 1].last) - 1);
+  if (between.length > 0) {
+    tiles.push({
+      key: 'between',
+      value: compactDuration(Math.round(median(between)), inDays),
+      label: between.length >= 2 ? t('insights.gaps.tileUsually') : t('insights.gaps.tileBetween'),
+    });
+  }
+  return tiles;
+}
+
+export type DayMark = 'revised' | 'missed' | 'gap' | 'today';
+
+/**
+ * Every day of the range, oldest first: revised, one day missed (not a gap), a gap's day (with the gap's index in
+ * `view.gaps`), or today not yet revised (today isn't over, so it is never missed).
+ */
+export function dayMarks(view: Pick<GapsView, 'gaps' | 'rangeStart'>, revised: { day: string; pages: number[] }[], today: string): { day: string; mark: DayMark; gap?: number }[] {
+  const done = new Set(revisionDays(revised, today));
+  const out: { day: string; mark: DayMark; gap?: number }[] = [];
+  const end = dayNumber(today);
+  for (let n = dayNumber(view.rangeStart); n <= end; n++) {
+    const day = dayFromNumber(n);
+    if (done.has(day)) {
+      out.push({ day, mark: 'revised' });
+      continue;
+    }
+    const gap = view.gaps.findIndex((g) => g.first <= day && day <= g.last);
+    if (gap >= 0) out.push({ day, mark: 'gap', gap });
+    else out.push({ day, mark: n === end ? 'today' : 'missed' });
+  }
+  return out;
+}
+
+/**
+ * Against the range before, as long: "Gaps are rarer and shorter", "rarer", "shorter", or "More gaps than before",
+ * with what it compares. Null when the account doesn't reach back that far, or nothing changed.
+ */
+export function gapsTrend(view: Pick<GapsView, 'gaps'>, before: { count: number; averageDays: number } | null, previous: string): { title: string; detail: string; better: boolean } | null {
+  if (!before) return null;
+  const now = view.gaps.filter((g) => !g.atLeast);
+  const average = now.length ? now.reduce((n, g) => n + g.days, 0) / now.length : 0;
+  const rarer = now.length < before.count;
+  const shorter = now.length > 0 && before.count > 0 && average < before.averageDays - 0.25;
+  const more = now.length > before.count;
+  const title = rarer && shorter ? t('insights.gaps.rarerShorter') : rarer ? t('insights.gaps.rarer') : shorter ? t('insights.gaps.shorter') : more ? t('insights.gaps.more') : null;
+  if (!title) return null;
+  const detail = t('insights.gaps.trendDetail', {
+    now: t('insights.gaps.countAveraging', { count: now.length, days: Math.round(average) }),
+    before: t('insights.gaps.countAveraging', { count: before.count, days: Math.round(before.averageDays) }),
+    previous,
+  });
+  return { title, detail, better: !more };
+}
