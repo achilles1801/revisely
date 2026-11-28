@@ -82,6 +82,7 @@ import { shareIcon } from '../../lib/platformUi';
 import { ResetDataSheet } from '../../components/settings/ResetDataSheet';
 import { LicencesSheet } from '../../components/settings/LicencesSheet';
 import { showsModelLicense } from '../../lib/release/modelLicense';
+import { memorizedInSettingsEnabled } from '../../lib/release/memorizedInSettings';
 import { TestScenarioSheet, useSyncHeld } from '../../components/settings/TestScenarioSheet';
 import { showsResetMyData } from '../../lib/testerReset';
 import { replayOffered } from '../../lib/whatsNew/due';
@@ -289,6 +290,9 @@ export default function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProp<HomeStackParamList, 'Settings'>>();
   const { user, pages, saveUser, resetOnboarding, pendingChanges = 0 } = useApp();
+  // Memorized pages under Revision on the first level (MEM-9, Revisely Dev): the whole pages memorized.
+  const memorizedInSettings = memorizedInSettingsEnabled();
+  const memorizedCount = useMemo(() => pages.filter((p) => p.status === 'memorized').length, [pages]);
   const help = useHelpButtons();
   const { firebaseUser, signOutUser, deleteAccount } = useAuth();
   const { theme, palette, themeMode, setThemeMode } = useTheme();
@@ -809,6 +813,10 @@ export default function SettingsScreen() {
             ) : null}
             <Section>
               <Row icon="analytics-outline" label={t('settings.sections.revision')} value={schedule?.perDay ?? (localUser.smartTrackingEnabled ? t('settings.root.smartOn') : t('settings.root.smartOff'))} onPress={() => openPage('revision')} testID="settings-page-revision" />
+              {/* Revisely Dev (MEM-9): Memorized pages has its own row, under Revision (Majd: "under the revision tab not above it"). */}
+              {memorizedInSettings ? (
+                <Row icon="layers-outline" label={t('settings.activity.memorizedPages')} value={t('common.pages', { count: memorizedCount })} onPress={() => navigation.navigate('Memorization')} testID="settings-memorized-pages" />
+              ) : null}
               <Row icon="alarm-outline" label={t('settings.sections.reminders')} value={remindersSummary(remindersOn, prayerEnabled ? prayerOn : 0)} onPress={() => openPage('reminders')} testID="settings-page-reminders" />
               {prayerEnabled ? (
                 <Row icon="time-outline" label={t('settings.sections.prayer')} value={prayerValue} onPress={() => openPage('prayer')} testID="settings-page-prayer" />
@@ -998,11 +1006,14 @@ export default function SettingsScreen() {
             />
             {/* When the revision day starts. With prayer times its method is Prayer's Calculation, so the switch alone. */}
             <FajrBoundaryCard compact={prayerEnabled} />
-            <Row
-              icon="book-outline"
-              label={t('settings.activity.memorizedPages')}
-              onPress={() => navigation.navigate('Memorization')}
-            />
+            {/* In Revisely Dev it is on the first level instead (MEM-9). */}
+            {!memorizedInSettings ? (
+              <Row
+                icon="book-outline"
+                label={t('settings.activity.memorizedPages')}
+                onPress={() => navigation.navigate('Memorization')}
+              />
+            ) : null}
             <Row
               icon="pulse-outline"
               label={t('settings.activity.activity')}

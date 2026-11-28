@@ -62,7 +62,10 @@ classic default), and a fresh install starts in light.
     second card restating it, and no ⋯ (Nov 2026): where today starts ends with "Change", which opens Jump to
     (`lib/jump`, `home/JumpSheet`) directly (HOME-3, Nov 25 2026; Edit schedule is in Settings → Revision); the memorized line,
     "17.9% of the Quran memorized ›" (one decimal, of 604 pages; always shown, no setting; it wraps,
-    never truncates), opens the memorized pages ready to edit. The old "Behind? / back a day" (Home
+    never truncates), opens the memorized pages ready to edit. In Revisely Dev (MEM-9, Majd's option B, Nov 27 2026) the
+    line and the juz dots are off Home: Memorized pages is a row of Settings' first level, right under Revision, opening a
+    Settings-style editor (`screens/main/MemorizedPagesScreen`, `components/memorization/MemorizedEditor`), and Activity's
+    Memorization section opens it too (MEM-10), until `lib/release/memorizedInSettings` is on. The old "Behind? / back a day" (Home
     and the plan editor's "Running behind?") is gone: Jump to covers it. Under the memorized line,
     **juz dots** (`v2/JuzDots`): thirty, one per
     juz, each lit by that juz's memorized share (`juzFractions`; half a juz, half a dot) in the

@@ -1901,6 +1901,37 @@ Revo is the in-app assistant (it supersedes the Ask coach, whose rules above sti
   - From a sitting it stays inside the pages the sitting held, chosen from the first ayah to go to their end (MEM-5).
   - Surah and Juz add exactly that surah's or juz's ayahs: a neighbour sharing its page is not added.
 
+- **MEM-9.** (Revisely Dev) Memorized pages are off Home and have a place of their own in Settings (Majd, Nov 27 2026:
+  "not on home page but available in settings under its own thing (but id put it under the revision tab not above it)
+  with the new memorized editor screen thing shown in the mocks, fits revisely style way better").
+  - Home's Today post has no "… of the Quran memorized" line and no juz dots. An account with nothing memorized still gets
+    "Mark memorized pages" (HOME-9).
+  - Settings' first level has Memorized pages right under Revision, with how many pages are memorized ("104 pages"). The
+    Revision page no longer lists it.
+  - It opens Memorized pages, the same screen from everywhere that opens the memorized pages (Settings, Activity, a day's
+    Memorized entry, Revo, "Mark memorized pages"), ready to edit: no ✎ first. At the top, how many pages are memorized,
+    the share of the Quran ("17.2% of the Quran"), the juz dots, and how many juz and surahs. Then Show by Surahs, Juz or
+    Hizb, and a row for each: its circle marks the whole surah, juz or hizb (or unmarks it), its value says All or how
+    much ("12 of 20"), and the row opens it.
+  - An opened juz or hizb has Whole juz (Whole hizb) as a switch, then its surahs, each with its circle and its pages.
+    Each page is named by its place in its surah (1, 2, 3 …), and a tap marks or unmarks it. An opened surah has Whole
+    surah and its pages. Back returns to the list, changes kept.
+  - Changes are drafts. A bar with Cancel and "Save N changes" shows only once something changed. Save asks "When did you
+    memorize these?" when pages were newly marked, as before (Today logs them in Activity), and a custom plan then offers
+    Review schedule. Leaving with changes not saved asks Save or Discard.
+  - From a day's Memorized entry it opens that entry's surah, its pages ringed (ACT-6).
+
+- **MEM-10.** (Revisely Dev) Activity's Memorization section opens the memorized pages, and its chart goes by month or by
+  day (Majd, Nov 27 2026: "i kinda like the new ui/chart for the memorized stuff its way cleaner ... not necessarily
+  having to show a bunch of empty previous months of no memorization especially if someone just joined revisely and also
+  having a daily view").
+  - Under the figure, the juz dots, then one row, "Edit memorized pages", which opens Memorized pages (MEM-9).
+  - The chart has Month and Day. Month: the twelve months up to this one, starting from the first with a page memorized,
+    so no run of empty months comes before it. Day: the 30 days up to today, starting from the first day with a page
+    memorized. Pages count by their share (MEM-2). With nothing memorized in the span, no chart.
+  - A bar picks its month or day: the figure becomes it ("3 pages on 25 November"), and what was memorized then is listed
+    under the bars, each opening its day. The same bar again clears it.
+
 ## Help
 
 - **HELP-1.** Screens that need explaining have a ?. Home's sits at the right of the Today

@@ -35,6 +35,7 @@ import { describePageRange } from '../lib/passages';
 import { PageStatus } from '../lib/memorizationChanges';
 import { arabicLabelLines } from '../lib/platformUi';
 import { t } from '../i18n';
+import { useMemorizationToggles } from './memorization/useMemorizationToggles';
 
 if (
   Platform.OS === 'android' &&
@@ -119,133 +120,14 @@ export function MemorizationBrowser({
   const [expandedKey, setExpandedKey] = useState<string | null>(focusSurah != null ? `surah-${focusSurah}` : null);
   const [expandedChildKey, setExpandedChildKey] = useState<string | null>(null);
 
-  const surahTrackingEnabled = !!pendingSurahChanges && !!onSurahChange;
-
-  const baseSurahSet = useMemo(
-    () => new Set(baseMemorizedSurahs),
-    [baseMemorizedSurahs],
-  );
-
-  const effectiveSurahSet = useMemo(() => {
-    if (!surahTrackingEnabled) return new Set<number>();
-    const next = new Set(baseSurahSet);
-    pendingSurahChanges!.forEach((status, num) => {
-      if (status === 'memorized') next.add(num);
-      else next.delete(num);
-    });
-    return next;
-  }, [surahTrackingEnabled, baseSurahSet, pendingSurahChanges]);
-
-  const baseStatusByPage = useMemo(() => {
-    const map = new Map<number, PageStatus>();
-    for (const p of pages) {
-      map.set(p.pageNumber, p.status === 'memorized' ? 'memorized' : 'not_memorized');
-    }
-    return map;
-  }, [pages]);
-
-  const getStatus = useCallback(
-    (pageNumber: number): PageStatus => {
-      const override = pendingChanges.get(pageNumber);
-      if (override !== undefined) return override;
-      return baseStatusByPage.get(pageNumber) ?? 'not_memorized';
-    },
-    [baseStatusByPage, pendingChanges],
-  );
-
-  const applyBulk = useCallback(
-    (pageNumbers: number[], target: PageStatus) => {
-      const next = new Map(pendingChanges);
-      for (const pn of pageNumbers) {
-        const original = baseStatusByPage.get(pn) ?? 'not_memorized';
-        if (original === target) next.delete(pn);
-        else next.set(pn, target);
-      }
-      onChange(next);
-    },
-    [pendingChanges, baseStatusByPage, onChange],
-  );
-
-  const countMemorized = useCallback(
-    (pageNumbers: number[]) => {
-      let n = 0;
-      for (const pn of pageNumbers) if (getStatus(pn) === 'memorized') n++;
-      return n;
-    },
-    [getStatus],
-  );
-
-  const setSurahPending = useCallback(
-    (surahNumber: number, target: PageStatus) => {
-      if (!surahTrackingEnabled) return;
-      const next = new Map(pendingSurahChanges!);
-      const baseTarget: PageStatus = baseSurahSet.has(surahNumber)
-        ? 'memorized'
-        : 'not_memorized';
-      if (baseTarget === target) next.delete(surahNumber);
-      else next.set(surahNumber, target);
-      onSurahChange!(next);
-    },
-    [surahTrackingEnabled, pendingSurahChanges, baseSurahSet, onSurahChange],
-  );
-
-  // Tarteel-style cascading toggle for a surah. Updates surah-level intent
-  // plus the page-level state, with shared-page protection.
-  const toggleSurah = useCallback(
-    (surahNumber: number, surahPages: number[]) => {
-      const allMemorized =
-        countMemorized(surahPages) === surahPages.length;
-      const target: PageStatus = allMemorized ? 'not_memorized' : 'memorized';
-
-      if (surahTrackingEnabled) setSurahPending(surahNumber, target);
-
-      if (target === 'memorized') {
-        applyBulk(surahPages, 'memorized');
-        return;
-      }
-
-      if (!surahTrackingEnabled) {
-        applyBulk(surahPages, 'not_memorized');
-        return;
-      }
-
-      const futureSet = new Set(effectiveSurahSet);
-      futureSet.delete(surahNumber);
-      const pagesToClear = surahPages.filter((pn) => {
-        const surahsOnPage = getSurahsForPage(pn);
-        return !surahsOnPage.some((s) => futureSet.has(s.number));
-      });
-      if (pagesToClear.length > 0) applyBulk(pagesToClear, 'not_memorized');
-    },
-    [
-      countMemorized,
-      surahTrackingEnabled,
-      setSurahPending,
-      effectiveSurahSet,
-      applyBulk,
-    ],
-  );
-
-  const togglePage = useCallback(
-    (pageNumber: number) => {
-      applyBulk(
-        [pageNumber],
-        getStatus(pageNumber) === 'memorized' ? 'not_memorized' : 'memorized',
-      );
-    },
-    [applyBulk, getStatus],
-  );
-
-  const toggleScope = useCallback(
-    (pageNumbers: number[]) => {
-      const target: PageStatus =
-        countMemorized(pageNumbers) === pageNumbers.length
-          ? 'not_memorized'
-          : 'memorized';
-      applyBulk(pageNumbers, target);
-    },
-    [countMemorized, applyBulk],
-  );
+  const { getStatus, countMemorized, togglePage, toggleSurah, toggleScope } = useMemorizationToggles({
+    pages,
+    pendingChanges,
+    onChange,
+    baseMemorizedSurahs,
+    pendingSurahChanges,
+    onSurahChange,
+  });
 
   const expand = useCallback((key: string | null) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);

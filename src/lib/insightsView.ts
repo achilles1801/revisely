@@ -6,7 +6,7 @@
 import { getPagesForJuz, getSurahsForPage } from './quranData';
 import { describePassage, pagesNote, surahNameIn } from './passages';
 import { PACE_MIN_ITEMS } from './activityInsights';
-import { memorizedByMonth, type MemorizationItemLike } from './memorizedAyahs';
+import { memorizedByMonth, memorizedItemShare, type MemorizationItemLike } from './memorizedAyahs';
 import { coverageRecency, type CoverageRecency } from './recency';
 import { formatDate, t, weekdayLetters, formatNumeral } from '../i18n';
 
@@ -321,6 +321,37 @@ export function ratedWeakCounts(logs: { date: string; weaknessUpdates?: { page: 
 /** Pages memorized each month, the 12 months ending `last`, oldest first, by page share (lib/memorizedAyahs, MEM-2). */
 export function memorizationMonths(items: MemorizationItemLike[], last: string): { month: string; pages: number }[] {
   return memorizedByMonth(items, last).map(({ month, pages }) => ({ month, pages }));
+}
+
+/**
+ * Memorization's chart (MEM-10; Majd, Nov 27 2026: "not necessarily having to show a bunch of empty previous months of no
+ * memorization especially if someone just joined revisely and also having a daily view"). By month: the twelve months
+ * ending `today`'s, from the first with a page memorized. By day: the 30 days ending `today`, from the first day with a page
+ * memorized. Pages by their share (MEM-2), oldest first; empty when nothing was memorized in the span.
+ */
+export function memorizationSeries(
+  items: MemorizationItemLike[],
+  today: string,
+  unit: 'month' | 'day',
+): { key: string; pages: number }[] {
+  if (unit === 'month') {
+    const months = memorizedByMonth(items, today.slice(0, 7)).map(({ month, pages }) => ({ key: month, pages }));
+    const first = months.findIndex((m) => m.pages > 0);
+    return first < 0 ? [] : months.slice(first);
+  }
+  const from = shiftDay(today, -29);
+  const sums = new Map<string, number>();
+  for (const i of items) {
+    if (i.day < from || i.day > today) continue;
+    sums.set(i.day, (sums.get(i.day) ?? 0) + memorizedItemShare(i));
+  }
+  const days: { key: string; pages: number }[] = [];
+  for (let d = 0; d < 30; d++) {
+    const day = shiftDay(from, d);
+    days.push({ key: day, pages: Math.round((sums.get(day) ?? 0) * 10) / 10 });
+  }
+  const first = days.findIndex((d) => d.pages > 0);
+  return first < 0 ? [] : days.slice(first);
 }
 
 /** A month's label under its bar: its initial, or "Nov" at either end. */

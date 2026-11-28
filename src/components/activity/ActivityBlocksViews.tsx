@@ -7,6 +7,7 @@ import { Gesture } from 'react-native-gesture-handler';
 import { usePagerGesture } from '../../navigation/PagerTabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { calendarScreenLabel, CALENDAR_SPAN_KEY, parseSpan, periodForGap, periodForSpan, shiftWeek, showsToday, weekDays, type CalendarGap, type CalendarSpan } from '../../lib/activityCalendar';
+import { computeMemorizationStats } from '../../lib/memorizationStats';
 import { weekStart as weekStartOf } from '../../lib/activityHeatmap';
 import { StyleSheet, View as RNView } from 'react-native';
 import { useApp } from '../../context/AppContext';
@@ -83,6 +84,8 @@ interface Props {
   onOpenLastRevised?: (sort?: 'waiting') => void;
   /** Smart Tracking off: Insights' line that opens Settings at its switch (ACT-12). */
   onTurnOnSmartTracking?: () => void;
+  /** Memorization's "Edit memorized pages" (MEM-10, Revisely Dev). */
+  onEditMemorized?: () => void;
   /** Days with a note in the log (the calendar's note dot). */
   noteDays: Set<string>;
   /** The day's note and the day entry's Add a note (ACT-34). */
@@ -114,8 +117,9 @@ interface Props {
 
 const NO_YEAR: { day: string; pages: number[] }[] = [];
 
-export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, firstTomorrow, onViewChange, onShowTop, refreshRef, section, onOpenSection, onOpenCalendar, calendarAt, onOpenMonth, onOpenRamadan, monthPage }: Props) {
+export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpenDay, onReviseTomorrow, onPlanIt, onAddToPlan, onOpenPage, onOpenAyahs, onSeeAllPages, onOpenLastRevised, onTurnOnSmartTracking, onEditMemorized, firstTomorrow, onViewChange, onShowTop, refreshRef, section, onOpenSection, onOpenCalendar, calendarAt, onOpenMonth, onOpenRamadan, monthPage }: Props) {
   const { pages, logs, user } = useApp();
+  const memorizedJuz = useMemo(() => computeMemorizationStats(pages).juzFractions, [pages]);
   const { palette, isDark } = useTheme();
   // The Ramadan theme (THEME-5, THEME-6): the list's star and its first row.
   const ramadanDecor = useRamadanDecor();
@@ -389,6 +393,8 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
     pushBack: fullRevision,
     itemsFrom: rangeFrom,
     recitation,
+    // Each juz's memorized share, by the page (MEM-2), for Memorization's juz dots (MEM-10).
+    memorizedJuz,
   };
   const insightsActions = {
     onOpenDay,
@@ -401,6 +407,7 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
     onSeeAllPages,
     onOpenLastRevised,
     onTurnOnSmartTracking,
+    onEditMemorized,
   };
   // Recitation only for an account that recites, Gaps where it is open; Weak spots with Smart Tracking off is its invite.
   const sectionsHas = (id: InsightsSection) => (id === 'recitation' ? recitation != null && onOpenAyahs != null : id === 'gaps' ? gapsOn : true);

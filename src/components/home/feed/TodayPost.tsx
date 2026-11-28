@@ -61,6 +61,7 @@ export function TodayPost({
   memorized,
   onPrimary,
   onMemorization,
+  memorizedLine = true,
   onJump,
   catchUp,
   onCarryOver,
@@ -98,6 +99,8 @@ export function TodayPost({
   onPrimary: () => void;
   /** Opens the memorized pages, ready to edit. */
   onMemorization: () => void;
+  /** The memorized line and the juz dots at the post's end; Revisely Dev has them off Home (MEM-9). Default true. */
+  memorizedLine?: boolean;
   /** Where today starts: "Change" (and a tap on the line) opens Jump to. */
   onJump: () => void;
   /** The catch-up offer for pages missed on earlier days (catchUpLine), or none. */
@@ -279,22 +282,27 @@ export function TodayPost({
                 </Text>
               </Tap>
             ) : null}
-            <Tap
-              onPress={onMemorization}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={t('home.today.editMemorizedLabel', { line: memorized.body })}
-              style={styles.memorized}
-              testID="today-memorized"
-            >
-              {/* The › inside the text, held to its last word, so a long line wraps instead of cutting off. */}
-              <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={LINES_MAX_SCALE}>
-                {memorized.body}
-                {NBSP}
-                <Chevron color={palette.secondary} />
-              </Text>
-            </Tap>
-            <JuzDots juz={memorized.juz} progress={memorized.fraction} label={memorized.body} testID="today-dots" />
+            {/* Revisely Dev (MEM-9): memorized pages are off Home, in Settings under Revision and in Activity. */}
+            {memorizedLine ? (
+              <>
+                <Tap
+                  onPress={onMemorization}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('home.today.editMemorizedLabel', { line: memorized.body })}
+                  style={styles.memorized}
+                  testID="today-memorized"
+                >
+                  {/* The › inside the text, held to its last word, so a long line wraps instead of cutting off. */}
+                  <Text style={[typeV2.meta, { color: palette.secondary }]} maxFontSizeMultiplier={LINES_MAX_SCALE}>
+                    {memorized.body}
+                    {NBSP}
+                    <Chevron color={palette.secondary} />
+                  </Text>
+                </Tap>
+                <JuzDots juz={memorized.juz} progress={memorized.fraction} label={memorized.body} testID="today-dots" />
+              </>
+            ) : null}
           </>
         }
       >

@@ -47,6 +47,7 @@ import { SessionPost } from '../../components/home/feed/SessionPost';
 import { KahfPost } from '../../components/home/feed/KahfPost';
 import { RecentSection } from '../../components/activity/ActivityItemRow';
 import { useHomeV3 } from '../../lib/release/homeV3';
+import { memorizedInSettingsEnabled } from '../../lib/release/memorizedInSettings';
 import { RunningTimerChip } from '../../components/timer/RunningTimerChip';
 import { HeroGlow } from '../../components/v2/HeroGlow';
 import { HomeGround } from '../../components/home/HomeGround';
@@ -677,6 +678,8 @@ export default function DashboardScreen() {
           memorized={memorized}
           onPrimary={handleCtaPress}
           onMemorization={() => navigation.navigate('Memorization', { edit: true })}
+          // Revisely Dev (MEM-9): memorized pages are in Settings under Revision and in Activity, not on Home.
+          memorizedLine={!memorizedInSettingsEnabled()}
           onJump={() => setJumpOpen(true)}
           catchUp={home.catchUp}
           onCarryOver={handleCarryOver}
