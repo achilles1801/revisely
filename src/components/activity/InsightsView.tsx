@@ -70,6 +70,7 @@ import { gapsView } from '../../lib/insightsGaps';
 import { RecitationInsights } from './RecitationInsights';
 import { FirstSection, SectionAlone, useFirstSection, useSectionAlone } from './sectionPlace';
 import { SectionRow } from './SectionRow';
+import { consistencyRow, coverageRow, pagesRow, paceRow } from '../../lib/activityRowValues';
 import { DEFAULT_SECTIONS, sectionsToShow, type InsightsSection, type TabLayout } from '../../lib/activitySections';
 import { stillMarkedWords } from '../../lib/reciteInsights/insights';
 import type { Recitation } from '../../lib/reciteInsights/useRecitation';
@@ -677,8 +678,8 @@ function Coverage({
       <SectionRow
         title={t('activity.insights.coverage')}
         line={line}
-        figure={inCycles ? cyclesText : formatPercentage(pct)}
-        unit={inCycles ? t('activity.oneTab.cycles', { count: Number(cyclesText) }) : null}
+        figure={coverageRow(pct, inCycles ? cyclesText : null).figure}
+        unit={coverageRow(pct, inCycles ? cyclesText : null).unit}
         onPress={row}
         separator={!lastRow}
         testID="insights-row-coverage"
@@ -1014,8 +1015,8 @@ function Consistency({
         title={t('activity.insights.consistency')}
         // When they revise, once three days have times; otherwise the figure says it all.
         line={busiest && hoursShown ? busiest : null}
-        figure={String(inRange.done)}
-        unit={figureText}
+        figure={consistencyRow(inRange.done, inRange.of).figure}
+        unit={consistencyRow(inRange.done, inRange.of).unit}
         onPress={row}
         separator={!last}
         testID="insights-row-consistency"
@@ -1234,8 +1235,8 @@ function WeakSpots({
       <SectionRow
         title={t('activity.insights.weakSpots')}
         line={rows.length > 0 ? t('activity.oneTab.weakFirst', { label: rows[0].label }) : null}
-        figure={String(pages.length)}
-        unit={t('activity.insights.pagesWord', { count: pages.length })}
+        figure={pagesRow(pages.length).figure}
+        unit={pagesRow(pages.length).unit}
         onPress={row}
         separator={!last}
         testID="insights-row-weak"
@@ -1341,8 +1342,8 @@ function Memorization({ data, onOpenDay, row, last }: { data: InsightsData; onOp
       <SectionRow
         title={t('activity.insights.memorization')}
         line={[added > 0 ? `+${formatNumber(added)} ${span.inWords}` : null, share].filter(Boolean).join(' · ') || null}
-        figure={String(data.memorized.size)}
-        unit={t('activity.insights.pagesWord', { count: data.memorized.size })}
+        figure={pagesRow(data.memorized.size).figure}
+        unit={pagesRow(data.memorized.size).unit}
         onPress={row}
         separator={!last}
         testID="insights-row-memorization"
@@ -1504,8 +1505,8 @@ function Pace({ data, onOpenDay, row, last }: { data: InsightsData; onOpenDay?: 
       <SectionRow
         title={t('activity.insights.pace')}
         line={change ?? t('activity.insights.revisingSpan', { span: span.lastWords })}
-        figure={formatPace(p.perPage)}
-        unit={t('activity.insights.minAPage')}
+        figure={paceRow(p.perPage).figure}
+        unit={paceRow(p.perPage).unit}
         onPress={row}
         separator={!last}
         testID="insights-row-pace"

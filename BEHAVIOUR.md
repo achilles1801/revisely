@@ -1349,6 +1349,16 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   sign-in. Each fresh answer then replaces them in place and is kept for the next start; a read that fails meanwhile
   (offline, or before Auth) leaves them as they are, quietly. Before anything is kept (a first start, another account) it
   loads as before.
+- **ACT-37.** (Revisely Dev) A row's figure and its words at the end never wrap and never push the row's name aside, for
+  any of the rows (Majd, Nov 27 2026: "the consistency text on the right as u can see is too much and starts to break the
+  formatting -- this should never happen for any of them"). Each is one line, side by side, within half the row on an
+  iPhone SE's width, whatever the numbers; from text 1.2 times the usual size the words go under the figure, each still
+  one line, up to the largest text the row allows. So the words are short and the rest is the grey line's or the
+  section's page: Consistency "7" "of 7 days" (since when is on its page; before, "of the last 7 days · 8 of 9 since 19
+  November"), Gaps "Today" "revised" or "6 days" "away" in whole weeks, months or years from 2 weeks (before, "you
+  revised, after a 12-day gap" and "Over 3 weeks" "since your last revision, on 24 Oct"). The Ramadan row (THEME-6)
+  stands out from the sections on a warm band in the theme's gold, inset by the margin, with a gold edge (Majd: "shouldn't
+  the ramadan card stand out more? maybe like some highlite"); its text reads at 4.5:1 on it.
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
   strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
   stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,
