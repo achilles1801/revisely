@@ -35,6 +35,7 @@ export const common: NonNullable<ArStrings['common']> = {
   search: 'بحث',
   apply: 'تطبيق',
   nOfTotal: '{{n}} من {{total}}',
+  underOnePercent: 'أقل من ١٪',
   saving: 'جارٍ الحفظ…',
   megabytes: '{{n}} ميغابايت',
   juzRange: 'الأجزاء {{from}}–{{to}}',

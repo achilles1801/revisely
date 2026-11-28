@@ -75,6 +75,7 @@ is checked on Home, the widget, the reminders and Revo at once (USER-1, USER-2),
 | Back after weeks away | S SCHED-5, UT, UM | UT (session) | — | S REMIND-2, UM | UM | UM |
 | Fajr boundary, before Fajr | S DAY-2, P, UM | S DAY-4 | S DAY-9 | U, UM | U, UM | U, UM |
 | DST days, every zone | P DAY-6, -8, UM | P | — | U, UM | U, UM | UM |
+| Travel: the date line, big jumps, a custom plan with rest days | P DAY-8, UT, UM (flights) | — | — | UM (flights) | UM (flights) | UM (flights) |
 | Smart Tracking on | S, UM | — | S | — | — | P, UM |
 | Offline, outbox | S SYNC-1..5 | S | S ACT-13 | SA (hand-logged, offline) | same hook as the reminders | — |
 | Two phones | S SYNC-3, -5, UM | — | — | UM | UM | UM |
@@ -85,7 +86,7 @@ is checked on Home, the widget, the reminders and Revo at once (USER-1, USER-2),
 
 ## What the sweep found (Nov 27 2026)
 
-All nine were cases where one screen disagreed with Home or with the account. Each is a rule now, and its fix landed
+All eleven were cases where one screen disagreed with Home or with the account. Each is a rule now, and its fix landed
 with a scenario that fails without it.
 
 | Rule | What happened | Fix |
@@ -98,10 +99,13 @@ with a scenario that fails without it.
 | SESS-4, SESS-9, USER-2 | Pages logged by hand for today counted on Home but not in the session or review it opened: Continue opened on the first page with nothing checked, Review session opened empty. | The session and the review count them (`src/lib/handLogged.ts`). |
 | USER-2 | The widget and the reminders read the Activity items only when the number of sessions changed, and left out pages logged by hand still waiting on the phone: today logged by hand (offline or not) stayed "5 pages left", reminders still coming, until the next launch. | Both read `useScreenHistory` (`src/lib/activityHistory.ts`): again on every outbox change, with what is waiting. |
 | USER-1 | What's new's first slide named a partly memorized page by the whole page ("Al-Ikhlas to An-Nas" with only An-Nas memorized). | It names it as Home does, by its memorized ayahs. |
+| USER-2, AHEAD-3 | After a flight west across the date line, yesterday's session became today's: its pages revised for tomorrow counted done today but not credited, and Home read "Continue at … 1 of 1" on a day still to start. | One revision counts for one day: a page of today's revised only for a later day isn't done today (`dayProgress`). |
+| USER-2, REMIND-1 | With the saved place far from the phone, a revision day can run 40 hours (no Fajr there one day, so it turned at midnight; Fajr the next). The reminders planned two mornings and two middays under one id, the second replacing the first; and tomorrow's span was taken to start at "Fajr on its date", a day off, so one 3 PM was planned for two days. | At most one of each a day; each day starts where the one before ends (`src/lib/reminders/plan.ts`). |
 | USER-2 | With ayahs of a page memorized (MEM-4), Activity's Revised elsewhere worked the day out from whole pages only, so it offered other pages than Home's today (2–6 where Home had 1–5). | The sheets and the day view read `revisablePages`, as Home does. |
 
-Waiting on Majd: what unchecking a page logged by hand does in the session and the review. Until he answers it stays
-checked there; either answer is one switch (`HAND_LOGGED_UNCHECK`, `src/lib/handLogged.ts`).
+Majd's answers (Nov 27 2026): unchecking a page logged by hand in the session or the review takes it off its entry
+(`HAND_LOGGED_UNCHECK` 'remove'); under 1% memorized reads "under 1%"; a plan of rest days alone reads "Rest days only";
+the Lock Screen widget shows a moon on a rest day (#1056, held for the next store native release).
 
 Home itself held up: over thousands of generated accounts per run, HOME-9 doesn't come back (and with its fix undone,
 the property finds it at once, through a plan that starts tomorrow as well as a rest day).
@@ -126,8 +130,7 @@ Checked by reading, nothing found: Activity's day card and day view on a rest da
 day, never a plan to contradict); the tour's other slides (example data, the same for everyone).
 
 Still unchecked (for later): the widgets' native drawing (Swift, Kotlin) and their rest-day status line (#1056, held for
-the next store native release); the widget's write is native, so scenarios check its data, not what it draws; travel
-across the date line on a custom plan; the session and end card are generated in scenarios for five kinds of user, not
+the next store native release); the widget's write is native, so scenarios check its data, not what it draws; the session and end card are generated in scenarios for five kinds of user, not
 in the property test.
 
 ## The rules every screen keeps (checked by the property test)
@@ -142,3 +145,5 @@ in the property test.
 - Home, Revo, the widget and the reminders agree on today: how many pages, how many done, and whether it is done.
 - With pages memorized, the memorized line never says 0%; short of the whole Qur'an, never 100%.
 - A day done on Home is done on the widget, and no reminder asks for it; tomorrow, done ahead already, gets none either.
+- After a flight (the date line, any big jump), all of the above still hold, the widget's days run forward each once, and the
+  reminders plan at most one of each kind a day, none in the past, none twice.

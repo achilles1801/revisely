@@ -3,6 +3,7 @@
 // nothing changed, it says something else (REVO-35): "done" once, then what's ahead, in turn.
 
 import { placeOfPage } from '../passages';
+import { formatPercent } from '../homeToday';
 import { aheadLead, nextRevisionDayPlan } from '../aheadPlan';
 import type { TodaySnapshot } from '../todaySnapshot';
 import type { RevisionLog, User, UserPage } from '../../types';
@@ -130,10 +131,8 @@ export interface Aside {
 
 /** "17.9%": of the 604 pages, to one decimal, as Home says it. */
 function percentOfQuran(pages: number): string {
-  const percent = Math.round((pages / 604) * 1000) / 10;
-  if (percent <= 0) return '0%';
-  if (percent >= 100) return '100%';
-  return `${percent.toFixed(1)}%`;
+  // As Home says it (lib/homeToday formatPercent): "under 1%" below 1%.
+  return formatPercent(pages / 604);
 }
 
 /** The weak part left longest (the context lists weak pages oldest revised first), with the page after it if weak too. */

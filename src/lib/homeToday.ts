@@ -19,13 +19,16 @@ import type { DailyAssignment, QuranPage, RevisionLog, User, UserPage } from '..
 import { formatPercentage, t } from '../i18n';
 
 /**
- * "17.9%": of the 604 pages, to one decimal ("0%", "100%" at the ends); «١٧٫٩٪» in Arabic. Something memorized never
- * rounds to 0%, nor anything short of the whole Qur'an to 100% (USER-1): a few ayahs read "0.1%", all but a few "99.9%".
+ * "17.9%": of the 604 pages, to one decimal ("0%", "100%" at the ends); «١٧٫٩٪» in Arabic. Under 1% reads "under 1%"
+ * (Majd, Nov 27 2026: "should just be under 1%, i feel like decimal under 1 is too demotivating"), and nothing short of
+ * the whole Qur'an rounds to 100%: all but a few ayahs read "99.9%" (USER-1). Every memorized share shown reads here:
+ * Home, Revo's greeting, Add memorized.
  */
 export function formatPercent(fraction: number): string {
   if (!(fraction > 0)) return formatPercentage(0);
   if (fraction >= 1) return formatPercentage(100);
-  const percent = Math.min(99.9, Math.max(0.1, Math.round(fraction * 1000) / 10));
+  if (fraction < 0.01) return t('common.underOnePercent');
+  const percent = Math.min(99.9, Math.round(fraction * 1000) / 10);
   return formatPercentage(percent, 1);
 }
 

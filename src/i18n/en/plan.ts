@@ -92,6 +92,8 @@ export const plan = {
     longCycle: 'A {{n}}-day cycle is a long gap between revisions. Past about two weeks, pages usually need more reinforcement.',
     nothingToSchedule: 'Nothing to schedule yet',
     noDays: 'No days in this cycle',
+    /** A plan whose days are all rest days (Majd, Nov 27 2026: "yes"). */
+    restDaysOnly: 'Rest days only',
     restDayDeleted: 'Rest day deleted',
     /** "Al-Mulk deleted". */
     dayDeleted: '{{title}} deleted',

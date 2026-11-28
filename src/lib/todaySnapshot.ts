@@ -106,7 +106,14 @@ export function dayProgress(input: {
   const own = duePagesOf(list, user, day, revisablePages(pages));
   // Pages logged by hand for the day count as its sessions' do (ACT-15), once each.
   const counted = history ? [...logs, ...handLogsOf(history)] : logs;
-  const done = doneOnDay(counted, day);
+  const credited = creditedOnDay(counted, day);
+  const caughtUp = caughtUpOnDay(counted, day);
+  // Done for the day: credited to it, caught up in its sessions, or revised in them for a later day (SESS-4's "Done · N").
+  // But one revision counts for one day (AHEAD-3): a page of the day's own revised in its sessions only for a later day
+  // counts there, not here. After a flight west across the date line, yesterday's session is today's, and its pages
+  // revised ahead for tomorrow read "1 of 1" done on a day still to start (the user-matrix sweep, Nov 27 2026).
+  const listed = new Set(list);
+  const done = new Set([...doneOnDay(counted, day)].filter((p) => credited.has(p) || caughtUp.has(p) || !listed.has(p)));
   // A day with none of its own pages (an off day given pages from Insights) is done once its pages are:
   // Home said "N of N" and Continue revision for good (Nov 8 2026).
   if (own.length === 0) {
@@ -114,7 +121,7 @@ export function dayProgress(input: {
     const status = list.length > 0 && finishingDone === list.length ? 'completed' : finishingDone > 0 ? 'partial' : 'not_started';
     return { pages: list, own, done, finishing: list, finishingDone, status };
   }
-  const { status, pagesCompleted } = todayStatusOf(own, creditedOnDay(counted, day), caughtUpOnDay(counted, day));
+  const { status, pagesCompleted } = todayStatusOf(own, credited, caughtUp);
   return { pages: list, own, done, finishing: own, finishingDone: Math.min(pagesCompleted, own.length), status };
 }
 

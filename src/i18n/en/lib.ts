@@ -201,6 +201,7 @@ export const lib = {
     twoThirds: 'two thirds of the Quran',
     threeQuarters: 'three quarters of the Quran',
     percentQuran: '{{percent}}% of the Quran',
+    underOneQuran: 'under 1% of the Quran',
     reviseFirst: 'Revise {{what}} first tomorrow',
     reviseTheseFirst: 'Revise these weak spots first tomorrow',
     juz: 'Juz {{n}}',

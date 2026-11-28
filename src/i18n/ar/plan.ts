@@ -103,6 +103,7 @@ export const plan: NonNullable<ArStrings['plan']> = {
     longCycle: 'دورة من {{n}} يوم فترة طويلة بين المراجعات. بعد أسبوعين تقريبًا، تحتاج الصفحات عادةً إلى تثبيت أكثر.',
     nothingToSchedule: 'لا يوجد ما يُجدوَل بعد',
     noDays: 'لا أيام في هذه الدورة',
+    restDaysOnly: 'أيام راحة فقط',
     restDayDeleted: 'حُذف يوم الراحة',
     dayDeleted: 'حُذف {{title}}',
     unsaved: 'تغييرات غير محفوظة',

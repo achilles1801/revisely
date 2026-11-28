@@ -967,7 +967,7 @@ export default function SettingsScreen() {
             <Row
               icon="calendar-outline"
               label={t('settings.revision.schedule')}
-              subtitle={schedule?.repeats}
+              subtitle={schedule?.repeats ?? undefined}
               value={schedule?.perDay}
               onPress={() => navigation.navigate('PlanEdit')}
               testID="settings-schedule"

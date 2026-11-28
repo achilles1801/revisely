@@ -80,3 +80,27 @@ describe('[ACT-24] [SESS-7] today with pages from Insights first', () => {
     expect(snapshotOn(user, '2026-10-17', [revised('2026-10-17', [], [8, 9])]).status).toBe('completed');
   });
 });
+
+describe('[AHEAD-3] [USER-2] one revision counts for one day', () => {
+  // After a flight west across the date line, yesterday's session is today's: it revised today's pages, but for the
+  // day after (ahead). They count there, not here: today is still to start, never "Continue at … 3 of 3" (the
+  // user-matrix sweep, Nov 27 2026).
+  const plan = { days: [[1, 2, 3], [4, 5, 6]], cycleStartDate: '2026-11-27', direction: 'forward' as const };
+  const user = { ...baseUser, customPlan: plan };
+
+  it('a page of the day’s own, revised in its session only for a later day, is not done for this day', () => {
+    const session: RevisionLog = { ...revised('2026-11-27', [], []), ahead: { '2026-11-29': [1, 2, 3] } };
+    const today = snapshotOn(user, '2026-11-27', [session]);
+    expect(today.pages).toEqual([1, 2, 3]);
+    expect(today.status).toBe('not_started');
+    expect([...today.done]).toEqual([]);
+    expect(today.pagesDone).toBe(0);
+  });
+
+  it('pages revised ahead for a later day that aren’t the day’s own still count in "Done · N" (SESS-4)', () => {
+    const session: RevisionLog = { ...revised('2026-11-27', [1, 2, 3], [1, 2, 3]), ahead: { '2026-11-28': [4, 5, 6] } };
+    const today = snapshotOn(user, '2026-11-27', [session]);
+    expect(today.status).toBe('completed');
+    expect([...today.done].sort()).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+});

@@ -7,6 +7,7 @@
 // its ayahs and pages stay inside the pages the sitting held. Revisely Dev chooses on the real page
 // instead of the From and To wheels, and shows the choice as pages (MEM-8).
 
+import { formatPercent } from '../../lib/homeToday';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, StyleSheet, Text, View } from 'react-native';
 import { Sheet } from '../v2/Sheet';
@@ -35,10 +36,8 @@ import { t } from '../../i18n';
 type What = 'ayahs' | 'pages' | 'page' | 'surah' | 'juz';
 
 /** Of the 604 pages, to one decimal, as Home writes it ("50.6%"). */
-const percent = (pages: number) => {
-  const p = Math.round((pages / 604) * 1000) / 10;
-  return p <= 0 ? '0%' : p >= 100 ? '100%' : `${p.toFixed(1)}%`;
-};
+// As Home says it (lib/homeToday formatPercent): "under 1%" below 1%.
+const percent = (pages: number) => formatPercent(pages / 604);
 
 /** What a sitting on the Day brings to the sheet: the pages it held, and its minutes. */
 export interface SittingToAdd {

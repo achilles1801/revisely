@@ -510,11 +510,15 @@ export default function PlanEditScreen() {
 
   // The header (SCHED-7): how much a day, then how often each page comes round; a named plan's name above.
   const amount = scheduleAmount(user, days, isDirty);
+  // A plan of rest days alone (Majd, Nov 27 2026: "Rest days only"), not "0 pages a day".
+  const restOnly = days.length > 0 && days.every((d) => d.length === 0);
   const heroTitle = !hasMemorized
     ? t('plan.edit.nothingToSchedule')
     : days.length === 0
       ? t('plan.edit.noDays')
-      : t('plan.edit.perDay', { amount });
+      : restOnly
+        ? t('plan.edit.restDaysOnly')
+        : t('plan.edit.perDay', { amount });
   const repeats = t('plan.edit.everyPage', { count: days.length });
 
   const removedSummary = removed ? summarizeDay(removed.pages) : null;
@@ -567,7 +571,7 @@ export default function PlanEditScreen() {
             </Text>
           ) : null}
           <Text style={[typeV2.title, { color: palette.text }]}>{heroTitle}</Text>
-          {hasMemorized && days.length > 0 ? (
+          {hasMemorized && days.length > 0 && !restOnly ? (
             <Text style={[typeV2.body, styles.heroLineV2, { color: palette.secondary }]}>{repeats}</Text>
           ) : null}
           {draftOpen ? (

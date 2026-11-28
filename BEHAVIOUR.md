@@ -88,7 +88,9 @@ How the tests are made: `tests/scenarios/README.md`.
   unsaved edits, with the next Save when it has). A plan made with "Create new plan" has no name. On the automatic
   schedule, saving a copy only keeps a copy. A saved plan is a copy: editing the plan in use doesn't change it, and
   deleting it doesn't rename the plan in use. With a custom plan, "Daily amount" says the plan's days stay as they are,
-  and (Revisely Dev) its row shows the amount the plan's days hold, in the header's words, so the two agree (REVO-43).
+  and (Revisely Dev) its row shows the amount the plan's days hold, in the header's words, so the two agree (REVO-43). A
+  plan of rest days alone reads "Rest days only", with no line about pages coming round, here and in Settings (Majd, Nov
+  27 2026).
 
 ## A revision session
 
@@ -1944,8 +1946,9 @@ by hand, carried pages, the Fajr boundary, every zone, Arabic) and checks these 
   anything is memorized (HOME-9), nor anything else while nothing is. No line is empty or shows a missing number, and the
   button opens what it names: Start or Continue a day with pages, Revise ahead a later day with pages, Review session a
   day that is done; a rest day with no next day has none. "N of total" shows only while part of the day is done. The
-  memorized line never rounds something memorized down to 0% nor anything short of all of it up to 100%: a few ayahs
-  read "0.1%", all but a few "99.9%". What's new's first slide names the account's page as Home does, a partly memorized
+  memorized share never reads 0% for something memorized, nor 100% short of all of it: under 1% reads "under 1%", with no
+  decimals below 1, wherever it shows (Home, Revo's greeting, Add memorized, Insights; Majd, Nov 27 2026: "should just be
+  under 1%, i feel like decimal under 1 is too demotivating"), and all but a few ayahs "99.9%". What's new's first slide names the account's page as Home does, a partly memorized
   page by its memorized ayahs (MEM-4). (Found by the sweep: one ayah memorized read "0% of the Quran memorized"; only
   An-Nas memorized read "Al-Ikhlas to An-Nas" in the tour.)
 - **USER-2.** Home, the widget, the reminders and Revo agree about a day: whether it is done and which of its pages are
@@ -1958,9 +1961,14 @@ by hand, carried pages, the Fajr boundary, every zone, Arabic) and checks these 
   them. Activity's Revised elsewhere (and its page picker) offers a day's pages as Home has them, a partly memorized
   page among them (MEM-4). Pages logged by hand for today count in the session and the review Home opens as on Home:
   Continue opens after them with them checked, and Review session holds them. The widget and the reminders count them at
-  once, offline too (those still waiting on the phone), as Home does; they are never copied into the session's
-  own record (ACT-14), and, until Majd decides otherwise (`HAND_LOGGED_UNCHECK`), they stay checked there and come off
-  in Activity. (Found by the sweep, Nov 27 2026: the reminders and the widget counted only the day's own
+  once, offline too (those still waiting on the phone), as Home does. After a flight, across the date line or any big
+  jump, every screen still agrees: one revision counts for one day (AHEAD-3), so a page of today's revised in its session
+  only for a later day isn't done today, and each revision day gets at most one reminder of each kind, its days in order
+  and never overlapping, however long the day is (a day with no Fajr at the saved place turns at midnight, the next at
+  Fajr there); they are never copied into the session's
+  own record (ACT-14). Unchecking one there takes it off its hand-logged entry, and Home, Activity, the widget and the
+  reminders count it no more (Majd, Nov 27 2026: "it means the user didn't revise that page therefore it should be
+  removed"). (Found by the sweep, Nov 27 2026: the reminders and the widget counted only the day's own
   sessions, so a day revised ahead or logged by hand still had "Good morning, today is …" coming, and the widget showed
   it not done; a day of pages from Insights never read as done on the widget; and with ayahs of a page memorized,
   Revised elsewhere worked the day out without that page, so it offered other pages than Home's.)

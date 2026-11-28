@@ -151,7 +151,7 @@ describe('Memorized add sheet (ACT-5)', () => {
     fireEvent.press(screen.getByTestId('add-memorized-to-ayah'));
     fireEvent.press(screen.getByTestId('add-memorized-to-ayah-picker-ayah-20'));
     expect(words()).toBe('Al-Mulk 1–20 · 20 ayahs');
-    expect(flatText(screen.getByTestId('add-memorized-share'))).toMatch(/^Memorized on today: 0\.5% → 0\.8% of the Quran$/);
+    expect(flatText(screen.getByTestId('add-memorized-share'))).toMatch(/^Memorized on today: under 1% → under 1% of the Quran$/);
     fireEvent.press(screen.getByTestId('sheet-right'));
     await flush();
     const alMulk = Array.from({ length: 20 }, (_, i) => 67001 + i);
