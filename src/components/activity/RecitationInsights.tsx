@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { typeV2 } from '../../theme/v2';
 import { SectionRow } from './SectionRow';
+import { recitationRow } from '../../lib/activityRowValues';
 import { ChromeText, STACK_AT_SCALE } from './ChromeText';
 import { Tap } from '../v2/Tap';
 import { openRevo } from '../../lib/revo/open';
@@ -91,7 +92,7 @@ export function RecitationInsights({ records, words, today, window, inWords, sma
       <SectionRow
         title={t('activity.recitation.title')}
         line={scoreLine(ins, inWords, true)}
-        figure={ins.score !== null ? formatAccuracy(ins.score) : null}
+        figure={recitationRow(ins.score)?.figure ?? null}
         onPress={row}
         separator={!last}
         testID="insights-row-recitation"

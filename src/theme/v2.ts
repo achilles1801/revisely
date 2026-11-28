@@ -764,6 +764,12 @@ export interface RamadanTokens {
   wire: string;
   /** The string lights' bulbs, in turn. */
   bulbs: readonly [string, string, string];
+  /**
+   * Insights' Ramadan row, set apart from the sections (Majd, Nov 27 2026: "shouldn't the ramadan card stand out more?
+   * maybe like some highlite"): a warm band behind it, edged in `bandEdge`. Text and grey text read at 4.5:1 on it.
+   */
+  band: string;
+  bandEdge: string;
 }
 
 const RAMADAN_BASE = {
@@ -777,6 +783,8 @@ const RAMADAN_BASE = {
     wire: '#CBBFA6',
     amber: '#E3A72F',
     third: '#D9774A',
+    band: '#FBEFD4',
+    bandEdge: '#E6C98A',
   },
   dark: {
     gold: '#E8B65A',
@@ -788,6 +796,8 @@ const RAMADAN_BASE = {
     wire: '#5A4F3C',
     amber: '#FFC857',
     third: '#FFE9B8',
+    band: '#241B0C',
+    bandEdge: '#6B5226',
   },
 } as const;
 
@@ -804,6 +814,8 @@ export function ramadanV2(isDark: boolean, accent: AccentName = DEFAULT_ACCENT):
     // doneText: the accent itself for every accent (Jade's accentText is ink). An accent it doesn't know (a test's stand-in
     // palette) takes the default's, so a bulb never goes missing.
     bulbs: [b.amber, paletteV2(isDark, ACCENTS.includes(accent) ? accent : DEFAULT_ACCENT).doneText, b.third],
+    band: b.band,
+    bandEdge: b.bandEdge,
   };
 }
 

@@ -17,6 +17,7 @@ import { typeV2 } from '../../theme/v2';
 import { t } from '../../i18n';
 import { chevron, forwardIcon } from '../../i18n/direction';
 import { SectionRow } from './SectionRow';
+import { gapsRow } from '../../lib/activityRowValues';
 import { ChromeText, STACK_AT_SCALE } from './ChromeText';
 import { Tap } from '../v2/Tap';
 import {
@@ -124,9 +125,9 @@ function Gaps({ view, all, firstDay, onOpenDay, onOpenCalendar, pushBack, onOpen
       <SectionRow
         title={t('insights.gaps.title')}
         line={summary}
-        figure={figure.value}
-        unit={figure.text}
-        red={figure.red}
+        figure={gapsRow(view.sinceLast).figure}
+        unit={gapsRow(view.sinceLast).unit}
+        red={gapsRow(view.sinceLast).red}
         onPress={row}
         separator={!last}
         testID="insights-row-gaps"

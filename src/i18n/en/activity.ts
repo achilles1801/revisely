@@ -447,6 +447,19 @@ export const activity = {
     /** After Coverage's figure at All time: "3.1 cycles". */
     cycles_one: 'cycle',
     cycles_other: 'cycles',
+    /** Short enough for a row's end on one line (ACT-37). Consistency's: "7" "of 7 days". */
+    ofDays_one: 'of {{count}} day',
+    ofDays_other: 'of {{count}} days',
+    /** Gaps' row: "Today" "revised", or since the last revision "6" "days away", "3" "weeks away". */
+    revisedToday: 'revised',
+    daysAway_one: 'day away',
+    daysAway_other: 'days away',
+    weeksAway_one: 'week away',
+    weeksAway_other: 'weeks away',
+    monthsAway_one: 'month away',
+    monthsAway_other: 'months away',
+    yearsAway_one: 'year away',
+    yearsAway_other: 'years away',
     /** The week at the top (Majd's T1): its title, "Month ›" and its grey line. */
     thisWeek: 'This week',
     month: 'Month',

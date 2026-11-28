@@ -57,6 +57,11 @@ describe('the Ramadan theme’s colours', () => {
     expect(contrast(t.gold, p.bg)).toBeGreaterThanOrEqual(3);
     expect(contrast(t.mote, p.bg)).toBeGreaterThanOrEqual(2.5);
     expect(t.bulbs[1]).toBe(p.doneText);
+    // Insights' Ramadan row stands out on a warm band (Majd, Nov 27 2026): seen against the ground, its edge against it,
+    // and the row's text and grey text read on it.
+    expect(contrast(t.band, p.bg)).toBeGreaterThanOrEqual(1.1);
+    expect(contrast(t.bandEdge, t.band)).toBeGreaterThanOrEqual(1.3);
+    for (const ink of [p.text, p.secondary]) expect(contrast(ink, t.band)).toBeGreaterThanOrEqual(4.5);
   });
 
   it('takes the default accent’s bulb for an accent it doesn’t know (a stand-in palette)', () => {

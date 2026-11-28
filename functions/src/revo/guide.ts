@@ -364,7 +364,7 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
 export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     title: 'Revised elsewhere, a day’s entry and Home',
-    covers: ['ACT-33', 'ACT-34', 'ACT-35', 'HOME-4', 'HOME-5', 'HOME-6', 'HOME-7'],
+    covers: ['ACT-33', 'ACT-34', 'ACT-35', 'ACT-37', 'HOME-4', 'HOME-5', 'HOME-6', 'HOME-7'],
     routes: ['Dashboard', 'Activity'],
     text: lines(
       '- A day’s + → “Revised elsewhere”: a search for a surah or juz above the 30 juz. A tap chooses a juz; a hold opens it for its halves or parts. Extra pages never change the day’s schedule.',

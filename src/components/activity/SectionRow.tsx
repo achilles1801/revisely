@@ -1,8 +1,10 @@
 // A section of one Activity tab as a quiet row (ACT-35, version A): its name, one grey line, its figure at the end and ›.
-// The whole row is one button that opens the section on a page of its own.
+// The whole row is one button that opens the section on a page of its own. The figure and its words never wrap and never
+// push the name aside (ACT-37): each is one line, side by side, or the words under the figure above the usual text size (ROW_STACK_AT); their
+// values come from lib/activityRowValues, short enough for an SE-wide screen at the largest text.
 
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { layoutV2, typeV2 } from '../../theme/v2';
@@ -10,6 +12,7 @@ import { forwardIcon } from '../../i18n/direction';
 import { spokenText } from '../../lib/passages';
 import { Tap } from '../v2/Tap';
 import { ChromeText } from './ChromeText';
+import { ROW_STACK_AT } from '../../lib/activityRowValues';
 import { formatNumeral, t } from '../../i18n';
 
 export function SectionRow({
@@ -36,6 +39,7 @@ export function SectionRow({
   testID?: string;
 }) {
   const { palette } = useTheme();
+  const stacked = useWindowDimensions().fontScale >= ROW_STACK_AT;
   const spoken = [title, figure ? [figure, unit].filter(Boolean).join(' ') : null, line].filter(Boolean).map((s) => spokenText(s as string)).join(', ');
   return (
     <Tap
@@ -57,12 +61,12 @@ export function SectionRow({
         ) : null}
       </View>
       {figure ? (
-        <View style={styles.figure} testID={testID ? `${testID}-figure` : undefined}>
-          <ChromeText style={[styles.number, { color: red ? palette.red : palette.text }]} numberOfLines={1}>
+        <View style={[styles.figure, stacked && styles.figureStacked]} testID={testID ? `${testID}-figure` : undefined}>
+          <ChromeText style={[styles.number, { color: red ? palette.red : palette.text }]} numberOfLines={1} testID={testID ? `${testID}-number` : undefined}>
             {formatNumeral(figure)}
           </ChromeText>
           {unit ? (
-            <ChromeText style={[typeV2.meta, styles.unit, { color: palette.secondary }]} numberOfLines={2}>
+            <ChromeText style={[typeV2.meta, { color: palette.secondary }]} numberOfLines={1} testID={testID ? `${testID}-unit` : undefined}>
               {unit}
             </ChromeText>
           ) : null}
@@ -77,7 +81,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 64, paddingVertical: 12, marginStart: layoutV2.gutter, paddingEnd: layoutV2.gutter },
   words: { flex: 1, minWidth: 0, gap: 2 },
   title: { fontSize: 17, lineHeight: 22, fontWeight: '600' },
-  figure: { flexDirection: 'row', alignItems: 'baseline', gap: 4, flexShrink: 1, maxWidth: '50%', justifyContent: 'flex-end' },
+  figure: { flexDirection: 'row', alignItems: 'baseline', gap: 4, maxWidth: '50%', justifyContent: 'flex-end' },
+  figureStacked: { flexDirection: 'column', alignItems: 'flex-end', gap: 0 },
   number: { fontSize: 20, lineHeight: 24, fontWeight: '700' },
-  unit: { flexShrink: 1 },
 });
