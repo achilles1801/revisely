@@ -316,12 +316,9 @@ current basic sounds". October 2026's version was removed for the voices it offe
   Thursday evening the card says Friday began at maghrib. It comes and goes on time with Home left open, and on
   coming back to the app. (Changed Nov 21 2026, Majd: it followed the revision day, so it showed on Friday evening
   after maghrib and never on Thursday evening.)
-- **KAHF-2.** The card is one row with no buttons (Majd, Nov 27 2026: "i'm open to redesigning the surah kahf card"):
-  its line says it's Friday, its 12 pages and until maghrib (on Thursday evening, that Friday began at maghrib), ending
-  in "Read"; once read, "Done for this Friday." ending in "Open". A tap on the row or its line opens Al-Kahf's first
-  page in the reader over Home, and back comes back to Home, as today's ayah does (HOME-7; before, it opened in the
-  Read tab over its surah list). The check beside its ⋯ is "Mark as read".
-  Al-Kahf read inside that window counts for that Friday: its check, or every page of it in
+- **KAHF-2.** The card's "Read" opens Al-Kahf's first page in the reader over Home, and back comes back to Home, as
+  today's ayah does (HOME-7; before, it opened in the Read tab over its surah list).
+  Al-Kahf read inside that window counts for that Friday: "Mark as read", or every page of it in
   readings that ended inside it (the reader's timer), with the pages revised on Friday's own revision day. Read on
   Thursday evening, the card shows it as done on Friday morning. Read on Thursday before maghrib, it doesn't count.
   Activity still shows each reading on the revision day it was done (DAY-9): a Thursday-evening reading is on
@@ -494,9 +491,9 @@ current basic sounds". October 2026's version was removed for the voices it offe
   Once today is done, "Review session" still opens today's session. (Before: a "Today's journal" row under Today, from
   Nov 23 2026, and the last three sessions with "See all".)
 - **HOME-5.** (Revisely Dev) Home has one solid button, the Today post's ("Start revision", "Continue revision",
-  "Mark memorized pages"; "Review session" is an outline). Al-Kahf's "Read" is the accent word ending its grey line,
-  with a check to mark it read (KAHF-2), and the catch-up's "Add to today" is the accent words ending a grey line under
-  the Today post's button (CARRY-1), never a button of its own. A tap anywhere on that line adds the pages.
+  "Mark memorized pages"; "Review session" is an outline). Al-Kahf's "Read" is an outline like "Mark as read", and the
+  catch-up's "Add to today" is the accent words ending a grey line under the Today post's button (CARRY-1), never a
+  button of its own. A tap anywhere on that line adds the pages.
 - **HOME-6.** (Revisely Dev) Home's background runs from the top to the tab bar as one piece, with no edge and no plain
   block under the posts (Majd, Nov 26 2026: "connect it to the top in a way with the rest of the theme/gradient so that it
   doesn't just look like one huge empty black rectangle", then "build a, b, and c and just have them as appearance options

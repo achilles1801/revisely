@@ -138,7 +138,7 @@ describe('Home, version 3 (Revisely Dev)', () => {
     await app.close();
   });
 
-  it('[HOME-5] [KAHF-1] [KAHF-2] on Friday Al-Kahf is one row with no buttons: the Today post’s button is Home’s one solid button', async () => {
+  it('[HOME-5] [KAHF-1] on Friday Al-Kahf’s Read is an outline: the Today post’s button is Home’s one solid button', async () => {
     const phone = await account();
     const { app, home } = await openHome(phone, '2026-11-06 10:00');
     await app.until(() => home.kahf() != null, 'the Al-Kahf card');

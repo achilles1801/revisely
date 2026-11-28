@@ -104,10 +104,10 @@ describe('Al-Kahf on the Islamic Friday', () => {
     // After Thursday's maghrib: Friday has begun. Still to read (the afternoon's reading doesn't count).
     await returnAt(app, plus(thuMaghrib, 5));
     await app.until(() => h.kahf() != null, 'the Al-Kahf card after Thursday’s maghrib');
-    expect(h.kahf()).toContain('Friday began at maghrib. 12 pages.');
+    expect(h.kahf()).toContain('Friday began at maghrib. Read Surah Al-Kahf.');
     expect(app.screen.queryByTestId('kahf-mark')).not.toBeNull();
 
-    // Its check (Mark as read), 20 minutes: done for this Friday.
+    // Mark as read, 20 minutes: done for this Friday.
     await press(app, app.screen.getByTestId('kahf-mark'));
     await app.until(() => app.screen.queryByLabelText('20 minutes, Usual') != null, 'the minutes sheet');
     await press(app, app.screen.getByLabelText('20 minutes, Usual'));
