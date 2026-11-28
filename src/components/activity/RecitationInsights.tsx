@@ -206,8 +206,10 @@ function RecitationPage({ records, words, today, window, inWords, span, smartTra
 
       {/* The trend first: mistakes a page in the range, against the period before. */}
       <View testID="insights-recitation-figure">
-        {trend.takes > 0 && rate !== null ? (
+        {trend.takes > 0 ? (
           <>
+            {/* Takes kept without their final answer only (RECITE-11): no rate, the line alone. */}
+            {rate !== null ? (
             <View style={styles.hero}>
               <ChromeText style={[styles.big, { color: palette.text }]} numberOfLines={1} testID="insights-recitation-rate">
                 {perPageText(rate)}
@@ -235,8 +237,9 @@ function RecitationPage({ records, words, today, window, inWords, span, smartTra
                 </View>
               ) : null}
             </View>
+            ) : null}
             <ChromeText style={[typeV2.meta, styles.heroLine, { color: palette.secondary }]} testID="insights-recitation-line">
-              {heroLine(trend.takes, trend.score !== null ? formatAccuracy(trend.score) : null, range.lastWords, range.before)}
+              {heroLine(trend.takes, trend.score !== null ? formatAccuracy(trend.score) : null, range.lastWords, chip ? range.before : null)}
             </ChromeText>
           </>
         ) : (

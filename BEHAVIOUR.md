@@ -1559,7 +1559,7 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   - First, the mistakes a page in Insights' range ("0.5 mistakes a page"), with a chip against the same length before it
     ("↓ from 0.9", green when fewer, red when more, "same as before" to a tenth; none for All time or with no takes
     before), and its takes, the words said right and the span ("40 takes · 98.8% of words said right · last 3 months,
-    against the 3 months before"). A page is fair to long and short takes: each page a take reached counts by the share
+    against the 3 months before"; "against" only with the chip). A page is fair to long and short takes: each page a take reached counts by the share
     of its words recited, a line at least. Mistakes are the take summary's: never Not clear, a word corrected straight
     away or a tajweed note; a take kept without its final answer never counts in a rate.
   - Then the mistakes a page by kind on Insights' one chart (ACT-41), stacked: wrong or skipped words, hesitations (an

@@ -227,6 +227,14 @@ describe('Insights: Recitation’s page (ACT-42, RINS-2)', () => {
     expect(screen.queryByTestId('insights-recitation-takes')).toBeNull();
   });
 
+  it('[ACT-42] takes kept without their final answer only: the takes, no rate', async () => {
+    const unfinished = [{ ...take(-3, KAHF, [mark(w22, 'word')], 0.98), unfinished: true as const }];
+    await open(data({ recitation: { records: unfinished, words } }));
+    expect(screen.queryByTestId('insights-recitation-rate')).toBeNull();
+    // Nothing before it to compare with: no chip, and the line says only its span.
+    expect(text('insights-recitation-line')).toBe('1 take · last 30 days');
+  });
+
   it('[ACT-42] takes without a mistake say so in place of empty bars', async () => {
     const clean = [take(-3, KAHF, [], 1), take(-1, BAQ, [], 1)];
     await open(data({ recitation: { records: clean, words } }));
