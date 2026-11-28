@@ -1373,6 +1373,21 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   revised, after a 12-day gap" and "Over 3 weeks" "since your last revision, on 24 Oct"). The Ramadan row (THEME-6)
   stands out from the sections on a warm band in the theme's gold, inset by the margin, with a gold edge (Majd: "shouldn't
   the ramadan card stand out more? maybe like some highlite"); its text reads at 4.5:1 on it.
+- **ACT-38.** (Revisely Dev) Coverage's own page (ACT-35) starts from its point, "Is all I've memorized coming round, and
+  what's slipping out of rotation?" (Majd, Nov 27 2026: "yes build all seven screens"; board
+  `~/Documents/revisely-today-mocks/insights-v2/board-rest.png`). First the share that came round in the range ("91% came
+  round"), with its trend against the same length of days just before it ("↑ from 84%", green when up; ink, never red,
+  when down; none over All time, when the account is younger than both spans together, or when it is the same), and one
+  grey line, "278 of your 305 memorized pages were revised in 30 days ›", that opens what wasn't revised (ACT-23). The
+  pages memorized during the range don't count in the days before it. All time in cycles reads "3.1 cycles" over "Of your
+  305 memorized pages since 9 September". Then a card, "Each juz, by its last revision" and "tap a juz" (a surah, a page:
+  Juz | Surah | Page stay, ACT-26), with the tiles and the legend; a juz not memorized is the track's grey there. Last,
+  the juz slipping out of rotation: over 30 days since their least recently revised page (ACT-4's stale juz), and longer
+  than the plan takes to go round when it is known (Gaps' reading of the plan, ACT-28), the two left longest: "Juz 4 and
+  Juz 5 are slipping out of rotation" over "Last revised 41 and 33 days ago; your plan goes round every 15 days." The row
+  opens the first juz (ACT-21); Plan them (Plan it for one) puts their memorized pages first tomorrow (ACT-24) and becomes
+  "First tomorrow ✓", with "Add to plan ›" under it on a custom plan. With none slipping there is no row. The list's row
+  (ACT-35) and the two tabs' Insights are as before.
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
   strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
   stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,

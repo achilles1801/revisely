@@ -45,6 +45,36 @@ export const activity = {
     nextNever: 'Juz {{juz}}, never',
     planJuz: 'Plan Juz {{juz}}',
     planIt: 'Plan it',
+    /** Insights' own pages (ACT-38): a figure's trend against the period before, after its arrow: "↑ from 84%". */
+    trendFrom: 'from {{value}}',
+    /** "Up from 84% the 30 days before", for VoiceOver. */
+    trendUp: 'Up from {{value}} {{before}}',
+    trendDown: 'Down from {{value}} {{before}}',
+    /** Coverage's page: "91% | came round", over "278 of your 305 memorized pages were revised in 30 days." */
+    cameRound: 'came round',
+    /** All time in cycles: "3.1 | cycles" over "Of your 305 memorized pages since 9 September". */
+    cyclesUnit_one: 'cycle',
+    cyclesUnit_other: 'cycles',
+    cyclesLine: 'Of your {{pages}} {{span}}',
+    coverageLine: '{{n}} of your {{pages}} were revised {{span}}',
+    byLastRevisionJuz: 'Each juz, by its last revision',
+    byLastRevisionSurah: 'Each surah, by its last revision',
+    byLastRevisionPage: 'Each page, by its last revision',
+    tapAJuz: 'tap a juz',
+    tapASurah: 'tap a surah',
+    tapAPage: 'tap a page',
+    /** The juz slipping out of rotation (ACT-38): over "Last revised 41 and 33 days ago; your plan goes round every 15 days." */
+    slippingOne: 'Juz {{juz}} is slipping out of rotation',
+    slippingTwo: 'Juz {{a}} and Juz {{b}} are slipping out of rotation',
+    lastRevisedAgoTwo: 'Last revised {{a}} and {{b}} days ago',
+    juzNeverRevised: 'Juz {{juz}} never revised',
+    juzDaysAgo_one: 'Juz {{juz}} {{count}} day ago',
+    juzDaysAgo_other: 'Juz {{juz}} {{count}} days ago',
+    slippingPlan_one: '{{ages}}; your plan goes round every day.',
+    slippingPlan_other: '{{ages}}; your plan goes round every {{count}} days.',
+    slippingAges: '{{ages}}.',
+    planThem: 'Plan them',
+    planJuzTwo: 'Plan Juz {{a}} and Juz {{b}}',
     notRevisedSpan: 'Not revised {{span}}',
     everyOtherRevised: 'Every other memorized page was revised {{span}}.',
     /** A count that starts on the account's first day: "since 8 November". */

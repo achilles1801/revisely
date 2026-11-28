@@ -364,12 +364,12 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
 export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     title: 'Revised elsewhere, a day’s entry and Home',
-    covers: ['ACT-33', 'ACT-34', 'ACT-35', 'ACT-37', 'HOME-4', 'HOME-5', 'HOME-6', 'HOME-7', 'HOME-10'],
+    covers: ['ACT-33', 'ACT-34', 'ACT-35', 'ACT-37', 'ACT-38', 'HOME-4', 'HOME-5', 'HOME-6', 'HOME-7', 'HOME-10'],
     routes: ['Dashboard', 'Activity'],
     text: lines(
-      '- A day’s + → “Revised elsewhere”: a search for a surah or juz above the 30 juz. A tap chooses a juz; a hold opens it for its halves or parts. Extra pages never change the day’s schedule.',
-      '- Activity is one tab: “This week” (“Month” opens the calendar), the picked day (tap to open; no note), then “Your revision”: a row per section opening its page (empty ones hidden), “Edit sections” last. Spot tests: own line, block and search filter. A note can show under a take or spot test (Note sheet’s Show under, or its menu’s “Add a note”).',
-      '- Home: a ring of today’s pages; no “Recent sessions” (in Activity). “Home background” is in Appearance.',
+      '- A day’s + → “Revised elsewhere”: a search for a surah or juz above the 30 juz. Tap a juz to choose it; hold it for its parts. Extra pages never change the schedule.',
+      '- Activity is one tab: “This week” (“Month” opens the calendar), the picked day (tap to open; no note), then “Your revision”: a row per section opening its page (empty ones hidden), “Edit sections” last. A section’s page: its figure, ↑/↓ against the days before; Coverage’s juz slipping out of rotation, “Plan them”. Spot tests: own line, block and search filter. A note can show under a take or spot test (Note sheet’s Show under, or its menu’s “Add a note”).',
+      '- Home: a ring of today’s pages; “Recent sessions” is in Activity, “Home background” in Appearance.',
     ),
   },
   {
@@ -380,7 +380,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['MEM-9', 'MEM-10', 'MEM-12'],
     routes: ['Settings', 'Memorization', 'ActivitySection'],
     text: lines(
-      '- Home shows no memorized line or juz dots. Settings → “Memorized pages” (under “Revision”, e.g. "104 pages") opens them ready to edit: “Show by” “Surahs”, “Juz” or “Hizb”; a row’s circle marks it all, the row opens it (“Whole juz”, then its surahs’ pages, numbered within each surah). A change shows “Cancel” and e.g. "Save 2 changes".',
+      '- Home shows no memorized line or juz dots. Settings → “Memorized pages” (under “Revision”) opens them ready to edit: “Show by” “Surahs”, “Juz” or “Hizb”; a row’s circle marks it all, the row opens it (“Whole juz”, then its surahs’ pages, numbered within each surah). A change shows “Cancel” and e.g. "Save 2 changes".',
       '- Activity → “Memorization”: “Edit memorized pages”, then the chart by “Month” or “Day”, from the first month or day memorized.',
     ),
   },
@@ -436,10 +436,10 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- The bar writes each word once they’ve said it, in the order said: a repeat or going back shows again, and nothing ahead of their voice.',
       '- “Test me” here is one spot test: a random verse, the page hidden but for it. How far, where from and “Show progress” are in Settings → Mushaf and Recite → Spot tests; it finishes a surah ending near. It ends with “Hasbuk”, or “Stopped early”.',
       '- Settings → Mushaf and Recite → “Help improve mistake detection” (on by default) keeps each take and its result to train it; software checks them, nobody listens. Every account that recites has it. Settings → Testing → “Premium” turns Premium off to see Mark mistakes locked.',
-      '- Settings → About → “Licences” shows the recitation model’s licence (the Quran Muaalem License) in full, offline too.',
-      '- Settings → Testing → “Mistake detection model” says which model the checker runs (e.g. v7); a tap asks again.',
+      '- Settings → About → “Licences”: the recitation model’s licence (Quran Muaalem License), offline.',
+      '- Settings → Testing → “Mistake detection model”: the checker’s model; tap to ask again.',
       '- Settings → Appearance → “Language”: “Phone’s language”, English or العربية (Arabic). It restarts Revisely (“Restart”, or “Not now”). In Arabic, Revo answers in Arabic too. Untranslated text shows in English. In Arabic the mushaf turns as a printed one does.',
-      '- Settings → Help and support → “Rate Revisely” opens the store’s review page. After a day’s revision with a streak of 7 days or more, the end card may show “Enjoying Revisely? Rate it”: at most 3 times, four months apart, not in an account’s first week, never after a tap or dismissal. Nothing is given for rating.',
+      '- Settings → Help and support → “Rate Revisely” opens the store’s review page. After a day’s revision with a streak of 7 days or more, the end card may show “Enjoying Revisely? Rate it”: at most 3 times, four months apart, never in an account’s first week or after a tap or dismissal. Nothing is given for rating.',
     ),
   },
   {
