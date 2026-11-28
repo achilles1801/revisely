@@ -68,6 +68,9 @@ export default function ReminderScreen() {
         fajrBoundaryEnabled,
         locationCoords,
         fajrCalculationMethod: DEFAULT_FAJR_METHOD,
+        // The surahs chosen as surahs earlier in setup ("Choose by surah instead", or every one with "All of it"): kept,
+        // not replaced by a new account's empty list (ONBOARD-6).
+        memorizedSurahs: account?.memorizedSurahs ?? [],
         // The beginner's path (PATH-1); an account that never had one writes nothing new.
         ...pathFieldForSetup(path, account),
       });

@@ -202,3 +202,47 @@ it('[ONBOARD-5] Preview onboarding walks every question on a blank account and s
   expect(JSON.stringify(app.app.user)).toBe(before);
   await app.close();
 });
+
+it('[ONBOARD-6] a surah chosen in "Choose by surah instead" is still chosen once setup ends', async () => {
+  setZone(ZONES.chicago);
+  setNow('2026-11-03 12:00');
+  const email = newEmail();
+  createAccountPartWay(email, 'scenario-password', 604);
+
+  const phone = new Phone('phone');
+  const app = await phone.open(onboardingFlow);
+  await app.act(() => app.auth.signIn(email, 'scenario-password'));
+  await app.until(() => app.app.pages.length === 604, 'the pages');
+  const flow = new Onboarding(app);
+
+  await flow.press('welcome-begin');
+  await flow.reach('journey-select');
+  await flow.press('journey-part');
+  await flow.reach('juz-selection');
+  await app.until(() => flow.summary() === '1 page chosen', 'Al-Fatihah to start chosen');
+  // Al-Ikhlas, which shares the Qur'an's last page with Al-Falaq and An-Nas, chosen as a surah.
+  await flow.press('juz-by-surah');
+  await flow.reach('surah-112-check');
+  await flow.press('surah-112-check');
+  await flow.press('juz-by-surah-done');
+  await flow.press('juz-continue');
+  await flow.reach('daily-amount');
+  // Saved with the juz screen's Continue.
+  await app.until(() => (app.app.user?.memorizedSurahs ?? []).includes(112), 'Al-Ikhlas saved as a surah');
+  await flow.press('amount-continue');
+  await flow.reach('day-start');
+  await flow.press('day-midnight');
+  await flow.reach('reminder');
+  await flow.press('reminder-off');
+  await app.until(() => app.app.onboardingComplete, 'onboarding to complete');
+  await app.untilSynced();
+
+  // The last answer saves the plan and keeps it (it wrote an empty list over it).
+  expect(app.app.user?.memorizedSurahs).toEqual([112]);
+  expect(memorizedOnServer(email)).toEqual([1, 604]);
+  await app.close();
+  const again = await phone.open(onboardingFlow);
+  await again.untilLoaded();
+  expect(again.app.user?.memorizedSurahs).toEqual([112]);
+  await again.close();
+});
