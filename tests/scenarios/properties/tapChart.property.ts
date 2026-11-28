@@ -2,7 +2,7 @@
 // pick. Values over every bar up to 7, else over the lit one; labels for every bar up to 10, else the ends and the pick,
 // never two side by side past 10.
 import fc from 'fast-check';
-import { LABELS_ALL_UP_TO, labelShown, litIndex, VALUES_ALL_UP_TO, valueShown } from '../../../src/components/activity/TapChart';
+import { chartLayout, LABELS_ALL_UP_TO, labelShown, litIndex, MAX_BAR_WIDTH, MIN_SLOTS, VALUES_ALL_UP_TO, valueShown } from '../../../src/components/activity/TapChart';
 import { runs } from './fixtures';
 
 const chart = fc.integer({ min: 1, max: 60 }).chain((n) => fc.record({ n: fc.constant(n), picked: fc.option(fc.integer({ min: 0, max: n - 1 }), { nil: null }) }));
@@ -29,6 +29,24 @@ describe('[ACT-41] the chart’s values and labels', () => {
         for (const end of [0, n - 1]) if (picked == null || Math.abs(end - picked) > 1) if (!shown[end]) return false;
         for (let i = 1; i < n; i++) if (shown[i] && shown[i - 1]) return false;
         return shown.filter(Boolean).length <= 3;
+      }),
+      { numRuns: runs(300) },
+    );
+  });
+
+  it('never one block: a bar is never wider than the maximum, at least 7 slots, and they fit the width (Majd: "garbage ui")', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 120 }), fc.integer({ min: 280, max: 500 }), (n, width) => {
+        const l = chartLayout(n, width);
+        return (
+          l.slots >= MIN_SLOTS &&
+          l.slots === Math.max(n, MIN_SLOTS) &&
+          l.lead === l.slots - n &&
+          l.bar <= MAX_BAR_WIDTH &&
+          l.bar > 0 &&
+          l.bar <= l.slot &&
+          l.slots * l.slot + (l.slots - 1) * l.gap <= width + 1e-6
+        );
       }),
       { numRuns: runs(300) },
     );

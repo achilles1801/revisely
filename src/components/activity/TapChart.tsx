@@ -6,14 +6,15 @@
 // the two ends and the pick (`labelShown`). Built from Memorization's chart (MEM-10, #1066), which uses it.
 // The range pills (4 weeks, 3 months, a year) and Month | Day are `ChartPills`.
 
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../context/ThemeContext';
 import { typeV2 } from '../../theme/v2';
 import { Tap } from '../v2/Tap';
 import { PillButton } from '../v2/PillButton';
 import { ChromeText } from './ChromeText';
+import { t } from '../../i18n';
 
 export interface ChartBar {
   /** Stable for the chart (a month "2026-11", a day "2026-11-27", a week's first day). */
@@ -34,6 +35,22 @@ export interface ChartBar {
 export const VALUES_ALL_UP_TO = 7;
 /** Up to this many bars, every label shows under its bar. */
 export const LABELS_ALL_UP_TO = 10;
+
+/**
+ * Never one block (Majd, Nov 28 2026, of a month drawn as one full-width bar: "plz ensure something like this never
+ * happens (garbage ui)"): a bar is at most MAX_BAR_WIDTH wide, and the chart has at least MIN_SLOTS slots, the bars at
+ * the end (the newest at the right) with the slots before them empty.
+ */
+export const MAX_BAR_WIDTH = 28;
+export const MIN_SLOTS = 7;
+
+/** Where the bars go in `width` points: the slots, the gap between them, each slot's width and each bar's. */
+export function chartLayout(n: number, width: number): { slots: number; lead: number; gap: number; slot: number; bar: number } {
+  const slots = Math.max(n, MIN_SLOTS);
+  const gap = slots > 60 ? 1 : slots > 14 ? 2 : 6;
+  const slot = Math.max(0, (width - gap * (slots - 1)) / slots);
+  return { slots, lead: slots - n, gap, slot, bar: Math.min(MAX_BAR_WIDTH, slot) };
+}
 
 /** The bar lit: the one picked, else the newest. */
 export function litIndex(n: number, picked: number | null): number {
@@ -66,6 +83,7 @@ export function TapChart({
   height = 72,
   testID,
   barTestID,
+  empty,
 }: {
   bars: readonly ChartBar[];
   /** The picked bar's key, or none. */
@@ -82,17 +100,32 @@ export function TapChart({
   testID: string;
   /** Each bar's test id (by default `${testID}-bar-${key}`). */
   barTestID?: (key: string) => string;
+  /** With no bars, what the chart says instead (an empty frame never shows). */
+  empty?: string;
 }) {
   const { palette } = useTheme();
+  const window = useWindowDimensions().width;
+  // The chart's width, measured; until then the screen's less the section's gutters.
+  const [measured, setMeasured] = useState<number | null>(null);
   const n = bars.length;
+  if (n === 0) {
+    return (
+      <View style={[styles.empty, { minHeight: height + 21 }]} testID={`${testID}-empty`}>
+        <ChromeText style={[typeV2.meta, { color: palette.secondary, textAlign: 'center' }]}>{empty ?? t('activity.insights.chartEmpty')}</ChromeText>
+      </View>
+    );
+  }
+  const layout = chartLayout(n, measured ?? window - 32);
   const pickedIndex = picked == null ? null : bars.findIndex((b) => b.key === picked);
   const pickAt = pickedIndex != null && pickedIndex >= 0 ? pickedIndex : null;
   const lit = litIndex(n, pickAt);
   const top = Math.max(max ?? 0, ...bars.map((b) => b.value), 1e-9);
-  const gap = n > 14 ? 2 : 6;
+  const { gap, lead } = layout;
+  const blanks = Array.from({ length: lead }, (_, i) => <View key={`lead-${i}`} style={styles.col} testID={`${testID}-slot-empty`} />);
   return (
-    <View testID={testID}>
+    <View testID={testID} onLayout={(e) => setMeasured(e.nativeEvent.layout.width)}>
       <View style={[styles.bars, { height: height + 21, gap }]}>
+        {blanks}
         {bars.map((b, i) => {
           const on = i === lit;
           const faded = pickAt != null && !on;
@@ -115,9 +148,9 @@ export function TapChart({
               ) : null}
               {h > 0 ? (
                 gradient && !b.parts ? (
-                  <LinearGradient colors={[gradient[1], gradient[0]]} style={[styles.bar, { height: h, opacity: faded ? 0.45 : 1 }]} testID={`${testID}-fill-${b.key}`} />
+                  <LinearGradient colors={[gradient[1], gradient[0]]} style={[styles.bar, { width: layout.bar, height: h, opacity: faded ? 0.45 : 1 }]} testID={`${testID}-fill-${b.key}`} />
                 ) : (
-                  <View style={[styles.bar, styles.stack, { height: h, opacity: faded ? 0.45 : 1 }]} testID={`${testID}-fill-${b.key}`}>
+                  <View style={[styles.bar, styles.stack, { width: layout.bar, height: h, opacity: faded ? 0.45 : 1 }]} testID={`${testID}-fill-${b.key}`}>
                     {[...parts.keys()].reverse().map((k) =>
                       parts[k] > 0 ? (
                         <View key={k} style={{ flex: parts[k], backgroundColor: colours[k] ?? colours[0] }} testID={`${testID}-part-${b.key}-${k}`} />
@@ -131,6 +164,7 @@ export function TapChart({
         })}
       </View>
       <View style={[styles.labels, { gap }]}>
+        {Array.from({ length: lead }, (_, i) => <View key={`lead-${i}`} style={styles.label} />)}
         {bars.map((b, i) => (
           <ChromeText
             key={b.key}
@@ -174,10 +208,11 @@ export function ChartPills<K extends string>({
 const styles = StyleSheet.create({
   bars: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 10 },
   col: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
-  bar: { alignSelf: 'stretch', borderRadius: 5, overflow: 'hidden' },
+  bar: { borderRadius: 5, overflow: 'hidden', maxWidth: MAX_BAR_WIDTH },
   stack: { flexDirection: 'column' },
   value: { width: 48, textAlign: 'center', fontWeight: '600', marginBottom: 3 },
   labels: { flexDirection: 'row', marginTop: 6 },
   label: { flex: 1, textAlign: 'center' },
   pills: { flexDirection: 'row', gap: 6, marginTop: 14 },
+  empty: { alignItems: 'center', justifyContent: 'center', marginTop: 10, paddingHorizontal: 16 },
 });

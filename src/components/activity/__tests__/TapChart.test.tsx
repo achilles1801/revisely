@@ -2,8 +2,9 @@
 // press-and-hold; stacked parts in their colours; values and labels as the rule says (their rules: the property test).
 import React from 'react';
 import { StyleSheet } from 'react-native';
+import { Dimensions } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { ChartPills, TapChart, type ChartBar } from '../TapChart';
+import { chartLayout, ChartPills, MAX_BAR_WIDTH, MIN_SLOTS, TapChart, type ChartBar } from '../TapChart';
 
 const mockPalette = require('../../../theme/v2').paletteV2(false, 'crimson');
 jest.mock('../../../context/ThemeContext', () => ({ useTheme: () => ({ palette: mockPalette, theme: mockPalette, isDark: false }) }));
@@ -81,3 +82,35 @@ describe('[ACT-41] the chart', () => {
     expect(onChange).toHaveBeenCalledWith('1y');
   });
 });
+
+describe('[ACT-41] never one block, never an empty frame (Majd: "plz ensure something like this never happens (garbage ui)")', () => {
+  let dims: jest.SpyInstance | null = null;
+  afterEach(() => {
+    dims?.mockRestore();
+    dims = null;
+  });
+  // An iPhone SE and a Pro Max (Majd's).
+  it.each([320, 440])('at %i pt: 0 points says so; 1, 2, 3 and many keep each bar narrow, in at least 7 slots', (width) => {
+    dims = jest.spyOn(Dimensions, 'get').mockReturnValue({ width, height: 800, scale: 3, fontScale: 1 });
+    for (const n of [0, 1, 2, 3, 12, 30, 90]) {
+      render(<TapChart bars={bars(n)} picked={null} onPick={jest.fn()} colours={['red']} testID="chart" />);
+      if (n === 0) {
+        expect(screen.getByTestId('chart-empty')).toHaveTextContent('Nothing here yet in this range');
+        expect(screen.queryAllByRole('button')).toHaveLength(0);
+      } else {
+        const layout = chartLayout(n, width - 32);
+        expect(screen.queryAllByTestId('chart-slot-empty')).toHaveLength(Math.max(0, MIN_SLOTS - n));
+        for (const b of bars(n)) {
+          const w = StyleSheet.flatten(screen.getByTestId(`chart-fill-${b.key}`).props.style).width as number;
+          expect(w).toBeGreaterThan(0);
+          expect(w).toBeLessThanOrEqual(MAX_BAR_WIDTH);
+          expect(w).toBe(layout.bar);
+        }
+        // A lone bar is one slot of seven, never the chart's width.
+        expect(layout.slots * layout.bar).toBeLessThanOrEqual(width - 32);
+      }
+      screen.unmount();
+    }
+  });
+});
+

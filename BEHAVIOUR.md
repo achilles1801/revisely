@@ -1395,7 +1395,11 @@ International", "The Clear Quran®") and in `lib/quranenc`.
   colours of its key. The value shows above every bar when there are 7 or fewer, otherwise above the lit one (the pick,
   else the newest). The labels under the bars all show up to 10 bars, otherwise the two ends and the pick, and an end
   next to the pick gives way to it. Its choices are a row of small pills (a range: 4 weeks, 3 months, a year; or Month
-  and Day). Memorization's chart (MEM-10) is this chart.
+  and Day). Memorization's chart (MEM-10) is this chart. It is never one block (Majd, Nov 28 2026, of a month drawn as
+  one full-width bar: "plz ensure something like this never happens (garbage ui)"): a bar is at most 28 pt wide, and the
+  chart has at least seven slots, the bars at the end (the newest at the right) and the slots before them empty, on an
+  SE and a Pro Max alike. With nothing in its range it says so in one grey line ("Nothing here yet in this range"),
+  never an empty frame.
 - **ACT-19.** Without Smart Tracking no page is rated, so Activity shows no strength: no weak, moderate or
   strong counts, no weak marks on a day's pages, no Weak spots (ACT-12) and no rating colours. Recency
   stands in where it reads well: when a part was last revised and how often. With Smart Tracking on,
