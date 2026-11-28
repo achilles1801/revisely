@@ -364,11 +364,11 @@ export const GUIDE_SECTIONS: readonly GuideSection[] = [
 export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
   {
     title: 'Revised elsewhere, a day’s entry and Home',
-    covers: ['ACT-33', 'ACT-34', 'ACT-35', 'ACT-37', 'ACT-38', 'ACT-41', 'ACT-42', 'HOME-4', 'HOME-5', 'HOME-6', 'HOME-7', 'HOME-10'],
+    covers: ['ACT-33', 'ACT-34', 'ACT-35', 'ACT-37', 'ACT-38', 'ACT-39', 'ACT-41', 'ACT-42', 'HOME-4', 'HOME-5', 'HOME-6', 'HOME-7', 'HOME-10'],
     routes: ['Dashboard', 'Activity'],
     text: lines(
       '- A day’s + → “Revised elsewhere”: a search for a surah or juz, then the 30 juz. Tap a juz to choose it, hold for its parts. Extra pages never change the schedule.',
-      '- Activity is one tab: “This week” (“Month”: the calendar), the picked day (tap opens it; no note), then “Your revision”: a row per section opening its page (empty ones hidden), “Edit sections” last. A section’s page: its figure, ↑/↓ against before; Coverage’s juz slipping out of rotation, “Plan them”; Gaps’ days. Spot tests: own line, block, search filter. A note can show under a take or spot test (Note sheet’s Show under or “Add a note”).',
+      '- Activity is one tab: “This week” (“Month”: the calendar), the picked day (tap opens it; no note), then “Your revision”: a row per section opening its page (empty ones hidden), “Edit sections” last. A section’s page: its figure, ↑/↓ against before; Coverage’s juz slipping out of rotation, “Plan them”; Gaps’ days; Weak spots by week, the page weak most often. Spot tests: own line, block, search filter. A note can show under a take or spot test (Note sheet’s Show under or “Add a note”).',
       '- Home: a ring of today’s pages; “Recent sessions” is in Activity, “Home background” in Appearance.',
     ),
   },
@@ -424,7 +424,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     covers: ['SESS-8', 'LANG-2', 'RECITE-7', 'RECITE-26', 'RECITE-27', 'RECITE-28', 'RECITE-29', 'RECITE-30', 'RECITE-33', 'SET-5', 'ONBOARD-5'],
     routes: ['Settings'],
     text: lines(
-      '- Settings → Testing → “Preview onboarding”: the first setup’s screens on a blank account, saving nothing.',
+      '- Settings → Testing → “Preview onboarding”: the first setup on a blank account, saving nothing.',
       '- Revo’s mic (field empty): tap and speak; the words appear as heard, in the app’s language (Arabic or English). A pause or Stop ends it; nothing is sent until send.',
       '- Settings → Mushaf and Recite → “Mistakes to mark”: “Mistakes”, or “Strict (Beta)”, which also marks tajweed in violet: ghunnah, ikhfa, qalqalah, idgham (with and without ghunnah), iqlab, a natural madd dropped, “Madd munfasil” at 4 or 5 counts, a lazim madd held short, and “Madd ʿarid” once it’s set to a length. It doesn’t check “Madd muttasil”, munfasil at 2 counts or ikhfa of meem yet, so never say it checks every tajweed rule. It’s Beta: it can miss a slip or note a correct word.',
       '- Two tiers of marks. Mistakes: a wrong or skipped word, a hesitation (“Hesitated here”, on the word they didn’t know; after the end, “Extra word”), a wrong haraka or letter, each named on its card (“Wrong word”, “Wrong haraka”, “Wrong letter”, “Wrong shadda”) and in the summary, counted in the score, never a “slip”. Tajweed notes (Strict): “(Beta)” after the name. Never counted: tajweed, “Not clear” and “Corrected” (a word put right at once). Red: words; amber: harakat, letters and Not clear; violet: tajweed; green: Corrected.',
@@ -436,10 +436,10 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
       '- The bar writes each word once they’ve said it, in the order said: a repeat or going back shows again, and nothing ahead of their voice.',
       '- “Test me” here is one spot test: a random verse, the page hidden but for it. How far, where from and “Show progress” are in Settings → Mushaf and Recite → Spot tests; it finishes a surah ending near. It ends with “Hasbuk”, or “Stopped early”.',
       '- Settings → Mushaf and Recite → “Help improve mistake detection” (on by default) keeps each take and its result to train it; software checks them, nobody listens. Every account that recites has it. Settings → Testing → “Premium” turns Premium off to see Mark mistakes locked.',
-      '- Settings → About → “Licences”: the recitation model’s licence (Quran Muaalem License), offline.',
+      '- Settings → About → “Licences”: the recitation model’s licence (Quran Muaalem License).',
       '- Settings → Testing → “Mistake detection model”: the model the checker runs.',
-      '- Settings → Appearance → “Language”: “Phone’s language”, English or العربية (Arabic). It restarts Revisely (“Restart”, or “Not now”). In Arabic, Revo answers in Arabic too. Untranslated text shows in English. In Arabic the mushaf turns as a printed one does.',
-      '- Settings → Help and support → “Rate Revisely” opens the store’s review page. After a day’s revision with a streak of 7 days or more, the end card may show “Enjoying Revisely? Rate it”: at most 3 times, four months apart, never in an account’s first week or after a tap or dismissal. Nothing is given for rating.',
+      '- Settings → Appearance → “Language”: “Phone’s language”, English or العربية (Arabic). It restarts Revisely (“Restart” or “Not now”). In Arabic, Revo answers in Arabic too. Untranslated text shows in English. In Arabic the mushaf turns as a printed one does.',
+      '- Settings → Help and support → “Rate Revisely” opens the store’s review page. After a day’s revision with a streak of 7 days or more, the end card may show “Enjoying Revisely? Rate it”: at most 3 times, 4 months apart, not in the first week, never after a tap or dismissal. Nothing is given for rating.',
     ),
   },
   {
@@ -537,7 +537,7 @@ export const DEV_GUIDE_SECTIONS: readonly GuideSection[] = [
     routes: ['Settings', 'OnDeviceBench'],
     text: lines(
       '- Settings → Testing → “On-device model” is the Revisely team’s bench: it times Recite’s model on this phone (per 4-second window; the mark is under 250 ms at p95), with memory and heat, and “Long run” adds battery.',
-      '- “Stub” under the phone’s name means this build has no on-device engine. Results go to the team without their account or audio.',
+      '- “Stub” under the phone’s name: no on-device engine in this build. Results go to the team without their account or audio.',
       '- With Recite’s pack on the phone, the screen also shows a “Self-check” line: whether the models compute the expected numbers on this phone. It then tests a take on a recording (Strict where the phone can run it) for about a minute and a half, so stay on the screen; nothing is recorded from the microphone. Both go to the team once per pack and app update.',
     ),
   },

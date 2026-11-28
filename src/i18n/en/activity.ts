@@ -83,6 +83,23 @@ export const activity = {
     monthEarly: 'early {{month}}',
     monthMid: 'mid-{{month}}',
     monthLate: 'late {{month}}',
+    /** Weak spots' page (ACT-39): "4 | weak pages ↓ from 9" over "Pages you rated weak in your last session of them". */
+    weakUnit_one: 'weak page',
+    weakUnit_other: 'weak pages',
+    weakLine: 'Pages you rated weak in your last session of them',
+    strengthTitle: 'Weak and moderate, week by week',
+    tapAWeek: 'tap a week',
+    /** A week of a chart: "This week · 4 weak · 7 moderate", "Week of 9 Nov · 1.7 min a page". */
+    weekThis: 'This week',
+    weekOf: 'Week of {{day}}',
+    weekThisShort: 'This wk',
+    strengthWeek: '{{week}} · {{weak}} weak · {{moderate}} moderate',
+    weakLegend: 'Weak',
+    moderateLegend: 'Moderate',
+    weakOften_one: 'weak in {{count}} session {{span}}',
+    weakOften_other: 'weak in {{count}} sessions {{span}}',
+    reviseWeak_one: 'Revise the weak page first tomorrow',
+    reviseWeak_other: 'Revise the {{count}} weak pages first tomorrow',
     notRevisedSpan: 'Not revised {{span}}',
     everyOtherRevised: 'Every other memorized page was revised {{span}}.',
     /** A count that starts on the account's first day: "since 8 November". */

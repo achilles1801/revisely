@@ -5,7 +5,7 @@
 
 import { getPagesForJuz } from './quranData';
 import type { JuzTile } from './insightsView';
-import { formatDate, t } from '../i18n';
+import { formatDate, formatDay, t } from '../i18n';
 
 const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
 const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
@@ -156,4 +156,95 @@ export function doneByWords(done: JuzDoneBy, today: string): { title: string; de
     title: t('activity.insights.doneBy', { juz: done.juz, when: partOfMonth(done.day, today) }),
     detail: t('activity.insights.doneByDetail', { count: done.left, perMonth: done.perMonth }),
   };
+}
+
+// ── Weak spots (ACT-39) ──────────────────────────────────────────────────
+
+type RatingLog = { date: string; weaknessUpdates?: { page: number; rating: number }[] };
+
+/** Weak is a rating of 1–2, moderate 3 (an unrated page counts as strong). */
+const isWeak = (r: number | undefined) => r != null && r <= 2;
+const isModerate = (r: number | undefined) => r === 3;
+
+/**
+ * Each memorized page's rating at the end of `day`: its last session rating on or before it; a page rated only after it
+ * counts as strong then (pages start strong); a page no session in the logs rated keeps its rating now.
+ */
+export function ratingsOn(input: { logs: RatingLog[]; memorized: Set<number>; rating: (page: number) => number | undefined; day: string }): Map<number, number | undefined> {
+  const { logs, memorized, rating, day } = input;
+  const until = new Map<number, number>();
+  const later = new Set<number>();
+  for (const log of [...logs].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))) {
+    for (const w of log.weaknessUpdates ?? []) {
+      if (log.date <= day) until.set(w.page, w.rating);
+      else later.add(w.page);
+    }
+  }
+  const out = new Map<number, number | undefined>();
+  for (const p of memorized) out.set(p, until.has(p) ? until.get(p) : later.has(p) ? undefined : rating(p));
+  return out;
+}
+
+/** Memorized pages weak now, and as the range began (null over All time, or with no session before it in the logs). */
+export function weakCount(input: {
+  logs: RatingLog[];
+  memorized: Set<number>;
+  rating: (page: number) => number | undefined;
+  today: string;
+  window: number | null;
+}): { now: number; before: number | null } {
+  const { logs, memorized, rating, today, window } = input;
+  const now = [...memorized].filter((p) => isWeak(rating(p))).length;
+  if (window == null) return { now, before: null };
+  const start = shiftDay(today, -window);
+  if (!logs.some((l) => l.date <= start)) return { now, before: null };
+  const then = ratingsOn({ logs, memorized, rating, day: start });
+  return { now, before: [...then.values()].filter(isWeak).length };
+}
+
+/** Weak and moderate pages at the end of each of the last `weeks` weeks, oldest first, the last ending today. */
+export function strengthWeeks(input: {
+  logs: RatingLog[];
+  memorized: Set<number>;
+  rating: (page: number) => number | undefined;
+  today: string;
+  weeks: number;
+}): { end: string; weak: number; moderate: number }[] {
+  const out: { end: string; weak: number; moderate: number }[] = [];
+  for (let k = input.weeks - 1; k >= 0; k--) {
+    const end = shiftDay(input.today, -7 * k);
+    const on = k === 0 ? new Map([...input.memorized].map((p) => [p, input.rating(p)])) : ratingsOn({ ...input, day: end });
+    const values = [...on.values()];
+    out.push({ end, weak: values.filter(isWeak).length, moderate: values.filter(isModerate).length });
+  }
+  return out;
+}
+
+/** The memorized page rated weak most often in the range (at least twice), the first by page on a tie. */
+export function weakMostOften(ratedWeak: Map<number, number>, memorized: Set<number>): { page: number; times: number } | null {
+  let best: { page: number; times: number } | null = null;
+  for (const [page, times] of ratedWeak) {
+    if (!memorized.has(page) || times < 2) continue;
+    if (!best || times > best.times || (times === best.times && page < best.page)) best = { page, times };
+  }
+  return best;
+}
+
+// ── Weekly charts (ACT-39, ACT-40) ───────────────────────────────────────
+
+const weekStartWords = (end: string) => formatDay(shiftDay(end, -6), { day: 'numeric', month: 'short' }, 'en-GB');
+
+/** A week of a weekly chart, ending `end`: "This week", or "Week of 3 Nov" by its first day (the line over the chart). */
+export function weekName(end: string, today: string): string {
+  return end === today ? t('activity.insights.weekThis') : t('activity.insights.weekOf', { day: weekStartWords(end) });
+}
+
+/**
+ * Under a week's bar. `short` (every bar labelled, 10 bars or fewer): its first day's number, "16", the line above naming
+ * the week; "16 Nov" and "This wk" were cut on an SE at the largest text, in a 32 pt slot. Otherwise "16 Nov", and "This
+ * wk" for the newest: only the ends and the pick are labelled then, each with room of its own.
+ */
+export function weekBarLabel(end: string, today: string, short: boolean): string {
+  if (short) return formatDay(shiftDay(end, -6), { day: 'numeric' });
+  return end === today ? t('activity.insights.weekThisShort') : weekStartWords(end);
 }

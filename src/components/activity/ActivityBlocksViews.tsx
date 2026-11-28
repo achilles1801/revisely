@@ -395,6 +395,8 @@ export function ActivityBlocksViews({ today, noteDays, noteOf, onAddNote, onOpen
     recitation,
     // Each juz's memorized share, by the page (MEM-2), for Memorization's juz dots (MEM-10).
     memorizedJuz,
+    // The sessions' ratings: Weak spots' page reads them week by week (ACT-39).
+    logs,
   };
   const insightsActions = {
     onOpenDay,

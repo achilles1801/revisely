@@ -146,3 +146,63 @@ it('[MEM-11] Memorization’s page says when the juz in progress is done at this
   expect(text(app, 'insights-memorization-done-by')).toBe('[flag-outline] At this pace, Juz 29 is done in early February 2027 9 pages to go, at about 4 a month.');
   await app.close();
 });
+
+/** A finished session on `day` (the app's shape), revising `pages`, with `ratings` [page, rating]. */
+async function sessionOn(uid: string, day: string, pages: number[], ratings: [number, number][]): Promise<void> {
+  const at = `${day}T19:00:00.000Z`;
+  await setServerDoc(`users/${uid}/sessions/${day}`, {
+    id: day,
+    date: day,
+    state: 'COMPLETED',
+    createdAt: timestamp(at),
+    updatedAt: timestamp(at),
+    completedAt: timestamp(at),
+    durationMinutes: 12,
+    assignedPages: pages,
+    totalAssignedPages: pages.length,
+    pagesRevised: pages,
+    pagesSkipped: [],
+    weaknessUpdates: ratings.map(([pageNumber, newRating]) => ({ pageNumber, previousRating: 4, newRating, changedAt: timestamp(at) })),
+    completionPercentage: 100,
+  });
+}
+
+it('[ACT-39] Weak spots’ page starts from its point: the pages weak now and their trend, weak and moderate week by week, the page weak most often, and Revise them', async () => {
+  setZone(ZONES.chicago);
+  setNow('2026-07-01 20:00');
+  const phone = new Phone();
+  // Juz 30 memorized, with Smart Tracking (pages are rated).
+  const first = await newAccount(phone, { memorized: pagesRange(582, 604), user: { dailyPageCapacity: 5, smartTrackingEnabled: true } });
+  const uid = first.uid;
+  await first.close();
+  await markPreviewTester(uid);
+
+  // 40 days ago three pages weak and one moderate; 20 days ago one of them strong again and another moderate; lately one
+  // more strong, and 590 weak twice.
+  await sessionOn(uid, ago(40), [582, 583, 584, 585], [[582, 1], [583, 2], [584, 2], [585, 3]]);
+  await sessionOn(uid, ago(20), [584, 585, 586], [[584, 4], [585, 3], [586, 3]]);
+  await sessionOn(uid, ago(10), [590], [[590, 1]]);
+  await sessionOn(uid, ago(3), [583, 590], [[583, 4], [590, 2]]);
+  for (const [p, r] of [[582, 1], [583, 4], [584, 4], [585, 3], [586, 3], [590, 2]]) await setServerDoc(`users/${uid}/pages/${p}`, { weaknessRating: r });
+
+  setNow(`${TODAY} 09:00`);
+  const app = await openSection(phone, 'insights-row-weak');
+
+  // The point: two pages weak now, down from three as the range began.
+  await app.until(() => /^2 weak pages/.test(label(app, 'insights-weak-figure') ?? ''), 'two weak pages');
+  expect(label(app, 'insights-weak-figure')).toBe('2 weak pages, Down from 3 the month before');
+  expect(text(app, 'insights-weak-figure-line')).toBe('Pages you rated weak in your last session of them');
+
+  // Weak and moderate week by week: five weeks for 30 days, the newest on the line; a tap picks a week.
+  expect(text(app, 'insights-weak-week')).toBe('This week · 2 weak · 2 moderate');
+  await tap(app, `insights-weak-chart-bar-${ago(28)}`);
+  expect(text(app, 'insights-weak-week')).toMatch(/^Week of \d+ \w+ · 3 weak · 1 moderate$/);
+
+  // The page weak most often opens it; Revise them puts the two weak pages first tomorrow.
+  // Page 590 is Al-Buruj, whole (its name held together by a no-break hyphen).
+  expect(text(app, 'insights-weak-often-row')?.replace(/\u2011/g, '-')).toBe('Al-Buruj weak in 2 sessions in the last 30 days [chevron-forward]');
+  expect(text(app, 'insights-revise-weak')).toBe('Revise the 2 weak pages first tomorrow [chevron-forward]');
+  await tap(app, 'insights-revise-weak-row');
+  await app.until(() => shows(app, 'insights-revise-weak-done'), 'First tomorrow ✓');
+  await app.close();
+});

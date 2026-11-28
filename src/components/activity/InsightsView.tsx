@@ -69,7 +69,7 @@ import {
 } from '../../lib/coverageViews';
 import { PaceSheet } from './PaceSheet';
 import { AdviceButton, InsightAdvice, InsightCard, InsightHero, type Trend } from './InsightPageParts';
-import { coverageBefore, doneByWords, juzDoneBy, slippingJuz, slippingWords } from '../../lib/insightsPages';
+import { coverageBefore, doneByWords, juzDoneBy, slippingJuz, slippingWords, strengthWeeks, weakCount, weakMostOften, weekBarLabel, weekName } from '../../lib/insightsPages';
 import { GapsSection } from './GapsSection';
 import type { PushBack } from '../../lib/gapsCycle';
 import { gapsView } from '../../lib/insightsGaps';
@@ -96,7 +96,7 @@ import {
   weeksGrid,
   type InsightsRange,
 } from '../../lib/insightsRange';
-import { t, weekdayLetters, formatNumeral, formatPercentage, formatNumber, formatDate } from '../../i18n';
+import { t, weekdayLetters, formatNumeral, formatPercentage, formatNumber, formatDate, formatDay } from '../../i18n';
 import { chevron, forwardIcon } from '../../i18n/direction';
 
 /** Consistency's weeks grid: the gap between cells, and the largest a cell gets (3 months on a wide phone). */
@@ -145,6 +145,8 @@ export interface InsightsData {
   pushBack?: PushBack | null;
   /** The takes with Mark mistakes (Revisely Dev, an account that recites): the Recitation section (RINS-2). */
   recitation?: Recitation | null;
+  /** The sessions' ratings, for Weak spots' page: weak and moderate week by week, and weak as the range began (ACT-39). */
+  logs?: { date: string; weaknessUpdates?: { page: number; rating: number }[] }[];
 }
 
 /**
@@ -1327,6 +1329,7 @@ function WeakSpots({
     for (const w of stillMarkedWords(data.recitation.records)) byPage.set(words.pageOf(w.w), (byPage.get(words.pageOf(w.w)) ?? 0) + 1);
     return byPage;
   }, [data.recitation]);
+  const alone = useSectionAlone();
   const markedOn = (rowPages: number[]) => rowPages.reduce((n, p) => n + (marked.get(p) ?? 0), 0);
   const reasonOf = (r: { pages: number[]; reason: string }) => {
     const n = markedOn(r.pages);
@@ -1345,6 +1348,19 @@ function WeakSpots({
       />
     );
   }
+  const ask = data.revo ? (
+    <Tap
+      onPress={() => openRevo({ attach: { kind: 'insight', label: t('activity.insights.weakSpots'), insight: 'weakSpots' }, place: { kind: 'weakSpots' } })}
+      accessibilityRole="button"
+      accessibilityLabel={t('activity.insights.askRevoWeakSpots')}
+      style={[styles.ask, { borderColor: palette.outline }]}
+      testID="insights-ask-revo"
+    >
+      <Ionicons name="sparkles-outline" size={16} color={palette.accentText} />
+      <ChromeText style={[typeV2.name, { color: palette.text }]}>{t('activity.insights.ask')}</ChromeText>
+    </Tap>
+  ) : undefined;
+  if (alone) return <WeakSpotsPage data={data} ask={ask} onReviseTomorrow={onReviseTomorrow} onOpenPage={onOpenPage} onSeeAllPages={onSeeAllPages} />;
   return (
     <Section
       title={t('activity.insights.weakSpots')}
@@ -1413,6 +1429,122 @@ function WeakSpots({
           style={styles.seeAll}
           testID="insights-see-all-pages"
         >
+          <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
+            {t('activity.insights.seeAllByStrength')}
+          </ChromeText>
+          <Ionicons name={forwardIcon()} size={16} color={palette.link} />
+        </Tap>
+      ) : null}
+    </Section>
+  );
+}
+
+/** Weeks a page's weekly chart shows: the range's, 4 at least and 26 at most (ACT-39). */
+const weeksOf = (window: number) => Math.min(26, Math.max(4, Math.ceil(window / 7)));
+
+/** A week of a weekly chart, ending `end`: "This week", or "Week of 3 Nov" by its first day. */
+/** Under a week's bar: its first day's number while every bar has a label (ACT-41), else "16 Nov" and "This wk". */
+const weekLabel = (end: string, today: string, bars: number) => weekBarLabel(end, today, bars <= LABELS_ALL_UP_TO);
+
+/**
+ * Weak spots' own page (ACT-39, Revisely Dev): from its point, "Which pages are weak now, and are they getting stronger?".
+ * The weak pages now with their trend since the range began, weak and moderate week by week (a tap picks a week), the page
+ * rated weak most often, and Revise them first tomorrow. Ask and "See all pages by strength" stay.
+ */
+function WeakSpotsPage({
+  data,
+  ask,
+  onReviseTomorrow,
+  onOpenPage,
+  onSeeAllPages,
+}: {
+  data: InsightsData;
+  ask?: React.ReactNode;
+  onReviseTomorrow: (pages: number[]) => void;
+  onOpenPage: (page: number) => void;
+  onSeeAllPages?: () => void;
+}) {
+  const { palette } = useTheme();
+  const [picked, setPicked] = useState<string | null>(null);
+  const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
+  const logs = data.logs ?? [];
+  const count = weakCount({ logs, memorized: data.memorized, rating: data.rating, today: data.today, window: span.all ? null : span.window });
+  const weeks = useMemo(
+    () => strengthWeeks({ logs, memorized: data.memorized, rating: data.rating, today: data.today, weeks: weeksOf(span.window) }),
+    [logs, data.memorized, data.rating, data.today, span.window],
+  );
+  const weakPages = [...data.memorized].filter((p) => (data.rating(p) ?? 5) <= 2).sort((a, b) => a - b);
+  const often = weakMostOften(data.ratedWeak, data.memorized);
+  const trend: Trend | null =
+    count.before == null || count.before === count.now
+      ? null
+      : {
+          text: t('activity.insights.trendFrom', { value: formatNumber(count.before) }),
+          up: count.now > count.before,
+          good: count.now < count.before,
+          label: t(count.now > count.before ? 'activity.insights.trendUp' : 'activity.insights.trendDown', { value: formatNumber(count.before), before: span.before ?? '' }),
+        };
+  const shown = weeks.find((w) => w.end === picked) ?? weeks[weeks.length - 1];
+  return (
+    <Section title={t('activity.insights.weakSpots')} detail="" right={ask} testID="insights-weak-spots">
+      <InsightHero
+        value={String(count.now)}
+        unit={t('activity.insights.weakUnit', { count: count.now })}
+        trend={trend}
+        line={t('activity.insights.weakLine')}
+        testID="insights-weak-figure"
+      />
+      <InsightCard title={t('activity.insights.strengthTitle')} hint={t('activity.insights.tapAWeek')} testID="insights-weak-card">
+        {shown ? (
+          <ChromeText style={[typeV2.name, styles.chartLine, { color: palette.text }]} testID="insights-weak-week">
+            {t('activity.insights.strengthWeek', { week: weekName(shown.end, data.today), weak: shown.weak, moderate: shown.moderate })}
+          </ChromeText>
+        ) : null}
+        <TapChart
+          bars={weeks.map((w) => ({
+            key: w.end,
+            value: w.weak + w.moderate,
+            parts: [w.weak, w.moderate],
+            label: weekLabel(w.end, data.today, weeks.length),
+            spoken: t('activity.insights.strengthWeek', { week: weekName(w.end, data.today), weak: w.weak, moderate: w.moderate }),
+          }))}
+          picked={picked}
+          onPick={setPicked}
+          colours={[palette.red, palette.warn]}
+          testID="insights-weak-chart"
+        />
+        <View style={styles.legend}>
+          {[
+            { key: 'weak', label: t('activity.insights.weakLegend'), color: palette.red },
+            { key: 'moderate', label: t('activity.insights.moderateLegend'), color: palette.warn },
+          ].map((l) => (
+            <View key={l.key} style={styles.legendItem}>
+              <View style={[styles.swatch, { backgroundColor: l.color }]} />
+              <ChromeText style={[typeV2.meta, styles.legendText, { color: palette.secondary }]}>{l.label}</ChromeText>
+            </View>
+          ))}
+        </View>
+      </InsightCard>
+      {often ? (
+        <InsightAdvice
+          title={describePassage([often.page])}
+          detail={t('activity.insights.weakOften', { count: often.times, span: span.inTheLast })}
+          onPress={() => onOpenPage(often.page)}
+          hint={t('activity.insights.opensInReader')}
+          testID="insights-weak-often"
+        />
+      ) : null}
+      {weakPages.length > 0 ? (
+        allFirstTomorrow(weakPages, data.firstTomorrow ?? new Set()) ? (
+          <View style={styles.reviseDone}>
+            <FirstTomorrowDone testID="insights-revise-weak-done" />
+          </View>
+        ) : (
+          <InsightAdvice title={t('activity.insights.reviseWeak', { count: weakPages.length })} onPress={() => onReviseTomorrow(weakPages)} testID="insights-revise-weak" />
+        )
+      ) : null}
+      {onSeeAllPages ? (
+        <Tap onPress={onSeeAllPages} accessibilityRole="button" hitSlop={8} style={styles.seeAll} testID="insights-see-all-pages">
           <ChromeText style={[typeV2.name, styles.linkText, { color: palette.link }]} maxFontSizeMultiplier={LINK_MAX_SCALE}>
             {t('activity.insights.seeAllByStrength')}
           </ChromeText>
@@ -1928,5 +2060,8 @@ const styles = StyleSheet.create({
   footnote: { marginTop: 10 },
   footnoteTap: { flexDirection: 'row', marginTop: 10, paddingVertical: 4 },
   weekByWeek: { marginTop: 12, gap: 6 },
+  // Insights' own pages (ACT-39): the chart's line, the week shown, under the card's title.
+  chartLine: { marginTop: 8 },
+  reviseDone: { marginTop: 16, alignItems: 'flex-start' },
   weekLine: { height: 40 },
 });
