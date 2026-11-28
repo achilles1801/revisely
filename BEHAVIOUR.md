@@ -1523,7 +1523,8 @@ International", "The Clear Quran®") and in `lib/quranenc`.
 - **ACT-40.** (Revisely Dev) Pace's own page (ACT-35) starts from its point, "Am I getting quicker, and when am I
   sharpest?" (same board). First minutes a page ("1.8 min a page") with its trend against the same length before ("↓ from
   2.1", green when quicker; none over All time or when they read the same), over "24 timed revisions, against the 3 months
-  before ›", which lists each one (ACT-23). Then a card, "Minutes a page, week by week" (the range's weeks, 4 at least and
+  before ›", which lists each one (ACT-23); with nothing before to be against (a young account), its span instead ("10 timed
+  revisions in 30 days ›"). Then a card, "Minutes a page, week by week" (the range's weeks, 4 at least and
   26 at most, from the first with a timed revision): the line over the chart is the newest week ("This week · 1.7 min a
   page", or "no timed revisions") or the week tapped (ACT-41). Last, when they're quickest: the timed revisions in the range
   by the part of the day each began (before 7 AM, 7 AM to noon, noon to 5 PM, 5 to 9 PM, after 9 PM, on the phone's clock),

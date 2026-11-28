@@ -2056,8 +2056,10 @@ function PacePage({ data, pace, onShowTimed, sheet }: { data: InsightsData; pace
         value={formatPace(pace.perPage)}
         unit={t('activity.insights.minAPage')}
         trend={trend}
+        // "Against the month before" only when there is one to be against: a young account's line says its span instead
+        // (the iOS E2E shot of Nov 28 said "11 timed revisions, against the month before" with nothing before).
         line={
-          span.before
+          span.before && before != null
             ? t('activity.insights.paceLine', { count: pace.revisions, before: span.before })
             : t('activity.insights.paceLineAll', { count: pace.revisions, span: span.inWords })
         }

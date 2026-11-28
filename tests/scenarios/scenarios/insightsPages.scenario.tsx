@@ -250,3 +250,28 @@ it('[ACT-40] Pace’s page starts from its point: minutes a page and its trend, 
   expect(text(app, 'insights-pace-quickest')).toBe('[sunny-outline] Quickest at dawn 1.6 min a page before 7 AM, 2.2 from 7 AM to noon.');
   await app.close();
 });
+
+it('[ACT-40] a young account’s Pace: no trend, and its line names its span, never “against the month before” it hasn’t had', async () => {
+  setZone(ZONES.chicago);
+  setNow('2026-07-01 20:00');
+  const phone = new Phone();
+  const first = await newAccount(phone, { memorized: pagesRange(582, 604), user: { dailyPageCapacity: 5 } });
+  const uid = first.uid;
+  await first.close();
+  await markPreviewTester(uid);
+  // Two weeks of timed revisions (ten, Pace's least), nothing before them.
+  for (const n of [1, 2, 3, 4, 5, 6, 8, 9, 10, 12]) {
+    const day = ago(n);
+    const at = new Date(`${day}T15:00:00.000Z`).getTime();
+    await setServerDoc(`users/${uid}/revisions/manual-${day}`, {
+      id: `manual-${day}`, uid, day, countsFor: day, occurredAt: at, source: 'manual', pages: [582, 583, 584, 585, 586], skipped: [], assigned: [], minutes: 10, recordings: [],
+    });
+  }
+
+  setNow(`${TODAY} 09:00`);
+  const app = await openSection(phone, 'insights-row-pace');
+  await app.until(() => /^2 min a page/.test(label(app, 'insights-pace-figure') ?? ''), 'the pace, 2');
+  expect(label(app, 'insights-pace-figure')).toBe('2 min a page');
+  expect(text(app, 'insights-pace-figure-line')).toBe('10 timed revisions in 30 days ›');
+  await app.close();
+});
