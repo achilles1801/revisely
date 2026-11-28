@@ -1,0 +1,42 @@
+# Insights’ seven pages on a young account (`e2e/insights-pages`, as 09-insights-pages.yaml): two weeks of revising, a
+# month of memorizing, a few takes (subflows/seed-young.yaml), the case that broke before. Light then dark, each page's top
+# and end (09-insights-<section>-young-<theme>, 09-insights-<section>-end-young-<theme>). It looks; the scenarios test
+# the rules.
+# Rules (BEHAVIOUR.md): ACT-35, ACT-41, ACT-43, ACT-44, MEM-10
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-16T20:00
+      BOUNDARY: midnight
+- runFlow: ../subflows/seed-young.yaml
+- runFlow: ../subflows/relaunch.yaml
+- runFlow: ../subflows/backup-notice.yaml
+- openLink:
+    link: revisely://e2e/insights-pages?on=1
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+# Recitation's section needs mistake detection, Revisely Dev's (as 09-revo-attach turns it on).
+- openLink:
+    link: revisely://e2e/recite-live?on=1
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 20000
+- runFlow:
+    file: ../subflows/insights-pages.yaml
+    env:
+      THEME: young-light
+# Home first: theme.yaml opens Settings from Home, and the pass ends on Activity.
+- runFlow: ../subflows/back-home.yaml
+- runFlow:
+    file: ../subflows/theme.yaml
+    env:
+      THEME: Dark
+- runFlow:
+    file: ../subflows/insights-pages.yaml
+    env:
+      THEME: young-dark

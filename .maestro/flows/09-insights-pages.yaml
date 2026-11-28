@@ -1,0 +1,46 @@
+# Insights' seven pages as Revisely Dev shows them (`e2e/insights-pages` turns them on here: the one Activity tab, ACT-35,
+# and Memorization's chart, MEM-10), on the Activity seed, light then dark. Each page from its row: its top, then its end.
+# It looks; the scenarios test the rules (insightsPages, activityOneTab and each section's own). Its screenshots are the
+# run's artifacts (09-insights-<section>-<theme>, 09-insights-<section>-end-<theme>), for checking the pages without a
+# simulator.
+# Rules (BEHAVIOUR.md): ACT-35, ACT-38, ACT-39, ACT-40, ACT-41, ACT-42, ACT-43, ACT-44, MEM-10, MEM-11
+appId: com.revisionbuddy.app
+---
+- runFlow:
+    file: ../subflows/new-account.yaml
+    env:
+      CLOCK: 2026-11-03T20:00
+      BOUNDARY: midnight
+- runFlow: ../subflows/seed-activity.yaml
+- runFlow:
+    file: ../subflows/relaunch-recordings.yaml
+    env:
+      SET: activity
+- runFlow: ../subflows/backup-notice.yaml
+- openLink:
+    link: revisely://e2e/insights-pages?on=1
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+# Recitation's section needs mistake detection, Revisely Dev's; with no takes on the Activity seed its row stays away.
+- openLink:
+    link: revisely://e2e/recite-live?on=1
+    optional: true
+- runFlow: ../subflows/open-link-prompt.yaml
+- extendedWaitUntil:
+    visible:
+      id: today-post
+    timeout: 20000
+- runFlow:
+    file: ../subflows/insights-pages.yaml
+    env:
+      THEME: light
+# Home first: theme.yaml opens Settings from Home, and the pass ends on Activity.
+- runFlow: ../subflows/back-home.yaml
+- runFlow:
+    file: ../subflows/theme.yaml
+    env:
+      THEME: Dark
+- runFlow:
+    file: ../subflows/insights-pages.yaml
+    env:
+      THEME: dark

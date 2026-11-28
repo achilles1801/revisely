@@ -13,6 +13,7 @@ import { pinFreshTheme } from './theme';
 import { handleUpdateLink } from './updates';
 import { handleJournalDesignLink } from './journalDesign';
 import { handleHomeV3Link } from './homeV3';
+import { handleInsightsPagesLink } from './insightsPages';
 import { handleMemorizedPickerLink } from './memorizedPicker';
 import { handleReciteLiveLink } from './reciteLive';
 import { handleVoiceSearchLink } from './voiceSearch';
@@ -29,6 +30,7 @@ function handle(url: string | null | undefined): void {
   if (handleReciteLiveLink(url)) return;
   if (handleMemorizedPickerLink(url)) return;
   if (handleJournalDesignLink(url)) return;
+  if (handleInsightsPagesLink(url)) return;
   if (handleHomeV3Link(url)) return;
   if (handleVoiceSearchLink(url)) return;
   handleNetworkLink(url);

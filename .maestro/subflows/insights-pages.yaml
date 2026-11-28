@@ -1,0 +1,75 @@
+# Insights' seven pages, from the one Activity tab's rows, in their order (activitySections' INSIGHTS_SECTIONS). Run by
+# 09-insights-pages.yaml and 24-insights-young.yaml, from Home, with `e2e/insights-pages` on. The list first
+# (09-insights-list-<THEME>): a section shows once it has something to say (Recitation needs takes, which the Activity
+# seed hasn't), so a page whose row isn't there is skipped, and the list's shot says which.
+#   env THEME: the screenshots' names' last part (light, dark, young-light, young-dark)
+appId: com.revisionbuddy.app
+---
+# The tab, again if the tap was lost (a touch start, then a cancel: run 46129448756's retry). A tab stays on screen, so
+# not tap-to-open.yaml; a second tap on Activity only scrolls it to the top.
+- repeat:
+    while:
+      notVisible:
+        id: activity-sections-list
+    times: 3
+    commands:
+      - tapOn:
+          id: tab-ActivityTab
+      - extendedWaitUntil:
+          visible:
+            id: activity-sections-list
+          timeout: 10000
+          optional: true
+- extendedWaitUntil:
+    visible:
+      id: activity-sections-list
+    timeout: 20000
+# From the list's top: the dark pass comes back to where the light one left it.
+- scrollUntilVisible:
+    element:
+      id: activity-sections-list
+    direction: UP
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: activity-edit-sections
+    direction: DOWN
+    timeout: 20000
+    optional: true
+- runFlow:
+    file: shot.yaml
+    env:
+      NAME: 09-insights-list-${THEME}
+- scrollUntilVisible:
+    element:
+      id: activity-sections-list
+    direction: UP
+    timeout: 20000
+- runFlow:
+    file: insights-page.yaml
+    env:
+      SECTION: coverage
+- runFlow:
+    file: insights-page.yaml
+    env:
+      SECTION: consistency
+- runFlow:
+    file: insights-page.yaml
+    env:
+      SECTION: gaps
+- runFlow:
+    file: insights-page.yaml
+    env:
+      SECTION: weak
+- runFlow:
+    file: insights-page.yaml
+    env:
+      SECTION: recitation
+- runFlow:
+    file: insights-page.yaml
+    env:
+      SECTION: memorization
+- runFlow:
+    file: insights-page.yaml
+    env:
+      SECTION: pace

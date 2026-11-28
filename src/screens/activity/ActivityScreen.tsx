@@ -32,7 +32,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useRevisionDay } from '../../hooks/useRevisionDay';
 import { buildActivityDays } from '../../lib/activity';
 import { firstNoteText, journalFirstDay } from '../../lib/journal';
-import { activityOneTabEnabled } from '../../lib/release/activityOneTab';
+import { useActivityOneTab } from '../../lib/release/activityOneTab';
 import { useInsightsActions } from './useInsightsActions';
 import type { HomeStackParamList } from '../../navigation/MainNavigator';
 import { IconButton, TopBar } from '../../components/v2/TopBar';
@@ -67,7 +67,7 @@ export default function ActivityScreen() {
   const { day: today } = useRevisionDay(user);
   // Insights' buttons (the weak pages first tomorrow, with its toast; the reader; Settings), shared with a section's page.
   const { props: insightsActions, toast: carryToast } = useInsightsActions(tabFootprint);
-  const oneTab = activityOneTabEnabled();
+  const oneTab = useActivityOneTab();
   // The Ramadan theme (THEME-5): lanterns and falling light, five lanterns and more light in the last ten nights.
   const ramadan = useRamadanDecor();
   const ramadanMonth = useRamadanMonth();
