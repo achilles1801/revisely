@@ -11,7 +11,7 @@
 //     all", which also lists the similar ayahs gone on with and, with Smart Tracking, passages rated strong that slip.
 //   - Your takes: how long they usually are, the longest, and whether long takes go better than short ones.
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -30,7 +30,6 @@ import type { MemoryRecord } from '../../lib/reciteMemory/record';
 import { recitationInsights, type SlippingPassage } from '../../lib/reciteInsights/insights';
 import { passageName, scoreLine, similarNote, similarTitle, slipNote, strongNote } from '../../lib/reciteInsights/describe';
 import {
-  CHART_SPANS,
   fixedAndSlipping,
   KINDS,
   kindBars,
@@ -54,14 +53,13 @@ import {
   shareLine,
   slippingTile,
   spanIn,
-  spanLabel,
   takesLine,
   takesTitle,
   trendChip,
 } from '../../lib/reciteInsights/trendWords';
 import { markFill } from '../reciteLive/markColours';
 import { WordChip } from '../reciteLive/WordChip';
-import { ChartPills, TapChart, type ChartBar } from './TapChart';
+import { TapChart, type ChartBar } from './TapChart';
 import { InsightCard, InsightHero } from './InsightPageParts';
 import { useFirstSection, useSectionAlone } from './sectionPlace';
 import { formatNumber, t } from '../../i18n';
@@ -134,10 +132,14 @@ function RecitationPage({ records, words, today, window, inWords, span, smartTra
   const first = useFirstSection();
   const alone = useSectionAlone();
   const range = span ?? { lastWords: inWords, inTheLast: inWords, before: null, all: false };
-  const [chartSpan, setChartSpan] = useState<ChartSpan>(() => spanForRange(window, range.all));
+  // The chart spans the range: the page has one range, the header's, as every Insights page (Nov 28 2026: its own 4 weeks |
+  // 3 months | Year said the same thing as the header's chip a second way, and didn't follow it when it changed).
+  const chartSpan: ChartSpan = spanForRange(window, range.all);
   // The bar picked: undefined until a tap (the chart opens on the newest week or month with takes, as its board does),
   // null once a tap clears it (the newest lit).
   const [chosen, setChosen] = useState<string | null | undefined>(undefined);
+  // A pick from another range means nothing in this one.
+  useEffect(() => setChosen(undefined), [chartSpan]);
   const [kindAlone, setKindAlone] = useState<KindKey | null>(null);
   const [allPassages, setAllPassages] = useState(false);
 
@@ -229,16 +231,7 @@ function RecitationPage({ records, words, today, window, inWords, span, smartTra
         )}
       </View>
 
-      {/* Mistakes by kind, week by week. */}
-      <ChartPills
-        options={CHART_SPANS.map((k) => ({ key: k, label: spanLabel(k) }))}
-        value={chartSpan}
-        onChange={(k) => {
-          setChartSpan(k);
-          setChosen(undefined);
-        }}
-        testID="insights-recitation-span"
-      />
+      {/* Mistakes by kind, week by week (or month by month over All time). */}
       <InsightCard title={chartTitle(chartSpan)} hint={t('reciteInsights.page.aPage')} testID="insights-recitation-chart">
         {anyTakes ? (
           <>
