@@ -1,0 +1,45 @@
+# Insights' seven pages, from the one Activity tab's rows, in their order (activitySections' INSIGHTS_SECTIONS). Run by
+# 09-insights-pages.yaml, from Home, with `e2e/insights-pages` on.
+#   env THEME: light or dark, for the screenshots' names
+appId: com.revisionbuddy.app
+---
+- tapOn:
+    id: tab-ActivityTab
+- extendedWaitUntil:
+    visible:
+      id: activity-sections-list
+    timeout: 20000
+# From the list's top: the dark pass comes back to where the light one left it.
+- scrollUntilVisible:
+    element:
+      id: insights-row-coverage
+    direction: UP
+    timeout: 20000
+- runFlow:
+    file: insights-page.yaml
+    env:
+      SECTION: coverage
+- runFlow:
+    file: insights-page.yaml
+    env:
+      SECTION: consistency
+- runFlow:
+    file: insights-page.yaml
+    env:
+      SECTION: gaps
+- runFlow:
+    file: insights-page.yaml
+    env:
+      SECTION: weak
+- runFlow:
+    file: insights-page.yaml
+    env:
+      SECTION: recitation
+- runFlow:
+    file: insights-page.yaml
+    env:
+      SECTION: memorization
+- runFlow:
+    file: insights-page.yaml
+    env:
+      SECTION: pace

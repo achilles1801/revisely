@@ -5,7 +5,8 @@
 //
 // One switch, so it can reach App Store users on its own: off, it is Revisely Dev's; on, everyone's. Turning it on is this
 // one line (MEMORIZED_IN_SETTINGS_RELEASED = true), with MEM-9's and MEM-10's lines moving from Revo's Dev guide to the main
-// guide (and Home's line in the main guide going).
+// guide (and Home's line in the main guide going). An E2E build turns it on with a link (lib/e2e/insightsPages), for
+// Memorization's page.
 
 import { isDevVariant } from '../variant';
 
@@ -23,5 +24,8 @@ export function memorizedInSettingsEnabled(): boolean {
   if (forTests !== undefined) return forTests;
   // Under Jest, only where a test turns it on: the tests that run as Revisely Dev test the store app's Home and editor.
   if (process.env.NODE_ENV === 'test') return MEMORIZED_IN_SETTINGS_RELEASED;
-  return MEMORIZED_IN_SETTINGS_RELEASED || isDevVariant();
+  if (MEMORIZED_IN_SETTINGS_RELEASED || isDevVariant()) return true;
+  return process.env.EXPO_PUBLIC_E2E === '1'
+    ? (require('../e2e/insightsPages') as typeof import('../e2e/insightsPages')).e2eInsightsPagesOn()
+    : false;
 }
