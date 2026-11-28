@@ -69,6 +69,8 @@ import {
   type SurahCoverage,
 } from '../../lib/coverageViews';
 import { PaceSheet } from './PaceSheet';
+import { AdviceButton, InsightAdvice, InsightCard, InsightHero, type Trend } from './InsightPageParts';
+import { coverageBefore, slippingJuz, slippingWords } from '../../lib/insightsPages';
 import { GapsSection } from './GapsSection';
 import type { PushBack } from '../../lib/gapsCycle';
 import { gapsView } from '../../lib/insightsGaps';
@@ -538,6 +540,8 @@ function Coverage({
   onOpenPage?: (page: number) => void;
 } & AsRow) {
   const { palette } = useTheme();
+  // Its own page (ACT-38, Revisely Dev): from its point, the share that came round and its trend, then the tiles in a card.
+  const alone = useSectionAlone();
   // Juz | Surah | Page (ACT-26), kept on the phone like Week | Month.
   const [view, setViewState] = useState<CoverageView>('juz');
   // The Surah view's juz the user opened or closed, over the default (those with something to act on).
@@ -590,6 +594,9 @@ function Coverage({
       {typeof text === 'number' ? formatNumber(text) : text}
     </ChromeText>
   );
+  // On the page's card (ACT-38) a juz not memorized is the track's grey: the usual ground is the card's own colour in dark.
+  const onCard = (look: ReturnType<typeof fillLook>) =>
+    alone && look.segments.length === 0 && look.ground.dim ? { ...look, ground: { ...look.ground, backgroundColor: palette.track } } : look;
   const tile = (jt: JuzTile) => {
     const label =
       jt.state === 'none'
@@ -610,7 +617,7 @@ function Coverage({
         accessibilityHint={t('activity.insights.opensJuz', { juz: jt.juz })}
         testID={`juz-tile-${jt.juz}`}
       >
-        <CoverageFill look={fillLook(jt.state, jt.counts, palette)} label={tileText(jt.juz)} style={styles.fill} contentStyle={styles.tileContent} />
+        <CoverageFill look={onCard(fillLook(jt.state, jt.counts, palette))} label={tileText(jt.juz)} style={styles.fill} contentStyle={styles.tileContent} />
         {jt.learning ? <View style={[styles.learnDot, { backgroundColor: palette.primary }]} /> : null}
       </Tap>
     );
@@ -659,7 +666,7 @@ function Coverage({
           ? { borderWidth: 1.5, borderColor: palette.secondary }
           : state === 'stale'
             ? { borderWidth: 1.5, borderColor: palette.red }
-            : { backgroundColor: palette.heat[0], opacity: 0.6 };
+            : { backgroundColor: alone ? palette.track : palette.heat[0], opacity: 0.6 };
 
   // "Not revised yet" only while a page is (ACT-25); "Not memorized" where such parts show (not in Surah).
   const anyNew = useMemo(
@@ -668,7 +675,7 @@ function Coverage({
   );
   const legend = (['week', 'month', 'new', 'stale', 'none'] as const)
     .filter((key) => (key !== 'new' || anyNew) && (key !== 'none' || view !== 'surah'))
-    .map((key) => ({ key, label: COVERAGE_LABELS[key], swatch: coverageLook(key, palette).box }));
+    .map((key) => ({ key, label: COVERAGE_LABELS[key], swatch: key === 'none' && alone ? { backgroundColor: palette.track } : coverageLook(key, palette).box }));
   const detail =
     view === 'surah'
       ? t('activity.insights.coverageDetailSurah')
@@ -694,6 +701,222 @@ function Coverage({
         separator={!lastRow}
         testID="insights-row-coverage"
       />
+    );
+  }
+  const viewPills = (
+    <View style={alone ? styles.cardViews : styles.views}>
+      <PillTabs<CoverageView>
+        options={[
+          { value: 'juz', label: t('common.juz') },
+          { value: 'surah', label: t('common.surah') },
+          { value: 'page', label: t('common.page') },
+        ]}
+        value={view}
+        onChange={setView}
+        tone="ink"
+        compact
+        hug
+        testID="coverage-views"
+      />
+    </View>
+  );
+  const grid =
+    view === 'juz' ? (
+      <View style={styles.tiles} testID="coverage-juz">
+        {[0, 1, 2].map((row) => (
+          <View key={row} style={styles.tileRow}>
+            {tiles.slice(row * 10, row * 10 + 10).map(tile)}
+          </View>
+        ))}
+      </View>
+    ) : view === 'surah' ? (
+      // Each juz with memorized pages is a header (its tile, filled, and what it stands at); a tap shows or
+      // hides its surahs. Open at first: the juz with something to act on (ACT-26).
+      <View style={styles.surahs} testID="coverage-surahs">
+        {groups.map((g) => {
+          const isOpen = open.has(g.juz);
+          const words = coverageWords(g.counts);
+          return (
+            <View key={g.juz}>
+              <Tap
+                onPress={() => toggle(g.juz, isOpen)}
+                style={styles.juzHead}
+                accessibilityRole="button"
+                accessibilityLabel={t('activity.insights.juzWithWords', { juz: g.juz, words })}
+                accessibilityState={{ expanded: isOpen }}
+                accessibilityHint={isOpen ? t('activity.insights.hidesSurahs') : t('activity.insights.showsSurahs')}
+                testID={`coverage-juz-${g.juz}`}
+              >
+                <CoverageFill look={fillLook(stateOf(g.counts), g.counts, palette)} label={tileText(g.juz)} style={styles.headTile} contentStyle={styles.tileContent} />
+                <View style={styles.flex}>
+                  <ChromeText style={[typeV2.name, { color: palette.text }]}>{t('common.juzN', { n: g.juz })}</ChromeText>
+                  <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{words.charAt(0).toUpperCase() + words.slice(1)}</ChromeText>
+                </View>
+                <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={18} color={palette.secondary} />
+              </Tap>
+              {isOpen ? (
+                <View style={styles.chips} testID={`coverage-juz-${g.juz}-surahs`}>
+                  {g.surahs.map(chip(g.juz))}
+                </View>
+              ) : null}
+            </View>
+          );
+        })}
+      </View>
+    ) : (
+      // A row per juz with memorized pages, a cell per page: a cell opens the reader there, the juz its sheet.
+      <View style={styles.pageGrid} testID="coverage-pages">
+        {rows.map((r) => (
+          <View key={r.juz} style={styles.pageRow}>
+            <Tap
+              onPress={() => onOpenJuz(r.juz)}
+              style={styles.pageLabel}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.juzN', { n: r.juz })}
+              accessibilityHint={t('activity.insights.opensJuz', { juz: r.juz })}
+              testID={`coverage-page-row-${r.juz}`}
+            >
+              <ChromeText style={[styles.pageLabelText, { color: palette.secondary }]}>{formatNumber(r.juz)}</ChromeText>
+            </Tap>
+            <View style={styles.cells}>
+              {r.cells.map((c) => (
+                <Tap
+                  key={c.page}
+                  onPress={() => onOpenPage?.(c.page)}
+                  style={styles.cellSlot}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('activity.insights.pageCell', {
+                    passage: spokenText(describePassage([c.page], { form: 'compact' })),
+                    page: c.page,
+                    state: pageWords(c.state),
+                  })}
+                  accessibilityHint={t('activity.insights.opensInReader')}
+                  testID={`coverage-page-${c.page}`}
+                >
+                  <View style={[styles.cell, cellLook(c.state)]} />
+                </Tap>
+              ))}
+            </View>
+          </View>
+        ))}
+      </View>
+    );
+  const legendRow = (
+    <View style={styles.legend}>
+      {legend.map((l) => (
+        <View key={l.key} style={styles.legendItem}>
+          <View style={[styles.swatch, l.swatch]} />
+          <ChromeText style={[typeV2.meta, styles.legendText, { color: palette.secondary }]} numberOfLines={1}>
+            {l.label}
+          </ChromeText>
+        </View>
+      ))}
+    </View>
+  );
+  const uncoveredSheet = uncoveredUsed ? (
+      <Sheet
+        visible={uncoveredOpen}
+        onClose={() => setUncoveredOpen(false)}
+        title={t('activity.insights.notRevisedSpan', { span: span.inWords })}
+        message={t('activity.insights.ofMemorized', { n: count.of - count.revised, pages: t('activity.insights.memorizedPages', { count: count.of }) })}
+        messageMaxScale={CHROME_MAX_SCALE}
+        scroll
+        onHidden={() => {
+          const j = thenJuz.current;
+          thenJuz.current = null;
+          if (j != null) onOpenJuz(j);
+        }}
+        testID="insights-uncovered"
+      >
+        {uncovered.map((r, i) => (
+          <UncoveredLine
+            key={`${r.juz}-${r.pages[0]}`}
+            row={r}
+            separator={i < uncovered.length - 1}
+            onPress={() => {
+              thenJuz.current = r.juz;
+              setUncoveredOpen(false);
+            }}
+          />
+        ))}
+        <ChromeText style={[typeV2.meta, styles.uncoveredFoot, { color: palette.secondary }]}>
+          {t('activity.insights.everyOtherRevised', { span: span.inTheLast })}
+        </ChromeText>
+      </Sheet>
+    ) : null;
+  if (alone) {
+    // The share's trend against the same length of days before the range (not over All time: there is none before it).
+    const before = inCycles ? null : coverageBefore({ memorized: data.memorized, revised: data.revised, memorizations: data.memorizations, today: data.today, window: days, firstDay: data.firstDay });
+    const pctBefore = before ? coveragePercent(before.revised, before.of) : null;
+    const trend: Trend | null =
+      pctBefore == null || pctBefore === pct
+        ? null
+        : {
+            text: t('activity.insights.trendFrom', { value: formatPercentage(pctBefore) }),
+            up: pct > pctBefore,
+            good: pct > pctBefore,
+            label: t(pct > pctBefore ? 'activity.insights.trendUp' : 'activity.insights.trendDown', { value: formatPercentage(pctBefore), before: span.before ?? '' }),
+          };
+    // The juz slipping out of rotation: left longer than the plan goes round (Gaps' reading of the plan, when there is one).
+    const cycleDays = data.pushBack?.cycleDays ?? null;
+    const slipping = slippingJuz(tiles, cycleDays);
+    const slipPages = slipping.flatMap((jt) => getPagesForJuz(jt.juz).filter((p) => data.memorized.has(p)));
+    const slipWords = slipping.length > 0 ? slippingWords(slipping, cycleDays) : null;
+    return (
+      <Section title={t('activity.insights.coverage')} detail={detail} testID="insights-coverage">
+        <InsightHero
+          value={inCycles ? cyclesText : formatPercentage(pct)}
+          unit={inCycles ? t('activity.insights.cyclesUnit', { count: Number(cyclesText) }) : t('activity.insights.cameRound')}
+          trend={trend}
+          line={
+            inCycles
+              ? t('activity.insights.cyclesLine', { pages: t('activity.insights.memorizedPages', { count: count.of }), span: span.inWords })
+              : t('activity.insights.coverageLine', { n: count.revised, pages: t('activity.insights.memorizedPages', { count: count.of }), span: span.inWords })
+          }
+          onPressLine={
+            count.revised < count.of
+              ? () => {
+                  setUncoveredUsed(true);
+                  setUncoveredOpen(true);
+                }
+              : undefined
+          }
+          lineHint={t('activity.insights.showsUnrevised')}
+          testID="insights-coverage-figure"
+        />
+        <InsightCard
+          title={view === 'surah' ? t('activity.insights.byLastRevisionSurah') : view === 'page' ? t('activity.insights.byLastRevisionPage') : t('activity.insights.byLastRevisionJuz')}
+          hint={view === 'surah' ? t('activity.insights.tapASurah') : view === 'page' ? t('activity.insights.tapAPage') : t('activity.insights.tapAJuz')}
+          testID="insights-coverage-card"
+        >
+          {viewPills}
+          {grid}
+          {legendRow}
+        </InsightCard>
+        {slipWords ? (
+          <InsightAdvice
+            icon="warning-outline"
+            title={slipWords.title}
+            detail={slipWords.detail}
+            onPress={() => onOpenJuz(slipping[0].juz)}
+            hint={t('activity.insights.opensJuz', { juz: slipping[0].juz })}
+            action={
+              allFirstTomorrow(slipPages, data.firstTomorrow ?? new Set()) ? (
+                <FirstTomorrowDone testID="insights-plan-them-done" onAddToPlan={onAddToPlan ? () => onAddToPlan(slipPages) : undefined} />
+              ) : (
+                <AdviceButton
+                  title={slipping.length > 1 ? t('activity.insights.planThem') : t('activity.insights.planIt')}
+                  label={slipping.length > 1 ? t('activity.insights.planJuzTwo', { a: slipping[0].juz, b: slipping[1].juz }) : t('activity.insights.planJuz', { juz: slipping[0].juz })}
+                  onPress={() => onPlanIt(slipPages)}
+                  testID="insights-plan-them"
+                />
+              )
+            }
+            testID="insights-slipping"
+          />
+        ) : null}
+        {uncoveredSheet}
+      </Section>
     );
   }
   return (
@@ -730,111 +953,9 @@ function Coverage({
         hint={t('activity.insights.showsUnrevised')}
         testID="insights-coverage-figure"
       />
-      <View style={styles.views}>
-        <PillTabs<CoverageView>
-          options={[
-            { value: 'juz', label: t('common.juz') },
-            { value: 'surah', label: t('common.surah') },
-            { value: 'page', label: t('common.page') },
-          ]}
-          value={view}
-          onChange={setView}
-          tone="ink"
-          compact
-          hug
-          testID="coverage-views"
-        />
-      </View>
-      {view === 'juz' ? (
-        <View style={styles.tiles} testID="coverage-juz">
-          {[0, 1, 2].map((row) => (
-            <View key={row} style={styles.tileRow}>
-              {tiles.slice(row * 10, row * 10 + 10).map(tile)}
-            </View>
-          ))}
-        </View>
-      ) : view === 'surah' ? (
-        // Each juz with memorized pages is a header (its tile, filled, and what it stands at); a tap shows or
-        // hides its surahs. Open at first: the juz with something to act on (ACT-26).
-        <View style={styles.surahs} testID="coverage-surahs">
-          {groups.map((g) => {
-            const isOpen = open.has(g.juz);
-            const words = coverageWords(g.counts);
-            return (
-              <View key={g.juz}>
-                <Tap
-                  onPress={() => toggle(g.juz, isOpen)}
-                  style={styles.juzHead}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('activity.insights.juzWithWords', { juz: g.juz, words })}
-                  accessibilityState={{ expanded: isOpen }}
-                  accessibilityHint={isOpen ? t('activity.insights.hidesSurahs') : t('activity.insights.showsSurahs')}
-                  testID={`coverage-juz-${g.juz}`}
-                >
-                  <CoverageFill look={fillLook(stateOf(g.counts), g.counts, palette)} label={tileText(g.juz)} style={styles.headTile} contentStyle={styles.tileContent} />
-                  <View style={styles.flex}>
-                    <ChromeText style={[typeV2.name, { color: palette.text }]}>{t('common.juzN', { n: g.juz })}</ChromeText>
-                    <ChromeText style={[typeV2.meta, { color: palette.secondary }]}>{words.charAt(0).toUpperCase() + words.slice(1)}</ChromeText>
-                  </View>
-                  <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={18} color={palette.secondary} />
-                </Tap>
-                {isOpen ? (
-                  <View style={styles.chips} testID={`coverage-juz-${g.juz}-surahs`}>
-                    {g.surahs.map(chip(g.juz))}
-                  </View>
-                ) : null}
-              </View>
-            );
-          })}
-        </View>
-      ) : (
-        // A row per juz with memorized pages, a cell per page: a cell opens the reader there, the juz its sheet.
-        <View style={styles.pageGrid} testID="coverage-pages">
-          {rows.map((r) => (
-            <View key={r.juz} style={styles.pageRow}>
-              <Tap
-                onPress={() => onOpenJuz(r.juz)}
-                style={styles.pageLabel}
-                accessibilityRole="button"
-                accessibilityLabel={t('common.juzN', { n: r.juz })}
-                accessibilityHint={t('activity.insights.opensJuz', { juz: r.juz })}
-                testID={`coverage-page-row-${r.juz}`}
-              >
-                <ChromeText style={[styles.pageLabelText, { color: palette.secondary }]}>{formatNumber(r.juz)}</ChromeText>
-              </Tap>
-              <View style={styles.cells}>
-                {r.cells.map((c) => (
-                  <Tap
-                    key={c.page}
-                    onPress={() => onOpenPage?.(c.page)}
-                    style={styles.cellSlot}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('activity.insights.pageCell', {
-                      passage: spokenText(describePassage([c.page], { form: 'compact' })),
-                      page: c.page,
-                      state: pageWords(c.state),
-                    })}
-                    accessibilityHint={t('activity.insights.opensInReader')}
-                    testID={`coverage-page-${c.page}`}
-                  >
-                    <View style={[styles.cell, cellLook(c.state)]} />
-                  </Tap>
-                ))}
-              </View>
-            </View>
-          ))}
-        </View>
-      )}
-      <View style={styles.legend}>
-        {legend.map((l) => (
-          <View key={l.key} style={styles.legendItem}>
-            <View style={[styles.swatch, l.swatch]} />
-            <ChromeText style={[typeV2.meta, styles.legendText, { color: palette.secondary }]} numberOfLines={1}>
-              {l.label}
-            </ChromeText>
-          </View>
-        ))}
-      </View>
+      {viewPills}
+      {grid}
+      {legendRow}
       {untouched ? (
         <View style={[styles.untouched, { backgroundColor: palette.bubble }]}>
           {/* The row opens its juz (ACT-21); Plan it stays its own button. */}
@@ -884,37 +1005,7 @@ function Coverage({
           )}
         </View>
       ) : null}
-      {uncoveredUsed ? (
-        <Sheet
-          visible={uncoveredOpen}
-          onClose={() => setUncoveredOpen(false)}
-          title={t('activity.insights.notRevisedSpan', { span: span.inWords })}
-          message={t('activity.insights.ofMemorized', { n: count.of - count.revised, pages: t('activity.insights.memorizedPages', { count: count.of }) })}
-          messageMaxScale={CHROME_MAX_SCALE}
-          scroll
-          onHidden={() => {
-            const j = thenJuz.current;
-            thenJuz.current = null;
-            if (j != null) onOpenJuz(j);
-          }}
-          testID="insights-uncovered"
-        >
-          {uncovered.map((r, i) => (
-            <UncoveredLine
-              key={`${r.juz}-${r.pages[0]}`}
-              row={r}
-              separator={i < uncovered.length - 1}
-              onPress={() => {
-                thenJuz.current = r.juz;
-                setUncoveredOpen(false);
-              }}
-            />
-          ))}
-          <ChromeText style={[typeV2.meta, styles.uncoveredFoot, { color: palette.secondary }]}>
-            {t('activity.insights.everyOtherRevised', { span: span.inTheLast })}
-          </ChromeText>
-        </Sheet>
-      ) : null}
+      {uncoveredSheet}
     </Section>
   );
 }
@@ -1779,6 +1870,7 @@ const styles = StyleSheet.create({
   fill: { flex: 1, minHeight: 32 },
   tileContent: { paddingHorizontal: 2 },
   views: { marginTop: 14 },
+  cardViews: { marginTop: 12 },
   surahs: { marginTop: 10 },
   juzHead: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
   headTile: { width: 36, minHeight: 28 },

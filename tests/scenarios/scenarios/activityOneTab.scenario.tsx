@@ -79,7 +79,9 @@ it('[ACT-35] Activity is one tab: this week and the day, then the sections as ro
   // The page reads its own items: 0% until they're in (a loaded CI runner read it before, Nov 26 2026).
   const coverage = () => app.screen.queryByTestId('insights-coverage-figure')?.props.accessibilityLabel;
   await app.until(() => /^22%/.test(coverage() ?? ''), 'Coverage drawn in full, 22%');
-  expect(coverage()).toBe('22% 5 of 23 memorized pages in 30 days');
+  // From its point (ACT-38): no trend on a day-old account, the count in the line under it.
+  expect(coverage()).toBe('22% came round');
+  expect(text(app, 'insights-coverage-figure-line')).toBe('5 of your 23 memorized pages were revised in 30 days ›');
   expect(shows(app, 'juz-tile-30')).toBe(true);
 
   // Its range is the list's: 7 days here, and the list says 7 days once Back comes to it.

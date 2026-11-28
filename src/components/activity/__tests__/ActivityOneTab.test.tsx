@@ -197,6 +197,7 @@ describe('[ACT-35] one Activity tab', () => {
     expect(screen.getByTestId('insights-range')).toHaveTextContent(/3 months/);
     screen.unmount();
     render(<ActivityBlocksViews {...props()} section="coverage" />);
-    expect(await screen.findByTestId('insights-coverage-figure')).toHaveTextContent(/3 months/);
+    // The range is in the line under Coverage's figure (ACT-38).
+    expect(await screen.findByTestId('insights-coverage-figure-line')).toHaveTextContent(/3 months/);
   });
 });
