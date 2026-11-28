@@ -76,7 +76,7 @@ import { gapsView } from '../../lib/insightsGaps';
 import { RecitationInsights } from './RecitationInsights';
 import { FirstSection, SectionAlone, useFirstSection, useSectionAlone } from './sectionPlace';
 import { SectionRow } from './SectionRow';
-import { ChartPills, LABELS_ALL_UP_TO, TapChart } from './TapChart';
+import { ChartPills, LABELS_ALL_UP_TO, MEM_CHART, TapChart } from './TapChart';
 import { consistencyRow, coverageRow, pagesRow, paceRow } from '../../lib/activityRowValues';
 import { DEFAULT_SECTIONS, sectionsToShow, type InsightsSection, type TabLayout } from '../../lib/activitySections';
 import { stillMarkedWords } from '../../lib/reciteInsights/insights';
@@ -1537,6 +1537,9 @@ function MemorizationUpgraded({ data, onOpenDay, onEditMemorized }: { data: Insi
             max={top}
             testID={`insights-memorization-bars-${unit}`}
             barTestID={(key) => `insights-memorization-bar-${key}`}
+            // MEM-12: never one block, by month 28 pt and 6 slots at least, by day 14 pt and 7.
+            maxBar={MEM_CHART[unit].maxBar}
+            minSlots={MEM_CHART[unit].minSlots}
           />
         </>
       ) : null}

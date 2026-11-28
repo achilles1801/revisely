@@ -44,6 +44,9 @@ export const LABELS_ALL_UP_TO = 10;
 export const MAX_BAR_WIDTH = 28;
 export const MIN_SLOTS = 7;
 
+/** Memorization's chart (MEM-12): a bar's widest and the fewest slots, by month and by day. */
+export const MEM_CHART = { month: { maxBar: 28, minSlots: 6 }, day: { maxBar: 14, minSlots: 7 } } as const;
+
 /** Where the bars go in `width` points: the slots, the gap between them, each slot's width and each bar's. */
 export function chartLayout(
   n: number,

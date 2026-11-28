@@ -195,7 +195,8 @@ it('[MEM-10] [MEM-12] Activity’s Memorization opens the memorized pages; its c
   await tap(app, 'insights-memorization-month');
   await app.until(() => has(app, 'insights-memorization-bars-month'), 'the months');
   expect(order(app, /^insights-memorization-bar-/)).toEqual(['insights-memorization-bar-2026-11']);
-  expect(app.screen.queryAllByTestId('memorization-slot-empty').length).toBe(2 * 5);
+  // Six month slots at least (MEM-12): the one month at the right, five empty before it (TapChart's `-slot-empty`).
+  expect(app.screen.queryAllByTestId('insights-memorization-bars-month-slot-empty').length).toBe(5);
 
   // By day: from Monday, the first day memorized, to today.
   await tap(app, 'insights-memorization-day');
