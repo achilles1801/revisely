@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   heroRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 6, rowGap: 4 },
   heroNumber: { fontSize: 34, lineHeight: 40, fontWeight: '700', letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
   heroUnit: { fontSize: 17, lineHeight: 22, flexShrink: 1 },
-  trend: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, marginStart: 4, alignSelf: 'center' },
+  trend: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, alignSelf: 'center' },
   trendText: { fontSize: 13, lineHeight: 18, fontWeight: '600', fontVariant: ['tabular-nums'] },
   line: { marginTop: 4 },
   card: { borderRadius: 16, padding: 14, marginTop: 16 },

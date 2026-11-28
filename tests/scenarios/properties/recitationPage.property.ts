@@ -215,8 +215,8 @@ describe('[ACT-44] whatever the page shows stays whole, on an SE and a Pro Max, 
           { takes: 1, pages: 1, mistakes: then, kinds: { words: then, hesitations: 0, slips: 0 } },
           'the month before',
         );
-        // Insights' pages' pill (InsightPageParts): a 12 pt arrow, 3 between, 8 inside each side, 4 before it.
-        const chipW = chip ? textWidth(chip.text, 'meta@13', scale) * WIDE + 12 + 3 + 16 + 4 : 0;
+        // Insights' pages' pill (InsightPageParts): a 12 pt arrow, 3 between, 8 inside each side.
+        const chipW = chip ? textWidth(chip.text, 'meta@13', scale) * WIDE + 12 + 3 + 16 : 0;
         for (const w of WIDTHS) {
           // The hero's row wraps when full (InsightHero): the pill goes under, then the words; each fits a line.
           expect(figure).toBeLessThanOrEqual(inner(w));
