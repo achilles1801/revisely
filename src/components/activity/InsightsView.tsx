@@ -69,7 +69,7 @@ import {
 } from '../../lib/coverageViews';
 import { PaceSheet } from './PaceSheet';
 import { AdviceButton, InsightAdvice, InsightCard, InsightHero, type Trend } from './InsightPageParts';
-import { coverageBefore, doneByWords, juzDoneBy, slippingJuz, slippingWords, strengthWeeks, weakCount, weakMostOften, weekBarLabel, weekName } from '../../lib/insightsPages';
+import { coverageBefore, doneByWords, juzDoneBy, quickestPart, slippingJuz, slippingWords, strengthWeeks, weakCount, weakMostOften, weekBarLabel, weekName, type DayPart } from '../../lib/insightsPages';
 import { GapsSection } from './GapsSection';
 import type { PushBack } from '../../lib/gapsCycle';
 import { gapsView } from '../../lib/insightsGaps';
@@ -1439,12 +1439,17 @@ function WeakSpots({
   );
 }
 
-/** Weeks a page's weekly chart shows: the range's, 4 at least and 26 at most (ACT-39). */
+/** Weeks a page's weekly chart shows: the range's, 4 at least and 26 at most (ACT-39, ACT-40). */
 const weeksOf = (window: number) => Math.min(26, Math.max(4, Math.ceil(window / 7)));
 
 /** A week of a weekly chart, ending `end`: "This week", or "Week of 3 Nov" by its first day. */
 /** Under a week's bar: its first day's number while every bar has a label (ACT-41), else "16 Nov" and "This wk". */
 const weekLabel = (end: string, today: string, bars: number) => weekBarLabel(end, today, bars <= LABELS_ALL_UP_TO);
+const shiftDays = (day: string, n: number) => {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
 
 /**
  * Weak spots' own page (ACT-39, Revisely Dev): from its point, "Which pages are weak now, and are they getting stronger?".
@@ -1886,6 +1891,7 @@ function Pace({ data, onOpenDay, row, last }: { data: InsightsData; onOpenDay?: 
   const range = span.window;
   // At large text Pace's two tiles stack, one above the other.
   const stacked = useWindowDimensions().fontScale >= STACK_AT_SCALE;
+  const alone = useSectionAlone();
   // "From 24 timed revisions ›" (i11): each one, as dots and a list.
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetUsed, setSheetUsed] = useState(false);
@@ -1908,6 +1914,33 @@ function Pace({ data, onOpenDay, row, last }: { data: InsightsData; onOpenDay?: 
         onPress={row}
         separator={!last}
         testID="insights-row-pace"
+      />
+    );
+  }
+  const sheet = sheetUsed ? (
+    <PaceSheet
+      visible={sheetOpen}
+      onClose={() => setSheetOpen(false)}
+      revised={data.revised}
+      today={data.today}
+      range={range}
+      inWords={span.inWords}
+      beforeWords={span.before}
+      perPage={p.perPage}
+      before={span.before ? p.before : null}
+      onOpenDay={onOpenDay}
+    />
+  ) : null;
+  if (alone) {
+    return (
+      <PacePage
+        data={data}
+        pace={p}
+        onShowTimed={() => {
+          setSheetUsed(true);
+          setSheetOpen(true);
+        }}
+        sheet={sheet}
       />
     );
   }
@@ -1949,20 +1982,92 @@ function Pace({ data, onOpenDay, row, last }: { data: InsightsData; onOpenDay?: 
             .join(' ')}
         </ChromeText>
       </Tap>
-      {sheetUsed ? (
-        <PaceSheet
-          visible={sheetOpen}
-          onClose={() => setSheetOpen(false)}
-          revised={data.revised}
-          today={data.today}
-          range={range}
-          inWords={span.inWords}
-          beforeWords={span.before}
-          perPage={p.perPage}
-          before={span.before ? p.before : null}
-          onOpenDay={onOpenDay}
+      {sheet}
+    </Section>
+  );
+}
+
+const QUICKEST: Record<DayPart, { title: () => string; when: () => string; icon: 'sunny-outline' | 'moon-outline' }> = {
+  dawn: { title: () => t('activity.insights.quickestDawn'), when: () => t('activity.insights.partDawn'), icon: 'sunny-outline' },
+  morning: { title: () => t('activity.insights.quickestMorning'), when: () => t('activity.insights.partMorning'), icon: 'sunny-outline' },
+  afternoon: { title: () => t('activity.insights.quickestAfternoon'), when: () => t('activity.insights.partAfternoon'), icon: 'sunny-outline' },
+  evening: { title: () => t('activity.insights.quickestEvening'), when: () => t('activity.insights.partEvening'), icon: 'moon-outline' },
+  night: { title: () => t('activity.insights.quickestNight'), when: () => t('activity.insights.partNight'), icon: 'moon-outline' },
+};
+
+/**
+ * Pace's own page (ACT-40, Revisely Dev): from its point, "Am I getting quicker, and when am I sharpest?". Minutes a page
+ * with its trend against the same length before (down is better), its timed revisions as the line under it (opening each
+ * one, ACT-23), minutes a page week by week (a tap picks a week), and the part of the day they're quickest.
+ */
+function PacePage({ data, pace, onShowTimed, sheet }: { data: InsightsData; pace: NonNullable<ReturnType<typeof paceView>>; onShowTimed: () => void; sheet: React.ReactNode }) {
+  const { palette } = useTheme();
+  const [picked, setPicked] = useState<string | null>(null);
+  const span = rangeSpan(data.range ?? 30, data.today, data.firstDay);
+  const own = useMemo(() => data.revised.filter((r) => r.day === r.countsFor), [data.revised]);
+  const weeks = useMemo(() => {
+    const n = weeksOf(span.window);
+    return weeklyPace(own, data.today, n).map((v, i, all) => ({ end: shiftDays(data.today, -7 * (all.length - 1 - i)), perPage: v }));
+  }, [own, data.today, span.window]);
+  const quick = useMemo(() => quickestPart(own, data.today, span.window), [own, data.today, span.window]);
+  const before = span.before ? pace.before : null;
+  const trend: Trend | null =
+    before == null || formatPace(before) === formatPace(pace.perPage)
+      ? null
+      : {
+          text: t('activity.insights.trendFrom', { value: formatPace(before) }),
+          up: pace.perPage > before,
+          good: pace.perPage < before,
+          label: t(pace.perPage > before ? 'activity.insights.trendUp' : 'activity.insights.trendDown', { value: formatPace(before), before: span.before ?? '' }),
+        };
+  const shown = weeks.find((w) => w.end === picked) ?? weeks[weeks.length - 1];
+  const weekLine = (w: { end: string; perPage: number | null }) =>
+    w.perPage == null
+      ? t('activity.insights.paceWeekNone', { week: weekName(w.end, data.today) })
+      : t('activity.insights.paceWeek', { week: weekName(w.end, data.today), pace: formatPace(w.perPage) });
+  return (
+    <Section title={t('activity.insights.pace')} detail="" testID="insights-pace">
+      <InsightHero
+        value={formatPace(pace.perPage)}
+        unit={t('activity.insights.minAPage')}
+        trend={trend}
+        line={
+          span.before
+            ? t('activity.insights.paceLine', { count: pace.revisions, before: span.before })
+            : t('activity.insights.paceLineAll', { count: pace.revisions, span: span.inWords })
+        }
+        onPressLine={onShowTimed}
+        lineHint={t('activity.insights.showsTimed')}
+        testID="insights-pace-figure"
+      />
+      <InsightCard title={t('activity.insights.paceTitle')} hint={t('activity.insights.tapAWeek')} testID="insights-pace-card">
+        {shown ? (
+          <ChromeText style={[typeV2.name, styles.chartLine, { color: palette.text }]} testID="insights-pace-week">
+            {weekLine(shown)}
+          </ChromeText>
+        ) : null}
+        <TapChart
+          bars={weeks.map((w) => ({ key: w.end, value: w.perPage ?? 0, label: weekLabel(w.end, data.today, weeks.length), spoken: weekLine(w) }))}
+          picked={picked}
+          onPick={setPicked}
+          colours={[palette.heat[2]]}
+          testID="insights-pace-chart"
+        />
+      </InsightCard>
+      {quick ? (
+        <InsightAdvice
+          icon={QUICKEST[quick.quickest.part].icon}
+          title={QUICKEST[quick.quickest.part].title()}
+          detail={t('activity.insights.quickestDetail', {
+            fast: formatPace(quick.quickest.perPage),
+            fastWhen: QUICKEST[quick.quickest.part].when(),
+            slow: formatPace(quick.slowest.perPage),
+            slowWhen: QUICKEST[quick.slowest.part].when(),
+          })}
+          testID="insights-pace-quickest"
         />
       ) : null}
+      {sheet}
     </Section>
   );
 }
@@ -2060,7 +2165,7 @@ const styles = StyleSheet.create({
   footnote: { marginTop: 10 },
   footnoteTap: { flexDirection: 'row', marginTop: 10, paddingVertical: 4 },
   weekByWeek: { marginTop: 12, gap: 6 },
-  // Insights' own pages (ACT-39): the chart's line, the week shown, under the card's title.
+  // Insights' own pages (ACT-39, ACT-40): the chart's line, the week shown, under the card's title.
   chartLine: { marginTop: 8 },
   reviseDone: { marginTop: 16, alignItems: 'flex-start' },
   weekLine: { height: 40 },
