@@ -1,10 +1,14 @@
 // screens/onboarding and components/onboarding: the welcome, then one question a screen.
 export const onboarding = {
   welcome: {
-    /** "Your Quran, remembered." with "remembered" in the accent, on a new line. */
-    title: 'Your Quran,',
-    accent: 'remembered',
-    body: 'Revise what you have memorized, a little every day.',
+    /** The app's line (`common.slogan`), "Even one verse counts.", with "counts." in the accent, on a new line. */
+    title: 'Even one verse',
+    accent: 'counts.',
+    /**
+     * Majd, Nov 27 2026: "the MAIN goal of revisely is for people to establish a connection with the quran ... even if it
+     * means reading one verse or one translation that it brings u closer to the quran".
+     */
+    body: 'Read, revise or understand a verse a day, and come closer to the Qur’an.',
     begin: 'Begin',
     note: 'Takes under a minute',
   },

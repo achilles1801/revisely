@@ -65,7 +65,6 @@ export default function WelcomeScreen() {
             <Text style={{ color: palette.accentText }} testID="welcome-accent">
               {t('onboarding.welcome.accent')}
             </Text>
-            .
           </Text>
           <Text style={[typeV2.menu, styles.body, { color: palette.secondary }]} maxFontSizeMultiplier={1.6}>
             {t('onboarding.welcome.body')}
@@ -89,7 +88,7 @@ const styles = StyleSheet.create({
   top: { alignItems: 'center' },
   middle: { flex: 1, justifyContent: 'center', paddingVertical: 32 },
   headline: { fontSize: 36, lineHeight: 42, fontWeight: '700', letterSpacing: -0.8 },
-  // Narrow enough to break after the comma on every phone.
+  // A short measure, so the line under the slogan reads as two or three even lines on every phone.
   body: { marginTop: 12, maxWidth: 270, lineHeight: 24 },
   foot: { paddingHorizontal: layoutV2.gutter, paddingTop: 8, paddingBottom: 16, gap: 10 },
   note: { textAlign: 'center' },

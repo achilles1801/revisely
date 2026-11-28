@@ -2,6 +2,12 @@
 // somewhere ("Done" as a status, not a button) gets its own key in that folder's file.
 export const common = {
   back: 'Back',
+  /**
+   * The app's line (Majd, Nov 27 2026: "yes lock it in"), on the welcome screens. "Qur’an" with the apostrophe in headlines
+   * and around the line; "Quran" only in store keywords. Onboarding's welcome splits it into `onboarding.welcome.title` and
+   * `.accent`, which must read the same (OnboardingScreens.v2.test).
+   */
+  slogan: 'Even one verse counts.',
   /** Anything memorized under 1% of the Qur'an (Majd, Nov 27 2026: "should just be under 1%, i feel like decimal under 1 is too demotivating"). */
   underOnePercent: 'under 1%',
   cancel: 'Cancel',
