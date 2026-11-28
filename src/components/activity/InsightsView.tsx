@@ -13,6 +13,7 @@ import { Tap } from '../v2/Tap';
 import { AddToPlanLink } from './AddToPlanLink';
 import { layoutV2, typeV2 } from '../../theme/v2';
 import { lastRevisedByPage } from '../../lib/activityInsights';
+import { shiftMonth } from '../../lib/activityHeatmap';
 import {
   busiestHours,
   coverageCount,
@@ -1535,6 +1536,7 @@ function WeakSpotsPage({
           onPick={setPicked}
           colours={[palette.red, palette.warn]}
           testID="insights-weak-chart"
+          slotLabel={(before) => weekLabel(shiftDays(weeks[0].end, -7 * before), data.today, weeks.length)}
         />
         <View style={styles.legend}>
           {[
@@ -1702,6 +1704,10 @@ function MemorizationUpgraded({ data, onOpenDay, onEditMemorized }: { data: Insi
             // MEM-12: never one block, by month 28 pt and 6 slots at least, by day 14 pt and 7.
             maxBar={MEM_CHART[unit].maxBar}
             minSlots={MEM_CHART[unit].minSlots}
+            // The first slot before the first month or day (ACT-41): the month, or the day's number, it stands for.
+            slotLabel={(before) =>
+              unit === 'month' ? monthLabel(shiftMonth(series[0].key, -before), true) : formatNumber(Number(shiftDays(series[0].key, -before).slice(8)))
+            }
           />
         </>
       ) : null}
@@ -2070,6 +2076,7 @@ function PacePage({ data, pace, onShowTimed, sheet }: { data: InsightsData; pace
           onPick={setPicked}
           colours={[palette.heat[2]]}
           testID="insights-pace-chart"
+          slotLabel={(before) => weekLabel(shiftDays(weeks[0].end, -7 * before), data.today, weeks.length)}
         />
       </InsightCard>
       {quick ? (
