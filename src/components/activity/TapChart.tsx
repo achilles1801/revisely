@@ -161,7 +161,9 @@ export function ChartPills<K extends string>({
   testID: string;
 }) {
   return (
-    <View style={styles.pills} testID={testID}>
+    // The row's own id is `${testID}-pills`: `testID` is often the section's own (insights-memorization), and two
+    // elements with one id break a lookup by it.
+    <View style={styles.pills} testID={`${testID}-pills`}>
       {options.map((o) => (
         <PillButton key={o.key} title={o.label} size="sm" variant={o.key === value ? 'solid' : 'outline'} onPress={() => onChange(o.key)} testID={`${testID}-${o.key}`} />
       ))}
